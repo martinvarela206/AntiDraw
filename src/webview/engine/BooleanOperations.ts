@@ -1,69 +1,285 @@
-import { VectorElement, PathVertex } from './VectorModel.js';
+import polygonClipping, { MultiPolygon, Polygon, Ring, Pair } from 'polygon-clipping';
+import { VectorElement, PathVertex, VectorModel } from './VectorModel.js';
+
+export interface TrimResult {
+  trimmed: VectorElement;
+  targetId: string;
+  cutterId: string;
+}
 
 export class BooleanOperations {
-  // Combine multiple selected paths into a single path element
-  public static combine(elements: VectorElement[]): VectorElement | null {
-    if (!elements || elements.length === 0) return null;
+  // Sample a cubic Bezier curve into line segments
+  private static sampleBezier(
+    p1: { x: number; y: number },
+    h1: { x: number; y: number },
+    h2: { x: number; y: number },
+    p2: { x: number; y: number },
+    steps: number = 24
+  ): Pair[] {
+    const pts: Pair[] = [];
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      const inv = 1 - t;
+      const x =
+        inv * inv * inv * p1.x +
+        3 * inv * inv * t * h1.x +
+        3 * inv * t * t * h2.x +
+        t * t * t * p2.x;
+      const y =
+        inv * inv * inv * p1.y +
+        3 * inv * inv * t * h1.y +
+        3 * inv * t * t * h2.y +
+        t * t * t * p2.y;
+      pts.push([x, y]);
+    }
+    return pts;
+  }
 
-    const baseEl = elements[0];
-    const combinedVertices: PathVertex[] = [];
+  // Convert a VectorElement into polygon-clipping MultiPolygon
+  private static elementToGeom(el: VectorElement): MultiPolygon {
+    if (!el.vertices || el.vertices.length < 3) return [];
 
-    elements.forEach((el) => {
-      if (el.vertices) {
-        combinedVertices.push(...el.vertices);
+    // Group vertices by subpaths (each subpath starts with 'M' or index 0)
+    const subpaths: PathVertex[][] = [];
+    let currentSubpath: PathVertex[] = [];
+
+    for (let i = 0; i < el.vertices.length; i++) {
+      const v = el.vertices[i];
+      if ((v.command === 'M' || i === 0) && currentSubpath.length > 0) {
+        subpaths.push(currentSubpath);
+        currentSubpath = [];
       }
+      currentSubpath.push(v);
+    }
+    if (currentSubpath.length > 0) {
+      subpaths.push(currentSubpath);
+    }
+
+    const polygons: Polygon[] = [];
+
+    for (const sp of subpaths) {
+      if (sp.length < 3) continue;
+      const ring: Ring = [];
+
+      for (let i = 0; i < sp.length; i++) {
+        const v = sp[i];
+        const nextV = sp[(i + 1) % sp.length];
+
+        ring.push([v.x, v.y]);
+
+        if (v.handleOut || nextV.handleIn) {
+          const h1 = v.handleOut || { x: v.x, y: v.y };
+          const h2 = nextV.handleIn || { x: nextV.x, y: nextV.y };
+          const sampled = this.sampleBezier(v, h1, h2, nextV, 24);
+          // sampleBezier ends at nextV; push intermediate points
+          for (let j = 0; j < sampled.length - 1; j++) {
+            ring.push(sampled[j]);
+          }
+        }
+      }
+
+      // Close ring for polygon-clipping: first point must equal last point
+      if (ring.length >= 3) {
+        const first = ring[0];
+        const last = ring[ring.length - 1];
+        if (Math.hypot(first[0] - last[0], first[1] - last[1]) > 0.001) {
+          ring.push([first[0], first[1]]);
+        }
+        polygons.push([ring]);
+      }
+    }
+
+    return polygons;
+  }
+
+  // Convert a MultiPolygon back into a VectorElement with vertices and SVG path d
+  private static multiPolygonToElement(
+    mp: MultiPolygon,
+    id: string,
+    baseAttrs: Record<string, string>,
+    model: VectorModel
+  ): VectorElement | null {
+    if (!mp || mp.length === 0) return null;
+
+    const vertices: PathVertex[] = [];
+
+    mp.forEach((polygon) => {
+      polygon.forEach((ring) => {
+        if (ring.length < 3) return;
+
+        // Simplify consecutive duplicate points
+        const cleanRing: Pair[] = [];
+        for (let i = 0; i < ring.length; i++) {
+          const pt = ring[i];
+          if (
+            cleanRing.length === 0 ||
+            Math.hypot(pt[0] - cleanRing[cleanRing.length - 1][0], pt[1] - cleanRing[cleanRing.length - 1][1]) > 0.05
+          ) {
+            cleanRing.push(pt);
+          }
+        }
+
+        // Drop the closing duplicate point for path vertices
+        if (cleanRing.length >= 3) {
+          const first = cleanRing[0];
+          const last = cleanRing[cleanRing.length - 1];
+          if (Math.hypot(first[0] - last[0], first[1] - last[1]) < 0.05) {
+            cleanRing.pop();
+          }
+        }
+
+        if (cleanRing.length < 3) return;
+
+        cleanRing.forEach((pt, idx) => {
+          vertices.push({
+            id: `v_${Date.now().toString(36)}_${vertices.length}`,
+            x: Math.round(pt[0] * 100) / 100,
+            y: Math.round(pt[1] * 100) / 100,
+            command: idx === 0 ? 'M' : 'L',
+            nodeType: 'asymmetric',
+          });
+        });
+      });
     });
 
-    const fill = baseEl.attributes.fill || '#4f46e5';
-    const stroke = baseEl.attributes.stroke || '#ffffff';
+    if (vertices.length === 0) return null;
 
+    const d = model.compilePathD(vertices, true);
     return {
-      id: `combined_${Date.now().toString(36)}`,
+      id,
       tagName: 'path',
       attributes: {
-        ...baseEl.attributes,
-        id: `combined_${Date.now().toString(36)}`,
-        fill,
-        stroke,
+        ...baseAttrs,
+        id,
+        d,
         'fill-rule': 'evenodd',
+        'data-node-types': vertices.map((v) => v.nodeType).join(','),
       },
-      vertices: combinedVertices,
+      vertices,
       isClosed: true,
     };
   }
 
-  // Perform Union operation on vectors
-  public static union(el1: VectorElement, el2: VectorElement): VectorElement {
-    const combined = this.combine([el1, el2])!;
-    combined.attributes['fill-rule'] = 'nonzero';
-    return combined;
+  // Join (Union / Weld): Combines all selected vector shapes into a single unified outline
+  public static union(elements: VectorElement[], model: VectorModel): VectorElement | null {
+    if (!elements || elements.length === 0) return null;
+    if (elements.length === 1) return elements[0];
+
+    const geoms: MultiPolygon[] = elements.map((el) => this.elementToGeom(el)).filter((g) => g.length > 0);
+    if (geoms.length === 0) return null;
+
+    let result = geoms[0];
+    for (let i = 1; i < geoms.length; i++) {
+      result = polygonClipping.union(result, geoms[i]);
+    }
+
+    const id = `union_${Date.now().toString(36)}`;
+    return this.multiPolygonToElement(result, id, elements[0].attributes, model);
   }
 
-  // Perform Subtract (Difference) operation on vectors
-  public static subtract(el1: VectorElement, el2: VectorElement): VectorElement {
-    const combined = this.combine([el1, el2])!;
-    combined.attributes['fill-rule'] = 'evenodd';
-    return combined;
+  // Minus (Trim / Resta): The first selected vector (cutter) trims the last selected vector (target).
+  // Cutter is retained in document, target is replaced with trimmed shape.
+  public static subtract(elements: VectorElement[], model: VectorModel): TrimResult | null {
+    if (!elements || elements.length < 2) return null;
+
+    const cutterEl = elements[0];
+    const targetEl = elements[elements.length - 1];
+
+    const cutterGeom = this.elementToGeom(cutterEl);
+    const targetGeom = this.elementToGeom(targetEl);
+
+    if (cutterGeom.length === 0 || targetGeom.length === 0) return null;
+
+    const trimmedMp = polygonClipping.difference(targetGeom, cutterGeom);
+    const id = `trimmed_${Date.now().toString(36)}`;
+    const trimmedEl = this.multiPolygonToElement(trimmedMp, id, targetEl.attributes, model);
+    if (!trimmedEl) return null;
+
+    return {
+      trimmed: trimmedEl,
+      targetId: targetEl.id,
+      cutterId: cutterEl.id,
+    };
   }
 
-  // Perform Intersect operation on vectors
-  public static intersect(el1: VectorElement, el2: VectorElement): VectorElement {
-    const combined = this.combine([el1, el2])!;
-    combined.attributes['fill-rule'] = 'evenodd';
-    return combined;
+  // Intersect: Retains only the overlapping region between shapes
+  public static intersect(elements: VectorElement[], model: VectorModel): VectorElement | null {
+    if (!elements || elements.length < 2) return null;
+
+    const geoms: MultiPolygon[] = elements.map((el) => this.elementToGeom(el)).filter((g) => g.length > 0);
+    if (geoms.length < 2) return null;
+
+    let result = geoms[0];
+    for (let i = 1; i < geoms.length; i++) {
+      result = polygonClipping.intersection(result, geoms[i]);
+    }
+
+    const id = `intersect_${Date.now().toString(36)}`;
+    return this.multiPolygonToElement(result, id, elements[0].attributes, model);
   }
 
-  // Perform Exclude (XOR) operation on vectors
-  public static exclude(el1: VectorElement, el2: VectorElement): VectorElement {
-    const combined = this.combine([el1, el2])!;
-    combined.attributes['fill-rule'] = 'evenodd';
-    return combined;
+  // Exclusion (XOR): Retains only non-overlapping regions
+  public static exclude(elements: VectorElement[], model: VectorModel): VectorElement | null {
+    if (!elements || elements.length < 2) return null;
+
+    const geoms: MultiPolygon[] = elements.map((el) => this.elementToGeom(el)).filter((g) => g.length > 0);
+    if (geoms.length < 2) return null;
+
+    let result = geoms[0];
+    for (let i = 1; i < geoms.length; i++) {
+      result = polygonClipping.xor(result, geoms[i]);
+    }
+
+    const id = `exclude_${Date.now().toString(36)}`;
+    return this.multiPolygonToElement(result, id, elements[0].attributes, model);
+  }
+
+  // Fragment / Divide: Produces intersection and exclusion shapes simultaneously
+  public static fragment(elements: VectorElement[], model: VectorModel): VectorElement[] | null {
+    if (!elements || elements.length < 2) return null;
+
+    const el1 = elements[0];
+    const el2 = elements[1];
+
+    const geom1 = this.elementToGeom(el1);
+    const geom2 = this.elementToGeom(el2);
+    if (geom1.length === 0 || geom2.length === 0) return null;
+
+    const mpIntersect = polygonClipping.intersection(geom1, geom2);
+    const mpExclude = polygonClipping.xor(geom1, geom2);
+
+    const idInt = `frag_int_${Date.now().toString(36)}`;
+    const idExc = `frag_exc_${Date.now().toString(36)}`;
+
+    const elInt = this.multiPolygonToElement(
+      mpIntersect,
+      idInt,
+      { ...el1.attributes, fill: el1.attributes.fill || '#6366f1' },
+      model
+    );
+    const elExc = this.multiPolygonToElement(
+      mpExclude,
+      idExc,
+      { ...el2.attributes, fill: el2.attributes.fill || '#ec4899' },
+      model
+    );
+
+    const result: VectorElement[] = [];
+    if (elInt) result.push(elInt);
+    if (elExc) result.push(elExc);
+
+    return result.length > 0 ? result : null;
   }
 
   // Helper to get element bounding box
-  private static getElementBox(el: VectorElement): { minX: number; minY: number; maxX: number; maxY: number; cx: number; cy: number } | null {
+  private static getElementBox(
+    el: VectorElement
+  ): { minX: number; minY: number; maxX: number; maxY: number; cx: number; cy: number } | null {
     if (!el.vertices || el.vertices.length === 0) return null;
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity;
     el.vertices.forEach((v) => {
       minX = Math.min(minX, v.x);
       minY = Math.min(minY, v.y);

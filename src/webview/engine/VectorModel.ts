@@ -212,18 +212,13 @@ export class VectorModel {
         curX = x;
         curY = y;
 
-        // If closing segment L back to first vertex, don't duplicate
-        if (vertices.length > 2 && Math.hypot(curX - vertices[0].x, curY - vertices[0].y) < 0.01) {
-          // Closed back to start
-        } else {
-          vertices.push({
-            id: `v_${vIndex++}`,
-            x,
-            y,
-            nodeType: 'asymmetric',
-            command: cmdUpper as 'M' | 'L',
-          });
-        }
+        vertices.push({
+          id: `v_${vIndex++}`,
+          x,
+          y,
+          nodeType: 'asymmetric',
+          command: cmdUpper as 'M' | 'L',
+        });
       } else if (cmdUpper === 'H') {
         if (i >= tokens.length) break;
         let x = tokens[i] as number;
@@ -274,19 +269,14 @@ export class VectorModel {
         curX = x;
         curY = y;
 
-        // If closing segment C back to first vertex, set handleIn on first vertex
-        if (vertices.length > 2 && Math.hypot(curX - vertices[0].x, curY - vertices[0].y) < 0.01) {
-          vertices[0].handleIn = { x: x2, y: y2 };
-        } else {
-          vertices.push({
-            id: `v_${vIndex++}`,
-            x,
-            y,
-            handleIn: { x: x2, y: y2 },
-            nodeType: 'asymmetric',
-            command: 'C',
-          });
-        }
+        vertices.push({
+          id: `v_${vIndex++}`,
+          x,
+          y,
+          handleIn: { x: x2, y: y2 },
+          nodeType: 'asymmetric',
+          command: 'C',
+        });
       } else if (cmdUpper === 'S') {
         if (i + 3 >= tokens.length) break;
         let x2 = tokens[i] as number;
@@ -314,32 +304,18 @@ export class VectorModel {
         curX = x;
         curY = y;
 
-        if (vertices.length > 2 && Math.hypot(curX - vertices[0].x, curY - vertices[0].y) < 0.01) {
-          vertices[0].handleIn = { x: x2, y: y2 };
-        } else {
-          vertices.push({
-            id: `v_${vIndex++}`,
-            x,
-            y,
-            handleIn: { x: x2, y: y2 },
-            nodeType: 'asymmetric',
-            command: 'C',
-          });
-        }
+        vertices.push({
+          id: `v_${vIndex++}`,
+          x,
+          y,
+          handleIn: { x: x2, y: y2 },
+          nodeType: 'asymmetric',
+          command: 'C',
+        });
       } else if (cmdUpper === 'Z') {
         // Closing command
       } else {
         i++;
-      }
-    }
-
-    // Filter out trailing redundant vertex that duplicates start vertex
-    if (vertices.length > 1) {
-      const first = vertices[0];
-      const last = vertices[vertices.length - 1];
-      if (Math.hypot(first.x - last.x, first.y - last.y) < 0.01) {
-        if (last.handleIn) first.handleIn = last.handleIn;
-        vertices.pop();
       }
     }
 
@@ -357,41 +333,60 @@ export class VectorModel {
     return vertices;
   }
 
-  // Convert vertices back into SVG 'd' string with proper closing Bézier curves
+  // Convert vertices back into SVG 'd' string with proper per-subpath closing and Bézier curves
   public compilePathD(vertices: PathVertex[], isClosed?: boolean): string {
     if (!vertices || vertices.length === 0) return '';
-    let d = '';
+
+    // Group vertices by subpath (each subpath begins with command 'M' or first vertex)
+    const subpaths: PathVertex[][] = [];
+    let currentSubpath: PathVertex[] = [];
 
     for (let i = 0; i < vertices.length; i++) {
       const v = vertices[i];
-      if (i === 0) {
-        d += `M ${formatNum(v.x)} ${formatNum(v.y)}`;
-      } else {
-        const prev = vertices[i - 1];
+      if ((v.command === 'M' || i === 0) && currentSubpath.length > 0) {
+        subpaths.push(currentSubpath);
+        currentSubpath = [];
+      }
+      currentSubpath.push(v);
+    }
+    if (currentSubpath.length > 0) {
+      subpaths.push(currentSubpath);
+    }
+
+    const dParts: string[] = [];
+
+    for (const sp of subpaths) {
+      if (sp.length === 0) continue;
+      let spD = `M ${formatNum(sp[0].x)} ${formatNum(sp[0].y)}`;
+
+      for (let i = 1; i < sp.length; i++) {
+        const v = sp[i];
+        const prev = sp[i - 1];
         if (prev.handleOut || v.handleIn) {
           const h1 = prev.handleOut || { x: prev.x, y: prev.y };
           const h2 = v.handleIn || { x: v.x, y: v.y };
-          d += ` C ${formatNum(h1.x)} ${formatNum(h1.y)} ${formatNum(h2.x)} ${formatNum(h2.y)} ${formatNum(v.x)} ${formatNum(v.y)}`;
+          spD += ` C ${formatNum(h1.x)} ${formatNum(h1.y)} ${formatNum(h2.x)} ${formatNum(h2.y)} ${formatNum(v.x)} ${formatNum(v.y)}`;
         } else {
-          d += ` L ${formatNum(v.x)} ${formatNum(v.y)}`;
+          spD += ` L ${formatNum(v.x)} ${formatNum(v.y)}`;
         }
       }
-    }
 
-    // Properly close path loop
-    if (isClosed && vertices.length > 1) {
-      const first = vertices[0];
-      const last = vertices[vertices.length - 1];
-      if (last.handleOut || first.handleIn) {
-        const h1 = last.handleOut || { x: last.x, y: last.y };
-        const h2 = first.handleIn || { x: first.x, y: first.y };
-        d += ` C ${formatNum(h1.x)} ${formatNum(h1.y)} ${formatNum(h2.x)} ${formatNum(h2.y)} ${formatNum(first.x)} ${formatNum(first.y)} Z`;
-      } else {
-        d += ' Z';
+      if (isClosed && sp.length > 1) {
+        const first = sp[0];
+        const last = sp[sp.length - 1];
+        if (last.handleOut || first.handleIn) {
+          const h1 = last.handleOut || { x: last.x, y: last.y };
+          const h2 = first.handleIn || { x: first.x, y: first.y };
+          spD += ` C ${formatNum(h1.x)} ${formatNum(h1.y)} ${formatNum(h2.x)} ${formatNum(h2.y)} ${formatNum(first.x)} ${formatNum(first.y)} Z`;
+        } else {
+          spD += ' Z';
+        }
       }
+
+      dParts.push(spD);
     }
 
-    return d;
+    return dParts.join(' ');
   }
 
   // Convert shape tags (rect, circle, ellipse, star, line, polygon) to path vertices

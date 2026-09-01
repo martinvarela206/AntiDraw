@@ -1434,24 +1434,79 @@ class AntiDrawApp {
     }
   }
 
-  private handleBoolean(op: 'union' | 'subtract' | 'intersect' | 'exclude' | 'combine'): void {
-    const selectedEls = this.model.elements.filter((el) => this.selectionTool.isSelected(el.id));
+  private handleBoolean(op: 'union' | 'subtract' | 'intersect' | 'exclude' | 'combine' | 'fragment'): void {
+    const selectedIds = Array.from(this.selectionTool.selectedElementIds);
+    const selectedEls: VectorElement[] = [];
+    selectedIds.forEach((id) => {
+      const el = this.model.elements.find((e) => e.id === id);
+      if (el) selectedEls.push(el);
+    });
+
     if (selectedEls.length < 2) return;
 
-    let result: VectorElement | null = null;
-    if (op === 'union') result = BooleanOperations.union(selectedEls[0], selectedEls[1]);
-    if (op === 'subtract') result = BooleanOperations.subtract(selectedEls[0], selectedEls[1]);
-    if (op === 'intersect') result = BooleanOperations.intersect(selectedEls[0], selectedEls[1]);
-    if (op === 'exclude') result = BooleanOperations.exclude(selectedEls[0], selectedEls[1]);
-    if (op === 'combine') result = BooleanOperations.combine(selectedEls);
-
-    if (result) {
-      const removeIds = new Set(selectedEls.map((e) => e.id));
-      this.model.elements = this.model.elements.filter((e) => !removeIds.has(e.id));
-      this.model.elements.push(result);
-      this.selectionTool.select(result.id);
-      this.render();
-      this.syncToHost();
+    if (op === 'union') {
+      const result = BooleanOperations.union(selectedEls, this.model);
+      if (result) {
+        const removeIds = new Set(selectedEls.map((e) => e.id));
+        this.model.elements = this.model.elements.filter((e) => !removeIds.has(e.id));
+        this.model.elements.push(result);
+        this.selectionTool.select(result.id);
+        this.render();
+        this.syncToHost();
+      }
+    } else if (op === 'subtract') {
+      // 1st selected vector cuts the last selected vector; cutter is NOT deleted
+      const trimRes = BooleanOperations.subtract(selectedEls, this.model);
+      if (trimRes) {
+        const targetIdx = this.model.elements.findIndex((e) => e.id === trimRes.targetId);
+        if (targetIdx >= 0) {
+          this.model.elements[targetIdx] = trimRes.trimmed;
+        }
+        this.selectionTool.select(trimRes.trimmed.id);
+        this.render();
+        this.syncToHost();
+      }
+    } else if (op === 'intersect') {
+      const result = BooleanOperations.intersect(selectedEls, this.model);
+      if (result) {
+        const removeIds = new Set(selectedEls.map((e) => e.id));
+        this.model.elements = this.model.elements.filter((e) => !removeIds.has(e.id));
+        this.model.elements.push(result);
+        this.selectionTool.select(result.id);
+        this.render();
+        this.syncToHost();
+      }
+    } else if (op === 'exclude') {
+      const result = BooleanOperations.exclude(selectedEls, this.model);
+      if (result) {
+        const removeIds = new Set(selectedEls.map((e) => e.id));
+        this.model.elements = this.model.elements.filter((e) => !removeIds.has(e.id));
+        this.model.elements.push(result);
+        this.selectionTool.select(result.id);
+        this.render();
+        this.syncToHost();
+      }
+    } else if (op === 'combine') {
+      // Union / Boundary while retaining source objects
+      const result = BooleanOperations.union(selectedEls, this.model);
+      if (result) {
+        this.model.elements.push(result);
+        this.selectionTool.select(result.id);
+        this.render();
+        this.syncToHost();
+      }
+    } else if (op === 'fragment') {
+      // Divide into intersection + exclusion simultaneously, removing originals
+      const frags = BooleanOperations.fragment(selectedEls, this.model);
+      if (frags && frags.length > 0) {
+        const removeIds = new Set(selectedEls.map((e) => e.id));
+        this.model.elements = this.model.elements.filter((e) => !removeIds.has(e.id));
+        frags.forEach((f) => this.model.elements.push(f));
+        this.selectionTool.deselectAll();
+        frags.forEach((f) => this.selectionTool.selectedElementIds.add(f.id));
+        this.render();
+        this.syncToHost();
+      }
     }
   }
 

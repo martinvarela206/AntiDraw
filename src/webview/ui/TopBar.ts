@@ -3,7 +3,7 @@ import { CanvasManager } from '../engine/CanvasManager.js';
 
 export interface TopBarCallbacks {
   onAlign: (type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => void;
-  onBoolean: (op: 'union' | 'subtract' | 'intersect' | 'exclude' | 'combine') => void;
+  onBoolean: (op: 'union' | 'subtract' | 'intersect' | 'exclude' | 'combine' | 'fragment') => void;
   onZOrder: (action: 'front' | 'forward' | 'backward' | 'back') => void;
   onToggleGrid: () => void;
   onToggleGuides: () => void;
@@ -42,11 +42,12 @@ export class TopBar {
 
       <!-- Boolean Operations -->
       <div class="top-bar-group">
-        <button class="btn-icon" id="btn-bool-union" title="Union (Add Shapes)">${ToolIcons.union}</button>
-        <button class="btn-icon" id="btn-bool-subtract" title="Subtract (Subtract Front)">${ToolIcons.subtract}</button>
-        <button class="btn-icon" id="btn-bool-intersect" title="Intersect">${ToolIcons.intersect}</button>
-        <button class="btn-icon" id="btn-bool-exclude" title="Exclude (XOR)">${ToolIcons.exclude}</button>
-        <button class="btn-icon" id="btn-bool-combine" title="Combine Paths">${ToolIcons.combine}</button>
+        <button class="btn-icon" id="btn-bool-union" title="Weld / Union (Soldar formas)">${ToolIcons.union}</button>
+        <button class="btn-icon" id="btn-bool-subtract" title="Trim / Minus (1° corta al último, conserva cortador)">${ToolIcons.subtract}</button>
+        <button class="btn-icon" id="btn-bool-intersect" title="Intersect (Intersección)">${ToolIcons.intersect}</button>
+        <button class="btn-icon" id="btn-bool-exclude" title="Exclusion / XOR (Exclusión)">${ToolIcons.exclude}</button>
+        <button class="btn-icon" id="btn-bool-combine" title="Boundary / Weld Retaining Sources (Unir conservando originales)">${ToolIcons.combine}</button>
+        <button class="btn-icon" id="btn-bool-fragment" title="Divide / Fragment (Intersección y exclusión a la vez)">${ToolIcons.fragment}</button>
       </div>
 
       <div class="top-bar-divider"></div>
@@ -84,6 +85,7 @@ export class TopBar {
     this.bindClick('btn-bool-intersect', () => this.callbacks.onBoolean('intersect'));
     this.bindClick('btn-bool-exclude', () => this.callbacks.onBoolean('exclude'));
     this.bindClick('btn-bool-combine', () => this.callbacks.onBoolean('combine'));
+    this.bindClick('btn-bool-fragment', () => this.callbacks.onBoolean('fragment'));
 
     this.bindClick('btn-z-front', () => this.callbacks.onZOrder('front'));
     this.bindClick('btn-z-forward', () => this.callbacks.onZOrder('forward'));

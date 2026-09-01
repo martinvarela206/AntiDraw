@@ -115,6 +115,12 @@ export const ToolIcons = {
     <circle cx="15" cy="15" r="6"/>
   </svg>`,
 
+  fragment: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+    <rect x="3" y="3" width="8" height="8" rx="1" fill="currentColor" fill-opacity="0.3"/>
+    <rect x="13" y="13" width="8" height="8" rx="1" fill="currentColor" fill-opacity="0.3"/>
+    <rect x="8" y="8" width="8" height="8" rx="1" fill="currentColor"/>
+  </svg>`,
+
   // Alignments
   alignLeft: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="2" x2="4" y2="22"/><rect x="8" y="5" width="12" height="5" rx="1"/><rect x="8" y="14" width="8" height="5" rx="1"/></svg>`,
   alignCenter: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="2" x2="12" y2="22"/><rect x="6" y="5" width="12" height="5" rx="1"/><rect x="8" y="14" width="8" height="5" rx="1"/></svg>`,
