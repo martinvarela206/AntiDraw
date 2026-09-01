@@ -55,6 +55,7 @@ class AntiDrawApp {
   private initialVertices: PathVertex[] = [];
   private initialElementsMap: Map<string, PathVertex[]> = new Map();
   private initialBox: any = null;
+  private dragAnchorPt: Point = { x: 0, y: 0 };
 
   // Guide dragging state
   private dragGuideOrientation: 'horizontal' | 'vertical' = 'horizontal';
@@ -156,6 +157,7 @@ class AntiDrawApp {
         },
         onToggleSnap: (type) => {
           if (type === 'grid') this.canvasMgr.snapToGrid = !this.canvasMgr.snapToGrid;
+          if (type === 'guide') this.canvasMgr.snapToGuides = !this.canvasMgr.snapToGuides;
           if (type === 'vertex') this.canvasMgr.snapToVertices = !this.canvasMgr.snapToVertices;
           this.topBar.update();
         },
@@ -556,8 +558,38 @@ class AntiDrawApp {
         }
       }
 
-      // 3. Check hit on composite bounding box handles if vector elements are selected
+      // 3. Check hit directly on a vertex of any selected element (move from vertex)
       const selectedEls = this.model.elements.filter((el) => this.selectionTool.isSelected(el.id));
+      let hitVertex: Point | null = null;
+      if (selectedEls.length > 0) {
+        for (const selEl of selectedEls) {
+          if (selEl.vertices) {
+            for (const v of selEl.vertices) {
+              if (Math.hypot(pt.x - v.x, pt.y - v.y) <= 8 / (this.canvasMgr.zoom || 1)) {
+                hitVertex = { x: v.x, y: v.y };
+                break;
+              }
+            }
+            if (hitVertex) break;
+          }
+        }
+      }
+
+      if (hitVertex) {
+        this.activeHandle = 'move';
+        this.dragAnchorPt = hitVertex;
+        this.initialElementsMap.clear();
+        selectedEls.forEach((el) => {
+          if (el.vertices) {
+            this.initialElementsMap.set(el.id, JSON.parse(JSON.stringify(el.vertices)));
+          }
+        });
+        this.propertyPanel.resetPanelMode();
+        this.render();
+        return;
+      }
+
+      // 4. Check hit on composite bounding box handles if vector elements are selected
       if (selectedEls.length > 0) {
         const groupBox = this.selectionTool.getGroupBoundingBox(selectedEls);
         if (groupBox) {
@@ -577,7 +609,7 @@ class AntiDrawApp {
         }
       }
 
-      // 4. Hit test vector elements under cursor
+      // 5. Hit test vector elements under cursor (fill or stroke/border)
       const hit = this.selectionTool.hitTest(this.model.elements, pt);
       if (hit) {
         if (e.ctrlKey || e.metaKey) {
@@ -593,6 +625,7 @@ class AntiDrawApp {
         const nowSelected = this.model.elements.filter((el) => this.selectionTool.isSelected(el.id));
         if (nowSelected.length > 0) {
           this.activeHandle = 'move';
+          this.dragAnchorPt = { x: pt.x, y: pt.y };
           this.initialElementsMap.clear();
           nowSelected.forEach((el) => {
             if (el.vertices) {
@@ -851,15 +884,29 @@ class AntiDrawApp {
         this.renderOverlay();
         return;
       } else if (this.activeHandle === 'move' && this.initialElementsMap.size > 0) {
+        // Collect other unselected vertices for snapToVertices
+        const otherVertices: Point[] = [];
+        this.model.elements.forEach((el) => {
+          if (!this.selectionTool.isSelected(el.id) && el.vertices) {
+            el.vertices.forEach((v) => otherVertices.push({ x: v.x, y: v.y }));
+          }
+        });
+
+        // Compute target position of the anchor and snap it
+        const rawTarget: Point = { x: this.dragAnchorPt.x + dx, y: this.dragAnchorPt.y + dy };
+        const snappedTarget = this.canvasMgr.snapPoint(rawTarget, otherVertices);
+        const effectiveDx = snappedTarget.x - this.dragAnchorPt.x;
+        const effectiveDy = snappedTarget.y - this.dragAnchorPt.y;
+
         this.initialElementsMap.forEach((origVerts, id) => {
           const el = this.model.elements.find((e) => e.id === id);
           if (el) {
             el.vertices = origVerts.map((v) => ({
               ...v,
-              x: v.x + dx,
-              y: v.y + dy,
-              handleIn: v.handleIn ? { x: v.handleIn.x + dx, y: v.handleIn.y + dy } : undefined,
-              handleOut: v.handleOut ? { x: v.handleOut.x + dx, y: v.handleOut.y + dy } : undefined,
+              x: v.x + effectiveDx,
+              y: v.y + effectiveDy,
+              handleIn: v.handleIn ? { x: v.handleIn.x + effectiveDx, y: v.handleIn.y + effectiveDy } : undefined,
+              handleOut: v.handleOut ? { x: v.handleOut.x + effectiveDx, y: v.handleOut.y + effectiveDy } : undefined,
             }));
           }
         });
@@ -881,10 +928,21 @@ class AntiDrawApp {
       const selectedEl = this.model.elements.find((el) => this.selectionTool.isSelected(el.id));
       if (selectedEl && selectedEl.vertices) {
         if (this.activeHandle === 'vertex' && this.nodeEditorTool.selectedVertexId) {
+          const otherVertices: Point[] = [];
+          this.model.elements.forEach((el) => {
+            if (el.vertices) {
+              el.vertices.forEach((v) => {
+                if (v.id !== this.nodeEditorTool.selectedVertexId) {
+                  otherVertices.push({ x: v.x, y: v.y });
+                }
+              });
+            }
+          });
+          const snappedPt = this.canvasMgr.snapPoint(pt, otherVertices);
           const result = this.nodeEditorTool.moveVertex(
             selectedEl.vertices,
             this.nodeEditorTool.selectedVertexId,
-            pt,
+            snappedPt,
             this.isShiftPressed,
             this.model.elements
           );
@@ -1419,7 +1477,20 @@ class AntiDrawApp {
         });
       }
 
-      // 6. Node Edit Mode Vertices & Bezier Handles
+      // 6. Always visible vertices for all selected elements (Selection mode & Node mode)
+      selectedEls.forEach((el) => {
+        if (el.vertices) {
+          const isNodeMode = this.toolbar.activeTool === 'node' && selectedEls.length === 1;
+          const selectedVertexId = this.nodeEditorTool.selectedVertexId;
+
+          el.vertices.forEach((v) => {
+            const isSelectedVertex = isNodeMode && v.id === selectedVertexId;
+            html += `<circle cx="${v.x}" cy="${v.y}" r="${isSelectedVertex ? 4.5 : 3.5}" fill="${isSelectedVertex ? '#38bdf8' : '#ffffff'}" stroke="#0284c7" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
+          });
+        }
+      });
+
+      // 7. Node Edit Mode Bezier Handles for Selected Vertex
       if (selectedEls.length === 1 && selectedEls[0].vertices && this.toolbar.activeTool === 'node') {
         const selectedEl = selectedEls[0];
         const verts = selectedEl.vertices!;
@@ -1435,8 +1506,6 @@ class AntiDrawApp {
         }
 
         verts.forEach((v, idx) => {
-          const isSelected = idx === selectedIdx;
-
           if (showHandlesFor.has(idx)) {
             if (v.handleIn) {
               html += `<line x1="${v.x}" y1="${v.y}" x2="${v.handleIn.x}" y2="${v.handleIn.y}" stroke="#a855f7" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
@@ -1447,8 +1516,6 @@ class AntiDrawApp {
               html += `<circle cx="${v.handleOut.x}" cy="${v.handleOut.y}" r="3.5" fill="#a855f7" stroke="#ffffff" stroke-width="1" />`;
             }
           }
-
-          html += `<circle cx="${v.x}" cy="${v.y}" r="${isSelected ? 4.5 : 3.5}" fill="${isSelected ? '#38bdf8' : '#ffffff'}" stroke="#0284c7" stroke-width="1" />`;
         });
       }
     }

@@ -5,8 +5,17 @@
       "orientation": "angled",
       "position": 222,
       "angle": 236,
-      "pivotX": 222,
-      "pivotY": 121,
+      "pivotX": 235,
+      "pivotY": 116,
+      "color": "#00f0ff"
+    },
+    {
+      "id": "guide_mtj1ztwb_aqcm",
+      "orientation": "vertical",
+      "position": 256,
+      "angle": 90,
+      "pivotX": 256,
+      "pivotY": 300,
       "color": "#00f0ff"
     }
   ],

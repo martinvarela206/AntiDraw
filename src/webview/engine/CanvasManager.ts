@@ -23,10 +23,11 @@ export class CanvasManager {
   public showGuides: boolean = true;
   public gridSpacing: number = 20;
 
-  public snapToGrid: boolean = true;
-  public snapToGuides: boolean = true;
-  public snapToVertices: boolean = true;
-  public snapThreshold: number = 6;
+  // Snap options disabled by default
+  public snapToGrid: boolean = false;
+  public snapToGuides: boolean = false;
+  public snapToVertices: boolean = false;
+  public snapThreshold: number = 5; // 5px proximity threshold
 
   // By default, no guide lines exist
   public guides: GuideLine[] = [];
@@ -47,51 +48,102 @@ export class CanvasManager {
   public selectedGuideId: string | null = null;
   public activeGuideTransformId: string | null = null;
 
-  // Snap point to active grid, guide lines, or existing vertices
+  // Snap point to active vertices, guide lines / guide intersections, or grid lines / grid intersections (3px proximity)
   public snapPoint(pt: Point, otherVertices: Point[] = []): Point {
     let snappedX = pt.x;
     let snappedY = pt.y;
+    const threshold = this.snapThreshold / (this.zoom || 1);
 
-    // 1. Snap to Vertices
+    // 1. Snap to Vertices of other vector elements (highest priority)
     if (this.snapToVertices && otherVertices.length > 0) {
-      let minDist = this.snapThreshold / this.zoom;
+      let minDist = threshold;
+      let bestVertex: Point | null = null;
       for (const v of otherVertices) {
         const d = Math.hypot(pt.x - v.x, pt.y - v.y);
-        if (d < minDist) {
-          return { x: v.x, y: v.y };
+        if (d <= minDist) {
+          minDist = d;
+          bestVertex = v;
         }
+      }
+      if (bestVertex) {
+        return { x: bestVertex.x, y: bestVertex.y };
       }
     }
 
-    // 2. Snap to Guides (Horizontal, Vertical, or Arbitrary Angled)
+    // 2. Snap to Guide Lines & Guide-Guide Intersections
     if (this.snapToGuides && this.showGuides && this.guides.length > 0) {
-      const threshold = this.snapThreshold / this.zoom;
+      // 2a. Check Guide-to-Guide Intersections first
+      let minIntDist = threshold;
+      let bestIntersection: Point | null = null;
+
+      for (let i = 0; i < this.guides.length; i++) {
+        for (let j = i + 1; j < this.guides.length; j++) {
+          const g1 = this.guides[i];
+          const g2 = this.guides[j];
+          const rad1 = ((g1.angle || 0) * Math.PI) / 180;
+          const rad2 = ((g2.angle || 0) * Math.PI) / 180;
+          const n1x = -Math.sin(rad1), n1y = Math.cos(rad1);
+          const n2x = -Math.sin(rad2), n2y = Math.cos(rad2);
+          const px1 = g1.pivotX ?? (g1.orientation === 'vertical' ? g1.position : 0);
+          const py1 = g1.pivotY ?? (g1.orientation === 'horizontal' ? g1.position : 0);
+          const px2 = g2.pivotX ?? (g2.orientation === 'vertical' ? g2.position : 0);
+          const py2 = g2.pivotY ?? (g2.orientation === 'horizontal' ? g2.position : 0);
+          const d1 = n1x * px1 + n1y * py1;
+          const d2 = n2x * px2 + n2y * py2;
+          const det = n1x * n2y - n1y * n2x;
+
+          if (Math.abs(det) > 1e-4) {
+            const ix = (d1 * n2y - d2 * n1y) / det;
+            const iy = (n1x * d2 - n2x * d1) / det;
+            const dist = Math.hypot(pt.x - ix, pt.y - iy);
+            if (dist <= minIntDist) {
+              minIntDist = dist;
+              bestIntersection = { x: ix, y: iy };
+            }
+          }
+        }
+      }
+
+      if (bestIntersection) {
+        return { x: bestIntersection.x, y: bestIntersection.y };
+      }
+
+      // 2b. Snap along single guide lines
+      let minLineDist = threshold;
+      let bestLineSnap: Point | null = null;
+
       for (const g of this.guides) {
         const rad = ((g.angle || 0) * Math.PI) / 180;
         const nx = -Math.sin(rad);
         const ny = Math.cos(rad);
         const px = g.pivotX ?? (g.orientation === 'vertical' ? g.position : 0);
         const py = g.pivotY ?? (g.orientation === 'horizontal' ? g.position : 0);
-
-        // Perpendicular distance from pt to line
         const dist = nx * (pt.x - px) + ny * (pt.y - py);
-        if (Math.abs(dist) <= threshold) {
-          snappedX = pt.x - dist * nx;
-          snappedY = pt.y - dist * ny;
-          return { x: snappedX, y: snappedY };
+
+        if (Math.abs(dist) <= minLineDist) {
+          minLineDist = Math.abs(dist);
+          bestLineSnap = {
+            x: pt.x - dist * nx,
+            y: pt.y - dist * ny,
+          };
         }
+      }
+
+      if (bestLineSnap) {
+        snappedX = bestLineSnap.x;
+        snappedY = bestLineSnap.y;
       }
     }
 
-    // 3. Snap to Grid
-    if (this.snapToGrid) {
+    // 3. Snap to Grid Lines & Grid Intersections
+    if (this.snapToGrid && this.showGrid) {
       const gx = Math.round(pt.x / this.gridSpacing) * this.gridSpacing;
       const gy = Math.round(pt.y / this.gridSpacing) * this.gridSpacing;
 
-      if (Math.abs(pt.x - gx) <= this.snapThreshold / this.zoom) {
+      if (Math.abs(pt.x - gx) <= threshold) {
         snappedX = gx;
       }
-      if (Math.abs(pt.y - gy) <= this.snapThreshold / this.zoom) {
+      if (Math.abs(pt.y - gy) <= threshold) {
         snappedY = gy;
       }
     }
