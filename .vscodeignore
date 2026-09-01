@@ -1,0 +1,16 @@
+.vscode/**
+.vscode-test/**
+src/**
+.agents/**
+.git/**
+.gitignore
+tsconfig.json
+esbuild.js
+install.bat
+install.ps1
+sample_test.svg
+pnpm-lock.yaml
+pnpm-workspace.yaml
+node_modules/**
+*.vsix
+*.log

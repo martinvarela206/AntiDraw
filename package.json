@@ -1,0 +1,51 @@
+{
+    "name":  "antidraw",
+    "displayName":  "AntiDraw - SVG Vector Editor",
+    "description":  "Integrated vector graphics editor for SVG files inspired by CorelDraw and Figma.",
+    "version":  "0.4.0",
+    "publisher":  "antigravity",
+    "packageManager":  "pnpm@11.22.0",
+    "engines":  {
+                    "vscode":  "^1.80.0"
+                },
+    "categories":  [
+                       "Other",
+                       "Visualization",
+                       "Designers"
+                   ],
+    "activationEvents":  [
+                             "onCustomEditor:antidraw.svgEditor"
+                         ],
+    "main":  "./dist/extension.js",
+    "contributes":  {
+                        "customEditors":  [
+                                              {
+                                                  "viewType":  "antidraw.svgEditor",
+                                                  "displayName":  "AntiDraw SVG Editor",
+                                                  "selector":  [
+                                                                   {
+                                                                       "filenamePattern":  "*.svg"
+                                                                   }
+                                                               ],
+                                                  "priority":  "option"
+                                              }
+                                          ],
+                        "commands":  [
+                                         {
+                                             "command":  "antidraw.openEditor",
+                                             "title":  "Open with AntiDraw SVG Editor"
+                                         }
+                                     ]
+                    },
+    "scripts":  {
+                    "build":  "node esbuild.js",
+                    "watch":  "node esbuild.js --watch",
+                    "compile":  "tsc -p . --noEmit"
+                },
+    "devDependencies":  {
+                            "@types/node":  "^20.0.0",
+                            "@types/vscode":  "^1.80.0",
+                            "esbuild":  "^0.20.0",
+                            "typescript":  "^5.0.0"
+                        }
+}
