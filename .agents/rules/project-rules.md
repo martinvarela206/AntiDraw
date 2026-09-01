@@ -21,4 +21,5 @@ This file contains rules specific to the AntiPaint project. Rules are written in
    - **Bug Fixes / Corrections**: Increment only the patch version (`X.X.x+1`). The patch counter increments indefinitely (e.g., `0.1.9` -> `0.1.10` -> `0.1.100` -> `0.1.1000`) without rolling over into minor version.
    - **New Features / Functionality**: Increment only the minor version (`X.x+1.X`). The minor counter increments indefinitely without modifying the major version.
    - **User Explicit Milestone / Release Selection**: Only when explicitly requested by the user, increment the major version and reset lower components to zero (`x+1.0.0`).
-
+3. **Mandatory VSIX Generation & Packaging**:
+   - After completing code modifications and updating the project version, always build and package the extension into a `.vsix` artifact (`pnpm run package` / `vsce package --no-dependencies`).

@@ -1,2 +1,4 @@
 allowBuilds:
-  esbuild: set this to true or false
+  '@vscode/vsce-sign': true
+  esbuild: true
+  keytar: true

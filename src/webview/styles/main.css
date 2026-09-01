@@ -153,12 +153,77 @@ body {
   box-shadow: 0 0 8px #60a5fa;
 }
 
-/* CANVAS AREA */
+/* CANVAS AREA & RULERS */
 .canvas-container {
   grid-area: canvas;
   background-color: var(--canvas-bg);
+  display: grid;
+  grid-template-rows: 20px 1fr;
+  grid-template-columns: 20px 1fr;
+  grid-template-areas:
+    "corner top-ruler"
+    "left-ruler scroll-area";
+  overflow: hidden;
+  position: relative;
+}
+
+.ruler-corner {
+  grid-area: corner;
+  background-color: var(--bg-panel);
+  border-right: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-muted);
+  z-index: 10;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.ruler-corner:hover {
+  background-color: var(--bg-panel-hover);
+  color: var(--accent-color);
+}
+
+.ruler-corner.active {
+  background-color: #2563eb !important;
+  background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%) !important;
+  color: #ffffff !important;
+  border-color: #60a5fa !important;
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.6), 0 0 10px rgba(59, 130, 246, 0.5) !important;
+}
+
+.ruler-top-container {
+  grid-area: top-ruler;
+  background-color: var(--bg-panel);
+  border-bottom: 1px solid var(--border-color);
+  overflow: hidden;
+  position: relative;
+  cursor: s-resize;
+  z-index: 5;
+}
+
+.ruler-left-container {
+  grid-area: left-ruler;
+  background-color: var(--bg-panel);
+  border-right: 1px solid var(--border-color);
+  overflow: hidden;
+  position: relative;
+  cursor: e-resize;
+  z-index: 5;
+}
+
+.ruler-canvas {
+  display: block;
+}
+
+.canvas-scroll-area {
+  grid-area: scroll-area;
   overflow: auto;
   padding: 40px;
+  position: relative;
 }
 
 .canvas-wrapper {

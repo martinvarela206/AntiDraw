@@ -1,11 +1,12 @@
 import { VectorModel, VectorElement, PathVertex, NodeType, Point } from './engine/VectorModel.js';
 import { SelectionTool, HandleType } from './engine/SelectionTool.js';
 import { NodeEditorTool } from './engine/NodeEditorTool.js';
-import { CanvasManager } from './engine/CanvasManager.js';
+import { CanvasManager, GuideLine, RulerConfig } from './engine/CanvasManager.js';
 import { BooleanOperations } from './engine/BooleanOperations.js';
 import { Toolbar, ToolType } from './ui/Toolbar.js';
 import { TopBar } from './ui/TopBar.js';
 import { PropertyPanel } from './ui/PropertyPanel.js';
+import { RulerView } from './ui/RulerView.js';
 import './styles/main.css';
 
 declare function acquireVsCodeApi(): {
@@ -25,18 +26,41 @@ class AntiDrawApp {
   private toolbar!: Toolbar;
   private topBar!: TopBar;
   private propertyPanel!: PropertyPanel;
+  private rulerView!: RulerView;
 
+  private canvasContainer!: HTMLElement;
+  private canvasScrollArea!: HTMLElement;
   private canvasWrapper!: HTMLElement;
   private svgCanvas!: SVGSVGElement;
   private overlaySvg!: SVGSVGElement;
 
   private isDragging: boolean = false;
   private dragStartPt: Point = { x: 0, y: 0 };
-  private activeHandle: HandleType | 'move' | 'vertex' | 'handleIn' | 'handleOut' | 'pen' | 'shape' | 'marquee' | null = null;
+  private activeHandle:
+    | HandleType
+    | 'move'
+    | 'vertex'
+    | 'handleIn'
+    | 'handleOut'
+    | 'pen'
+    | 'shape'
+    | 'marquee'
+    | 'guide-create'
+    | 'guide-move'
+    | 'guide-pivot'
+    | 'guide-rotate'
+    | null = null;
+
   private initialElementState: VectorElement | null = null;
   private initialVertices: PathVertex[] = [];
   private initialElementsMap: Map<string, PathVertex[]> = new Map();
   private initialBox: any = null;
+
+  // Guide dragging state
+  private dragGuideOrientation: 'horizontal' | 'vertical' = 'horizontal';
+  private dragGuideCurrentPt: Point = { x: 0, y: 0 };
+  private guideInitialState: GuideLine | null = null;
+  private activeRotateArrowIdx: 1 | 2 = 1;
 
   public penNodeType: NodeType = 'asymmetric';
   private currentPenVertices: PathVertex[] = [];
@@ -57,13 +81,27 @@ class AntiDrawApp {
 
   private initLayout(): void {
     const appEl = document.getElementById('app')!;
-    // Use flat CSS grid structure directly inside #app
+    // CSS grid structure inside #app
     appEl.innerHTML = `
       <div class="top-bar" id="top-bar"></div>
       <div class="left-toolbar" id="left-toolbar"></div>
       <div class="canvas-container" id="canvas-container">
-        <div class="canvas-wrapper" id="canvas-wrapper">
-          <canvas id="canvas-hit" style="position:absolute;top:0;left:0;display:none;"></canvas>
+        <div class="ruler-corner" id="ruler-corner" title="Ruler Settings (Scale &amp; Units)">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 3H3v18h18V3z"/>
+            <path d="M3 9h6M3 15h4M9 3v6M15 3v4"/>
+          </svg>
+        </div>
+        <div class="ruler-top-container" id="ruler-top-container">
+          <canvas class="ruler-canvas" id="ruler-top-canvas"></canvas>
+        </div>
+        <div class="ruler-left-container" id="ruler-left-container">
+          <canvas class="ruler-canvas" id="ruler-left-canvas"></canvas>
+        </div>
+        <div class="canvas-scroll-area" id="canvas-scroll-area">
+          <div class="canvas-wrapper" id="canvas-wrapper">
+            <canvas id="canvas-hit" style="position:absolute;top:0;left:0;display:none;"></canvas>
+          </div>
         </div>
       </div>
       <div class="right-panel" id="right-panel"></div>
@@ -74,6 +112,8 @@ class AntiDrawApp {
       </div>
     `;
 
+    this.canvasContainer = document.getElementById('canvas-container')!;
+    this.canvasScrollArea = document.getElementById('canvas-scroll-area')!;
     this.canvasWrapper = document.getElementById('canvas-wrapper')!;
 
     // Create svg-canvas and overlay-svg in JS and append to wrapper for guaranteed same-origin alignment
@@ -122,13 +162,46 @@ class AntiDrawApp {
       }
     );
 
+    // Initialize Rulers
+    this.rulerView = new RulerView(
+      this.canvasContainer,
+      this.canvasMgr,
+      {
+        onCornerClick: () => {
+          this.toolbar.deselectAll();
+          this.rulerView.setCornerActive(true);
+          this.selectionTool.deselectAll();
+          this.canvasMgr.selectedGuideId = null;
+          this.canvasMgr.activeGuideTransformId = null;
+          const statusTool = document.getElementById('status-tool');
+          if (statusTool) statusTool.innerText = `Tool: Ruler`;
+          this.propertyPanel.showRulerSettings(this.canvasMgr.rulerConfig);
+          this.render();
+        },
+        onStartDragGuide: (orientation, clientPos) => {
+          const pt = this.getCanvasPointFromClient(clientPos.x, clientPos.y);
+          this.activeHandle = 'guide-create';
+          this.dragGuideOrientation = orientation;
+          this.dragGuideCurrentPt = pt;
+          this.isDragging = true;
+          this.canvasMgr.selectedGuideId = null;
+          this.render();
+        },
+      }
+    );
+
+    // Sync rulers with scroll area
+    this.canvasScrollArea.addEventListener('scroll', () => {
+      this.syncRulerScroll();
+    });
+
     // Initialize Right Property Panel
     this.propertyPanel = new PropertyPanel(
       document.getElementById('right-panel')!,
       this.model,
       this.selectionTool,
       {
-        onUpdateElement: (el) => {
+        onUpdateElement: (_el) => {
           this.render();
           this.syncToHost();
         },
@@ -146,8 +219,39 @@ class AntiDrawApp {
         onFinishPenPath: (close) => {
           this.finishPenPath(close);
         },
+        onUpdateRuler: (cfg) => {
+          this.canvasMgr.rulerConfig = cfg;
+          this.syncRulerScroll();
+          this.syncMetadataToHost();
+        },
+        onUpdateGuide: (_guide) => {
+          this.render();
+          this.syncMetadataToHost();
+        },
+        onDeleteGuide: (id) => {
+          this.canvasMgr.removeGuide(id);
+          this.propertyPanel.resetPanelMode();
+          this.render();
+          this.syncMetadataToHost();
+        },
+        onClearAllGuides: () => {
+          this.canvasMgr.guides = [];
+          this.canvasMgr.selectedGuideId = null;
+          this.canvasMgr.activeGuideTransformId = null;
+          this.propertyPanel.resetPanelMode();
+          this.render();
+          this.syncMetadataToHost();
+        },
       }
     );
+  }
+
+  private syncRulerScroll(): void {
+    const wrapRect = this.canvasWrapper.getBoundingClientRect();
+    const scrollRect = this.canvasScrollArea.getBoundingClientRect();
+    const offsetX = wrapRect.left - scrollRect.left;
+    const offsetY = wrapRect.top - scrollRect.top;
+    this.rulerView.renderRulers(offsetX, offsetY);
   }
 
   private initEvents(): void {
@@ -155,12 +259,21 @@ class AntiDrawApp {
     window.addEventListener('message', (event) => {
       const msg = event.data;
       if (msg.type === 'loadSvg') {
-        // Skip re-parse if the webview itself triggered this change;
-        // this preserves in-memory state (nodeType, etc.) that SVG cannot encode.
         if (this.isUpdatingFromWebview) {
           this.isUpdatingFromWebview = false;
           return;
         }
+
+        // Load sidecar metadata if available, otherwise clear guides
+        if (msg.metadata) {
+          this.canvasMgr.guides = Array.isArray(msg.metadata.guides) ? msg.metadata.guides : [];
+          if (msg.metadata.ruler) {
+            this.canvasMgr.rulerConfig = { ...this.canvasMgr.rulerConfig, ...msg.metadata.ruler };
+          }
+        } else {
+          this.canvasMgr.guides = [];
+        }
+
         this.model.loadSvgString(msg.text);
         this.applyCanvasSize();
         this.render();
@@ -171,7 +284,7 @@ class AntiDrawApp {
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Shift') this.isShiftPressed = true;
 
-      if (document.activeElement?.tagName === 'INPUT') return;
+      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'SELECT') return;
 
       if (e.key === 'v' || e.key === 'V') this.toolbar.setTool('select');
       if (e.key === 'n' || e.key === 'N') this.toolbar.setTool('node');
@@ -190,6 +303,16 @@ class AntiDrawApp {
       }
 
       if (e.key === 'Delete' || e.key === 'Backspace') {
+        // 1. Delete selected guide line
+        if (this.canvasMgr.selectedGuideId) {
+          this.canvasMgr.removeGuide(this.canvasMgr.selectedGuideId);
+          this.propertyPanel.resetPanelMode();
+          this.render();
+          this.syncMetadataToHost();
+          return;
+        }
+
+        // 2. Delete selected vector elements
         if (this.selectionTool.selectedElementIds.size > 0) {
           this.model.elements = this.model.elements.filter(
             (el) => !this.selectionTool.isSelected(el.id)
@@ -204,6 +327,19 @@ class AntiDrawApp {
 
     window.addEventListener('keyup', (e) => {
       if (e.key === 'Shift') this.isShiftPressed = false;
+    });
+
+    // Window level pointer events for dragging across boundaries
+    window.addEventListener('pointermove', (e) => {
+      if (this.isDragging && (this.activeHandle === 'guide-create' || this.activeHandle === 'guide-move' || this.activeHandle === 'guide-pivot' || this.activeHandle === 'guide-rotate')) {
+        this.onPointerMove(e);
+      }
+    });
+
+    window.addEventListener('pointerup', (e) => {
+      if (this.isDragging && (this.activeHandle === 'guide-create' || this.activeHandle === 'guide-move' || this.activeHandle === 'guide-pivot' || this.activeHandle === 'guide-rotate')) {
+        this.onPointerUp(e);
+      }
     });
 
     // Pointer events on Canvas Wrapper
@@ -221,6 +357,16 @@ class AntiDrawApp {
     this.isUpdatingFromWebview = true;
     const svgText = this.model.toSvgString();
     vscode.postMessage({ type: 'updateDocument', text: svgText });
+  }
+
+  private syncMetadataToHost(): void {
+    vscode.postMessage({
+      type: 'updateMetadata',
+      metadata: {
+        guides: this.canvasMgr.guides,
+        ruler: this.canvasMgr.rulerConfig,
+      },
+    });
   }
 
   private applyCanvasSize(): void {
@@ -252,31 +398,104 @@ class AntiDrawApp {
       svg.style.top = '0';
       svg.style.left = '0';
     });
+
+    // Update ruler sizes
+    setTimeout(() => {
+      this.rulerView.updateSize(width, height);
+      this.syncRulerScroll();
+    }, 0);
   }
 
   private getCanvasPoint(e: PointerEvent | MouseEvent): Point {
-    // Use svgCanvas.getBoundingClientRect for precise offset of the SVG on screen
+    return this.getCanvasPointFromClient(e.clientX, e.clientY);
+  }
+
+  private getCanvasPointFromClient(clientX: number, clientY: number): Point {
     const rect = this.svgCanvas.getBoundingClientRect();
     const { width: canvasW, height: canvasH } = this.model.canvas;
-    // Scale in case CSS has resized the SVG (should be 1:1 but handle edge cases)
-    const scaleX = canvasW / rect.width;
-    const scaleY = canvasH / rect.height;
+    const scaleX = canvasW / (rect.width || 1);
+    const scaleY = canvasH / (rect.height || 1);
     return {
-      x: (e.clientX - rect.left) * scaleX,
-      y: (e.clientY - rect.top) * scaleY,
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY,
     };
   }
 
   private handleToolChange(tool: ToolType): void {
     const statusTool = document.getElementById('status-tool');
     if (statusTool) statusTool.innerText = `Tool: ${tool}`;
+    this.rulerView.setCornerActive(false);
+    this.propertyPanel.resetPanelMode();
+    if (tool !== 'select') {
+      this.canvasMgr.selectedGuideId = null;
+      this.canvasMgr.activeGuideTransformId = null;
+    }
     this.render();
+  }
+
+  // Hit test for guide line under point
+  private hitTestGuide(pt: Point, tolerance: number = 8): GuideLine | null {
+    if (!this.canvasMgr.showGuides) return null;
+    const threshold = tolerance / this.canvasMgr.zoom;
+
+    for (let i = this.canvasMgr.guides.length - 1; i >= 0; i--) {
+      const g = this.canvasMgr.guides[i];
+      const rad = ((g.angle || 0) * Math.PI) / 180;
+      const nx = -Math.sin(rad);
+      const ny = Math.cos(rad);
+      const px = g.pivotX ?? (g.orientation === 'vertical' ? g.position : this.model.canvas.width / 2);
+      const py = g.pivotY ?? (g.orientation === 'horizontal' ? g.position : this.model.canvas.height / 2);
+
+      const dist = Math.abs(nx * (pt.x - px) + ny * (pt.y - py));
+      if (dist <= threshold) {
+        return g;
+      }
+    }
+    return null;
+  }
+
+  // Calculate guide endpoints and control handles
+  private getGuideGeometry(guide: GuideLine): {
+    p1: Point;
+    p2: Point;
+    arrow1: Point;
+    arrow2: Point;
+    pivot: Point;
+  } {
+    const w = this.model.canvas.width;
+    const h = this.model.canvas.height;
+    const rad = ((guide.angle || 0) * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+
+    const px = guide.pivotX ?? (guide.orientation === 'vertical' ? guide.position : w / 2);
+    const py = guide.pivotY ?? (guide.orientation === 'horizontal' ? guide.position : h / 2);
+
+    // Large bounding span across canvas
+    const span = Math.max(w, h) * 2;
+    const p1 = { x: px - cos * span, y: py - sin * span };
+    const p2 = { x: px + cos * span, y: py + sin * span };
+
+    // Curved arrows positioned at visible bounds relative to pivot
+    const arrowDist = Math.min(w, h) * 0.4;
+    const arrow1 = { x: px - cos * arrowDist, y: py - sin * arrowDist };
+    const arrow2 = { x: px + cos * arrowDist, y: py + sin * arrowDist };
+
+    return { p1, p2, arrow1, arrow2, pivot: { x: px, y: py } };
   }
 
   private onPointerDown(e: PointerEvent): void {
     const pt = this.getCanvasPoint(e);
     this.dragStartPt = pt;
     this.isDragging = true;
+
+    // If toolbar is currently in ruler or inactive state, switch back to select tool
+    if (!this.toolbar.activeTool || (this.toolbar.activeTool as any) === '') {
+      this.toolbar.setTool('select');
+      this.rulerView.setCornerActive(false);
+      this.propertyPanel.resetPanelMode();
+    }
+
     const activeTool = this.toolbar.activeTool;
 
     try {
@@ -284,9 +503,61 @@ class AntiDrawApp {
     } catch (_err) {}
 
     if (activeTool === 'select') {
-      const selectedEls = this.model.elements.filter((el) => this.selectionTool.isSelected(el.id));
+      // 1. Check if clicking on active Guide Transform controls (pivot or curved arrows)
+      if (this.canvasMgr.activeGuideTransformId) {
+        const activeG = this.canvasMgr.getGuide(this.canvasMgr.activeGuideTransformId);
+        if (activeG) {
+          const geom = this.getGuideGeometry(activeG);
 
-      // 1. Check hit on composite bounding box handles if one or more elements are selected
+          // Check pivot click
+          if (Math.hypot(pt.x - geom.pivot.x, pt.y - geom.pivot.y) <= 12) {
+            this.activeHandle = 'guide-pivot';
+            this.guideInitialState = { ...activeG };
+            this.render();
+            return;
+          }
+
+          // Check arrow 1 click
+          if (Math.hypot(pt.x - geom.arrow1.x, pt.y - geom.arrow1.y) <= 16) {
+            this.activeHandle = 'guide-rotate';
+            this.activeRotateArrowIdx = 1;
+            this.guideInitialState = { ...activeG };
+            this.render();
+            return;
+          }
+
+          // Check arrow 2 click
+          if (Math.hypot(pt.x - geom.arrow2.x, pt.y - geom.arrow2.y) <= 16) {
+            this.activeHandle = 'guide-rotate';
+            this.activeRotateArrowIdx = 2;
+            this.guideInitialState = { ...activeG };
+            this.render();
+            return;
+          }
+        }
+      }
+
+      // 2. Check hit on Guide Lines
+      const hitGuide = this.hitTestGuide(pt, 8);
+      if (hitGuide) {
+        this.selectionTool.deselectAll();
+        this.canvasMgr.selectedGuideId = hitGuide.id;
+        this.activeHandle = 'guide-move';
+        this.guideInitialState = { ...hitGuide };
+        this.propertyPanel.showGuideSettings(hitGuide);
+        this.render();
+        return;
+      } else {
+        // Deselect guide if clicking elsewhere
+        if (this.canvasMgr.selectedGuideId) {
+          this.canvasMgr.selectedGuideId = null;
+          this.canvasMgr.activeGuideTransformId = null;
+          this.propertyPanel.resetPanelMode();
+        }
+      }
+
+      // 3. Check hit on composite bounding box handles if vector elements are selected
+      const selectedEls = this.model.elements.filter((el) => this.selectionTool.isSelected(el.id));
       if (selectedEls.length > 0) {
         const groupBox = this.selectionTool.getGroupBoundingBox(selectedEls);
         if (groupBox) {
@@ -306,21 +577,17 @@ class AntiDrawApp {
         }
       }
 
-      // 2. Hit test vector elements under cursor
+      // 4. Hit test vector elements under cursor
       const hit = this.selectionTool.hitTest(this.model.elements, pt);
       if (hit) {
         if (e.ctrlKey || e.metaKey) {
-          // Ctrl+Click: Toggle selection (add if not present, remove if present)
           this.selectionTool.toggleSelect(hit.element.id);
         } else if (e.shiftKey) {
-          // Shift+Click: Deselect clicked element
           this.selectionTool.deselect(hit.element.id);
         } else {
-          // Normal Click: If element is not already in multi-selection, select only it
           if (!this.selectionTool.isSelected(hit.element.id)) {
             this.selectionTool.select(hit.element.id);
           }
-          // If already selected, maintain multi-selection to allow moving together
         }
 
         const nowSelected = this.model.elements.filter((el) => this.selectionTool.isSelected(el.id));
@@ -335,18 +602,15 @@ class AntiDrawApp {
         }
         this.propertyPanel.resetPanelMode();
       } else {
-        // 3. Clicked on empty canvas space: start Marquee selection
+        // 5. Clicked on empty canvas space: start Marquee selection
         this.shapeStartPt = pt;
         this.activeHandle = 'marquee';
 
         if (e.shiftKey) {
-          // Shift+Drag on empty canvas: Deselect marquee
           this.selectionTool.isDeselectMarquee = true;
         } else if (e.ctrlKey || e.metaKey) {
-          // Ctrl+Drag: Additive marquee (keep current selection)
           this.selectionTool.isDeselectMarquee = false;
         } else {
-          // Normal drag: Clear previous selection and select marquee items
           this.selectionTool.deselectAll();
           this.selectionTool.isDeselectMarquee = false;
           this.propertyPanel.resetPanelMode();
@@ -371,7 +635,6 @@ class AntiDrawApp {
           this.activeHandle = hitNode.type;
           this.initialVertices = JSON.parse(JSON.stringify(selectedEl.vertices));
         } else {
-          // Click on empty canvas space in node mode: deselect vertex
           this.nodeEditorTool.selectedVertexId = null;
           this.nodeEditorTool.selectedHandleType = null;
         }
@@ -382,7 +645,6 @@ class AntiDrawApp {
     } else if (activeTool === 'pen') {
       const snappedPt = this.canvasMgr.snapPoint(pt);
 
-      // 1. Hit test on existing in-progress pen vertices
       let hitVertexIdx = -1;
       for (let i = 0; i < this.currentPenVertices.length; i++) {
         const v = this.currentPenVertices[i];
@@ -394,7 +656,6 @@ class AntiDrawApp {
 
       if (hitVertexIdx >= 0) {
         if (e.shiftKey) {
-          // Shift + Click: Delete this vertex
           this.currentPenVertices.splice(hitVertexIdx, 1);
           if (this.currentPenVertices.length > 0) {
             this.currentPenVertices[0].command = 'M';
@@ -402,19 +663,16 @@ class AntiDrawApp {
           this.render();
           return;
         } else if (e.ctrlKey || e.metaKey) {
-          // Ctrl + Drag: Reposition this vertex
           this.penMovingVertexIdx = hitVertexIdx;
           this.activeHandle = 'pen';
           this.render();
           return;
         } else if (hitVertexIdx === 0 && this.currentPenVertices.length >= 3) {
-          // Click on first vertex closes the path loop
           this.finishPenPath(true);
           return;
         }
       }
 
-      // 2. Add new vertex with current configured penNodeType
       const isStart = this.currentPenVertices.length === 0;
       let hIn: Point | undefined = undefined;
       let hOut: Point | undefined = undefined;
@@ -430,7 +688,7 @@ class AntiDrawApp {
         handleIn: hIn,
         handleOut: hOut,
         nodeType: this.penNodeType,
-        command: isStart ? 'M' : (this.penNodeType === 'asymmetric' ? 'L' : 'C'),
+        command: isStart ? 'M' : this.penNodeType === 'asymmetric' ? 'L' : 'C',
       };
 
       this.currentPenVertices.push(newV);
@@ -447,9 +705,38 @@ class AntiDrawApp {
     const coordsEl = document.getElementById('status-coords');
     if (coordsEl) coordsEl.innerText = `X: ${Math.round(pt.x)}, Y: ${Math.round(pt.y)}`;
 
+    // Update cursor indicator on rulers
+    this.rulerView.setCursorPos(pt.x, pt.y);
+
     if (!this.isDragging || !this.activeHandle) {
       // Hover testing for cursors
       if (this.toolbar.activeTool === 'select') {
+        // Check active guide controls hover
+        if (this.canvasMgr.activeGuideTransformId) {
+          const activeG = this.canvasMgr.getGuide(this.canvasMgr.activeGuideTransformId);
+          if (activeG) {
+            const geom = this.getGuideGeometry(activeG);
+            if (Math.hypot(pt.x - geom.pivot.x, pt.y - geom.pivot.y) <= 12) {
+              this.canvasWrapper.style.cursor = 'move';
+              return;
+            }
+            if (
+              Math.hypot(pt.x - geom.arrow1.x, pt.y - geom.arrow1.y) <= 16 ||
+              Math.hypot(pt.x - geom.arrow2.x, pt.y - geom.arrow2.y) <= 16
+            ) {
+              this.canvasWrapper.style.cursor = 'grab';
+              return;
+            }
+          }
+        }
+
+        // Check guide line hover
+        const hitG = this.hitTestGuide(pt, 6);
+        if (hitG) {
+          this.canvasWrapper.style.cursor = hitG.orientation === 'vertical' ? 'ew-resize' : hitG.orientation === 'horizontal' ? 'ns-resize' : 'crosshair';
+          return;
+        }
+
         const selectedEl = this.model.elements.find(
           (el) => el.id === this.selectionTool.selectedElementId
         );
@@ -484,9 +771,78 @@ class AntiDrawApp {
     const dx = pt.x - this.dragStartPt.x;
     const dy = pt.y - this.dragStartPt.y;
 
+    // Handle Guide interactions
+    if (this.activeHandle === 'guide-create') {
+      this.dragGuideCurrentPt = pt;
+      this.renderOverlay();
+      return;
+    }
+
+    if (this.activeHandle === 'guide-move' && this.canvasMgr.selectedGuideId && this.guideInitialState) {
+      const g = this.canvasMgr.getGuide(this.canvasMgr.selectedGuideId);
+      if (g) {
+        if (g.orientation === 'horizontal') {
+          g.position = Math.round(this.guideInitialState.position + dy);
+          g.pivotY = g.position;
+        } else if (g.orientation === 'vertical') {
+          g.position = Math.round(this.guideInitialState.position + dx);
+          g.pivotX = g.position;
+        } else {
+          g.pivotX = Math.round((this.guideInitialState.pivotX || 0) + dx);
+          g.pivotY = Math.round((this.guideInitialState.pivotY || 0) + dy);
+        }
+      }
+      this.render();
+      return;
+    }
+
+    if (this.activeHandle === 'guide-pivot' && this.canvasMgr.selectedGuideId) {
+      const g = this.canvasMgr.getGuide(this.canvasMgr.selectedGuideId);
+      if (g) {
+        g.pivotX = Math.round(pt.x);
+        g.pivotY = Math.round(pt.y);
+        if (g.orientation === 'horizontal') g.position = g.pivotY;
+        if (g.orientation === 'vertical') g.position = g.pivotX;
+      }
+      this.render();
+      return;
+    }
+
+    if (this.activeHandle === 'guide-rotate' && this.canvasMgr.selectedGuideId) {
+      const g = this.canvasMgr.getGuide(this.canvasMgr.selectedGuideId);
+      if (g) {
+        const px = g.pivotX ?? (g.orientation === 'vertical' ? g.position : this.model.canvas.width / 2);
+        const py = g.pivotY ?? (g.orientation === 'horizontal' ? g.position : this.model.canvas.height / 2);
+        const angleRad = Math.atan2(pt.y - py, pt.x - px);
+        let deg = Math.round((angleRad * 180) / Math.PI);
+        if (deg < 0) deg += 360;
+
+        // Snap angle to 0, 45, 90, 135, 180, 225, 270, 315 if within 3 degrees
+        const snapAngles = [0, 45, 90, 135, 180, 225, 270, 315, 360];
+        for (const sa of snapAngles) {
+          if (Math.abs(deg - sa) <= 3) {
+            deg = sa % 360;
+            break;
+          }
+        }
+
+        g.angle = deg;
+        if (g.angle === 0 || g.angle === 180) {
+          g.orientation = 'horizontal';
+          g.position = g.pivotY;
+        } else if (g.angle === 90 || g.angle === 270) {
+          g.orientation = 'vertical';
+          g.position = g.pivotX;
+        } else {
+          g.orientation = 'angled';
+        }
+      }
+      this.render();
+      return;
+    }
+
     if (this.toolbar.activeTool === 'select') {
       if (this.activeHandle === 'marquee' && this.shapeStartPt) {
-        // Update marquee drag rectangle
         const minX = Math.min(this.shapeStartPt.x, pt.x);
         const minY = Math.min(this.shapeStartPt.y, pt.y);
         const w = Math.abs(pt.x - this.shapeStartPt.x);
@@ -495,7 +851,6 @@ class AntiDrawApp {
         this.renderOverlay();
         return;
       } else if (this.activeHandle === 'move' && this.initialElementsMap.size > 0) {
-        // Move all selected elements together
         this.initialElementsMap.forEach((origVerts, id) => {
           const el = this.model.elements.find((e) => e.id === id);
           if (el) {
@@ -509,7 +864,6 @@ class AntiDrawApp {
           }
         });
       } else if (this.initialBox && this.activeHandle !== 'move' && this.initialElementsMap.size > 0) {
-        // Resize / Transform all selected elements together based on composite group box
         this.initialElementsMap.forEach((origVerts, id) => {
           const el = this.model.elements.find((e) => e.id === id);
           if (el) {
@@ -527,7 +881,6 @@ class AntiDrawApp {
       const selectedEl = this.model.elements.find((el) => this.selectionTool.isSelected(el.id));
       if (selectedEl && selectedEl.vertices) {
         if (this.activeHandle === 'vertex' && this.nodeEditorTool.selectedVertexId) {
-          // Move Vertex with Endpoint Auto-Fusion (unless Shift is pressed)
           const result = this.nodeEditorTool.moveVertex(
             selectedEl.vertices,
             this.nodeEditorTool.selectedVertexId,
@@ -540,7 +893,6 @@ class AntiDrawApp {
           (this.activeHandle === 'handleIn' || this.activeHandle === 'handleOut') &&
           this.nodeEditorTool.selectedVertexId
         ) {
-          // Move Bezier handle
           selectedEl.vertices = this.nodeEditorTool.moveHandle(
             selectedEl.vertices,
             this.nodeEditorTool.selectedVertexId,
@@ -552,35 +904,31 @@ class AntiDrawApp {
     } else if (this.toolbar.activeTool === 'pen') {
       if (this.isDragging && this.activeHandle === 'pen') {
         if (this.penMovingVertexIdx !== null && this.currentPenVertices[this.penMovingVertexIdx]) {
-          // Ctrl+Drag: Move existing node
           this.currentPenVertices[this.penMovingVertexIdx].x = pt.x;
           this.currentPenVertices[this.penMovingVertexIdx].y = pt.y;
         } else if (this.penActiveVertexIdx !== null && this.currentPenVertices[this.penActiveVertexIdx]) {
-          // Click & Drag while creating: pull handles dynamically
           const curV = this.currentPenVertices[this.penActiveVertexIdx];
-          const dx = pt.x - curV.x;
-          const dy = pt.y - curV.y;
+          const curDx = pt.x - curV.x;
+          const curDy = pt.y - curV.y;
           curV.handleOut = { x: pt.x, y: pt.y };
-          const angle = Math.atan2(dy, dx) + Math.PI;
+          const angle = Math.atan2(curDy, curDx) + Math.PI;
           const dist = curV.nodeType === 'symmetric'
-            ? Math.hypot(dx, dy)
-            : (curV.handleIn ? Math.hypot(curV.handleIn.x - curV.x, curV.handleIn.y - curV.y) : Math.hypot(dx, dy));
+            ? Math.hypot(curDx, curDy)
+            : (curV.handleIn ? Math.hypot(curV.handleIn.x - curV.x, curV.handleIn.y - curV.y) : Math.hypot(curDx, curDy));
           curV.handleIn = {
             x: curV.x + Math.cos(angle) * dist,
             y: curV.y + Math.sin(angle) * dist,
           };
-          if (curV.command === 'L' && (dx !== 0 || dy !== 0)) {
+          if (curV.command === 'L' && (curDx !== 0 || curDy !== 0)) {
             curV.command = 'C';
           }
         }
       } else {
-        // Hovering preview point for rubberband line
         this.penHoverPoint = pt;
       }
       this.renderOverlay();
       return;
     } else if (this.activeHandle === 'shape' && this.shapeStartPt) {
-      // Dynamic shape drag preview
       this.previewShape(this.shapeStartPt, pt);
     }
 
@@ -596,12 +944,70 @@ class AntiDrawApp {
 
     if (this.isDragging) {
       this.isDragging = false;
+      const pt = this.getCanvasPoint(e);
+
+      // 1. Finishing Guide Creation from ruler drag
+      if (this.activeHandle === 'guide-create') {
+        const isHoriz = this.dragGuideOrientation === 'horizontal';
+        const pos = Math.round(isHoriz ? pt.y : pt.x);
+
+        // Check if dragged into canvas bounds (if dropped back inside ruler area, ignore)
+        const isInside = isHoriz
+          ? pt.y >= 0 && pt.y <= this.model.canvas.height
+          : pt.x >= 0 && pt.x <= this.model.canvas.width;
+
+        if (isInside) {
+          const newG = this.canvasMgr.addGuide(
+            this.dragGuideOrientation,
+            pos,
+            this.model.canvas.width,
+            this.model.canvas.height
+          );
+          this.canvasMgr.selectedGuideId = newG.id;
+          this.propertyPanel.showGuideSettings(newG);
+          this.syncMetadataToHost();
+        }
+        this.activeHandle = null;
+        this.render();
+        return;
+      }
+
+      // 2. Finishing Guide Move (Check if dragged back to ruler to delete)
+      if (this.activeHandle === 'guide-move' && this.canvasMgr.selectedGuideId) {
+        const g = this.canvasMgr.getGuide(this.canvasMgr.selectedGuideId);
+        if (g) {
+          let shouldDelete = false;
+          if (g.orientation === 'horizontal' && (pt.y < 0 || pt.y > this.model.canvas.height)) {
+            shouldDelete = true;
+          } else if (g.orientation === 'vertical' && (pt.x < 0 || pt.x > this.model.canvas.width)) {
+            shouldDelete = true;
+          }
+
+          if (shouldDelete) {
+            this.canvasMgr.removeGuide(g.id);
+            this.propertyPanel.resetPanelMode();
+          }
+          this.syncMetadataToHost();
+        }
+        this.activeHandle = null;
+        this.guideInitialState = null;
+        this.render();
+        return;
+      }
+
+      // 3. Finishing Guide Transform (Pivot / Rotate)
+      if (this.activeHandle === 'guide-pivot' || this.activeHandle === 'guide-rotate') {
+        this.activeHandle = null;
+        this.guideInitialState = null;
+        this.syncMetadataToHost();
+        this.render();
+        return;
+      }
 
       if (this.activeHandle === 'pen') {
         this.penActiveVertexIdx = null;
         this.penMovingVertexIdx = null;
       } else if (this.activeHandle === 'marquee' && this.selectionTool.marqueeRect) {
-        // Commit marquee selection
         const hitIds = this.selectionTool.hitTestMarquee(
           this.model.elements,
           this.selectionTool.marqueeRect
@@ -620,7 +1026,6 @@ class AntiDrawApp {
         this.shapeStartPt = null;
         this.render();
       } else if (this.activeHandle === 'shape' && this.shapeStartPt) {
-        const pt = this.getCanvasPoint(e);
         this.commitShape(this.shapeStartPt, pt);
         this.shapeStartPt = null;
         this.toolbar.setTool('select');
@@ -639,6 +1044,18 @@ class AntiDrawApp {
     }
 
     const pt = this.getCanvasPoint(e);
+
+    // Double-click on guide line -> enter angle / pivot transform mode
+    const hitGuide = this.hitTestGuide(pt, 8);
+    if (hitGuide) {
+      this.selectionTool.deselectAll();
+      this.canvasMgr.selectedGuideId = hitGuide.id;
+      this.canvasMgr.activeGuideTransformId = hitGuide.id;
+      this.propertyPanel.showGuideSettings(hitGuide);
+      this.render();
+      return;
+    }
+
     const selectedEl = this.model.elements.find(
       (el) => el.id === this.selectionTool.selectedElementId
     );
@@ -684,7 +1101,6 @@ class AntiDrawApp {
       },
     };
 
-    // Store temporary shape vertices
     this.model.loadSvgString(this.model.toSvgString());
   }
 
@@ -812,8 +1228,6 @@ class AntiDrawApp {
         this.nodeEditorTool.selectedVertexId,
         type
       );
-      // Preserve both selection references across render() — render() -> propertyPanel.update()
-      // recreates panel DOM, which would otherwise lose the selectedVertexId state
       const savedElementId = this.selectionTool.selectedElementId;
       const savedVertexId = this.nodeEditorTool.selectedVertexId;
       this.render();
@@ -850,7 +1264,7 @@ class AntiDrawApp {
     }
 
     this.renderOverlay();
-    
+
     // Update Right Property Panel
     const selectedEl = this.model.elements.find(
       (el) => el.id === this.selectionTool.selectedElementId
@@ -861,51 +1275,102 @@ class AntiDrawApp {
         (v) => v.id === this.nodeEditorTool.selectedVertexId
       ) || null;
     }
+
+    const selectedGuide = this.canvasMgr.selectedGuideId
+      ? this.canvasMgr.getGuide(this.canvasMgr.selectedGuideId) || null
+      : null;
+
     this.propertyPanel.update(
       selectedV,
       this.toolbar.activeTool,
       this.penNodeType,
-      this.currentPenVertices.length
+      this.currentPenVertices.length,
+      selectedGuide
     );
   }
 
-  // Render Overlays: Grid lines, Guide lines, Bounding box + handles, Vertices & Bezier control handles
+  // Render Overlays: Grid lines, Guide lines (1px constant screen width), Bounding box + handles, Vertices & Bezier control handles
   private renderOverlay(): void {
     let html = '';
+    const w = this.model.canvas.width;
+    const h = this.model.canvas.height;
 
     // 1. Grid Lines Overlay
     if (this.canvasMgr.showGrid) {
       const step = this.canvasMgr.gridSpacing;
-      const w = this.model.canvas.width;
-      const h = this.model.canvas.height;
 
       for (let x = step; x < w; x += step) {
-        html += `<line x1="${x}" y1="0" x2="${x}" y2="${h}" stroke="#2a2d3d" stroke-width="0.5" stroke-dasharray="2 2" />`;
+        html += `<line x1="${x}" y1="0" x2="${x}" y2="${h}" stroke="#2a2d3d" stroke-width="0.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
       }
       for (let y = step; y < h; y += step) {
-        html += `<line x1="0" y1="${y}" x2="${w}" y2="${y}" stroke="#2a2d3d" stroke-width="0.5" stroke-dasharray="2 2" />`;
+        html += `<line x1="0" y1="${y}" x2="${w}" y2="${y}" stroke="#2a2d3d" stroke-width="0.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
       }
     }
 
-    // 2. Guide Lines Overlay
+    // 2. Guide Lines Overlay (Always 1px width, inverted highlight on select, transform controls on double click)
     if (this.canvasMgr.showGuides) {
       this.canvasMgr.guides.forEach((g) => {
-        if (g.orientation === 'horizontal') {
-          html += `<line x1="0" y1="${g.position}" x2="${this.model.canvas.width}" y2="${g.position}" stroke="#00f0ff" stroke-width="1" stroke-dasharray="4 2" />`;
-        } else {
-          html += `<line x1="${g.position}" y1="0" x2="${g.position}" y2="${this.model.canvas.height}" stroke="#00f0ff" stroke-width="1" stroke-dasharray="4 2" />`;
+        const isSelected = g.id === this.canvasMgr.selectedGuideId;
+        const isTransforming = g.id === this.canvasMgr.activeGuideTransformId;
+
+        // Inverted color on selection (default cyan #00f0ff -> bright inverse red #ff1a40)
+        const guideColor = isSelected ? '#ff1a40' : (g.color || '#00f0ff');
+        const dashArray = isSelected ? 'none' : '4 2';
+        const geom = this.getGuideGeometry(g);
+
+        // Render full guide line across visible canvas span
+        html += `<line x1="${geom.p1.x}" y1="${geom.p1.y}" x2="${geom.p2.x}" y2="${geom.p2.y}" stroke="${guideColor}" stroke-width="1" stroke-dasharray="${dashArray}" vector-effect="non-scaling-stroke" />`;
+
+        // Render Transform Controls when in active Guide Double-Click Mode
+        if (isTransforming) {
+          // Center Pivot Node Handle
+          html += `
+            <circle cx="${geom.pivot.x}" cy="${geom.pivot.y}" r="6" fill="#1e293b" stroke="${guideColor}" stroke-width="2" vector-effect="non-scaling-stroke" />
+            <circle cx="${geom.pivot.x}" cy="${geom.pivot.y}" r="2" fill="${guideColor}" />
+            <line x1="${geom.pivot.x - 9}" y1="${geom.pivot.y}" x2="${geom.pivot.x + 9}" y2="${geom.pivot.y}" stroke="${guideColor}" stroke-width="1" vector-effect="non-scaling-stroke" />
+            <line x1="${geom.pivot.x}" y1="${geom.pivot.y - 9}" x2="${geom.pivot.x}" y2="${geom.pivot.y + 9}" stroke="${guideColor}" stroke-width="1" vector-effect="non-scaling-stroke" />
+          `;
+
+          // Curved Double-Ended Arrows at both visible limits
+          const arrowRot = (g.angle || 0) + 90;
+
+          // Arrow 1
+          html += `
+            <g transform="translate(${geom.arrow1.x}, ${geom.arrow1.y}) rotate(${arrowRot})">
+              <path d="M -8,-5 C -4,-10 4,-10 8,-5 M 8,-5 L 4,-7 M 8,-5 L 8,-1 M -8,-5 L -4,-7 M -8,-5 L -8,-1 M -8,5 C -4,10 4,10 8,5 M 8,5 L 4,7 M 8,5 L 8,1 M -8,5 L -4,7 M -8,5 L -8,1" fill="none" stroke="${guideColor}" stroke-width="2" vector-effect="non-scaling-stroke" />
+              <circle cx="0" cy="0" r="14" fill="transparent" />
+            </g>
+          `;
+
+          // Arrow 2
+          html += `
+            <g transform="translate(${geom.arrow2.x}, ${geom.arrow2.y}) rotate(${arrowRot})">
+              <path d="M -8,-5 C -4,-10 4,-10 8,-5 M 8,-5 L 4,-7 M 8,-5 L 8,-1 M -8,-5 L -4,-7 M -8,-5 L -8,-1 M -8,5 C -4,10 4,10 8,5 M 8,5 L 4,7 M 8,5 L 8,1 M -8,5 L -4,7 M -8,5 L -8,1" fill="none" stroke="${guideColor}" stroke-width="2" vector-effect="non-scaling-stroke" />
+              <circle cx="0" cy="0" r="14" fill="transparent" />
+            </g>
+          `;
         }
       });
+    }
+
+    // Dynamic Guide Drag Creation Preview
+    if (this.activeHandle === 'guide-create') {
+      const isHoriz = this.dragGuideOrientation === 'horizontal';
+      if (isHoriz) {
+        html += `<line x1="-500" y1="${this.dragGuideCurrentPt.y}" x2="${w + 500}" y2="${this.dragGuideCurrentPt.y}" stroke="#00f0ff" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
+      } else {
+        html += `<line x1="${this.dragGuideCurrentPt.x}" y1="-500" x2="${this.dragGuideCurrentPt.x}" y2="${h + 500}" stroke="#00f0ff" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
+      }
     }
 
     // 3. Marquee Selection Rectangle Overlay
     if (this.selectionTool.marqueeRect) {
       const m = this.selectionTool.marqueeRect;
       const isDesel = this.selectionTool.isDeselectMarquee;
-      html += `<rect x="${m.x}" y="${m.y}" width="${m.width}" height="${m.height}" fill="${isDesel ? 'rgba(239, 68, 68, 0.12)' : 'rgba(59, 130, 246, 0.12)'}" stroke="${isDesel ? '#ef4444' : '#3b82f6'}" stroke-width="1" stroke-dasharray="4 2" />`;
+      html += `<rect x="${m.x}" y="${m.y}" width="${m.width}" height="${m.height}" fill="${isDesel ? 'rgba(239, 68, 68, 0.12)' : 'rgba(59, 130, 246, 0.12)'}" stroke="${isDesel ? '#ef4444' : '#3b82f6'}" stroke-width="1" stroke-dasharray="4 2" vector-effect="non-scaling-stroke" />`;
     }
 
-    // 4. Hover Highlight (Tolerance 3px diameter / border highlight)
+    // 4. Hover Highlight
     if (
       this.selectionTool.hoveredElementId &&
       !this.selectionTool.isSelected(this.selectionTool.hoveredElementId)
@@ -913,7 +1378,7 @@ class AntiDrawApp {
       const hEl = this.model.elements.find((e) => e.id === this.selectionTool.hoveredElementId);
       if (hEl && hEl.vertices) {
         const d = this.model.compilePathD(hEl.vertices, hEl.isClosed);
-        html += `<path d="${d}" fill="none" stroke="#6366f1" stroke-width="2" stroke-dasharray="4 2" opacity="0.8" />`;
+        html += `<path d="${d}" fill="none" stroke="#6366f1" stroke-width="2" stroke-dasharray="4 2" opacity="0.8" vector-effect="non-scaling-stroke" />`;
       }
     }
 
@@ -923,10 +1388,8 @@ class AntiDrawApp {
     if (selectedEls.length > 0) {
       const groupBox = this.selectionTool.getGroupBoundingBox(selectedEls);
       if (groupBox) {
-        // Dotted Bounding Rectangle (1px stroke width)
-        html += `<rect x="${groupBox.x}" y="${groupBox.y}" width="${groupBox.width}" height="${groupBox.height}" fill="none" stroke="#38bdf8" stroke-width="1" stroke-dasharray="3 3" />`;
+        html += `<rect x="${groupBox.x}" y="${groupBox.y}" width="${groupBox.width}" height="${groupBox.height}" fill="none" stroke="#38bdf8" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke" />`;
 
-        // Handles (NW, N, NE, W, E, SW, S, SE)
         const handles = [
           { x: groupBox.x, y: groupBox.y },
           { x: groupBox.cx, y: groupBox.y },
@@ -938,60 +1401,53 @@ class AntiDrawApp {
           { x: groupBox.x + groupBox.width, y: groupBox.y + groupBox.height },
         ];
 
-        handles.forEach((h) => {
-          html += `<rect x="${h.x - 3.5}" y="${h.y - 3.5}" width="7" height="7" fill="#ffffff" stroke="#0284c7" stroke-width="1" rx="1" />`;
+        handles.forEach((hPos) => {
+          html += `<rect x="${hPos.x - 3.5}" y="${hPos.y - 3.5}" width="7" height="7" fill="#ffffff" stroke="#0284c7" stroke-width="1" rx="1" />`;
         });
 
         // Rotation Handle
-        html += `<line x1="${groupBox.cx}" y1="${groupBox.y}" x2="${groupBox.cx}" y2="${groupBox.y - 18}" stroke="#38bdf8" stroke-width="1" stroke-dasharray="2 2" />`;
+        html += `<line x1="${groupBox.cx}" y1="${groupBox.y}" x2="${groupBox.cx}" y2="${groupBox.y - 18}" stroke="#38bdf8" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
         html += `<circle cx="${groupBox.cx}" cy="${groupBox.y - 18}" r="3.5" fill="#38bdf8" stroke="#ffffff" stroke-width="1" />`;
       }
 
-      // If multi-selected, draw individual subtle dashed bounds around each element
       if (selectedEls.length > 1) {
         selectedEls.forEach((el) => {
           const elBox = this.selectionTool.getBoundingBox(el);
           if (elBox) {
-            html += `<rect x="${elBox.x}" y="${elBox.y}" width="${elBox.width}" height="${elBox.height}" fill="none" stroke="#60a5fa" stroke-width="0.75" stroke-dasharray="2 2" opacity="0.6" />`;
+            html += `<rect x="${elBox.x}" y="${elBox.y}" width="${elBox.width}" height="${elBox.height}" fill="none" stroke="#60a5fa" stroke-width="0.75" stroke-dasharray="2 2" opacity="0.6" vector-effect="non-scaling-stroke" />`;
           }
         });
       }
 
-      // 6. Node Edit Mode Vertices & Bezier Handles (for single selected vector)
+      // 6. Node Edit Mode Vertices & Bezier Handles
       if (selectedEls.length === 1 && selectedEls[0].vertices && this.toolbar.activeTool === 'node') {
         const selectedEl = selectedEls[0];
-        const verts = selectedEl.vertices;
+        const verts = selectedEl.vertices!;
         const selectedIdx = verts.findIndex((v) => v.id === this.nodeEditorTool.selectedVertexId);
 
-        // Determine which vertex indices should show their handles:
-        // selected + one before + one after (wrapping for closed paths)
         const showHandlesFor = new Set<number>();
         if (selectedIdx >= 0) {
           showHandlesFor.add(selectedIdx);
-          // adjacent prev
-          const prevIdx = selectedIdx > 0 ? selectedIdx - 1 : (selectedEl.isClosed ? verts.length - 1 : -1);
+          const prevIdx = selectedIdx > 0 ? selectedIdx - 1 : selectedEl.isClosed ? verts.length - 1 : -1;
           if (prevIdx >= 0) showHandlesFor.add(prevIdx);
-          // adjacent next
-          const nextIdx = selectedIdx < verts.length - 1 ? selectedIdx + 1 : (selectedEl.isClosed ? 0 : -1);
+          const nextIdx = selectedIdx < verts.length - 1 ? selectedIdx + 1 : selectedEl.isClosed ? 0 : -1;
           if (nextIdx >= 0) showHandlesFor.add(nextIdx);
         }
 
         verts.forEach((v, idx) => {
           const isSelected = idx === selectedIdx;
 
-          // Render Bezier Handles only for selected + adjacent vertices
           if (showHandlesFor.has(idx)) {
             if (v.handleIn) {
-              html += `<line x1="${v.x}" y1="${v.y}" x2="${v.handleIn.x}" y2="${v.handleIn.y}" stroke="#a855f7" stroke-width="1" stroke-dasharray="2 2" />`;
+              html += `<line x1="${v.x}" y1="${v.y}" x2="${v.handleIn.x}" y2="${v.handleIn.y}" stroke="#a855f7" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
               html += `<circle cx="${v.handleIn.x}" cy="${v.handleIn.y}" r="3.5" fill="#a855f7" stroke="#ffffff" stroke-width="1" />`;
             }
             if (v.handleOut) {
-              html += `<line x1="${v.x}" y1="${v.y}" x2="${v.handleOut.x}" y2="${v.handleOut.y}" stroke="#a855f7" stroke-width="1" />`;
+              html += `<line x1="${v.x}" y1="${v.y}" x2="${v.handleOut.x}" y2="${v.handleOut.y}" stroke="#a855f7" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
               html += `<circle cx="${v.handleOut.x}" cy="${v.handleOut.y}" r="3.5" fill="#a855f7" stroke="#ffffff" stroke-width="1" />`;
             }
           }
 
-          // All vertex anchor points shown in node mode
           html += `<circle cx="${v.x}" cy="${v.y}" r="${isSelected ? 4.5 : 3.5}" fill="${isSelected ? '#38bdf8' : '#ffffff'}" stroke="#0284c7" stroke-width="1" />`;
         });
       }
@@ -1000,27 +1456,25 @@ class AntiDrawApp {
     // 7. Pen Tool In-Progress Path & Rubberband Overlay
     if (this.currentPenVertices.length > 0) {
       const penD = this.model.compilePathD(this.currentPenVertices, false);
-      html += `<path d="${penD}" fill="none" stroke="#38bdf8" stroke-width="2" />`;
+      html += `<path d="${penD}" fill="none" stroke="#38bdf8" stroke-width="2" vector-effect="non-scaling-stroke" />`;
 
       const lastV = this.currentPenVertices[this.currentPenVertices.length - 1];
       if (this.penHoverPoint) {
-        html += `<line x1="${lastV.x}" y1="${lastV.y}" x2="${this.penHoverPoint.x}" y2="${this.penHoverPoint.y}" stroke="#60a5fa" stroke-width="1.5" stroke-dasharray="3 3" />`;
+        html += `<line x1="${lastV.x}" y1="${lastV.y}" x2="${this.penHoverPoint.x}" y2="${this.penHoverPoint.y}" stroke="#60a5fa" stroke-width="1.5" stroke-dasharray="3 3" vector-effect="non-scaling-stroke" />`;
       }
 
       this.currentPenVertices.forEach((v, idx) => {
         const isStart = idx === 0;
 
-        // Render handles if present
         if (v.handleIn) {
-          html += `<line x1="${v.x}" y1="${v.y}" x2="${v.handleIn.x}" y2="${v.handleIn.y}" stroke="#a855f7" stroke-width="1" stroke-dasharray="2 2" />`;
+          html += `<line x1="${v.x}" y1="${v.y}" x2="${v.handleIn.x}" y2="${v.handleIn.y}" stroke="#a855f7" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
           html += `<circle cx="${v.handleIn.x}" cy="${v.handleIn.y}" r="3" fill="#a855f7" stroke="#ffffff" stroke-width="1" />`;
         }
         if (v.handleOut) {
-          html += `<line x1="${v.x}" y1="${v.y}" x2="${v.handleOut.x}" y2="${v.handleOut.y}" stroke="#a855f7" stroke-width="1" stroke-dasharray="2 2" />`;
+          html += `<line x1="${v.x}" y1="${v.y}" x2="${v.handleOut.x}" y2="${v.handleOut.y}" stroke="#a855f7" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
           html += `<circle cx="${v.handleOut.x}" cy="${v.handleOut.y}" r="3" fill="#a855f7" stroke="#ffffff" stroke-width="1" />`;
         }
 
-        // Vertex marker (Start vertex highlighted in green/cyan)
         if (isStart) {
           html += `<circle cx="${v.x}" cy="${v.y}" r="5" fill="#10b981" stroke="#ffffff" stroke-width="1.5" />`;
         } else {

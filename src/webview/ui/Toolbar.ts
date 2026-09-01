@@ -29,6 +29,11 @@ export class Toolbar {
     this.onToolChangeCallback(tool);
   }
 
+  public deselectAll(): void {
+    this.activeTool = '' as any;
+    this.render();
+  }
+
   private render(): void {
     const tools: { id: ToolType; title: string; icon: string }[] = [
       { id: 'select', title: 'Selection Tool (V)', icon: ToolIcons.select },

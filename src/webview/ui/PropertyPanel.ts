@@ -1,5 +1,6 @@
 import { VectorModel, VectorElement, PathVertex, NodeType } from '../engine/VectorModel.js';
 import { SelectionTool, BoundingBox } from '../engine/SelectionTool.js';
+import { GuideLine, RulerConfig } from '../engine/CanvasManager.js';
 import { ToolIcons } from '../icons/ToolIcons.js';
 
 export interface PropertyPanelCallbacks {
@@ -9,6 +10,10 @@ export interface PropertyPanelCallbacks {
   onSplitNode: () => void;
   onPenNodeTypeChange?: (nodeType: NodeType) => void;
   onFinishPenPath?: (close: boolean) => void;
+  onUpdateRuler?: (config: RulerConfig) => void;
+  onUpdateGuide?: (guide: GuideLine) => void;
+  onDeleteGuide?: (guideId: string) => void;
+  onClearAllGuides?: () => void;
 }
 
 export class PropertyPanel {
@@ -19,10 +24,12 @@ export class PropertyPanel {
   private activeTool: string = 'select';
   public penNodeType: NodeType = 'asymmetric';
   public penVertexCount: number = 0;
+  private activeRulerConfig: RulerConfig | null = null;
+  private activeGuide: GuideLine | null = null;
   private callbacks: PropertyPanelCallbacks;
 
   // Track which panel section is currently rendered to avoid full re-builds
-  private currentPanelMode: 'canvas' | 'element' | 'node' | 'pen' | 'multi' | null = null;
+  private currentPanelMode: 'canvas' | 'element' | 'node' | 'pen' | 'multi' | 'ruler' | 'guide' | null = null;
 
   constructor(
     container: HTMLElement,
@@ -41,12 +48,22 @@ export class PropertyPanel {
     selectedVertex: PathVertex | null = null,
     activeTool: string = 'select',
     penNodeType: NodeType = 'asymmetric',
-    penVertexCount: number = 0
+    penVertexCount: number = 0,
+    selectedGuide: GuideLine | null = null
   ): void {
     this.activeVertex = selectedVertex;
     this.activeTool = activeTool;
     this.penNodeType = penNodeType;
     this.penVertexCount = penVertexCount;
+    this.activeGuide = selectedGuide;
+
+    if (selectedGuide) {
+      this.currentPanelMode = 'guide';
+    } else if (activeTool && activeTool !== '' && activeTool !== 'ruler') {
+      if (this.currentPanelMode === 'ruler') {
+        this.currentPanelMode = null;
+      }
+    }
     this.renderPanel();
   }
 
@@ -54,12 +71,37 @@ export class PropertyPanel {
   public resetPanelMode(): void {
     this.currentPanelMode = null;
     this.activeVertex = null;
+    this.activeGuide = null;
+    this.activeRulerConfig = null;
+  }
+
+  public showRulerSettings(config: RulerConfig): void {
+    this.currentPanelMode = 'ruler';
+    this.activeRulerConfig = config;
+    this.renderRulerProperties(config);
+  }
+
+  public showGuideSettings(guide: GuideLine): void {
+    this.currentPanelMode = 'guide';
+    this.activeGuide = guide;
+    this.renderGuideProperties(guide);
   }
 
   private renderPanel(): void {
     if (this.activeTool === 'pen') {
       this.currentPanelMode = 'pen';
       this.renderPenProperties();
+      return;
+    }
+
+    if (this.currentPanelMode === 'ruler' && this.activeRulerConfig) {
+      this.renderRulerProperties(this.activeRulerConfig);
+      return;
+    }
+
+    if (this.activeGuide) {
+      this.currentPanelMode = 'guide';
+      this.renderGuideProperties(this.activeGuide);
       return;
     }
 
@@ -84,6 +126,180 @@ export class PropertyPanel {
     } else {
       this.currentPanelMode = 'canvas';
       this.renderCanvasProperties();
+    }
+  }
+
+  // Render Ruler Configuration Properties
+  private renderRulerProperties(config: RulerConfig): void {
+    this.container.innerHTML = `
+      <div class="panel-section">
+        <div class="panel-title">Ruler &amp; Grid Scale</div>
+        <div class="prop-row">
+          <span class="prop-label">Units</span>
+          <select class="prop-input" id="ruler-unit" style="cursor:pointer;">
+            <option value="px" ${config.unit === 'px' ? 'selected' : ''}>Pixels (px)</option>
+            <option value="mm" ${config.unit === 'mm' ? 'selected' : ''}>Millimeters (mm)</option>
+            <option value="cm" ${config.unit === 'cm' ? 'selected' : ''}>Centimeters (cm)</option>
+            <option value="in" ${config.unit === 'in' ? 'selected' : ''}>Inches (in)</option>
+          </select>
+        </div>
+        <div class="prop-row">
+          <span class="prop-label">Scale (px/u)</span>
+          <input type="number" class="prop-input" id="ruler-scale" value="${config.scale}" min="0.1" step="0.1" />
+        </div>
+        <div class="prop-row">
+          <span class="prop-label">Major Step</span>
+          <input type="number" class="prop-input" id="ruler-step" value="${config.step || 50}" min="10" step="10" />
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <div class="panel-title">Guide Actions</div>
+        <div class="prop-row" style="flex-direction:column; gap:6px;">
+          <button class="prop-input" id="btn-clear-guides" style="cursor:pointer; background:#ef4444; color:#fff; text-align:center; font-weight:600;">
+            🗑 Clear All Guides
+          </button>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <div class="panel-title">Guide Instructions</div>
+        <div style="font-size:11px; color:var(--text-muted); line-height:1.5;">
+          • <b>Drag from top ruler</b>: Create horizontal guide<br/>
+          • <b>Drag from left ruler</b>: Create vertical guide<br/>
+          • <b>Click guide</b>: Select guide<br/>
+          • <b>Drag guide to ruler or Supr</b>: Delete guide<br/>
+          • <b>Double-click guide</b>: Edit angle &amp; pivot node
+        </div>
+      </div>
+    `;
+
+    const unitSelect = this.container.querySelector<HTMLSelectElement>('#ruler-unit');
+    const scaleInput = this.container.querySelector<HTMLInputElement>('#ruler-scale');
+    const stepInput = this.container.querySelector<HTMLInputElement>('#ruler-step');
+    const clearBtn = this.container.querySelector<HTMLButtonElement>('#btn-clear-guides');
+
+    if (unitSelect) {
+      unitSelect.addEventListener('change', () => {
+        config.unit = unitSelect.value as any;
+        if (this.callbacks.onUpdateRuler) this.callbacks.onUpdateRuler(config);
+      });
+    }
+
+    if (scaleInput) {
+      scaleInput.addEventListener('change', () => {
+        config.scale = parseFloat(scaleInput.value) || 1;
+        if (this.callbacks.onUpdateRuler) this.callbacks.onUpdateRuler(config);
+      });
+    }
+
+    if (stepInput) {
+      stepInput.addEventListener('change', () => {
+        config.step = parseFloat(stepInput.value) || 50;
+        if (this.callbacks.onUpdateRuler) this.callbacks.onUpdateRuler(config);
+      });
+    }
+
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        if (this.callbacks.onClearAllGuides) this.callbacks.onClearAllGuides();
+      });
+    }
+  }
+
+  // Render Guide Line Properties
+  private renderGuideProperties(guide: GuideLine): void {
+    this.container.innerHTML = `
+      <div class="panel-section">
+        <div class="panel-title">Guide Line Settings</div>
+        <div class="prop-row">
+          <span class="prop-label">Type</span>
+          <span style="font-weight:600; color:var(--text-main); text-transform:capitalize;">${guide.orientation}</span>
+        </div>
+        <div class="prop-row">
+          <span class="prop-label">Angle (°)</span>
+          <input type="number" class="prop-input" id="guide-angle" value="${Math.round(guide.angle || 0)}" step="1" />
+        </div>
+        <div class="prop-row">
+          <span class="prop-label">Pivot X</span>
+          <input type="number" class="prop-input" id="guide-pivot-x" value="${Math.round(guide.pivotX || 0)}" />
+        </div>
+        <div class="prop-row">
+          <span class="prop-label">Pivot Y</span>
+          <input type="number" class="prop-input" id="guide-pivot-y" value="${Math.round(guide.pivotY || 0)}" />
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <div class="panel-title">Guide Color</div>
+        <div class="prop-row">
+          <span class="prop-label">Color</span>
+          <div class="color-picker-row">
+            <input type="color" class="color-swatch" id="guide-color" value="${guide.color || '#00f0ff'}" />
+            <input type="text" class="prop-input" id="guide-color-hex" value="${guide.color || '#00f0ff'}" />
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <div class="panel-title">Guide Actions</div>
+        <div class="prop-row" style="flex-direction:column; gap:6px;">
+          <button class="prop-input" id="btn-delete-guide" style="cursor:pointer; background:#ef4444; color:#fff; text-align:center; font-weight:600;">
+            🗑 Delete Guide (Supr)
+          </button>
+        </div>
+      </div>
+    `;
+
+    const angleInput = this.container.querySelector<HTMLInputElement>('#guide-angle');
+    const pivotXInput = this.container.querySelector<HTMLInputElement>('#guide-pivot-x');
+    const pivotYInput = this.container.querySelector<HTMLInputElement>('#guide-pivot-y');
+    const colorInput = this.container.querySelector<HTMLInputElement>('#guide-color');
+    const colorHexInput = this.container.querySelector<HTMLInputElement>('#guide-color-hex');
+    const deleteBtn = this.container.querySelector<HTMLButtonElement>('#btn-delete-guide');
+
+    if (angleInput) {
+      angleInput.addEventListener('change', () => {
+        guide.angle = parseFloat(angleInput.value) || 0;
+        guide.orientation = 'angled';
+        if (this.callbacks.onUpdateGuide) this.callbacks.onUpdateGuide(guide);
+      });
+    }
+
+    if (pivotXInput) {
+      pivotXInput.addEventListener('change', () => {
+        guide.pivotX = parseFloat(pivotXInput.value) || 0;
+        if (this.callbacks.onUpdateGuide) this.callbacks.onUpdateGuide(guide);
+      });
+    }
+
+    if (pivotYInput) {
+      pivotYInput.addEventListener('change', () => {
+        guide.pivotY = parseFloat(pivotYInput.value) || 0;
+        if (this.callbacks.onUpdateGuide) this.callbacks.onUpdateGuide(guide);
+      });
+    }
+
+    if (colorInput) {
+      colorInput.addEventListener('input', () => {
+        guide.color = colorInput.value;
+        if (colorHexInput) colorHexInput.value = colorInput.value;
+        if (this.callbacks.onUpdateGuide) this.callbacks.onUpdateGuide(guide);
+      });
+    }
+
+    if (colorHexInput) {
+      colorHexInput.addEventListener('change', () => {
+        guide.color = colorHexInput.value;
+        if (colorInput) colorInput.value = colorHexInput.value;
+        if (this.callbacks.onUpdateGuide) this.callbacks.onUpdateGuide(guide);
+      });
+    }
+
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', () => {
+        if (this.callbacks.onDeleteGuide) this.callbacks.onDeleteGuide(guide.id);
+      });
     }
   }
 
@@ -313,118 +529,195 @@ export class PropertyPanel {
     });
   }
 
-  // Render Element Properties (Fill, Stroke, etc.)
+  // Render Single Element Properties
   private renderElementProperties(el: VectorElement): void {
-    const fill = el.attributes['fill'] || '#000000';
-    const fillOpacity = parseFloat(el.attributes['fill-opacity'] || '1');
-    const stroke = el.attributes['stroke'] || '#000000';
-    const strokeOpacity = parseFloat(el.attributes['stroke-opacity'] || '1');
+    const fill = el.attributes['fill'] || 'none';
+    const stroke = el.attributes['stroke'] || '#ffffff';
     const strokeWidth = el.attributes['stroke-width'] || '1';
+    const strokeDash = el.attributes['stroke-dasharray'] || '';
+    const strokeLinecap = el.attributes['stroke-linecap'] || 'butt';
+    const strokeLinejoin = el.attributes['stroke-linejoin'] || 'miter';
 
-    const fillHex = fill === 'none' ? '#000000' : fill;
-    const strokeHex = stroke === 'none' ? '#000000' : stroke;
+    const box = this.selectionTool.getBoundingBox(el);
+    const x = box ? Math.round(box.x) : 0;
+    const y = box ? Math.round(box.y) : 0;
+    const w = box ? Math.round(box.width) : 0;
+    const h = box ? Math.round(box.height) : 0;
 
     this.container.innerHTML = `
       <div class="panel-section">
-        <div class="panel-title">Element</div>
+        <div class="panel-title">Transform</div>
         <div class="prop-row">
-          <span class="prop-label">ID</span>
-          <input type="text" class="prop-input" value="${el.id}" readonly />
+          <span class="prop-label">X</span>
+          <input type="number" class="prop-input" id="el-x" value="${x}" />
+          <span class="prop-label" style="width:20px; text-align:right;">Y</span>
+          <input type="number" class="prop-input" id="el-y" value="${y}" />
         </div>
         <div class="prop-row">
-          <span class="prop-label">Tag</span>
-          <input type="text" class="prop-input" value="${el.tagName}" readonly />
+          <span class="prop-label">W</span>
+          <input type="number" class="prop-input" id="el-w" value="${w}" />
+          <span class="prop-label" style="width:20px; text-align:right;">H</span>
+          <input type="number" class="prop-input" id="el-h" value="${h}" />
         </div>
       </div>
+
       <div class="panel-section">
         <div class="panel-title">Fill</div>
         <div class="prop-row">
           <span class="prop-label">Color</span>
           <div class="color-picker-row">
-            <input type="color" class="color-swatch" id="fill-color" value="${fillHex}" />
-            <input type="text" class="prop-input" id="fill-hex" value="${fill}" />
+            <input type="color" class="color-swatch" id="el-fill-color" value="${fill === 'none' ? '#4f46e5' : fill}" />
+            <input type="text" class="prop-input" id="el-fill-hex" value="${fill}" />
           </div>
         </div>
-        <div class="prop-row">
-          <span class="prop-label">Opacity</span>
-          <input type="range" class="prop-input" id="fill-alpha" min="0" max="1" step="0.01" value="${fillOpacity}" />
-          <span id="fill-alpha-val" style="min-width:34px;text-align:right;">${Math.round(fillOpacity * 100)}%</span>
-        </div>
       </div>
+
       <div class="panel-section">
         <div class="panel-title">Stroke</div>
         <div class="prop-row">
           <span class="prop-label">Color</span>
           <div class="color-picker-row">
-            <input type="color" class="color-swatch" id="stroke-color" value="${strokeHex}" />
-            <input type="text" class="prop-input" id="stroke-hex" value="${stroke}" />
+            <input type="color" class="color-swatch" id="el-stroke-color" value="${stroke === 'none' ? '#ffffff' : stroke}" />
+            <input type="text" class="prop-input" id="el-stroke-hex" value="${stroke}" />
           </div>
         </div>
         <div class="prop-row">
-          <span class="prop-label">Opacity</span>
-          <input type="range" class="prop-input" id="stroke-alpha" min="0" max="1" step="0.01" value="${strokeOpacity}" />
-          <span id="stroke-alpha-val" style="min-width:34px;text-align:right;">${Math.round(strokeOpacity * 100)}%</span>
+          <span class="prop-label">Width</span>
+          <input type="number" class="prop-input" id="el-stroke-width" value="${strokeWidth}" min="0" step="0.5" />
         </div>
         <div class="prop-row">
-          <span class="prop-label">Width</span>
-          <input type="number" class="prop-input" id="stroke-width" value="${strokeWidth}" min="0" step="0.5" />
+          <span class="prop-label">Dashes</span>
+          <input type="text" class="prop-input" id="el-stroke-dash" value="${strokeDash}" placeholder="e.g. 4 2" />
+        </div>
+        <div class="prop-row">
+          <span class="prop-label">Cap</span>
+          <select class="prop-input" id="el-stroke-cap" style="cursor:pointer;">
+            <option value="butt" ${strokeLinecap === 'butt' ? 'selected' : ''}>Butt</option>
+            <option value="round" ${strokeLinecap === 'round' ? 'selected' : ''}>Round</option>
+            <option value="square" ${strokeLinecap === 'square' ? 'selected' : ''}>Square</option>
+          </select>
+        </div>
+        <div class="prop-row">
+          <span class="prop-label">Join</span>
+          <select class="prop-input" id="el-stroke-join" style="cursor:pointer;">
+            <option value="miter" ${strokeLinejoin === 'miter' ? 'selected' : ''}>Miter</option>
+            <option value="round" ${strokeLinejoin === 'round' ? 'selected' : ''}>Round</option>
+            <option value="bevel" ${strokeLinejoin === 'bevel' ? 'selected' : ''}>Bevel</option>
+          </select>
         </div>
       </div>
     `;
 
-    const fillColor = this.container.querySelector<HTMLInputElement>('#fill-color');
-    const fillHexInput = this.container.querySelector<HTMLInputElement>('#fill-hex');
-    const fillAlpha = this.container.querySelector<HTMLInputElement>('#fill-alpha');
-    const fillAlphaVal = this.container.querySelector<HTMLElement>('#fill-alpha-val');
-    const strokeColor = this.container.querySelector<HTMLInputElement>('#stroke-color');
-    const strokeHexInput = this.container.querySelector<HTMLInputElement>('#stroke-hex');
-    const strokeAlpha = this.container.querySelector<HTMLInputElement>('#stroke-alpha');
-    const strokeAlphaVal = this.container.querySelector<HTMLElement>('#stroke-alpha-val');
-    const strokeWidthInput = this.container.querySelector<HTMLInputElement>('#stroke-width');
+    const elX = this.container.querySelector<HTMLInputElement>('#el-x');
+    const elY = this.container.querySelector<HTMLInputElement>('#el-y');
+    const elW = this.container.querySelector<HTMLInputElement>('#el-w');
+    const elH = this.container.querySelector<HTMLInputElement>('#el-h');
+    const elFillColor = this.container.querySelector<HTMLInputElement>('#el-fill-color');
+    const elFillHex = this.container.querySelector<HTMLInputElement>('#el-fill-hex');
+    const elStrokeColor = this.container.querySelector<HTMLInputElement>('#el-stroke-color');
+    const elStrokeHex = this.container.querySelector<HTMLInputElement>('#el-stroke-hex');
+    const elStrokeWidth = this.container.querySelector<HTMLInputElement>('#el-stroke-width');
+    const elStrokeDash = this.container.querySelector<HTMLInputElement>('#el-stroke-dash');
+    const elStrokeCap = this.container.querySelector<HTMLSelectElement>('#el-stroke-cap');
+    const elStrokeJoin = this.container.querySelector<HTMLSelectElement>('#el-stroke-join');
 
-    if (fillColor) fillColor.addEventListener('input', () => {
-      el.attributes['fill'] = fillColor.value;
-      if (fillHexInput) fillHexInput.value = fillColor.value;
-      this.callbacks.onUpdateElement(el);
-    });
-    if (fillHexInput) fillHexInput.addEventListener('change', () => {
-      el.attributes['fill'] = fillHexInput.value;
-      if (fillColor) fillColor.value = fillHexInput.value;
-      this.callbacks.onUpdateElement(el);
-    });
-    if (fillAlpha && fillAlphaVal) fillAlpha.addEventListener('input', () => {
-      const val = parseFloat(fillAlpha.value);
-      fillAlphaVal.innerText = `${Math.round(val * 100)}%`;
-      el.attributes['fill-opacity'] = val.toString();
-      this.callbacks.onUpdateElement(el);
-    });
-    if (strokeColor) strokeColor.addEventListener('input', () => {
-      el.attributes['stroke'] = strokeColor.value;
-      if (strokeHexInput) strokeHexInput.value = strokeColor.value;
-      this.callbacks.onUpdateElement(el);
-    });
-    if (strokeHexInput) strokeHexInput.addEventListener('change', () => {
-      el.attributes['stroke'] = strokeHexInput.value;
-      if (strokeColor) strokeColor.value = strokeHexInput.value;
-      this.callbacks.onUpdateElement(el);
-    });
-    if (strokeAlpha && strokeAlphaVal) strokeAlpha.addEventListener('input', () => {
-      const val = parseFloat(strokeAlpha.value);
-      strokeAlphaVal.innerText = `${Math.round(val * 100)}%`;
-      el.attributes['stroke-opacity'] = val.toString();
-      this.callbacks.onUpdateElement(el);
-    });
-    if (strokeWidthInput) strokeWidthInput.addEventListener('input', () => {
-      el.attributes['stroke-width'] = strokeWidthInput.value;
-      this.callbacks.onUpdateElement(el);
-    });
+    if (elX && elY && box && el.vertices) {
+      const applyPos = () => {
+        const targetX = parseFloat(elX.value) || 0;
+        const targetY = parseFloat(elY.value) || 0;
+        const dx = targetX - box.x;
+        const dy = targetY - box.y;
+        el.vertices = el.vertices!.map((v) => ({
+          ...v,
+          x: v.x + dx,
+          y: v.y + dy,
+          handleIn: v.handleIn ? { x: v.handleIn.x + dx, y: v.handleIn.y + dy } : undefined,
+          handleOut: v.handleOut ? { x: v.handleOut.x + dx, y: v.handleOut.y + dy } : undefined,
+        }));
+        this.callbacks.onUpdateElement(el);
+      };
+      elX.addEventListener('change', applyPos);
+      elY.addEventListener('change', applyPos);
+    }
+
+    if (elW && elH && box && el.vertices) {
+      const applySize = () => {
+        const targetW = Math.max(parseFloat(elW.value) || 1, 1);
+        const targetH = Math.max(parseFloat(elH.value) || 1, 1);
+        const sx = targetW / (box.width || 1);
+        const sy = targetH / (box.height || 1);
+        el.vertices = el.vertices!.map((v) => ({
+          ...v,
+          x: box.x + (v.x - box.x) * sx,
+          y: box.y + (v.y - box.y) * sy,
+          handleIn: v.handleIn ? { x: box.x + (v.handleIn.x - box.x) * sx, y: box.y + (v.handleIn.y - box.y) * sy } : undefined,
+          handleOut: v.handleOut ? { x: box.x + (v.handleOut.x - box.x) * sx, y: box.y + (v.handleOut.y - box.y) * sy } : undefined,
+        }));
+        this.callbacks.onUpdateElement(el);
+      };
+      elW.addEventListener('change', applySize);
+      elH.addEventListener('change', applySize);
+    }
+
+    if (elFillColor) {
+      elFillColor.addEventListener('input', () => {
+        el.attributes['fill'] = elFillColor.value;
+        if (elFillHex) elFillHex.value = elFillColor.value;
+        this.callbacks.onUpdateElement(el);
+      });
+    }
+    if (elFillHex) {
+      elFillHex.addEventListener('change', () => {
+        el.attributes['fill'] = elFillHex.value;
+        if (elFillColor) elFillColor.value = elFillHex.value;
+        this.callbacks.onUpdateElement(el);
+      });
+    }
+    if (elStrokeColor) {
+      elStrokeColor.addEventListener('input', () => {
+        el.attributes['stroke'] = elStrokeColor.value;
+        if (elStrokeHex) elStrokeHex.value = elStrokeColor.value;
+        this.callbacks.onUpdateElement(el);
+      });
+    }
+    if (elStrokeHex) {
+      elStrokeHex.addEventListener('change', () => {
+        el.attributes['stroke'] = elStrokeHex.value;
+        if (elStrokeColor) elStrokeColor.value = elStrokeHex.value;
+        this.callbacks.onUpdateElement(el);
+      });
+    }
+    if (elStrokeWidth) {
+      elStrokeWidth.addEventListener('input', () => {
+        el.attributes['stroke-width'] = elStrokeWidth.value;
+        this.callbacks.onUpdateElement(el);
+      });
+    }
+    if (elStrokeDash) {
+      elStrokeDash.addEventListener('change', () => {
+        el.attributes['stroke-dasharray'] = elStrokeDash.value;
+        this.callbacks.onUpdateElement(el);
+      });
+    }
+    if (elStrokeCap) {
+      elStrokeCap.addEventListener('change', () => {
+        el.attributes['stroke-linecap'] = elStrokeCap.value;
+        this.callbacks.onUpdateElement(el);
+      });
+    }
+    if (elStrokeJoin) {
+      elStrokeJoin.addEventListener('change', () => {
+        el.attributes['stroke-linejoin'] = elStrokeJoin.value;
+        this.callbacks.onUpdateElement(el);
+      });
+    }
   }
 
-  // Render Node/Vertex Properties — built once, then updated in place via updateNodePropertiesInPlace()
+  // Render Node Properties for single selected vertex
   private renderNodeProperties(el: VectorElement, v: PathVertex): void {
     this.container.innerHTML = `
       <div class="panel-section">
-        <div class="panel-title">Selected Vertex / Node</div>
+        <div class="panel-title">Vertex Coordinates</div>
         <div class="prop-row">
           <span class="prop-label">Position X</span>
           <input type="number" class="prop-input" id="node-pos-x" value="${Math.round(v.x)}" readonly />
@@ -463,16 +756,6 @@ export class PropertyPanel {
     this.bindMouseDown('btn-node-smooth', () => this.callbacks.onNodeTypeChange('smooth'));
     this.bindMouseDown('btn-node-sym', () => this.callbacks.onNodeTypeChange('symmetric'));
     this.bindMouseDown('btn-split-node', () => this.callbacks.onSplitNode());
-  }
-
-  private bindInput(id: string, fn: (val: string) => void): void {
-    const el = this.container.querySelector(`#${id}`) as HTMLInputElement;
-    if (el) el.addEventListener('change', () => fn(el.value));
-  }
-
-  private bindClick(id: string, fn: () => void): void {
-    const el = this.container.querySelector(`#${id}`);
-    if (el) el.addEventListener('click', fn);
   }
 
   // mousedown + preventDefault prevents focus change on canvas; stopPropagation blocks canvasWrapper pointerdown

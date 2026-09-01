@@ -37,12 +37,42 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
 
     let pendingWebviewEdits = 0;
 
-    // Send initial content when webview notifies it is ready or on load
-    const updateWebview = () => {
+    // Helper to get sidecar JSON URI for an SVG document
+    const getSidecarUri = (svgUri: vscode.Uri): vscode.Uri => {
+      const jsonPath = svgUri.path.replace(/\.svg$/i, '.json');
+      return svgUri.with({ path: jsonPath });
+    };
+
+    const readSidecarMetadata = async (): Promise<any> => {
+      try {
+        const sidecarUri = getSidecarUri(document.uri);
+        const data = await vscode.workspace.fs.readFile(sidecarUri);
+        const text = new TextDecoder('utf-8').decode(data);
+        return JSON.parse(text);
+      } catch (_e) {
+        return null;
+      }
+    };
+
+    const writeSidecarMetadata = async (metadata: any): Promise<void> => {
+      try {
+        const sidecarUri = getSidecarUri(document.uri);
+        const jsonString = JSON.stringify(metadata, null, 2);
+        const data = new TextEncoder().encode(jsonString);
+        await vscode.workspace.fs.writeFile(sidecarUri, data);
+      } catch (err: any) {
+        vscode.window.showErrorMessage(`Failed to save metadata: ${err?.message || err}`);
+      }
+    };
+
+    // Send initial content and metadata when webview notifies it is ready or on load
+    const updateWebview = async () => {
       if (pendingWebviewEdits === 0) {
+        const metadata = await readSidecarMetadata();
         webviewPanel.webview.postMessage({
           type: 'loadSvg',
           text: document.getText(),
+          metadata: metadata || null,
         });
       }
     };
@@ -51,7 +81,7 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
     webviewPanel.webview.onDidReceiveMessage(async (message) => {
       switch (message.type) {
         case 'ready':
-          updateWebview();
+          await updateWebview();
           break;
 
         case 'updateDocument': {
@@ -66,6 +96,13 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
             await vscode.workspace.applyEdit(edit);
             // Decrement AFTER a microtask tick so onDidChangeTextDocument fires first
             setTimeout(() => { pendingWebviewEdits = Math.max(0, pendingWebviewEdits - 1); }, 0);
+          }
+          break;
+        }
+
+        case 'updateMetadata': {
+          if (message.metadata !== undefined) {
+            await writeSidecarMetadata(message.metadata);
           }
           break;
         }

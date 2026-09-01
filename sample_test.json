@@ -1,0 +1,20 @@
+{
+  "guides": [
+    {
+      "id": "guide_mtj0ujgx_e46m",
+      "orientation": "angled",
+      "position": 222,
+      "angle": 236,
+      "pivotX": 222,
+      "pivotY": 121,
+      "color": "#00f0ff"
+    }
+  ],
+  "ruler": {
+    "unit": "px",
+    "scale": 1,
+    "originX": 0,
+    "originY": 0,
+    "step": 50
+  }
+}
