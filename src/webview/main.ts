@@ -63,6 +63,11 @@ class AntiDrawApp {
   private guideInitialState: GuideLine | null = null;
   private activeRotateArrowIdx: 1 | 2 = 1;
 
+  // Middle mouse button panning state
+  private isMiddlePanning: boolean = false;
+  private panStartClient: { x: number; y: number } = { x: 0, y: 0 };
+  private panStartScroll: { left: number; top: number } = { left: 0, top: 0 };
+
   public penNodeType: NodeType = 'asymmetric';
   private currentPenVertices: PathVertex[] = [];
   private penHoverPoint: Point | null = null;
@@ -107,9 +112,14 @@ class AntiDrawApp {
       </div>
       <div class="right-panel" id="right-panel"></div>
       <div class="status-bar">
-        <span id="status-tool">Tool: Select</span>
-        <span id="status-coords">X: 0, Y: 0</span>
-        <span id="status-info">Ready</span>
+        <div class="status-left">
+          <span id="status-tool">Tool: Select</span>
+          <span id="status-coords">X: 0, Y: 0</span>
+        </div>
+        <div class="status-right">
+          <span id="status-info">Ready</span>
+          <button class="status-zoom-btn" id="status-zoom" title="Click to reset zoom to 100%">100%</button>
+        </div>
       </div>
     `;
 
@@ -352,6 +362,100 @@ class AntiDrawApp {
     this.canvasWrapper.addEventListener('pointermove', (e) => this.onPointerMove(e));
     this.canvasWrapper.addEventListener('pointerup', (e) => this.onPointerUp(e));
     this.canvasWrapper.addEventListener('dblclick', (e) => this.onDoubleClick(e));
+
+    // Middle mouse button panning (hand cursor and viewport scroll)
+    this.canvasScrollArea.addEventListener('pointerdown', (e: PointerEvent) => {
+      if (e.button === 1) {
+        e.preventDefault();
+        this.isMiddlePanning = true;
+        this.panStartClient = { x: e.clientX, y: e.clientY };
+        this.panStartScroll = {
+          left: this.canvasScrollArea.scrollLeft,
+          top: this.canvasScrollArea.scrollTop,
+        };
+        this.canvasScrollArea.style.cursor = 'grabbing';
+        this.canvasWrapper.style.cursor = 'grabbing';
+        try {
+          this.canvasScrollArea.setPointerCapture(e.pointerId);
+        } catch (_) {}
+      }
+    });
+
+    this.canvasScrollArea.addEventListener('pointermove', (e: PointerEvent) => {
+      if (this.isMiddlePanning) {
+        e.preventDefault();
+        const dx = e.clientX - this.panStartClient.x;
+        const dy = e.clientY - this.panStartClient.y;
+        this.canvasScrollArea.scrollLeft = this.panStartScroll.left - dx;
+        this.canvasScrollArea.scrollTop = this.panStartScroll.top - dy;
+        this.syncRulerScroll();
+      }
+    });
+
+    const stopMiddlePan = (e: PointerEvent) => {
+      if (this.isMiddlePanning) {
+        this.isMiddlePanning = false;
+        this.canvasScrollArea.style.cursor = '';
+        this.canvasWrapper.style.cursor = '';
+        try {
+          this.canvasScrollArea.releasePointerCapture(e.pointerId);
+        } catch (_) {}
+      }
+    };
+
+    this.canvasScrollArea.addEventListener('pointerup', stopMiddlePan);
+    this.canvasScrollArea.addEventListener('pointercancel', stopMiddlePan);
+    window.addEventListener('pointerup', stopMiddlePan);
+
+    // Prevent default browser auto-scroll icon on middle click
+    this.canvasScrollArea.addEventListener('auxclick', (e: MouseEvent) => {
+      if (e.button === 1) e.preventDefault();
+    });
+
+    // Mouse Wheel: Ctrl + Wheel for Zoom In / Zoom Out (10% increments), Alt + Wheel for Horizontal Scroll
+    this.canvasScrollArea.addEventListener(
+      'wheel',
+      (e: WheelEvent) => {
+        if (e.ctrlKey && this.toolbar.activeTool === 'select') {
+          e.preventDefault();
+          const delta = e.deltaY < 0 ? 0.1 : -0.1;
+          const currentZoom = Math.round(this.canvasMgr.zoom * 10) / 10;
+          const newZoom = Math.round(Math.max(0.1, Math.min(10.0, currentZoom + delta)) * 10) / 10;
+          if (newZoom !== this.canvasMgr.zoom) {
+            this.setZoom(newZoom);
+          }
+        } else if (e.altKey) {
+          // Alt + Scroll -> Horizontal scroll only
+          e.preventDefault();
+          const delta = e.deltaY || e.deltaX;
+          this.canvasScrollArea.scrollLeft += delta;
+          this.syncRulerScroll();
+        }
+      },
+      { passive: false }
+    );
+
+    // Status bar zoom indicator: click to reset to 100%
+    const zoomResetBtn = document.getElementById('status-zoom');
+    if (zoomResetBtn) {
+      zoomResetBtn.addEventListener('click', () => {
+        this.setZoom(1.0);
+      });
+    }
+  }
+
+  public setZoom(zoom: number): void {
+    this.canvasMgr.zoom = Math.round(Math.max(0.1, Math.min(10.0, zoom)) * 10) / 10;
+    this.applyCanvasSize();
+    this.render();
+    this.updateStatusZoom();
+  }
+
+  private updateStatusZoom(): void {
+    const zoomEl = document.getElementById('status-zoom');
+    if (zoomEl) {
+      zoomEl.innerText = `${Math.round(this.canvasMgr.zoom * 100)}%`;
+    }
   }
 
   private notifyReady(): void {
@@ -376,14 +480,17 @@ class AntiDrawApp {
 
   private applyCanvasSize(): void {
     const { width, height, backgroundColor } = this.model.canvas;
+    const zoom = this.canvasMgr.zoom || 1.0;
+    const displayW = Math.round(width * zoom);
+    const displayH = Math.round(height * zoom);
     const vb = `0 0 ${width} ${height}`;
     this.model.canvas.viewBox = vb;
 
-    // Set canvas-wrapper to exact pixel dimensions — never scale with window
+    // Set canvas-wrapper to exact scaled pixel dimensions
     this.canvasWrapper.style.cssText = `
       position: relative;
-      width: ${width}px;
-      height: ${height}px;
+      width: ${displayW}px;
+      height: ${displayH}px;
       background-color: ${backgroundColor};
       box-shadow: 0 12px 40px rgba(0,0,0,0.6);
       border: 1px solid #2b2d3d;
@@ -392,13 +499,13 @@ class AntiDrawApp {
       overflow: hidden;
     `;
 
-    // Both SVGs: fixed pixel size equal to canvas, anchored at top-left
+    // Both SVGs: width and height match zoomed dimensions, viewBox stays in 1:1 canvas model space
     [this.svgCanvas, this.overlaySvg].forEach((svg) => {
       svg.setAttribute('width', width.toString());
       svg.setAttribute('height', height.toString());
       svg.setAttribute('viewBox', vb);
-      svg.style.width = `${width}px`;
-      svg.style.height = `${height}px`;
+      svg.style.width = `${displayW}px`;
+      svg.style.height = `${displayH}px`;
       svg.style.position = 'absolute';
       svg.style.top = '0';
       svg.style.left = '0';
@@ -490,6 +597,7 @@ class AntiDrawApp {
   }
 
   private onPointerDown(e: PointerEvent): void {
+    if (e.button !== 0) return;
     const pt = this.getCanvasPoint(e);
     this.dragStartPt = pt;
     this.isDragging = true;
