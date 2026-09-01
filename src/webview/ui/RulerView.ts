@@ -1,4 +1,5 @@
 import { CanvasManager, RulerConfig } from '../engine/CanvasManager.js';
+import { VectorModel } from '../engine/VectorModel.js';
 
 export interface RulerViewCallbacks {
   onCornerClick: () => void;
@@ -8,6 +9,7 @@ export interface RulerViewCallbacks {
 export class RulerView {
   private container: HTMLElement;
   private canvasMgr: CanvasManager;
+  private model: VectorModel;
   private callbacks: RulerViewCallbacks;
 
   private cornerBtn!: HTMLElement;
@@ -18,12 +20,20 @@ export class RulerView {
 
   private currentCursorX: number | null = null;
   private currentCursorY: number | null = null;
+  private currentOffsetX: number = 0;
+  private currentOffsetY: number = 0;
   private canvasW: number = 800;
   private canvasH: number = 600;
 
-  constructor(container: HTMLElement, canvasMgr: CanvasManager, callbacks: RulerViewCallbacks) {
+  constructor(
+    container: HTMLElement,
+    canvasMgr: CanvasManager,
+    model: VectorModel,
+    callbacks: RulerViewCallbacks
+  ) {
     this.container = container;
     this.canvasMgr = canvasMgr;
+    this.model = model;
     this.callbacks = callbacks;
     this.initDOM();
     this.initEvents();
@@ -96,10 +106,28 @@ export class RulerView {
     this.renderRulers();
   }
 
-  public renderRulers(offsetCanvasX: number = 0, offsetCanvasY: number = 0): void {
+  public renderRulers(offsetCanvasX?: number, offsetCanvasY?: number): void {
+    if (offsetCanvasX !== undefined) this.currentOffsetX = offsetCanvasX;
+    if (offsetCanvasY !== undefined) this.currentOffsetY = offsetCanvasY;
+
+    const offsetCanvasXVal = this.currentOffsetX;
+    const offsetCanvasYVal = this.currentOffsetY;
+
     const dpr = window.devicePixelRatio || 1;
     const cfg = this.canvasMgr.rulerConfig;
     const zoom = this.canvasMgr.zoom;
+    const vb = this.model.getViewBoxBounds();
+    const workBounds = this.model.getWorkingCanvasBounds(80);
+
+    // Calculate ruler zero origin relative to ViewBox (default at top-left of ViewBox)
+    const originCanvasX = vb.minX + (cfg.originX || 0);
+    const originCanvasY = vb.minY + (cfg.originY || 0);
+
+    const startX = offsetCanvasXVal + (originCanvasX - workBounds.minX) * zoom;
+    const startY = offsetCanvasYVal + (originCanvasY - workBounds.minY) * zoom;
+
+    const vbScreenStartX = offsetCanvasXVal + (vb.minX - workBounds.minX) * zoom;
+    const vbScreenStartY = offsetCanvasYVal + (vb.minY - workBounds.minY) * zoom;
 
     // --- RENDER TOP RULER ---
     const tCtx = this.topCtx;
@@ -114,9 +142,9 @@ export class RulerView {
     tCtx.fillStyle = '#1a1b23';
     tCtx.fillRect(0, 0, tW, tH);
 
-    // Canvas border highlight region on ruler
+    // ViewBox artboard highlight region on ruler
     tCtx.fillStyle = '#222533';
-    tCtx.fillRect(offsetCanvasX, 0, this.canvasW * zoom, tH);
+    tCtx.fillRect(vbScreenStartX, 0, vb.width * zoom, tH);
 
     // Draw ticks
     tCtx.strokeStyle = '#475569';
@@ -128,10 +156,11 @@ export class RulerView {
     const step = (cfg.step || 50) * zoom;
     const subStep = step / 5;
 
-    const startX = offsetCanvasX;
-    const endX = startX + this.canvasW * zoom + 500;
+    const minScreenX = offsetCanvasXVal - 500;
+    const maxScreenX = offsetCanvasXVal + workBounds.width * zoom + 500;
+    const firstTickX = startX - Math.ceil((startX - minScreenX) / subStep) * subStep;
 
-    for (let x = startX - 500; x < endX; x += subStep) {
+    for (let x = firstTickX; x < maxScreenX; x += subStep) {
       const relVal = Math.round((x - startX) / zoom / cfg.scale);
       const isMajor = Math.abs((x - startX) % step) < 0.5 || Math.abs((x - startX) % step - step) < 0.5;
       const isMedium = Math.abs((x - startX) % (step / 2)) < 0.5;
@@ -164,7 +193,7 @@ export class RulerView {
 
     // Cursor indicator on top ruler
     if (this.currentCursorX !== null) {
-      const curScreenX = offsetCanvasX + this.currentCursorX * zoom;
+      const curScreenX = offsetCanvasXVal + (this.currentCursorX - workBounds.minX) * zoom;
       tCtx.strokeStyle = '#00f0ff';
       tCtx.lineWidth = 1;
       tCtx.beginPath();
@@ -187,19 +216,20 @@ export class RulerView {
     lCtx.fillStyle = '#1a1b23';
     lCtx.fillRect(0, 0, lW, lH);
 
-    // Canvas border highlight region on ruler
+    // ViewBox artboard highlight region on ruler
     lCtx.fillStyle = '#222533';
-    lCtx.fillRect(0, offsetCanvasY, lW, this.canvasH * zoom);
+    lCtx.fillRect(0, vbScreenStartY, lW, vb.height * zoom);
 
     // Draw ticks
     lCtx.strokeStyle = '#475569';
     lCtx.fillStyle = '#94a3b8';
     lCtx.font = '8px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
 
-    const startY = offsetCanvasY;
-    const endY = startY + this.canvasH * zoom + 500;
+    const minScreenY = offsetCanvasYVal - 500;
+    const maxScreenY = offsetCanvasYVal + workBounds.height * zoom + 500;
+    const firstTickY = startY - Math.ceil((startY - minScreenY) / subStep) * subStep;
 
-    for (let y = startY - 500; y < endY; y += subStep) {
+    for (let y = firstTickY; y < maxScreenY; y += subStep) {
       const relVal = Math.round((y - startY) / zoom / cfg.scale);
       const isMajor = Math.abs((y - startY) % step) < 0.5 || Math.abs((y - startY) % step - step) < 0.5;
       const isMedium = Math.abs((y - startY) % (step / 2)) < 0.5;
@@ -239,7 +269,7 @@ export class RulerView {
 
     // Cursor indicator on left ruler
     if (this.currentCursorY !== null) {
-      const curScreenY = offsetCanvasY + this.currentCursorY * zoom;
+      const curScreenY = offsetCanvasYVal + (this.currentCursorY - workBounds.minY) * zoom;
       lCtx.strokeStyle = '#00f0ff';
       lCtx.lineWidth = 1;
       lCtx.beginPath();
@@ -250,3 +280,4 @@ export class RulerView {
     lCtx.restore();
   }
 }
+

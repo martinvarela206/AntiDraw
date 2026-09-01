@@ -23,3 +23,6 @@ This file contains rules specific to the AntiPaint project. Rules are written in
    - **User Explicit Milestone / Release Selection**: Only when explicitly requested by the user, increment the major version and reset lower components to zero (`x+1.0.0`).
 3. **Mandatory VSIX Generation & Packaging**:
    - After completing code modifications and updating the project version, always build and package the extension into a `.vsix` artifact (`pnpm run package` / `vsce package --no-dependencies`).
+4. **File-Specific Metadata Persistence**:
+   - All extension configuration, editor state, and visual tool parameters directly associated with the edited SVG file (such as guide lines, ruler origin/positions, grid settings, etc.) must be automatically persisted to and loaded from the companion JSON metadata file associated with the SVG (`.json`).
+

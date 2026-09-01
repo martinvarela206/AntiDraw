@@ -22,8 +22,21 @@
   "ruler": {
     "unit": "px",
     "scale": 1,
-    "originX": 0,
-    "originY": 0,
+    "originX": 30,
+    "originY": 20,
     "step": 50
+  },
+  "showGrid": true,
+  "showGuides": true,
+  "gridSpacing": 20,
+  "snapToGrid": false,
+  "snapToGuides": false,
+  "snapToVertices": false,
+  "shapeConfig": {
+    "aspectRatioW": 4,
+    "aspectRatioH": 3,
+    "starPoints": 5,
+    "starInnerRatio": 0.4,
+    "rectCornerRadius": 0
   }
 }

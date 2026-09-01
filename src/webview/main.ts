@@ -178,6 +178,7 @@ class AntiDrawApp {
     this.rulerView = new RulerView(
       this.canvasContainer,
       this.canvasMgr,
+      this.model,
       {
         onCornerClick: () => {
           this.toolbar.deselectAll();
@@ -279,11 +280,20 @@ class AntiDrawApp {
           return;
         }
 
-        // Load sidecar metadata if available, otherwise clear guides
+        // Load sidecar metadata if available
         if (msg.metadata) {
           this.canvasMgr.guides = Array.isArray(msg.metadata.guides) ? msg.metadata.guides : [];
           if (msg.metadata.ruler) {
             this.canvasMgr.rulerConfig = { ...this.canvasMgr.rulerConfig, ...msg.metadata.ruler };
+          }
+          if (msg.metadata.showGrid !== undefined) this.canvasMgr.showGrid = msg.metadata.showGrid;
+          if (msg.metadata.showGuides !== undefined) this.canvasMgr.showGuides = msg.metadata.showGuides;
+          if (msg.metadata.gridSpacing !== undefined) this.canvasMgr.gridSpacing = msg.metadata.gridSpacing;
+          if (msg.metadata.snapToGrid !== undefined) this.canvasMgr.snapToGrid = msg.metadata.snapToGrid;
+          if (msg.metadata.snapToGuides !== undefined) this.canvasMgr.snapToGuides = msg.metadata.snapToGuides;
+          if (msg.metadata.snapToVertices !== undefined) this.canvasMgr.snapToVertices = msg.metadata.snapToVertices;
+          if (msg.metadata.shapeConfig) {
+            this.canvasMgr.shapeConfig = { ...this.canvasMgr.shapeConfig, ...msg.metadata.shapeConfig };
           }
         } else {
           this.canvasMgr.guides = [];
@@ -565,6 +575,13 @@ class AntiDrawApp {
       metadata: {
         guides: this.canvasMgr.guides,
         ruler: this.canvasMgr.rulerConfig,
+        showGrid: this.canvasMgr.showGrid,
+        showGuides: this.canvasMgr.showGuides,
+        gridSpacing: this.canvasMgr.gridSpacing,
+        snapToGrid: this.canvasMgr.snapToGrid,
+        snapToGuides: this.canvasMgr.snapToGuides,
+        snapToVertices: this.canvasMgr.snapToVertices,
+        shapeConfig: this.canvasMgr.shapeConfig,
       },
     });
   }
@@ -975,7 +992,15 @@ class AntiDrawApp {
   private onPointerMove(e: PointerEvent): void {
     const pt = this.getCanvasPoint(e);
     const coordsEl = document.getElementById('status-coords');
-    if (coordsEl) coordsEl.innerText = `X: ${Math.round(pt.x)}, Y: ${Math.round(pt.y)}`;
+    if (coordsEl) {
+      const vb = this.model.getViewBoxBounds();
+      const cfg = this.canvasMgr.rulerConfig;
+      const originX = vb.minX + (cfg.originX || 0);
+      const originY = vb.minY + (cfg.originY || 0);
+      const relX = Math.round((pt.x - originX) / (cfg.scale || 1));
+      const relY = Math.round((pt.y - originY) / (cfg.scale || 1));
+      coordsEl.innerText = `X: ${relX}, Y: ${relY}`;
+    }
 
     // Update cursor indicator on rulers
     this.rulerView.setCursorPos(pt.x, pt.y);

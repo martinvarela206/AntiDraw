@@ -142,7 +142,35 @@ export class PropertyPanel {
 
   // Render Ruler Configuration Properties
   private renderRulerProperties(config: RulerConfig): void {
+    const vb = this.model.getViewBoxBounds();
+
     this.container.innerHTML = `
+      <div class="panel-section">
+        <div class="panel-title">Ruler Origin (Zero Point)</div>
+        <div class="prop-row">
+          <span class="prop-label">Origin X</span>
+          <input type="number" class="prop-input" id="ruler-origin-x" value="${config.originX || 0}" />
+          <span class="prop-label" style="width:20px; text-align:right;">Y</span>
+          <input type="number" class="prop-input" id="ruler-origin-y" value="${config.originY || 0}" />
+        </div>
+        <div class="prop-row" style="margin-top: 8px;">
+          <span class="prop-label" style="width:70px;">Align Horiz</span>
+          <div class="button-group" style="flex:1;">
+            <button class="tool-btn" id="ruler-align-left" title="Origin at Left of ViewBox (X=0)">${ToolIcons.alignLeft}</button>
+            <button class="tool-btn" id="ruler-align-center-h" title="Origin at Horizontal Center of ViewBox">${ToolIcons.alignCenter}</button>
+            <button class="tool-btn" id="ruler-align-right" title="Origin at Right of ViewBox">${ToolIcons.alignRight}</button>
+          </div>
+        </div>
+        <div class="prop-row" style="margin-top: 4px;">
+          <span class="prop-label" style="width:70px;">Align Vert</span>
+          <div class="button-group" style="flex:1;">
+            <button class="tool-btn" id="ruler-align-top" title="Origin at Top of ViewBox (Y=0)">${ToolIcons.alignTop}</button>
+            <button class="tool-btn" id="ruler-align-center-v" title="Origin at Vertical Center of ViewBox">${ToolIcons.alignMiddle}</button>
+            <button class="tool-btn" id="ruler-align-bottom" title="Origin at Bottom of ViewBox">${ToolIcons.alignBottom}</button>
+          </div>
+        </div>
+      </div>
+
       <div class="panel-section">
         <div class="panel-title">Ruler &amp; Grid Scale</div>
         <div class="prop-row">
@@ -185,10 +213,61 @@ export class PropertyPanel {
       </div>
     `;
 
+    const originXInput = this.container.querySelector<HTMLInputElement>('#ruler-origin-x');
+    const originYInput = this.container.querySelector<HTMLInputElement>('#ruler-origin-y');
+    const alignLeftBtn = this.container.querySelector<HTMLButtonElement>('#ruler-align-left');
+    const alignCenterHBtn = this.container.querySelector<HTMLButtonElement>('#ruler-align-center-h');
+    const alignRightBtn = this.container.querySelector<HTMLButtonElement>('#ruler-align-right');
+    const alignTopBtn = this.container.querySelector<HTMLButtonElement>('#ruler-align-top');
+    const alignCenterVBtn = this.container.querySelector<HTMLButtonElement>('#ruler-align-center-v');
+    const alignBottomBtn = this.container.querySelector<HTMLButtonElement>('#ruler-align-bottom');
+
     const unitSelect = this.container.querySelector<HTMLSelectElement>('#ruler-unit');
     const scaleInput = this.container.querySelector<HTMLInputElement>('#ruler-scale');
     const stepInput = this.container.querySelector<HTMLInputElement>('#ruler-step');
     const clearBtn = this.container.querySelector<HTMLButtonElement>('#btn-clear-guides');
+
+    const updateOrigin = (x: number, y: number) => {
+      config.originX = x;
+      config.originY = y;
+      if (originXInput) originXInput.value = x.toString();
+      if (originYInput) originYInput.value = y.toString();
+      if (this.callbacks.onUpdateRuler) this.callbacks.onUpdateRuler(config);
+    };
+
+    if (originXInput) {
+      originXInput.addEventListener('change', () => {
+        config.originX = parseFloat(originXInput.value) || 0;
+        if (this.callbacks.onUpdateRuler) this.callbacks.onUpdateRuler(config);
+      });
+    }
+
+    if (originYInput) {
+      originYInput.addEventListener('change', () => {
+        config.originY = parseFloat(originYInput.value) || 0;
+        if (this.callbacks.onUpdateRuler) this.callbacks.onUpdateRuler(config);
+      });
+    }
+
+    if (alignLeftBtn) {
+      alignLeftBtn.addEventListener('click', () => updateOrigin(0, config.originY || 0));
+    }
+    if (alignCenterHBtn) {
+      alignCenterHBtn.addEventListener('click', () => updateOrigin(Math.round(vb.width / 2), config.originY || 0));
+    }
+    if (alignRightBtn) {
+      alignRightBtn.addEventListener('click', () => updateOrigin(Math.round(vb.width), config.originY || 0));
+    }
+
+    if (alignTopBtn) {
+      alignTopBtn.addEventListener('click', () => updateOrigin(config.originX || 0, 0));
+    }
+    if (alignCenterVBtn) {
+      alignCenterVBtn.addEventListener('click', () => updateOrigin(config.originX || 0, Math.round(vb.height / 2)));
+    }
+    if (alignBottomBtn) {
+      alignBottomBtn.addEventListener('click', () => updateOrigin(config.originX || 0, Math.round(vb.height)));
+    }
 
     if (unitSelect) {
       unitSelect.addEventListener('change', () => {
