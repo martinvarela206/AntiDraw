@@ -860,7 +860,7 @@ class AntiDrawApp {
 
       // 4b. Check hit on composite bounding box handles if vector elements are selected
       if (selectedEls.length > 0) {
-        const groupBox = this.selectionTool.getGroupBoundingBox(selectedEls);
+        const groupBox = this.selectionTool.getGroupSelectionBoundingBox(selectedEls, 6);
         if (groupBox) {
           const handle = this.selectionTool.hitTestHandle(groupBox, pt, 14);
           if (handle) {
@@ -1035,13 +1035,13 @@ class AntiDrawApp {
           return;
         }
 
-        const selectedEl = this.model.elements.find(
-          (el) => el.id === this.selectionTool.selectedElementId
+        const selectedEls = this.model.elements.filter(
+          (el) => this.selectionTool.isSelected(el.id)
         );
         let cursor = 'default';
 
-        if (selectedEl) {
-          const box = this.selectionTool.getBoundingBox(selectedEl);
+        if (selectedEls.length > 0) {
+          const box = this.selectionTool.getGroupSelectionBoundingBox(selectedEls, 6);
           if (box) {
             const h = this.selectionTool.hitTestHandle(box, pt, 14);
             if (h) {
@@ -1962,7 +1962,7 @@ class AntiDrawApp {
     const selectedEls = this.model.elements.filter((e) => this.selectionTool.isSelected(e.id));
 
     if (selectedEls.length > 0) {
-      const groupBox = this.selectionTool.getGroupBoundingBox(selectedEls);
+      const groupBox = this.selectionTool.getGroupSelectionBoundingBox(selectedEls, 6);
       if (groupBox) {
         html += `<rect x="${groupBox.x}" y="${groupBox.y}" width="${groupBox.width}" height="${groupBox.height}" fill="none" stroke="#38bdf8" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke" />`;
 
@@ -1988,7 +1988,7 @@ class AntiDrawApp {
 
       if (selectedEls.length > 1) {
         selectedEls.forEach((el) => {
-          const elBox = this.selectionTool.getBoundingBox(el);
+          const elBox = this.selectionTool.getSelectionBoundingBox(el, 6);
           if (elBox) {
             html += `<rect x="${elBox.x}" y="${elBox.y}" width="${elBox.width}" height="${elBox.height}" fill="none" stroke="#60a5fa" stroke-width="0.75" stroke-dasharray="2 2" opacity="0.6" vector-effect="non-scaling-stroke" />`;
           }

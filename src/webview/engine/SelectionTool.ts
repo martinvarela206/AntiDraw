@@ -97,6 +97,20 @@ export class SelectionTool {
     };
   }
 
+  // Calculate padded bounding box for selection mask & resize handles
+  public getSelectionBoundingBox(element: VectorElement, padding: number = 6): BoundingBox | null {
+    const box = this.getBoundingBox(element);
+    if (!box) return null;
+    return {
+      x: box.x - padding,
+      y: box.y - padding,
+      width: box.width + padding * 2,
+      height: box.height + padding * 2,
+      cx: box.cx,
+      cy: box.cy,
+    };
+  }
+
   // Calculate composite group bounding box for multiple elements
   public getGroupBoundingBox(elements: VectorElement[]): BoundingBox | null {
     if (!elements || elements.length === 0) return null;
@@ -127,6 +141,20 @@ export class SelectionTool {
       height,
       cx: minX + width / 2,
       cy: minY + height / 2,
+    };
+  }
+
+  // Calculate composite group selection bounding box with padding
+  public getGroupSelectionBoundingBox(elements: VectorElement[], padding: number = 6): BoundingBox | null {
+    const box = this.getGroupBoundingBox(elements);
+    if (!box) return null;
+    return {
+      x: box.x - padding,
+      y: box.y - padding,
+      width: box.width + padding * 2,
+      height: box.height + padding * 2,
+      cx: box.cx,
+      cy: box.cy,
     };
   }
 
@@ -273,7 +301,7 @@ export class SelectionTool {
     handle: HandleType,
     dx: number,
     dy: number,
-    aspectRatio: boolean = false
+    padding: number = 6
   ): PathVertex[] {
     let newX = initialBox.x;
     let newY = initialBox.y;
@@ -317,29 +345,41 @@ export class SelectionTool {
         break;
     }
 
-    if (newW < 2) newW = 2;
-    if (newH < 2) newH = 2;
+    const minDim = padding * 2 + 2;
+    if (newW < minDim) newW = minDim;
+    if (newH < minDim) newH = minDim;
 
-    const scaleX = newW / initialBox.width;
-    const scaleY = newH / initialBox.height;
+    // Tight boxes before and after
+    const initialTightX = initialBox.x + padding;
+    const initialTightY = initialBox.y + padding;
+    const initialTightW = Math.max(initialBox.width - padding * 2, 1);
+    const initialTightH = Math.max(initialBox.height - padding * 2, 1);
+
+    const newTightX = newX + padding;
+    const newTightY = newY + padding;
+    const newTightW = Math.max(newW - padding * 2, 1);
+    const newTightH = Math.max(newH - padding * 2, 1);
+
+    const scaleX = newTightW / initialTightW;
+    const scaleY = newTightH / initialTightH;
 
     return initialVertices.map((v) => {
       const next: PathVertex = {
         ...v,
-        x: newX + (v.x - initialBox.x) * scaleX,
-        y: newY + (v.y - initialBox.y) * scaleY,
+        x: newTightX + (v.x - initialTightX) * scaleX,
+        y: newTightY + (v.y - initialTightY) * scaleY,
       };
 
       if (v.handleIn) {
         next.handleIn = {
-          x: newX + (v.handleIn.x - initialBox.x) * scaleX,
-          y: newY + (v.handleIn.y - initialBox.y) * scaleY,
+          x: newTightX + (v.handleIn.x - initialTightX) * scaleX,
+          y: newTightY + (v.handleIn.y - initialTightY) * scaleY,
         };
       }
       if (v.handleOut) {
         next.handleOut = {
-          x: newX + (v.handleOut.x - initialBox.x) * scaleX,
-          y: newY + (v.handleOut.y - initialBox.y) * scaleY,
+          x: newTightX + (v.handleOut.x - initialTightX) * scaleX,
+          y: newTightY + (v.handleOut.y - initialTightY) * scaleY,
         };
       }
       return next;
