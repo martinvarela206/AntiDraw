@@ -161,13 +161,13 @@ export class SelectionTool {
     return hits;
   }
 
-  // Hit test vector elements based on fill or stroke tolerance (3px diameter = 1.5px radius or tolerance threshold)
+  // Hit test vector elements based on fill or stroke tolerance
   public hitTest(
     elements: VectorElement[],
     pt: Point,
     zoomScale: number = 1.0
   ): { element: VectorElement; hitOnFill: boolean } | null {
-    const effectiveTolerance = (this.hoverTolerance / 2) / zoomScale;
+    const effectiveTolerance = Math.max((this.hoverTolerance / 2) / (zoomScale || 1), 3);
 
     // Search top-to-bottom (reverse array)
     for (let i = elements.length - 1; i >= 0; i--) {
@@ -176,15 +176,16 @@ export class SelectionTool {
 
       const fill = el.attributes.fill || 'none';
       const isFilled = fill !== 'none' && fill !== 'transparent' && fill !== 'rgba(0,0,0,0)';
+      const isClosed = el.isClosed !== false;
 
-      // 1. Edge/Stroke Hit test (within 3px diameter tolerance)
-      const edgeHit = this.hitTestPathEdge(el.vertices, pt, effectiveTolerance);
+      // 1. Edge/Stroke Hit test
+      const edgeHit = this.hitTestPathEdge(el.vertices, pt, effectiveTolerance, isClosed);
       if (edgeHit) {
         return { element: el, hitOnFill: false };
       }
 
       // 2. Fill area hit test
-      if (isFilled && this.hitTestPolygonFill(el.vertices, pt)) {
+      if (isFilled && isClosed && this.hitTestPolygonFill(el.vertices, pt)) {
         return { element: el, hitOnFill: true };
       }
     }
@@ -193,10 +194,18 @@ export class SelectionTool {
   }
 
   // Distance from point to path edge segments (lines and Bezier curves)
-  private hitTestPathEdge(vertices: PathVertex[], pt: Point, tolerance: number): boolean {
-    for (let i = 0; i < vertices.length - 1; i++) {
+  private hitTestPathEdge(
+    vertices: PathVertex[],
+    pt: Point,
+    tolerance: number,
+    isClosed: boolean = true
+  ): boolean {
+    if (!vertices || vertices.length < 2) return false;
+    const count = isClosed ? vertices.length : vertices.length - 1;
+
+    for (let i = 0; i < count; i++) {
       const p1 = vertices[i];
-      const p2 = vertices[i + 1];
+      const p2 = vertices[(i + 1) % vertices.length];
 
       if (p1.handleOut || p2.handleIn) {
         const h1 = p1.handleOut || { x: p1.x, y: p1.y };

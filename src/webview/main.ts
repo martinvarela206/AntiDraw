@@ -561,7 +561,43 @@ class AntiDrawApp {
         }
       }
 
-      // 3. Check hit directly on a vertex of any selected element (move from vertex)
+      // 3. Modifier-based selection (Ctrl: Toggle select/deselect; Shift: Deselect)
+      if (e.ctrlKey || e.metaKey) {
+        const hit = this.selectionTool.hitTest(this.model.elements, pt, this.canvasMgr.zoom);
+        if (hit) {
+          this.selectionTool.toggleSelect(hit.element.id);
+          this.propertyPanel.resetPanelMode();
+          this.render();
+          return;
+        } else {
+          // Ctrl + Drag on canvas: Marquee selection that adds to selection
+          this.shapeStartPt = pt;
+          this.activeHandle = 'marquee';
+          this.selectionTool.isDeselectMarquee = false;
+          this.render();
+          return;
+        }
+      }
+
+      if (e.shiftKey) {
+        const hit = this.selectionTool.hitTest(this.model.elements, pt, this.canvasMgr.zoom);
+        if (hit) {
+          this.selectionTool.deselect(hit.element.id);
+          this.propertyPanel.resetPanelMode();
+          this.render();
+          return;
+        } else {
+          // Shift + Drag on canvas: Deselect marquee
+          this.shapeStartPt = pt;
+          this.activeHandle = 'marquee';
+          this.selectionTool.isDeselectMarquee = true;
+          this.render();
+          return;
+        }
+      }
+
+      // 4. Normal selection (No Ctrl / Shift)
+      // 4a. Check hit directly on a vertex of any selected element (move from vertex)
       const selectedEls = this.model.elements.filter((el) => this.selectionTool.isSelected(el.id));
       let hitVertex: Point | null = null;
       if (selectedEls.length > 0) {
@@ -592,7 +628,7 @@ class AntiDrawApp {
         return;
       }
 
-      // 4. Check hit on composite bounding box handles if vector elements are selected
+      // 4b. Check hit on composite bounding box handles if vector elements are selected
       if (selectedEls.length > 0) {
         const groupBox = this.selectionTool.getGroupBoundingBox(selectedEls);
         if (groupBox) {
@@ -612,17 +648,11 @@ class AntiDrawApp {
         }
       }
 
-      // 5. Hit test vector elements under cursor (fill or stroke/border)
-      const hit = this.selectionTool.hitTest(this.model.elements, pt);
+      // 4c. Hit test vector elements under cursor (fill or stroke/border)
+      const hit = this.selectionTool.hitTest(this.model.elements, pt, this.canvasMgr.zoom);
       if (hit) {
-        if (e.ctrlKey || e.metaKey) {
-          this.selectionTool.toggleSelect(hit.element.id);
-        } else if (e.shiftKey) {
-          this.selectionTool.deselect(hit.element.id);
-        } else {
-          if (!this.selectionTool.isSelected(hit.element.id)) {
-            this.selectionTool.select(hit.element.id);
-          }
+        if (!this.selectionTool.isSelected(hit.element.id)) {
+          this.selectionTool.select(hit.element.id);
         }
 
         const nowSelected = this.model.elements.filter((el) => this.selectionTool.isSelected(el.id));
@@ -638,20 +668,13 @@ class AntiDrawApp {
         }
         this.propertyPanel.resetPanelMode();
       } else {
-        // 5. Clicked on empty canvas space: start Marquee selection
+        // 4d. Clicked on empty canvas space: start Marquee selection
+        this.selectionTool.deselectAll();
         this.shapeStartPt = pt;
         this.activeHandle = 'marquee';
-
-        if (e.shiftKey) {
-          this.selectionTool.isDeselectMarquee = true;
-        } else if (e.ctrlKey || e.metaKey) {
-          this.selectionTool.isDeselectMarquee = false;
-        } else {
-          this.selectionTool.deselectAll();
-          this.selectionTool.isDeselectMarquee = false;
-          this.propertyPanel.resetPanelMode();
-          this.canvasMgr.isCanvasSelected = true;
-        }
+        this.selectionTool.isDeselectMarquee = false;
+        this.propertyPanel.resetPanelMode();
+        this.canvasMgr.isCanvasSelected = true;
       }
     } else if (activeTool === 'node') {
       const selectedEl = this.model.elements.find(
@@ -1388,7 +1411,13 @@ class AntiDrawApp {
   }
 
   private handleAlign(type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom'): void {
-    const selectedEls = this.model.elements.filter((el) => this.selectionTool.isSelected(el.id));
+    const selectedIds = Array.from(this.selectionTool.selectedElementIds);
+    const selectedEls: VectorElement[] = [];
+    selectedIds.forEach((id) => {
+      const el = this.model.elements.find((e) => e.id === id);
+      if (el) selectedEls.push(el);
+    });
+
     if (selectedEls.length > 0) {
       const aligned = BooleanOperations.alignElements(
         selectedEls,

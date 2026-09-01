@@ -60,6 +60,26 @@ export class BooleanOperations {
     return combined;
   }
 
+  // Helper to get element bounding box
+  private static getElementBox(el: VectorElement): { minX: number; minY: number; maxX: number; maxY: number; cx: number; cy: number } | null {
+    if (!el.vertices || el.vertices.length === 0) return null;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    el.vertices.forEach((v) => {
+      minX = Math.min(minX, v.x);
+      minY = Math.min(minY, v.y);
+      maxX = Math.max(maxX, v.x);
+      maxY = Math.max(maxY, v.y);
+    });
+    return {
+      minX,
+      minY,
+      maxX,
+      maxY,
+      cx: minX + (maxX - minX) / 2,
+      cy: minY + (maxY - minY) / 2,
+    };
+  }
+
   // Align elements: left, center, right, top, middle, bottom
   public static alignElements(
     elements: VectorElement[],
@@ -69,44 +89,54 @@ export class BooleanOperations {
   ): VectorElement[] {
     if (!elements || elements.length === 0) return elements;
 
-    // Determine target align reference bounds
-    let targetX = 0;
-    let targetY = 0;
+    let targetX: number | null = null;
+    let targetY: number | null = null;
 
     if (elements.length === 1) {
+      // 1 vector selected: Align relative to Canvas
       if (type === 'left') targetX = 0;
-      if (type === 'center') targetX = canvasWidth / 2;
-      if (type === 'right') targetX = canvasWidth;
-      if (type === 'top') targetY = 0;
-      if (type === 'middle') targetY = canvasHeight / 2;
-      if (type === 'bottom') targetY = canvasHeight;
+      else if (type === 'center') targetX = canvasWidth / 2;
+      else if (type === 'right') targetX = canvasWidth;
+      else if (type === 'top') targetY = 0;
+      else if (type === 'middle') targetY = canvasHeight / 2;
+      else if (type === 'bottom') targetY = canvasHeight;
+    } else {
+      // Multiple vectors selected: Pivot is the first selected vector (elements[0])
+      const pivotBox = this.getElementBox(elements[0]);
+      if (pivotBox) {
+        if (type === 'left') targetX = pivotBox.minX;
+        else if (type === 'center') targetX = pivotBox.cx;
+        else if (type === 'right') targetX = pivotBox.maxX;
+        else if (type === 'top') targetY = pivotBox.minY;
+        else if (type === 'middle') targetY = pivotBox.cy;
+        else if (type === 'bottom') targetY = pivotBox.maxY;
+      }
     }
 
-    return elements.map((el) => {
+    return elements.map((el, index) => {
+      // For multi-selection, the pivot element (first selected) remains in place
+      if (elements.length > 1 && index === 0) {
+        return el;
+      }
+
       if (!el.vertices || el.vertices.length === 0) return el;
-
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-      el.vertices.forEach((v) => {
-        minX = Math.min(minX, v.x);
-        minY = Math.min(minY, v.y);
-        maxX = Math.max(maxX, v.x);
-        maxY = Math.max(maxY, v.y);
-      });
-
-      const w = maxX - minX;
-      const h = maxY - minY;
-      const cx = minX + w / 2;
-      const cy = minY + h / 2;
+      const box = this.getElementBox(el);
+      if (!box) return el;
 
       let dx = 0;
       let dy = 0;
 
-      if (type === 'left') dx = targetX - minX;
-      if (type === 'center') dx = targetX - cx;
-      if (type === 'right') dx = targetX - maxX;
-      if (type === 'top') dy = targetY - minY;
-      if (type === 'middle') dy = targetY - cy;
-      if (type === 'bottom') dy = targetY - maxY;
+      if (targetX !== null) {
+        if (type === 'left') dx = targetX - box.minX;
+        else if (type === 'center') dx = targetX - box.cx;
+        else if (type === 'right') dx = targetX - box.maxX;
+      }
+
+      if (targetY !== null) {
+        if (type === 'top') dy = targetY - box.minY;
+        else if (type === 'middle') dy = targetY - box.cy;
+        else if (type === 'bottom') dy = targetY - box.maxY;
+      }
 
       const newVertices = el.vertices.map((v) => ({
         ...v,
