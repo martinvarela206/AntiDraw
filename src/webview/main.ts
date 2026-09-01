@@ -258,6 +258,7 @@ class AntiDrawApp {
         onUpdateShapeConfig: (cfg) => {
           this.canvasMgr.shapeConfig = cfg;
         },
+        onBoolean: (op) => this.handleBoolean(op),
       }
     );
   }

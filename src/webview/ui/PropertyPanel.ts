@@ -15,6 +15,7 @@ export interface PropertyPanelCallbacks {
   onDeleteGuide?: (guideId: string) => void;
   onClearAllGuides?: () => void;
   onUpdateShapeConfig?: (config: ShapeToolConfig) => void;
+  onBoolean?: (op: 'union' | 'subtract' | 'intersect' | 'exclude' | 'combine' | 'fragment') => void;
 }
 
 export class PropertyPanel {
@@ -642,6 +643,18 @@ export class PropertyPanel {
           <input type="number" class="prop-input" id="batch-stroke-width" value="1" min="0" step="0.5" />
         </div>
       </div>
+
+      <div class="panel-section">
+        <div class="panel-title">Boolean Operations (Formas)</div>
+        <div class="prop-row" style="justify-content: flex-start; gap: 6px; flex-wrap: wrap;">
+          <button class="btn-icon" id="btn-prop-bool-union" title="Weld / Union (Soldar formas)">${ToolIcons.union}</button>
+          <button class="btn-icon" id="btn-prop-bool-subtract" title="Trim / Minus (1° corta al último, conserva cortador)">${ToolIcons.subtract}</button>
+          <button class="btn-icon" id="btn-prop-bool-intersect" title="Intersect (Intersección)">${ToolIcons.intersect}</button>
+          <button class="btn-icon" id="btn-prop-bool-exclude" title="Exclusion / XOR (Exclusión)">${ToolIcons.exclude}</button>
+          <button class="btn-icon" id="btn-prop-bool-combine" title="Boundary / Combine (Unir conservando originales)">${ToolIcons.combine}</button>
+          <button class="btn-icon" id="btn-prop-bool-fragment" title="Divide / Fragment (Intersección y exclusión a la vez)">${ToolIcons.fragment}</button>
+        </div>
+      </div>
     `;
 
     const bFillColor = this.container.querySelector<HTMLInputElement>('#batch-fill-color');
@@ -649,6 +662,13 @@ export class PropertyPanel {
     const bStrokeColor = this.container.querySelector<HTMLInputElement>('#batch-stroke-color');
     const bStrokeHex = this.container.querySelector<HTMLInputElement>('#batch-stroke-hex');
     const bStrokeWidth = this.container.querySelector<HTMLInputElement>('#batch-stroke-width');
+
+    this.bindMouseDown('btn-prop-bool-union', () => this.callbacks.onBoolean && this.callbacks.onBoolean('union'));
+    this.bindMouseDown('btn-prop-bool-subtract', () => this.callbacks.onBoolean && this.callbacks.onBoolean('subtract'));
+    this.bindMouseDown('btn-prop-bool-intersect', () => this.callbacks.onBoolean && this.callbacks.onBoolean('intersect'));
+    this.bindMouseDown('btn-prop-bool-exclude', () => this.callbacks.onBoolean && this.callbacks.onBoolean('exclude'));
+    this.bindMouseDown('btn-prop-bool-combine', () => this.callbacks.onBoolean && this.callbacks.onBoolean('combine'));
+    this.bindMouseDown('btn-prop-bool-fragment', () => this.callbacks.onBoolean && this.callbacks.onBoolean('fragment'));
 
     if (bFillColor) {
       bFillColor.addEventListener('input', () => {
@@ -882,6 +902,18 @@ export class PropertyPanel {
           </select>
         </div>
       </div>
+
+      <div class="panel-section">
+        <div class="panel-title">Boolean Operations (Formas)</div>
+        <div class="prop-row" style="justify-content: flex-start; gap: 6px; flex-wrap: wrap;">
+          <button class="btn-icon" id="btn-prop-bool-union-single" title="Weld / Union (Soldar formas)">${ToolIcons.union}</button>
+          <button class="btn-icon" id="btn-prop-bool-subtract-single" title="Trim / Minus (1° corta al último)">${ToolIcons.subtract}</button>
+          <button class="btn-icon" id="btn-prop-bool-intersect-single" title="Intersect (Intersección)">${ToolIcons.intersect}</button>
+          <button class="btn-icon" id="btn-prop-bool-exclude-single" title="Exclusion / XOR (Exclusión)">${ToolIcons.exclude}</button>
+          <button class="btn-icon" id="btn-prop-bool-combine-single" title="Boundary / Combine (Unir conservando originales)">${ToolIcons.combine}</button>
+          <button class="btn-icon" id="btn-prop-bool-fragment-single" title="Divide / Fragment (Intersección y exclusión a la vez)">${ToolIcons.fragment}</button>
+        </div>
+      </div>
     `;
 
     const elX = this.container.querySelector<HTMLInputElement>('#el-x');
@@ -987,6 +1019,13 @@ export class PropertyPanel {
         this.callbacks.onUpdateElement(el);
       });
     }
+
+    this.bindMouseDown('btn-prop-bool-union-single', () => this.callbacks.onBoolean && this.callbacks.onBoolean('union'));
+    this.bindMouseDown('btn-prop-bool-subtract-single', () => this.callbacks.onBoolean && this.callbacks.onBoolean('subtract'));
+    this.bindMouseDown('btn-prop-bool-intersect-single', () => this.callbacks.onBoolean && this.callbacks.onBoolean('intersect'));
+    this.bindMouseDown('btn-prop-bool-exclude-single', () => this.callbacks.onBoolean && this.callbacks.onBoolean('exclude'));
+    this.bindMouseDown('btn-prop-bool-combine-single', () => this.callbacks.onBoolean && this.callbacks.onBoolean('combine'));
+    this.bindMouseDown('btn-prop-bool-fragment-single', () => this.callbacks.onBoolean && this.callbacks.onBoolean('fragment'));
   }
 
   // Render Node Properties for single selected vertex

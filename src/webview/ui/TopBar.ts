@@ -3,7 +3,7 @@ import { CanvasManager } from '../engine/CanvasManager.js';
 
 export interface TopBarCallbacks {
   onAlign: (type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => void;
-  onBoolean: (op: 'union' | 'subtract' | 'intersect' | 'exclude' | 'combine' | 'fragment') => void;
+  onBoolean?: (op: 'union' | 'subtract' | 'intersect' | 'exclude' | 'combine' | 'fragment') => void;
   onZOrder: (action: 'front' | 'forward' | 'backward' | 'back') => void;
   onToggleGrid: () => void;
   onToggleGuides: () => void;
@@ -38,20 +38,6 @@ export class TopBar {
         <button class="btn-icon" id="btn-align-bottom" title="Align Bottom">${ToolIcons.alignBottom}</button>
       </div>
 
-      <div class="top-bar-divider"></div>
-
-      <!-- Boolean Operations -->
-      <div class="top-bar-group">
-        <button class="btn-icon" id="btn-bool-union" title="Weld / Union (Soldar formas)">${ToolIcons.union}</button>
-        <button class="btn-icon" id="btn-bool-subtract" title="Trim / Minus (1° corta al último, conserva cortador)">${ToolIcons.subtract}</button>
-        <button class="btn-icon" id="btn-bool-intersect" title="Intersect (Intersección)">${ToolIcons.intersect}</button>
-        <button class="btn-icon" id="btn-bool-exclude" title="Exclusion / XOR (Exclusión)">${ToolIcons.exclude}</button>
-        <button class="btn-icon" id="btn-bool-combine" title="Boundary / Weld Retaining Sources (Unir conservando originales)">${ToolIcons.combine}</button>
-        <button class="btn-icon" id="btn-bool-fragment" title="Divide / Fragment (Intersección y exclusión a la vez)">${ToolIcons.fragment}</button>
-      </div>
-
-      <div class="top-bar-divider"></div>
-
       <!-- Z-Ordering -->
       <div class="top-bar-group">
         <button class="btn-icon" id="btn-z-front" title="Bring to Front">${ToolIcons.bringFront}</button>
@@ -79,13 +65,6 @@ export class TopBar {
     this.bindClick('btn-align-top', () => this.callbacks.onAlign('top'));
     this.bindClick('btn-align-middle', () => this.callbacks.onAlign('middle'));
     this.bindClick('btn-align-bottom', () => this.callbacks.onAlign('bottom'));
-
-    this.bindClick('btn-bool-union', () => this.callbacks.onBoolean('union'));
-    this.bindClick('btn-bool-subtract', () => this.callbacks.onBoolean('subtract'));
-    this.bindClick('btn-bool-intersect', () => this.callbacks.onBoolean('intersect'));
-    this.bindClick('btn-bool-exclude', () => this.callbacks.onBoolean('exclude'));
-    this.bindClick('btn-bool-combine', () => this.callbacks.onBoolean('combine'));
-    this.bindClick('btn-bool-fragment', () => this.callbacks.onBoolean('fragment'));
 
     this.bindClick('btn-z-front', () => this.callbacks.onZOrder('front'));
     this.bindClick('btn-z-forward', () => this.callbacks.onZOrder('forward'));
