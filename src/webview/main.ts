@@ -244,6 +244,9 @@ class AntiDrawApp {
           this.render();
           this.syncMetadataToHost();
         },
+        onUpdateShapeConfig: (cfg) => {
+          this.canvasMgr.shapeConfig = cfg;
+        },
       }
     );
   }
@@ -673,7 +676,8 @@ class AntiDrawApp {
         }
       }
     } else if (['rect', 'ellipse', 'line', 'star'].includes(activeTool)) {
-      this.shapeStartPt = this.canvasMgr.snapPoint(pt);
+      const otherVertices = this.getOtherVertices();
+      this.shapeStartPt = this.canvasMgr.snapPoint(pt, otherVertices);
       this.activeHandle = 'shape';
     } else if (activeTool === 'pen') {
       const snappedPt = this.canvasMgr.snapPoint(pt);
@@ -987,7 +991,9 @@ class AntiDrawApp {
       this.renderOverlay();
       return;
     } else if (this.activeHandle === 'shape' && this.shapeStartPt) {
-      this.previewShape(this.shapeStartPt, pt);
+      const otherVertices = this.getOtherVertices();
+      const snappedPt = this.canvasMgr.snapPoint(pt, otherVertices);
+      this.previewShape(this.shapeStartPt, snappedPt, e.shiftKey, e.ctrlKey, e.altKey);
     }
 
     this.render();
@@ -1084,7 +1090,9 @@ class AntiDrawApp {
         this.shapeStartPt = null;
         this.render();
       } else if (this.activeHandle === 'shape' && this.shapeStartPt) {
-        this.commitShape(this.shapeStartPt, pt);
+        const otherVertices = this.getOtherVertices();
+        const snappedPt = this.canvasMgr.snapPoint(pt, otherVertices);
+        this.commitShape(this.shapeStartPt, snappedPt, e.shiftKey, e.ctrlKey, e.altKey);
         this.shapeStartPt = null;
         this.toolbar.setTool('select');
       }
@@ -1129,69 +1137,220 @@ class AntiDrawApp {
     }
   }
 
-  private previewShape(start: Point, current: Point): void {
-    const tool = this.toolbar.activeTool;
-    const w = Math.abs(current.x - start.x);
-    const h = Math.abs(current.y - start.y);
-    const x = Math.min(start.x, current.x);
-    const y = Math.min(start.y, current.y);
-
-    const tempId = 'temp_shape_preview';
-    this.model.elements = this.model.elements.filter((el) => el.id !== tempId);
-
-    const newEl: VectorElement = {
-      id: tempId,
-      tagName: tool === 'rect' ? 'rect' : 'ellipse',
-      attributes: {
-        id: tempId,
-        x: x.toString(),
-        y: y.toString(),
-        width: w.toString(),
-        height: h.toString(),
-        cx: (x + w / 2).toString(),
-        cy: (y + h / 2).toString(),
-        rx: (w / 2).toString(),
-        ry: (h / 2).toString(),
-        fill: '#6366f1',
-        'fill-opacity': '0.5',
-        stroke: '#ffffff',
-        'stroke-width': '2',
-      },
-    };
-
-    this.model.loadSvgString(this.model.toSvgString());
+  private getOtherVertices(excludeIds: string[] = []): Point[] {
+    const pts: Point[] = [];
+    const excludeSet = new Set(excludeIds);
+    this.model.elements.forEach((el) => {
+      if (!excludeSet.has(el.id) && el.vertices) {
+        el.vertices.forEach((v) => pts.push({ x: v.x, y: v.y }));
+      }
+    });
+    return pts;
   }
 
-  private commitShape(start: Point, current: Point): void {
-    const tool = this.toolbar.activeTool;
-    const w = Math.max(Math.abs(current.x - start.x), 10);
-    const h = Math.max(Math.abs(current.y - start.y), 10);
-    const x = Math.min(start.x, current.x);
-    const y = Math.min(start.y, current.y);
+  private calculateShapeBounds(
+    start: Point,
+    current: Point,
+    shiftKey: boolean,
+    ctrlKey: boolean,
+    altKey: boolean
+  ): { x: number; y: number; w: number; h: number; cx: number; cy: number; rx: number; ry: number } {
+    const dx = current.x - start.x;
+    const dy = current.y - start.y;
+    const sx = dx >= 0 ? 1 : -1;
+    const sy = dy >= 0 ? 1 : -1;
+    const rawW = Math.abs(dx);
+    const rawH = Math.abs(dy);
 
-    const id = `el_${Date.now().toString(36)}`;
-    const newEl: VectorElement = {
+    let targetW = Math.max(rawW, 2);
+    let targetH = Math.max(rawH, 2);
+
+    // Priority: ctrlKey (1:1 ratio) takes precedence over altKey
+    if (ctrlKey) {
+      const size = Math.max(rawW, rawH, 2);
+      targetW = size;
+      targetH = size;
+    } else if (altKey) {
+      const ratioW = this.canvasMgr.shapeConfig?.aspectRatioW || 4;
+      const ratioH = this.canvasMgr.shapeConfig?.aspectRatioH || 3;
+      const ratio = ratioW / (ratioH || 1);
+
+      if (rawW / ratio > rawH) {
+        targetW = Math.max(rawW, 2);
+        targetH = Math.max(targetW / ratio, 2);
+      } else {
+        targetH = Math.max(rawH, 2);
+        targetW = Math.max(targetH * ratio, 2);
+      }
+    }
+
+    let x = 0;
+    let y = 0;
+    let w = 0;
+    let h = 0;
+    let cx = 0;
+    let cy = 0;
+    let rx = 0;
+    let ry = 0;
+
+    if (shiftKey) {
+      // Shift: Expand from center
+      cx = start.x;
+      cy = start.y;
+      rx = targetW;
+      ry = targetH;
+      w = targetW * 2;
+      h = targetH * 2;
+      x = cx - targetW;
+      y = cy - targetH;
+    } else {
+      // Corner-to-corner expansion
+      x = sx > 0 ? start.x : start.x - targetW;
+      y = sy > 0 ? start.y : start.y - targetH;
+      w = targetW;
+      h = targetH;
+      cx = x + w / 2;
+      cy = y + h / 2;
+      rx = w / 2;
+      ry = h / 2;
+    }
+
+    return { x, y, w, h, cx, cy, rx, ry };
+  }
+
+  private createShapeElement(
+    tool: string,
+    start: Point,
+    current: Point,
+    id: string,
+    shiftKey: boolean = false,
+    ctrlKey: boolean = false,
+    altKey: boolean = false
+  ): VectorElement {
+    const isLine = tool === 'line';
+    const isClosed = !isLine;
+    let vertices: PathVertex[] = [];
+
+    if (isLine) {
+      let pStart = start;
+      let pEnd = current;
+      if (shiftKey) {
+        const dx = current.x - start.x;
+        const dy = current.y - start.y;
+        pStart = { x: start.x - dx, y: start.y - dy };
+        pEnd = { x: start.x + dx, y: start.y + dy };
+      }
+      if (ctrlKey) {
+        const dx = pEnd.x - pStart.x;
+        const dy = pEnd.y - pStart.y;
+        const len = Math.hypot(dx, dy);
+        let angle = Math.atan2(dy, dx);
+        const snap = Math.PI / 4;
+        angle = Math.round(angle / snap) * snap;
+        pEnd = {
+          x: pStart.x + len * Math.cos(angle),
+          y: pStart.y + len * Math.sin(angle),
+        };
+      }
+      vertices = this.model.convertShapeToVertices('line', {
+        x1: pStart.x.toString(),
+        y1: pStart.y.toString(),
+        x2: pEnd.x.toString(),
+        y2: pEnd.y.toString(),
+      });
+    } else {
+      const bounds = this.calculateShapeBounds(start, current, shiftKey, ctrlKey, altKey);
+
+      if (tool === 'rect') {
+        vertices = this.model.convertShapeToVertices('rect', {
+          x: bounds.x.toString(),
+          y: bounds.y.toString(),
+          width: bounds.w.toString(),
+          height: bounds.h.toString(),
+          rx: (this.canvasMgr.shapeConfig?.rectCornerRadius || 0).toString(),
+        });
+      } else if (tool === 'ellipse') {
+        vertices = this.model.convertShapeToVertices('ellipse', {
+          cx: bounds.cx.toString(),
+          cy: bounds.cy.toString(),
+          rx: bounds.rx.toString(),
+          ry: bounds.ry.toString(),
+        });
+      } else if (tool === 'star') {
+        vertices = this.model.convertShapeToVertices('star', {
+          cx: bounds.cx.toString(),
+          cy: bounds.cy.toString(),
+          rx: bounds.rx.toString(),
+          ry: bounds.ry.toString(),
+          points: (this.canvasMgr.shapeConfig?.starPoints || 5).toString(),
+          innerRatio: (this.canvasMgr.shapeConfig?.starInnerRatio || 0.4).toString(),
+        });
+      }
+    }
+
+    const d = this.model.compilePathD(vertices, isClosed);
+    return {
       id,
-      tagName: tool === 'rect' ? 'rect' : 'ellipse',
+      tagName: 'path',
       attributes: {
         id,
-        x: x.toString(),
-        y: y.toString(),
-        width: w.toString(),
-        height: h.toString(),
-        cx: (x + w / 2).toString(),
-        cy: (y + h / 2).toString(),
-        rx: (w / 2).toString(),
-        ry: (h / 2).toString(),
-        fill: '#6366f1',
+        d,
+        fill: isClosed ? '#6366f1' : 'none',
         stroke: '#ffffff',
         'stroke-width': '2',
+        'data-node-types': vertices.map((v) => v.nodeType).join(','),
       },
+      vertices,
+      isClosed,
     };
+  }
 
+  private previewShape(
+    start: Point,
+    current: Point,
+    shiftKey: boolean = false,
+    ctrlKey: boolean = false,
+    altKey: boolean = false
+  ): void {
+    const tempId = 'temp_shape_preview';
+    this.model.elements = this.model.elements.filter((el) => el.id !== tempId);
+    const newEl = this.createShapeElement(
+      this.toolbar.activeTool,
+      start,
+      current,
+      tempId,
+      shiftKey,
+      ctrlKey,
+      altKey
+    );
+    newEl.attributes['fill-opacity'] = '0.5';
     this.model.elements.push(newEl);
-    this.selectionTool.selectedElementId = id;
-    this.model.loadSvgString(this.model.toSvgString());
+    this.render();
+  }
+
+  private commitShape(
+    start: Point,
+    current: Point,
+    shiftKey: boolean = false,
+    ctrlKey: boolean = false,
+    altKey: boolean = false
+  ): void {
+    const tempId = 'temp_shape_preview';
+    this.model.elements = this.model.elements.filter((el) => el.id !== tempId);
+    const id = `el_${Date.now().toString(36)}`;
+    const newEl = this.createShapeElement(
+      this.toolbar.activeTool,
+      start,
+      current,
+      id,
+      shiftKey,
+      ctrlKey,
+      altKey
+    );
+    this.model.elements.push(newEl);
+    this.selectionTool.select(id);
+    this.render();
+    this.syncToHost();
   }
 
   // Commit pen path to vector model elements

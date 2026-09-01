@@ -1,6 +1,6 @@
 import { VectorModel, VectorElement, PathVertex, NodeType } from '../engine/VectorModel.js';
 import { SelectionTool, BoundingBox } from '../engine/SelectionTool.js';
-import { GuideLine, RulerConfig } from '../engine/CanvasManager.js';
+import { GuideLine, RulerConfig, ShapeToolConfig } from '../engine/CanvasManager.js';
 import { ToolIcons } from '../icons/ToolIcons.js';
 
 export interface PropertyPanelCallbacks {
@@ -14,6 +14,7 @@ export interface PropertyPanelCallbacks {
   onUpdateGuide?: (guide: GuideLine) => void;
   onDeleteGuide?: (guideId: string) => void;
   onClearAllGuides?: () => void;
+  onUpdateShapeConfig?: (config: ShapeToolConfig) => void;
 }
 
 export class PropertyPanel {
@@ -26,10 +27,17 @@ export class PropertyPanel {
   public penVertexCount: number = 0;
   private activeRulerConfig: RulerConfig | null = null;
   private activeGuide: GuideLine | null = null;
+  public shapeConfig: ShapeToolConfig = {
+    aspectRatioW: 4,
+    aspectRatioH: 3,
+    starPoints: 5,
+    starInnerRatio: 0.4,
+    rectCornerRadius: 0,
+  };
   private callbacks: PropertyPanelCallbacks;
 
   // Track which panel section is currently rendered to avoid full re-builds
-  private currentPanelMode: 'canvas' | 'element' | 'node' | 'pen' | 'multi' | 'ruler' | 'guide' | null = null;
+  private currentPanelMode: 'canvas' | 'element' | 'node' | 'pen' | 'multi' | 'ruler' | 'guide' | 'shape' | null = null;
 
   constructor(
     container: HTMLElement,
@@ -123,6 +131,9 @@ export class PropertyPanel {
     } else if (selectedEls.length > 1) {
       this.currentPanelMode = 'multi';
       this.renderMultiElementProperties(selectedEls);
+    } else if (['rect', 'ellipse', 'star', 'line'].includes(this.activeTool)) {
+      this.currentPanelMode = 'shape';
+      this.renderShapeToolProperties();
     } else {
       this.currentPanelMode = 'canvas';
       this.renderCanvasProperties();
@@ -378,6 +389,142 @@ export class PropertyPanel {
     this.bindMouseDown('btn-close-path', () => {
       if (this.callbacks.onFinishPenPath) this.callbacks.onFinishPenPath(true);
     });
+  }
+
+  // Render properties when a shape tool is active and no element is selected
+  private renderShapeToolProperties(): void {
+    const toolName =
+      this.activeTool === 'rect' ? 'Rectangle' :
+      this.activeTool === 'ellipse' ? 'Ellipse / Circle' :
+      this.activeTool === 'star' ? 'Star' : 'Line';
+
+    this.container.innerHTML = `
+      <div class="panel-section">
+        <div class="panel-title">${toolName} Tool Settings</div>
+        
+        <div class="prop-row">
+          <span class="prop-label">Proportion (Alt)</span>
+          <select class="prop-input" id="shape-aspect-preset" style="cursor:pointer;">
+            <option value="4:3" ${this.shapeConfig.aspectRatioW === 4 && this.shapeConfig.aspectRatioH === 3 ? 'selected' : ''}>4:3 (Standard)</option>
+            <option value="16:9" ${this.shapeConfig.aspectRatioW === 16 && this.shapeConfig.aspectRatioH === 9 ? 'selected' : ''}>16:9 (Widescreen)</option>
+            <option value="1:1" ${this.shapeConfig.aspectRatioW === 1 && this.shapeConfig.aspectRatioH === 1 ? 'selected' : ''}>1:1 (Square)</option>
+            <option value="3:2" ${this.shapeConfig.aspectRatioW === 3 && this.shapeConfig.aspectRatioH === 2 ? 'selected' : ''}>3:2 (Photo)</option>
+            <option value="2:1" ${this.shapeConfig.aspectRatioW === 2 && this.shapeConfig.aspectRatioH === 1 ? 'selected' : ''}>2:1 (Panoramic)</option>
+            <option value="custom" ${!['4:3', '16:9', '1:1', '3:2', '2:1'].includes(`${this.shapeConfig.aspectRatioW}:${this.shapeConfig.aspectRatioH}`) ? 'selected' : ''}>Custom</option>
+          </select>
+        </div>
+
+        <div class="prop-row">
+          <span class="prop-label">Ratio W : H</span>
+          <div style="display:flex; gap:6px; width:130px; align-items:center;">
+            <input type="number" class="prop-input" id="shape-ratio-w" value="${this.shapeConfig.aspectRatioW}" min="1" step="1" style="width:55px; text-align:center;" />
+            <span style="font-weight:bold; color:var(--text-muted);">:</span>
+            <input type="number" class="prop-input" id="shape-ratio-h" value="${this.shapeConfig.aspectRatioH}" min="1" step="1" style="width:55px; text-align:center;" />
+          </div>
+        </div>
+
+        ${this.activeTool === 'star' ? `
+          <div class="prop-row">
+            <span class="prop-label">Star Points</span>
+            <input type="number" class="prop-input" id="star-points" value="${this.shapeConfig.starPoints}" min="3" max="32" step="1" />
+          </div>
+          <div class="prop-row">
+            <span class="prop-label">Inner Ratio</span>
+            <input type="number" class="prop-input" id="star-inner-ratio" value="${this.shapeConfig.starInnerRatio}" min="0.1" max="0.9" step="0.05" />
+          </div>
+        ` : ''}
+
+        ${this.activeTool === 'rect' ? `
+          <div class="prop-row">
+            <span class="prop-label">Corner Radius</span>
+            <input type="number" class="prop-input" id="rect-corner-radius" value="${this.shapeConfig.rectCornerRadius}" min="0" step="1" />
+          </div>
+        ` : ''}
+      </div>
+
+      <div class="panel-section">
+        <div class="panel-title">Creation Shortcuts</div>
+        <div style="font-size:11px; color:var(--text-muted); line-height:1.6;">
+          • <b>Drag</b>: Free size from corner<br/>
+          • <b>Shift + Drag</b>: Expand from center<br/>
+          • <b>Ctrl + Drag</b>: 1:1 Aspect Ratio (Square/Circle)<br/>
+          • <b>Alt + Drag</b>: Fixed Aspect Ratio (${this.shapeConfig.aspectRatioW}:${this.shapeConfig.aspectRatioH})<br/>
+          • <b>Ctrl + Shift</b>: 1:1 Ratio from center<br/>
+          • <b>Alt + Shift</b>: Fixed ratio (${this.shapeConfig.aspectRatioW}:${this.shapeConfig.aspectRatioH}) from center
+        </div>
+      </div>
+    `;
+
+    const presetSelect = this.container.querySelector<HTMLSelectElement>('#shape-aspect-preset');
+    const ratioWInput = this.container.querySelector<HTMLInputElement>('#shape-ratio-w');
+    const ratioHInput = this.container.querySelector<HTMLInputElement>('#shape-ratio-h');
+    const starPointsInput = this.container.querySelector<HTMLInputElement>('#star-points');
+    const starInnerRatioInput = this.container.querySelector<HTMLInputElement>('#star-inner-ratio');
+    const rectRadiusInput = this.container.querySelector<HTMLInputElement>('#rect-corner-radius');
+
+    if (presetSelect) {
+      presetSelect.addEventListener('change', () => {
+        const val = presetSelect.value;
+        if (val !== 'custom') {
+          const [w, h] = val.split(':').map(Number);
+          this.shapeConfig.aspectRatioW = w;
+          this.shapeConfig.aspectRatioH = h;
+          if (ratioWInput) ratioWInput.value = w.toString();
+          if (ratioHInput) ratioHInput.value = h.toString();
+          if (this.callbacks.onUpdateShapeConfig) this.callbacks.onUpdateShapeConfig(this.shapeConfig);
+        }
+      });
+    }
+
+    if (ratioWInput) {
+      ratioWInput.addEventListener('input', () => {
+        const val = parseFloat(ratioWInput.value);
+        if (!isNaN(val) && val > 0) {
+          this.shapeConfig.aspectRatioW = val;
+          if (this.callbacks.onUpdateShapeConfig) this.callbacks.onUpdateShapeConfig(this.shapeConfig);
+        }
+      });
+    }
+
+    if (ratioHInput) {
+      ratioHInput.addEventListener('input', () => {
+        const val = parseFloat(ratioHInput.value);
+        if (!isNaN(val) && val > 0) {
+          this.shapeConfig.aspectRatioH = val;
+          if (this.callbacks.onUpdateShapeConfig) this.callbacks.onUpdateShapeConfig(this.shapeConfig);
+        }
+      });
+    }
+
+    if (starPointsInput) {
+      starPointsInput.addEventListener('input', () => {
+        const val = parseInt(starPointsInput.value, 10);
+        if (!isNaN(val) && val >= 3) {
+          this.shapeConfig.starPoints = val;
+          if (this.callbacks.onUpdateShapeConfig) this.callbacks.onUpdateShapeConfig(this.shapeConfig);
+        }
+      });
+    }
+
+    if (starInnerRatioInput) {
+      starInnerRatioInput.addEventListener('input', () => {
+        const val = parseFloat(starInnerRatioInput.value);
+        if (!isNaN(val) && val > 0 && val < 1) {
+          this.shapeConfig.starInnerRatio = val;
+          if (this.callbacks.onUpdateShapeConfig) this.callbacks.onUpdateShapeConfig(this.shapeConfig);
+        }
+      });
+    }
+
+    if (rectRadiusInput) {
+      rectRadiusInput.addEventListener('input', () => {
+        const val = parseFloat(rectRadiusInput.value);
+        if (!isNaN(val) && val >= 0) {
+          this.shapeConfig.rectCornerRadius = val;
+          if (this.callbacks.onUpdateShapeConfig) this.callbacks.onUpdateShapeConfig(this.shapeConfig);
+        }
+      });
+    }
   }
 
   // Render properties when multiple elements are selected

@@ -92,7 +92,7 @@ export class VectorModel {
       const children = Array.from(svgEl.children);
       children.forEach((child, idx) => {
         const tag = child.tagName.toLowerCase();
-        if (['path', 'rect', 'ellipse', 'circle', 'line', 'polygon', 'polyline', 'g'].includes(tag)) {
+        if (['path', 'rect', 'ellipse', 'circle', 'line', 'polygon', 'polyline', 'star'].includes(tag)) {
           const attrs: Record<string, string> = {};
           for (let i = 0; i < child.attributes.length; i++) {
             const attr = child.attributes[i];
@@ -122,8 +122,8 @@ export class VectorModel {
             elem.tagName = 'path';
             shapeAttrs.forEach((sa) => delete elem.attributes[sa]);
 
-            elem.attributes.d = this.compilePathD(elem.vertices, true);
-            elem.isClosed = true;
+            elem.isClosed = tag !== 'line' && tag !== 'polyline';
+            elem.attributes.d = this.compilePathD(elem.vertices, elem.isClosed);
           }
 
           this.elements.push(elem);
@@ -212,13 +212,18 @@ export class VectorModel {
         curX = x;
         curY = y;
 
-        vertices.push({
-          id: `v_${vIndex++}`,
-          x,
-          y,
-          nodeType: 'asymmetric',
-          command: cmdUpper as 'M' | 'L',
-        });
+        // If closing segment L back to first vertex, don't duplicate
+        if (vertices.length > 2 && Math.hypot(curX - vertices[0].x, curY - vertices[0].y) < 0.01) {
+          // Closed back to start
+        } else {
+          vertices.push({
+            id: `v_${vIndex++}`,
+            x,
+            y,
+            nodeType: 'asymmetric',
+            command: cmdUpper as 'M' | 'L',
+          });
+        }
       } else if (cmdUpper === 'H') {
         if (i >= tokens.length) break;
         let x = tokens[i] as number;
@@ -269,14 +274,19 @@ export class VectorModel {
         curX = x;
         curY = y;
 
-        vertices.push({
-          id: `v_${vIndex++}`,
-          x,
-          y,
-          handleIn: { x: x2, y: y2 },
-          nodeType: 'asymmetric',
-          command: 'C',
-        });
+        // If closing segment C back to first vertex, set handleIn on first vertex
+        if (vertices.length > 2 && Math.hypot(curX - vertices[0].x, curY - vertices[0].y) < 0.01) {
+          vertices[0].handleIn = { x: x2, y: y2 };
+        } else {
+          vertices.push({
+            id: `v_${vIndex++}`,
+            x,
+            y,
+            handleIn: { x: x2, y: y2 },
+            nodeType: 'asymmetric',
+            command: 'C',
+          });
+        }
       } else if (cmdUpper === 'S') {
         if (i + 3 >= tokens.length) break;
         let x2 = tokens[i] as number;
@@ -304,26 +314,31 @@ export class VectorModel {
         curX = x;
         curY = y;
 
-        vertices.push({
-          id: `v_${vIndex++}`,
-          x,
-          y,
-          handleIn: { x: x2, y: y2 },
-          nodeType: 'asymmetric',
-          command: 'C',
-        });
+        if (vertices.length > 2 && Math.hypot(curX - vertices[0].x, curY - vertices[0].y) < 0.01) {
+          vertices[0].handleIn = { x: x2, y: y2 };
+        } else {
+          vertices.push({
+            id: `v_${vIndex++}`,
+            x,
+            y,
+            handleIn: { x: x2, y: y2 },
+            nodeType: 'asymmetric',
+            command: 'C',
+          });
+        }
       } else if (cmdUpper === 'Z') {
-        // Z command marks end of path; do NOT push a duplicate vertex!
+        // Closing command
       } else {
         i++;
       }
     }
 
-    // Filter out trailing redundant vertex that duplicates the start vertex (M)
+    // Filter out trailing redundant vertex that duplicates start vertex
     if (vertices.length > 1) {
       const first = vertices[0];
       const last = vertices[vertices.length - 1];
       if (Math.hypot(first.x - last.x, first.y - last.y) < 0.01) {
+        if (last.handleIn) first.handleIn = last.handleIn;
         vertices.pop();
       }
     }
@@ -342,7 +357,7 @@ export class VectorModel {
     return vertices;
   }
 
-  // Convert vertices back into SVG 'd' string
+  // Convert vertices back into SVG 'd' string with proper closing Bézier curves
   public compilePathD(vertices: PathVertex[], isClosed?: boolean): string {
     if (!vertices || vertices.length === 0) return '';
     let d = '';
@@ -363,20 +378,34 @@ export class VectorModel {
       }
     }
 
-    if (isClosed) {
-      d += ' Z';
+    // Properly close path loop
+    if (isClosed && vertices.length > 1) {
+      const first = vertices[0];
+      const last = vertices[vertices.length - 1];
+      if (last.handleOut || first.handleIn) {
+        const h1 = last.handleOut || { x: last.x, y: last.y };
+        const h2 = first.handleIn || { x: first.x, y: first.y };
+        d += ` C ${formatNum(h1.x)} ${formatNum(h1.y)} ${formatNum(h2.x)} ${formatNum(h2.y)} ${formatNum(first.x)} ${formatNum(first.y)} Z`;
+      } else {
+        d += ' Z';
+      }
     }
 
     return d;
   }
 
-  // Convert shape tags (rect, circle, ellipse, line, polygon) to path vertices
-  private convertShapeToVertices(tag: string, attrs: Record<string, string>): PathVertex[] {
+  // Convert shape tags (rect, circle, ellipse, star, line, polygon) to path vertices
+  public convertShapeToVertices(tag: string, attrs: Record<string, string>): PathVertex[] {
     const vertices: PathVertex[] = [];
     let idx = 0;
-    const mkV = (x: number, y: number, hIn?: Point, hOut?: Point): PathVertex => ({
+    const mkV = (x: number, y: number, hIn?: Point, hOut?: Point, nodeType: NodeType = 'asymmetric'): PathVertex => ({
       id: `v_${idx++}`,
-      x, y, handleIn: hIn, handleOut: hOut, nodeType: hIn || hOut ? 'symmetric' : 'asymmetric', command: idx === 1 ? 'M' : 'L'
+      x,
+      y,
+      handleIn: hIn,
+      handleOut: hOut,
+      nodeType: nodeType,
+      command: idx === 1 ? 'M' : (hIn || hOut ? 'C' : 'L')
     });
 
     if (tag === 'rect') {
@@ -391,15 +420,14 @@ export class VectorModel {
         const k = 0.5522847498;
         const ox = rx * k;
         const oy = ry * k;
-        vertices.push(mkV(x + rx, y));
-        vertices.push(mkV(x + w - rx, y));
-        vertices.push(mkV(x + w, y + ry, { x: x + w - rx + ox, y: y }, { x: x + w, y: y + ry - oy }));
-        vertices.push(mkV(x + w, y + h - ry));
-        vertices.push(mkV(x + w - rx, y + h, { x: x + w, y: y + h - ry + oy }, { x: x + w - rx + ox, y: y + h }));
-        vertices.push(mkV(x + rx, y + h));
-        vertices.push(mkV(x, y + h - ry, { x: x + rx - ox, y: y + h }, { x: x, y: y + h - ry + oy }));
-        vertices.push(mkV(x, y + ry));
-        vertices.push(mkV(x + rx, y, { x: x, y: y + ry - oy }, { x: x + rx - ox, y: y }));
+        vertices.push(mkV(x + rx, y, undefined, undefined, 'asymmetric'));
+        vertices.push(mkV(x + w - rx, y, undefined, { x: x + w - rx + ox, y: y }, 'smooth'));
+        vertices.push(mkV(x + w, y + ry, { x: x + w, y: y + ry - oy }, undefined, 'smooth'));
+        vertices.push(mkV(x + w, y + h - ry, undefined, { x: x + w, y: y + h - ry + oy }, 'smooth'));
+        vertices.push(mkV(x + w - rx, y + h, { x: x + w - rx + ox, y: y + h }, undefined, 'smooth'));
+        vertices.push(mkV(x + rx, y + h, undefined, { x: x + rx - ox, y: y + h }, 'smooth'));
+        vertices.push(mkV(x, y + h - ry, { x: x, y: y + h - ry + oy }, undefined, 'smooth'));
+        vertices.push(mkV(x, y + ry, undefined, { x: x, y: y + ry - oy }, 'smooth'));
       } else {
         vertices.push(mkV(x, y));
         vertices.push(mkV(x + w, y));
@@ -415,10 +443,26 @@ export class VectorModel {
       const ox = rx * k;
       const oy = ry * k;
 
-      vertices.push(mkV(cx, cy - ry, { x: cx - ox, y: cy - ry }, { x: cx + ox, y: cy - ry }));
-      vertices.push(mkV(cx + rx, cy, { x: cx + rx, y: cy - oy }, { x: cx + rx, y: cy + oy }));
-      vertices.push(mkV(cx, cy + ry, { x: cx + ox, y: cy + ry }, { x: cx - ox, y: cy + ry }));
-      vertices.push(mkV(cx - rx, cy, { x: cx - rx, y: cy + oy }, { x: cx - rx, y: cy - oy }));
+      // 4 points (top 12h, right 3h, bottom 6h, left 9h)
+      vertices.push(mkV(cx, cy - ry, { x: cx - ox, y: cy - ry }, { x: cx + ox, y: cy - ry }, 'symmetric'));
+      vertices.push(mkV(cx + rx, cy, { x: cx + rx, y: cy - oy }, { x: cx + rx, y: cy + oy }, 'symmetric'));
+      vertices.push(mkV(cx, cy + ry, { x: cx + ox, y: cy + ry }, { x: cx - ox, y: cy + ry }, 'symmetric'));
+      vertices.push(mkV(cx - rx, cy, { x: cx - rx, y: cy + oy }, { x: cx - rx, y: cy - oy }, 'symmetric'));
+    } else if (tag === 'star') {
+      const cx = parseFloat(attrs.cx || '50');
+      const cy = parseFloat(attrs.cy || '50');
+      const rx = parseFloat(attrs.rx || attrs.r || '50');
+      const ry = parseFloat(attrs.ry || attrs.r || '50');
+      const points = parseInt(attrs.points || '5', 10);
+      const innerRatio = parseFloat(attrs.innerRatio || '0.4');
+
+      for (let k = 0; k < points * 2; k++) {
+        const angle = -Math.PI / 2 + (k * Math.PI) / points;
+        const isOuter = k % 2 === 0;
+        const curRx = isOuter ? rx : rx * innerRatio;
+        const curRy = isOuter ? ry : ry * innerRatio;
+        vertices.push(mkV(cx + curRx * Math.cos(angle), cy + curRy * Math.sin(angle)));
+      }
     } else if (tag === 'line') {
       const x1 = parseFloat(attrs.x1 || '0');
       const y1 = parseFloat(attrs.y1 || '0');

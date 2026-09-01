@@ -18,10 +18,26 @@ export interface RulerConfig {
   step: number;        // major step interval
 }
 
+export interface ShapeToolConfig {
+  aspectRatioW: number; // default 4
+  aspectRatioH: number; // default 3
+  starPoints: number;   // default 5
+  starInnerRatio: number; // default 0.4
+  rectCornerRadius: number; // default 0
+}
+
 export class CanvasManager {
   public showGrid: boolean = true;
   public showGuides: boolean = true;
   public gridSpacing: number = 20;
+
+  public shapeConfig: ShapeToolConfig = {
+    aspectRatioW: 4,
+    aspectRatioH: 3,
+    starPoints: 5,
+    starInnerRatio: 0.4,
+    rectCornerRadius: 0,
+  };
 
   // Snap options disabled by default
   public snapToGrid: boolean = false;
