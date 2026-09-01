@@ -338,6 +338,97 @@ class AntiDrawApp {
           this.syncToHost();
         }
       }
+
+      // Arrow Key Nudge for selected vectors with modifier multiplier steps
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        if (this.selectionTool.selectedElementIds.size > 0) {
+          e.preventDefault();
+
+          let step = 1;
+          const ctrl = e.ctrlKey || e.metaKey;
+          const shift = e.shiftKey;
+          const alt = e.altKey;
+
+          if (shift && alt) {
+            step = 100;
+          } else if (ctrl && alt) {
+            step = 75;
+          } else if (ctrl && shift) {
+            step = 50;
+          } else if (alt) {
+            step = 25;
+          } else if (shift) {
+            step = 10;
+          } else if (ctrl) {
+            step = 5;
+          } else {
+            step = 1;
+          }
+
+          let dx = 0;
+          let dy = 0;
+          if (e.key === 'ArrowLeft') dx = -step;
+          if (e.key === 'ArrowRight') dx = step;
+          if (e.key === 'ArrowUp') dy = -step;
+          if (e.key === 'ArrowDown') dy = step;
+
+          // If in Node Tool and a specific vertex is selected, move only that vertex
+          const activeEl = this.model.elements.find(
+            (el) => el.id === this.selectionTool.selectedElementId
+          );
+          if (
+            this.toolbar.activeTool === 'node' &&
+            activeEl &&
+            activeEl.vertices &&
+            this.nodeEditorTool.selectedVertexId
+          ) {
+            const v = activeEl.vertices.find(
+              (n) => n.id === this.nodeEditorTool.selectedVertexId
+            );
+            if (v) {
+              v.x += dx;
+              v.y += dy;
+              if (v.handleIn) {
+                v.handleIn.x += dx;
+                v.handleIn.y += dy;
+              }
+              if (v.handleOut) {
+                v.handleOut.x += dx;
+                v.handleOut.y += dy;
+              }
+              activeEl.attributes.d = this.model.compilePathD(
+                activeEl.vertices,
+                activeEl.isClosed
+              );
+              this.render();
+              this.syncToHost();
+              return;
+            }
+          }
+
+          // Otherwise translate all selected vector elements
+          this.model.elements.forEach((el) => {
+            if (this.selectionTool.isSelected(el.id) && el.vertices) {
+              el.vertices.forEach((v) => {
+                v.x += dx;
+                v.y += dy;
+                if (v.handleIn) {
+                  v.handleIn.x += dx;
+                  v.handleIn.y += dy;
+                }
+                if (v.handleOut) {
+                  v.handleOut.x += dx;
+                  v.handleOut.y += dy;
+                }
+              });
+              el.attributes.d = this.model.compilePathD(el.vertices, el.isClosed);
+            }
+          });
+
+          this.render();
+          this.syncToHost();
+        }
+      }
     });
 
     window.addEventListener('keyup', (e) => {
@@ -479,30 +570,29 @@ class AntiDrawApp {
   }
 
   private applyCanvasSize(): void {
-    const { width, height, backgroundColor } = this.model.canvas;
     const zoom = this.canvasMgr.zoom || 1.0;
-    const displayW = Math.round(width * zoom);
-    const displayH = Math.round(height * zoom);
-    const vb = `0 0 ${width} ${height}`;
-    this.model.canvas.viewBox = vb;
+    const workBounds = this.model.getWorkingCanvasBounds(80);
+    const displayW = Math.round(workBounds.width * zoom);
+    const displayH = Math.round(workBounds.height * zoom);
+    const vb = `${workBounds.minX} ${workBounds.minY} ${workBounds.width} ${workBounds.height}`;
 
-    // Set canvas-wrapper to exact scaled pixel dimensions
+    // Set canvas-wrapper to exact scaled pixel dimensions of the dynamic workspace
     this.canvasWrapper.style.cssText = `
       position: relative;
       width: ${displayW}px;
       height: ${displayH}px;
-      background-color: ${backgroundColor};
+      background-color: #12131c;
       box-shadow: 0 12px 40px rgba(0,0,0,0.6);
       border: 1px solid #2b2d3d;
       flex-shrink: 0;
       box-sizing: content-box;
-      overflow: hidden;
+      overflow: visible;
     `;
 
-    // Both SVGs: width and height match zoomed dimensions, viewBox stays in 1:1 canvas model space
+    // Both SVGs: width and height match zoomed dimensions, viewBox encompasses full working bounds
     [this.svgCanvas, this.overlaySvg].forEach((svg) => {
-      svg.setAttribute('width', width.toString());
-      svg.setAttribute('height', height.toString());
+      svg.setAttribute('width', workBounds.width.toString());
+      svg.setAttribute('height', workBounds.height.toString());
       svg.setAttribute('viewBox', vb);
       svg.style.width = `${displayW}px`;
       svg.style.height = `${displayH}px`;
@@ -513,7 +603,7 @@ class AntiDrawApp {
 
     // Update ruler sizes
     setTimeout(() => {
-      this.rulerView.updateSize(width, height);
+      this.rulerView.updateSize(workBounds.width, workBounds.height);
       this.syncRulerScroll();
     }, 0);
   }
@@ -523,13 +613,27 @@ class AntiDrawApp {
   }
 
   private getCanvasPointFromClient(clientX: number, clientY: number): Point {
+    try {
+      const pt = this.svgCanvas.createSVGPoint();
+      pt.x = clientX;
+      pt.y = clientY;
+      const ctm = this.svgCanvas.getScreenCTM();
+      if (ctm) {
+        const transformed = pt.matrixTransform(ctm.inverse());
+        return { x: transformed.x, y: transformed.y };
+      }
+    } catch (_err) {}
+
+    // Fallback: read directly from active SVG viewBox baseVal
     const rect = this.svgCanvas.getBoundingClientRect();
-    const { width: canvasW, height: canvasH } = this.model.canvas;
-    const scaleX = canvasW / (rect.width || 1);
-    const scaleY = canvasH / (rect.height || 1);
+    const vb = this.svgCanvas.viewBox.baseVal;
+    const vbX = vb ? vb.x : 0;
+    const vbY = vb ? vb.y : 0;
+    const vbW = vb && vb.width ? vb.width : rect.width;
+    const vbH = vb && vb.height ? vb.height : rect.height;
     return {
-      x: (clientX - rect.left) * scaleX,
-      y: (clientY - rect.top) * scaleY,
+      x: vbX + (clientX - rect.left) * (vbW / (rect.width || 1)),
+      y: vbY + (clientY - rect.top) * (vbH / (rect.height || 1)),
     };
   }
 
@@ -1230,6 +1334,8 @@ class AntiDrawApp {
 
       this.activeHandle = null;
       this.initialElementsMap.clear();
+      this.applyCanvasSize();
+      this.render();
       this.syncToHost();
     }
   }
@@ -1660,9 +1766,27 @@ class AntiDrawApp {
     }
   }
 
-  private render(): void {
+  private render(autoResize: boolean = true): void {
+    // Auto-adjust dynamic workspace dimensions only when NOT actively dragging
+    if (autoResize && !this.isDragging) {
+      this.applyCanvasSize();
+    }
+
     // Render actual SVG elements
     this.svgCanvas.innerHTML = '';
+
+    // 1. Render Artboard background rect behind all vector elements
+    const vb = this.model.getViewBoxBounds();
+    const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    bgRect.setAttribute('id', '__artboard_bg__');
+    bgRect.setAttribute('x', vb.minX.toString());
+    bgRect.setAttribute('y', vb.minY.toString());
+    bgRect.setAttribute('width', vb.width.toString());
+    bgRect.setAttribute('height', vb.height.toString());
+    bgRect.setAttribute('fill', this.model.canvas.backgroundColor || '#ffffff');
+    this.svgCanvas.appendChild(bgRect);
+
+    // 2. Render all vector elements
     const tempSvg = document.createElement('div');
     tempSvg.innerHTML = this.model.toSvgString();
     const parsedSvg = tempSvg.querySelector('svg');
@@ -1698,21 +1822,38 @@ class AntiDrawApp {
     );
   }
 
-  // Render Overlays: Grid lines, Guide lines (1px constant screen width), Bounding box + handles, Vertices & Bezier control handles
+  // Render Overlays: Artboard ViewBox Frame, Grid lines, Guide lines, Bounding box + handles, Vertices
   private renderOverlay(): void {
     let html = '';
-    const w = this.model.canvas.width;
-    const h = this.model.canvas.height;
+    const vb = this.model.getViewBoxBounds();
+    const workBounds = this.model.getWorkingCanvasBounds(80);
 
-    // 1. Grid Lines Overlay
+    // 0. Artboard (ViewBox Guide Frame - transparent fill so vectors underneath are visible)
+    html += `<rect x="${vb.minX}" y="${vb.minY}" width="${vb.width}" height="${vb.height}" fill="none" stroke="#6366f1" stroke-width="1.5" stroke-dasharray="6 3" opacity="0.85" vector-effect="non-scaling-stroke" />`;
+
+    // Artboard Badge Tag at top-left
+    const tagW = 160;
+    const tagH = 16;
+    html += `
+      <g opacity="0.95">
+        <rect x="${vb.minX}" y="${vb.minY - 20}" width="${tagW}" height="${tagH}" rx="3" fill="#1e1b4b" stroke="#6366f1" stroke-width="1" vector-effect="non-scaling-stroke" />
+        <text x="${vb.minX + 6}" y="${vb.minY - 8}" font-size="10" fill="#c7d2fe" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" font-weight="600">ViewBox: ${vb.width} × ${vb.height}</text>
+      </g>
+    `;
+
+    // 1. Grid Lines Overlay across working bounds
     if (this.canvasMgr.showGrid) {
       const step = this.canvasMgr.gridSpacing;
+      const startX = Math.floor(workBounds.minX / step) * step;
+      const endX = Math.ceil(workBounds.maxX / step) * step;
+      const startY = Math.floor(workBounds.minY / step) * step;
+      const endY = Math.ceil(workBounds.maxY / step) * step;
 
-      for (let x = step; x < w; x += step) {
-        html += `<line x1="${x}" y1="0" x2="${x}" y2="${h}" stroke="#2a2d3d" stroke-width="0.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
+      for (let x = startX; x <= endX; x += step) {
+        html += `<line x1="${x}" y1="${workBounds.minY}" x2="${x}" y2="${workBounds.maxY}" stroke="#2a2d3d" stroke-width="0.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
       }
-      for (let y = step; y < h; y += step) {
-        html += `<line x1="0" y1="${y}" x2="${w}" y2="${y}" stroke="#2a2d3d" stroke-width="0.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
+      for (let y = startY; y <= endY; y += step) {
+        html += `<line x1="${workBounds.minX}" y1="${y}" x2="${workBounds.maxX}" y2="${y}" stroke="#2a2d3d" stroke-width="0.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
       }
     }
 
@@ -1766,9 +1907,9 @@ class AntiDrawApp {
     if (this.activeHandle === 'guide-create') {
       const isHoriz = this.dragGuideOrientation === 'horizontal';
       if (isHoriz) {
-        html += `<line x1="-500" y1="${this.dragGuideCurrentPt.y}" x2="${w + 500}" y2="${this.dragGuideCurrentPt.y}" stroke="#00f0ff" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
+        html += `<line x1="${workBounds.minX - 500}" y1="${this.dragGuideCurrentPt.y}" x2="${workBounds.maxX + 500}" y2="${this.dragGuideCurrentPt.y}" stroke="#00f0ff" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
       } else {
-        html += `<line x1="${this.dragGuideCurrentPt.x}" y1="-500" x2="${this.dragGuideCurrentPt.x}" y2="${h + 500}" stroke="#00f0ff" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
+        html += `<line x1="${this.dragGuideCurrentPt.x}" y1="${workBounds.minY - 500}" x2="${this.dragGuideCurrentPt.x}" y2="${workBounds.maxY + 500}" stroke="#00f0ff" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
       }
     }
 

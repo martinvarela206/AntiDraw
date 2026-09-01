@@ -622,27 +622,46 @@ export class PropertyPanel {
     if (symBtn) symBtn.classList.toggle('active', v.nodeType === 'symmetric');
   }
 
-  // Render Canvas Properties
+  // Render Canvas & ViewBox Properties
   private renderCanvasProperties(): void {
     const { canvas } = this.model;
+    const vb = this.model.getViewBoxBounds();
 
     this.container.innerHTML = `
       <div class="panel-section">
-        <div class="panel-title">Canvas &amp; Workspace</div>
+        <div class="panel-title">Document Size</div>
         <div class="prop-row">
           <span class="prop-label">Width</span>
           <input type="number" class="prop-input" id="canvas-width" value="${canvas.width}" />
-        </div>
-        <div class="prop-row">
-          <span class="prop-label">Height</span>
+          <span class="prop-label" style="width:20px; text-align:right;">H</span>
           <input type="number" class="prop-input" id="canvas-height" value="${canvas.height}" />
         </div>
+      </div>
+
+      <div class="panel-section">
+        <div class="panel-title">ViewBox (Artboard Frame)</div>
         <div class="prop-row">
-          <span class="prop-label">ViewBox</span>
-          <input type="text" class="prop-input" id="canvas-viewbox" value="${canvas.viewBox}" />
+          <span class="prop-label">X</span>
+          <input type="number" class="prop-input" id="vb-minx" value="${vb.minX}" />
+          <span class="prop-label" style="width:20px; text-align:right;">Y</span>
+          <input type="number" class="prop-input" id="vb-miny" value="${vb.minY}" />
         </div>
         <div class="prop-row">
-          <span class="prop-label">Background</span>
+          <span class="prop-label">W</span>
+          <input type="number" class="prop-input" id="vb-width" value="${vb.width}" />
+          <span class="prop-label" style="width:20px; text-align:right;">H</span>
+          <input type="number" class="prop-input" id="vb-height" value="${vb.height}" />
+        </div>
+        <div class="prop-row">
+          <span class="prop-label">Raw</span>
+          <input type="text" class="prop-input" id="canvas-viewbox" value="${canvas.viewBox}" title="Format: minX minY width height" />
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <div class="panel-title">Artboard Background</div>
+        <div class="prop-row">
+          <span class="prop-label">Color</span>
           <div class="color-picker-row">
             <input type="color" class="color-swatch" id="canvas-bg-color" value="${canvas.backgroundColor}" />
             <input type="text" class="prop-input" id="canvas-bg-hex" value="${canvas.backgroundColor}" />
@@ -653,8 +672,23 @@ export class PropertyPanel {
 
     const widthInput = this.container.querySelector<HTMLInputElement>('#canvas-width');
     const heightInput = this.container.querySelector<HTMLInputElement>('#canvas-height');
+    const vbMinX = this.container.querySelector<HTMLInputElement>('#vb-minx');
+    const vbMinY = this.container.querySelector<HTMLInputElement>('#vb-miny');
+    const vbWidth = this.container.querySelector<HTMLInputElement>('#vb-width');
+    const vbHeight = this.container.querySelector<HTMLInputElement>('#vb-height');
+    const viewBoxInput = this.container.querySelector<HTMLInputElement>('#canvas-viewbox');
     const bgColor = this.container.querySelector<HTMLInputElement>('#canvas-bg-color');
     const bgHex = this.container.querySelector<HTMLInputElement>('#canvas-bg-hex');
+
+    const syncVbFromNumbers = () => {
+      const minX = parseFloat(vbMinX?.value || '0') || 0;
+      const minY = parseFloat(vbMinY?.value || '0') || 0;
+      const w = parseFloat(vbWidth?.value || '800') || 800;
+      const h = parseFloat(vbHeight?.value || '600') || 600;
+      this.model.setViewBoxBounds(minX, minY, w, h);
+      if (viewBoxInput) viewBoxInput.value = this.model.canvas.viewBox;
+      this.callbacks.onUpdateCanvas();
+    };
 
     if (widthInput) widthInput.addEventListener('change', () => {
       this.model.canvas.width = parseFloat(widthInput.value) || 800;
@@ -664,6 +698,22 @@ export class PropertyPanel {
       this.model.canvas.height = parseFloat(heightInput.value) || 600;
       this.callbacks.onUpdateCanvas();
     });
+
+    if (vbMinX) vbMinX.addEventListener('change', syncVbFromNumbers);
+    if (vbMinY) vbMinY.addEventListener('change', syncVbFromNumbers);
+    if (vbWidth) vbWidth.addEventListener('change', syncVbFromNumbers);
+    if (vbHeight) vbHeight.addEventListener('change', syncVbFromNumbers);
+
+    if (viewBoxInput) viewBoxInput.addEventListener('change', () => {
+      this.model.canvas.viewBox = viewBoxInput.value.trim();
+      const updatedVb = this.model.getViewBoxBounds();
+      if (vbMinX) vbMinX.value = updatedVb.minX.toString();
+      if (vbMinY) vbMinY.value = updatedVb.minY.toString();
+      if (vbWidth) vbWidth.value = updatedVb.width.toString();
+      if (vbHeight) vbHeight.value = updatedVb.height.toString();
+      this.callbacks.onUpdateCanvas();
+    });
+
     if (bgColor) bgColor.addEventListener('input', () => {
       this.model.canvas.backgroundColor = bgColor.value;
       if (bgHex) bgHex.value = bgColor.value;

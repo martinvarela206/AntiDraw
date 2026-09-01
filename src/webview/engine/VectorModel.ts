@@ -156,6 +156,55 @@ export class VectorModel {
     return svg;
   }
 
+  public getViewBoxBounds(): { minX: number; minY: number; width: number; height: number } {
+    const parts = (this.canvas.viewBox || '').trim().split(/[\s,]+/).map(parseFloat);
+    if (parts.length === 4 && !parts.some(isNaN)) {
+      return { minX: parts[0], minY: parts[1], width: parts[2], height: parts[3] };
+    }
+    return { minX: 0, minY: 0, width: this.canvas.width || 800, height: this.canvas.height || 600 };
+  }
+
+  public setViewBoxBounds(minX: number, minY: number, width: number, height: number): void {
+    this.canvas.viewBox = `${minX} ${minY} ${width} ${height}`;
+  }
+
+  // Calculate canvas bounds encompassing the ViewBox frame AND all vector elements
+  public getWorkingCanvasBounds(padding: number = 80): {
+    minX: number;
+    minY: number;
+    maxX: number;
+    maxY: number;
+    width: number;
+    height: number;
+  } {
+    const vb = this.getViewBoxBounds();
+    let minX = vb.minX;
+    let minY = vb.minY;
+    let maxX = vb.minX + vb.width;
+    let maxY = vb.minY + vb.height;
+
+    // Dynamically expand bounds if elements extend beyond viewBox
+    this.elements.forEach((el) => {
+      if (el.vertices && el.vertices.length > 0) {
+        el.vertices.forEach((v) => {
+          minX = Math.min(minX, v.x - padding);
+          minY = Math.min(minY, v.y - padding);
+          maxX = Math.max(maxX, v.x + padding);
+          maxY = Math.max(maxY, v.y + padding);
+        });
+      }
+    });
+
+    return {
+      minX,
+      minY,
+      maxX,
+      maxY,
+      width: Math.max(maxX - minX, vb.width),
+      height: Math.max(maxY - minY, vb.height),
+    };
+  }
+
   private createDefaultCanvas() {
     this.canvas = {
       width: 800,
