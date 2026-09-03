@@ -2,6 +2,8 @@ import { ToolIcons } from '../icons/ToolIcons.js';
 import { CanvasManager } from '../engine/CanvasManager.js';
 
 export interface TopBarCallbacks {
+  onUndo?: () => void;
+  onRedo?: () => void;
   onAlign: (type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => void;
   onBoolean?: (op: 'union' | 'subtract' | 'intersect' | 'exclude' | 'combine' | 'fragment') => void;
   onZOrder: (action: 'front' | 'forward' | 'backward' | 'back') => void;
@@ -28,6 +30,14 @@ export class TopBar {
 
   private render(): void {
     this.container.innerHTML = `
+      <!-- History (Undo / Redo) -->
+      <div class="top-bar-group">
+        <button class="btn-icon" id="btn-undo" title="Undo (Ctrl+Z)">${ToolIcons.undo}</button>
+        <button class="btn-icon" id="btn-redo" title="Redo (Ctrl+Y)">${ToolIcons.redo}</button>
+      </div>
+
+      <div class="top-bar-divider"></div>
+
       <!-- Alignments -->
       <div class="top-bar-group">
         <button class="btn-icon" id="btn-align-left" title="Align Left">${ToolIcons.alignLeft}</button>
@@ -59,6 +69,9 @@ export class TopBar {
     `;
 
     // Bind event listeners
+    this.bindClick('btn-undo', () => this.callbacks.onUndo?.());
+    this.bindClick('btn-redo', () => this.callbacks.onRedo?.());
+
     this.bindClick('btn-align-left', () => this.callbacks.onAlign('left'));
     this.bindClick('btn-align-center', () => this.callbacks.onAlign('center'));
     this.bindClick('btn-align-right', () => this.callbacks.onAlign('right'));

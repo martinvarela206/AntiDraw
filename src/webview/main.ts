@@ -85,6 +85,11 @@ class AntiDrawApp {
   private clipboardElements: VectorElement[] = [];
   private clipboardGuides: GuideLine[] = [];
 
+  // Undo / Redo history
+  private undoStack: string[] = [];
+  private redoStack: string[] = [];
+  private maxHistory: number = 50;
+
   constructor() {
     this.initLayout();
     this.initEvents();
@@ -158,6 +163,8 @@ class AntiDrawApp {
       document.getElementById('top-bar')!,
       this.canvasMgr,
       {
+        onUndo: () => this.undo(),
+        onRedo: () => this.redo(),
         onAlign: (type) => this.handleAlign(type),
         onBoolean: (op) => this.handleBoolean(op),
         onZOrder: (action) => this.handleZOrder(action),
@@ -375,6 +382,22 @@ class AntiDrawApp {
         }
       }
 
+      if (isCtrl && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault();
+        if (e.shiftKey) {
+          this.redo();
+        } else {
+          this.undo();
+        }
+        return;
+      }
+
+      if (isCtrl && (e.key === 'y' || e.key === 'Y')) {
+        e.preventDefault();
+        this.redo();
+        return;
+      }
+
       if (this.toolbar.activeTool === 'pen') {
         if (e.key === 'Enter') {
           this.finishPenPath(false);
@@ -399,6 +422,7 @@ class AntiDrawApp {
         if (this.toolbar.activeTool === 'node' && this.nodeEditorTool.selectedVertexId) {
           const selectedEl = this.model.elements.find((el) => this.selectionTool.isSelected(el.id));
           if (selectedEl && selectedEl.vertices && selectedEl.vertices.length > 2) {
+            this.pushUndo();
             selectedEl.vertices = this.nodeEditorTool.deleteVertex(selectedEl.vertices, this.nodeEditorTool.selectedVertexId);
             const isClosed = selectedEl.isClosed ?? (!selectedEl.tagName || ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(selectedEl.tagName) || (selectedEl.attributes.d ? /z/i.test(selectedEl.attributes.d) : false));
             selectedEl.attributes.d = this.model.compilePathD(selectedEl.vertices, isClosed);
@@ -412,6 +436,7 @@ class AntiDrawApp {
 
         // 2. Delete selected vector elements
         if (this.selectionTool.selectedElementIds.size > 0) {
+          this.pushUndo();
           this.model.elements = this.model.elements.filter(
             (el) => !this.selectionTool.isSelected(el.id)
           );
@@ -927,6 +952,7 @@ class AntiDrawApp {
       }
 
       if (hitVertex) {
+        this.pushUndo();
         this.activeHandle = 'move';
         this.dragAnchorPt = hitVertex;
         this.initialElementsMap.clear();
@@ -946,6 +972,7 @@ class AntiDrawApp {
         if (groupBox) {
           const handle = this.selectionTool.hitTestHandle(groupBox, pt, 14);
           if (handle) {
+            this.pushUndo();
             this.activeHandle = handle;
             this.initialElementsMap.clear();
             selectedEls.forEach((el) => {
@@ -969,6 +996,7 @@ class AntiDrawApp {
 
         const nowSelected = this.model.elements.filter((el) => this.selectionTool.isSelected(el.id));
         if (nowSelected.length > 0) {
+          this.pushUndo();
           this.activeHandle = 'move';
           this.dragAnchorPt = { x: pt.x, y: pt.y };
           this.initialElementsMap.clear();
@@ -1001,6 +1029,7 @@ class AntiDrawApp {
           this.nodeEditorTool.selectedVertexId
         );
         if (hitNode) {
+          this.pushUndo();
           this.nodeEditorTool.selectedVertexId = hitNode.vertex.id;
           this.nodeEditorTool.selectedHandleType = hitNode.type;
           this.activeHandle = hitNode.type;
@@ -1011,6 +1040,7 @@ class AntiDrawApp {
         }
       }
     } else if (['rect', 'ellipse', 'line', 'star'].includes(activeTool)) {
+      this.pushUndo();
       const otherVertices = this.getOtherVertices();
       this.shapeStartPt = this.snapPoint(pt, otherVertices);
       this.activeHandle = 'shape';
@@ -1501,6 +1531,7 @@ class AntiDrawApp {
         );
         if (hitNode && hitNode.type === 'vertex') {
           if (selectedEl.vertices.length > 2) {
+            this.pushUndo();
             selectedEl.vertices = this.nodeEditorTool.deleteVertex(selectedEl.vertices, hitNode.vertex.id);
             const isClosed = selectedEl.isClosed ?? (!selectedEl.tagName || ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(selectedEl.tagName) || (selectedEl.attributes.d ? /z/i.test(selectedEl.attributes.d) : false));
             selectedEl.attributes.d = this.model.compilePathD(selectedEl.vertices, isClosed);
@@ -1532,6 +1563,7 @@ class AntiDrawApp {
       const tol = Math.max(8, 12 / (this.canvasMgr.zoom || 1));
       const res = this.nodeEditorTool.insertVertexOnPath(targetEl.vertices, pt, tol, isClosed);
       if (res) {
+        this.pushUndo();
         targetEl.vertices = res.updatedVertices;
         targetEl.attributes.d = this.model.compilePathD(targetEl.vertices, isClosed);
         this.nodeEditorTool.selectedVertexId = res.newVertexId;
@@ -1744,6 +1776,7 @@ class AntiDrawApp {
     ctrlKey: boolean = false,
     altKey: boolean = false
   ): void {
+    this.pushUndo();
     const tempId = 'temp_shape_preview';
     this.model.elements = this.model.elements.filter((el) => el.id !== tempId);
     const id = `el_${Date.now().toString(36)}`;
@@ -1765,6 +1798,7 @@ class AntiDrawApp {
   // Commit pen path to vector model elements
   private finishPenPath(close: boolean = false): void {
     if (this.currentPenVertices.length >= 2) {
+      this.pushUndo();
       const id = `el_pen_${Date.now().toString(36)}`;
       const pathD = this.model.compilePathD(this.currentPenVertices, close);
       const newEl: VectorElement = {
@@ -1805,6 +1839,7 @@ class AntiDrawApp {
     });
 
     if (selectedEls.length > 0) {
+      this.pushUndo();
       const aligned = BooleanOperations.alignElements(
         selectedEls,
         type,
@@ -1829,6 +1864,7 @@ class AntiDrawApp {
     });
 
     if (selectedEls.length < 2) return;
+    this.pushUndo();
 
     if (op === 'union') {
       const result = BooleanOperations.union(selectedEls, this.model);
@@ -1898,6 +1934,8 @@ class AntiDrawApp {
 
   private handleZOrder(action: 'front' | 'forward' | 'backward' | 'back'): void {
     const selectedIds = Array.from(this.selectionTool.selectedElementIds);
+    if (selectedIds.length === 0) return;
+    this.pushUndo();
     selectedIds.forEach((id) => {
       this.model.elements = BooleanOperations.reorder(this.model.elements, id, action);
     });
@@ -1910,6 +1948,7 @@ class AntiDrawApp {
       (el) => el.id === this.selectionTool.selectedElementId
     );
     if (selectedEl && selectedEl.vertices && this.nodeEditorTool.selectedVertexId) {
+      this.pushUndo();
       selectedEl.vertices = this.nodeEditorTool.setNodeType(
         selectedEl.vertices,
         this.nodeEditorTool.selectedVertexId,
@@ -1929,6 +1968,7 @@ class AntiDrawApp {
       (el) => el.id === this.selectionTool.selectedElementId
     );
     if (selectedEl && selectedEl.vertices && this.nodeEditorTool.selectedVertexId) {
+      this.pushUndo();
       selectedEl.vertices = this.nodeEditorTool.splitNode(
         selectedEl.vertices,
         this.nodeEditorTool.selectedVertexId
@@ -1936,6 +1976,39 @@ class AntiDrawApp {
       this.render();
       this.syncToHost();
     }
+  }
+
+  private pushUndo(): void {
+    const state = JSON.stringify(this.model.elements);
+    this.undoStack.push(state);
+    if (this.undoStack.length > this.maxHistory) {
+      this.undoStack.shift();
+    }
+    this.redoStack = [];
+  }
+
+  private undo(): void {
+    if (this.undoStack.length === 0) return;
+    const currentState = JSON.stringify(this.model.elements);
+    this.redoStack.push(currentState);
+    const prevState = this.undoStack.pop()!;
+    this.model.elements = JSON.parse(prevState);
+    this.selectionTool.deselectAll();
+    this.propertyPanel.resetPanelMode();
+    this.render();
+    this.syncToHost();
+  }
+
+  private redo(): void {
+    if (this.redoStack.length === 0) return;
+    const currentState = JSON.stringify(this.model.elements);
+    this.undoStack.push(currentState);
+    const nextState = this.redoStack.pop()!;
+    this.model.elements = JSON.parse(nextState);
+    this.selectionTool.deselectAll();
+    this.propertyPanel.resetPanelMode();
+    this.render();
+    this.syncToHost();
   }
 
   private copySelection(): void {
@@ -1956,6 +2029,7 @@ class AntiDrawApp {
 
   private cutSelection(): void {
     this.copySelection();
+    this.pushUndo();
 
     if (this.canvasMgr.selectedGuideId) {
       this.canvasMgr.removeGuide(this.canvasMgr.selectedGuideId);
@@ -1980,6 +2054,7 @@ class AntiDrawApp {
     const newSelectedIds: string[] = [];
 
     if (this.clipboardElements.length > 0) {
+      this.pushUndo();
       const pastedElements: VectorElement[] = this.clipboardElements.map((srcEl) => {
         const el: VectorElement = JSON.parse(JSON.stringify(srcEl));
         el.id = `el_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
