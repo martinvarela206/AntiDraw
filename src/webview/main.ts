@@ -1436,15 +1436,32 @@ class AntiDrawApp {
       return;
     }
 
-    const selectedEl = this.model.elements.find(
-      (el) => el.id === this.selectionTool.selectedElementId
+    // Double-click to add a vertex to path (in node or select tool)
+    let targetEl = this.model.elements.find(
+      (el) => this.selectionTool.isSelected(el.id)
     );
 
-    // Double-click to add a vertex to path
-    if (selectedEl && selectedEl.vertices) {
-      const updated = this.nodeEditorTool.insertVertexOnPath(selectedEl.vertices, pt);
-      if (updated) {
-        selectedEl.vertices = updated;
+    if (!targetEl) {
+      const hit = this.selectionTool.hitTest(this.model.elements, pt, this.canvasMgr.zoom);
+      if (hit) {
+        targetEl = hit.element;
+        this.selectionTool.select(targetEl.id);
+      }
+    }
+
+    if (targetEl && targetEl.vertices) {
+      const isClosed = targetEl.isClosed ?? (!targetEl.tagName || ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(targetEl.tagName) || (targetEl.attributes.d ? /z/i.test(targetEl.attributes.d) : false));
+      const tol = Math.max(8, 12 / (this.canvasMgr.zoom || 1));
+      const res = this.nodeEditorTool.insertVertexOnPath(targetEl.vertices, pt, tol, isClosed);
+      if (res) {
+        targetEl.vertices = res.updatedVertices;
+        targetEl.attributes.d = this.model.compilePathD(targetEl.vertices, isClosed);
+        this.nodeEditorTool.selectedVertexId = res.newVertexId;
+        if (this.toolbar.activeTool !== 'node') {
+          this.toolbar.setTool('node');
+        }
+        const newV = targetEl.vertices.find((v) => v.id === res.newVertexId) || null;
+        this.propertyPanel.update(newV, 'node');
         this.render();
         this.syncToHost();
       }

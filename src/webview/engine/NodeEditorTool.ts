@@ -246,10 +246,21 @@ export class NodeEditorTool {
   }
 
   // Double-click on path segment to insert a new vertex with proper Bezier handles via De Casteljau subdivision
-  public insertVertexOnPath(vertices: PathVertex[], pt: Point, tolerance: number = 8): PathVertex[] | null {
-    for (let i = 0; i < vertices.length - 1; i++) {
+  public insertVertexOnPath(
+    vertices: PathVertex[],
+    pt: Point,
+    tolerance: number = 8,
+    isClosed: boolean = true
+  ): { updatedVertices: PathVertex[]; newVertexId: string } | null {
+    const n = vertices.length;
+    if (n < 2) return null;
+
+    const segmentCount = isClosed ? n : n - 1;
+
+    for (let i = 0; i < segmentCount; i++) {
       const v1 = vertices[i];
-      const v2 = vertices[i + 1];
+      const nextIdx = (i + 1) % n;
+      const v2 = vertices[nextIdx];
       const isCurve = !!(v1.handleOut || v2.handleIn);
 
       const h1 = v1.handleOut || { x: v1.x, y: v1.y };
@@ -260,6 +271,7 @@ export class NodeEditorTool {
         : distToSegmentPoint(pt, v1, v2);
 
       if (dist <= tolerance) {
+        const newId = `v_add_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
         if (isCurve) {
           // Find the t parameter on the cubic Bezier closest to pt
           let bestT = 0.5;
@@ -294,7 +306,7 @@ export class NodeEditorTool {
 
           // New vertex sits at p0123 with split handles
           const newVertex: PathVertex = {
-            id: `v_add_${Date.now().toString(36)}`,
+            id: newId,
             x: p0123x,
             y: p0123y,
             handleIn:  { x: p012x, y: p012y },
@@ -306,23 +318,31 @@ export class NodeEditorTool {
           // Update v1's handleOut to left split
           const updated = vertices.map((v, idx) => {
             if (idx === i) return { ...v, handleOut: { x: p01x, y: p01y } };
-            if (idx === i + 1) return { ...v, handleIn: { x: p23x, y: p23y } };
+            if (idx === nextIdx) return { ...v, handleIn: { x: p23x, y: p23y } };
             return v;
           });
-          updated.splice(i + 1, 0, newVertex);
-          return updated;
+          if (i === n - 1) {
+            updated.push(newVertex);
+          } else {
+            updated.splice(i + 1, 0, newVertex);
+          }
+          return { updatedVertices: updated, newVertexId: newId };
         } else {
           // Straight segment: insert linear node
           const newVertex: PathVertex = {
-            id: `v_add_${Date.now().toString(36)}`,
+            id: newId,
             x: pt.x,
             y: pt.y,
             nodeType: 'asymmetric',
             command: 'L',
           };
           const updated = [...vertices];
-          updated.splice(i + 1, 0, newVertex);
-          return updated;
+          if (i === n - 1) {
+            updated.push(newVertex);
+          } else {
+            updated.splice(i + 1, 0, newVertex);
+          }
+          return { updatedVertices: updated, newVertexId: newId };
         }
       }
     }
