@@ -7,6 +7,7 @@ export interface TopBarCallbacks {
   onAlign: (type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => void;
   onBoolean?: (op: 'union' | 'subtract' | 'intersect' | 'exclude' | 'combine' | 'fragment') => void;
   onZOrder: (action: 'front' | 'forward' | 'backward' | 'back') => void;
+  onToggleRulers?: () => void;
   onToggleGrid: () => void;
   onToggleGuides: () => void;
   onToggleSnap: (type: 'grid' | 'guide' | 'vertex') => void;
@@ -60,6 +61,7 @@ export class TopBar {
 
       <!-- Grid, Guides & Snapping -->
       <div class="top-bar-group">
+        <button class="btn-icon ${this.canvasMgr.showRulers ? 'active' : ''}" id="btn-toggle-rulers" title="Toggle Rulers">${ToolIcons.ruler}</button>
         <button class="btn-icon ${this.canvasMgr.showGrid ? 'active' : ''}" id="btn-toggle-grid" title="Toggle Grid Overlay">${ToolIcons.grid}</button>
         <button class="btn-icon ${this.canvasMgr.showGuides ? 'active' : ''}" id="btn-toggle-guides" title="Toggle Guide Lines">${ToolIcons.guide}</button>
         <button class="btn-icon ${this.canvasMgr.snapToGrid ? 'active' : ''}" id="btn-snap-grid" title="Snap to Grid (Lines &amp; Intersections)">${ToolIcons.snapGrid}</button>
@@ -84,6 +86,7 @@ export class TopBar {
     this.bindClick('btn-z-backward', () => this.callbacks.onZOrder('backward'));
     this.bindClick('btn-z-back', () => this.callbacks.onZOrder('back'));
 
+    this.bindClick('btn-toggle-rulers', () => this.callbacks.onToggleRulers?.());
     this.bindClick('btn-toggle-grid', () => this.callbacks.onToggleGrid());
     this.bindClick('btn-toggle-guides', () => this.callbacks.onToggleGuides());
     this.bindClick('btn-snap-grid', () => this.callbacks.onToggleSnap('grid'));

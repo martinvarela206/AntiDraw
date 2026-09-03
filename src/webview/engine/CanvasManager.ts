@@ -27,6 +27,7 @@ export interface ShapeToolConfig {
 }
 
 export class CanvasManager {
+  public showRulers: boolean = true;
   public showGrid: boolean = true;
   public showGuides: boolean = true;
   public gridSpacing: number = 20;

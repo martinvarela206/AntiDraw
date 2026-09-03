@@ -55,6 +55,11 @@ export const ToolIcons = {
     <line x1="8" y1="11" x2="14" y2="11"/>
   </svg>`,
 
+  ruler: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8">
+    <path d="M21.3 8.7l-6-6a2 2 0 0 0-2.8 0L3.2 12a2 2 0 0 0 0 2.8l6 6c.8.8 2 .8 2.8 0l9.3-9.3c.8-.8.8-2 0-2.8z"/>
+    <path d="M7.5 10.5l2-2M10.5 13.5l3-3M13.5 16.5l2-2M16.5 19.5l3-3"/>
+  </svg>`,
+
   grid: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5">
     <rect x="3" y="3" width="18" height="18"/>
     <line x1="9" y1="3" x2="9" y2="21"/>

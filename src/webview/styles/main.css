@@ -167,6 +167,17 @@ body {
   position: relative;
 }
 
+.canvas-container.no-rulers {
+  grid-template-rows: 0px 1fr !important;
+  grid-template-columns: 0px 1fr !important;
+}
+
+.canvas-container.no-rulers .ruler-corner,
+.canvas-container.no-rulers .ruler-top-container,
+.canvas-container.no-rulers .ruler-left-container {
+  display: none !important;
+}
+
 .ruler-corner {
   grid-area: corner;
   background-color: var(--bg-panel);

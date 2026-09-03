@@ -168,6 +168,14 @@ class AntiDrawApp {
         onAlign: (type) => this.handleAlign(type),
         onBoolean: (op) => this.handleBoolean(op),
         onZOrder: (action) => this.handleZOrder(action),
+        onToggleRulers: () => {
+          this.canvasMgr.showRulers = !this.canvasMgr.showRulers;
+          this.canvasContainer.classList.toggle('no-rulers', !this.canvasMgr.showRulers);
+          this.topBar.update();
+          this.syncRulerScroll();
+          this.render();
+          this.syncMetadataToHost();
+        },
         onToggleGrid: () => {
           this.canvasMgr.showGrid = !this.canvasMgr.showGrid;
           this.topBar.update();
@@ -317,6 +325,7 @@ class AntiDrawApp {
           if (msg.metadata.ruler) {
             this.canvasMgr.rulerConfig = { ...this.canvasMgr.rulerConfig, ...msg.metadata.ruler };
           }
+          if (msg.metadata.showRulers !== undefined) this.canvasMgr.showRulers = msg.metadata.showRulers;
           if (msg.metadata.showGrid !== undefined) this.canvasMgr.showGrid = msg.metadata.showGrid;
           if (msg.metadata.showGuides !== undefined) this.canvasMgr.showGuides = msg.metadata.showGuides;
           if (msg.metadata.gridSpacing !== undefined) this.canvasMgr.gridSpacing = msg.metadata.gridSpacing;
@@ -326,6 +335,8 @@ class AntiDrawApp {
           if (msg.metadata.shapeConfig) {
             this.canvasMgr.shapeConfig = { ...this.canvasMgr.shapeConfig, ...msg.metadata.shapeConfig };
           }
+          this.canvasContainer.classList.toggle('no-rulers', !this.canvasMgr.showRulers);
+          this.topBar.update();
         } else {
           this.canvasMgr.guides = [];
         }
@@ -673,6 +684,7 @@ class AntiDrawApp {
       metadata: {
         guides: this.canvasMgr.guides,
         ruler: this.canvasMgr.rulerConfig,
+        showRulers: this.canvasMgr.showRulers,
         showGrid: this.canvasMgr.showGrid,
         showGuides: this.canvasMgr.showGuides,
         gridSpacing: this.canvasMgr.gridSpacing,
