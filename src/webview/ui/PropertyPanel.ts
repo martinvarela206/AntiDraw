@@ -237,17 +237,21 @@ export class PropertyPanel {
     };
 
     if (originXInput) {
-      originXInput.addEventListener('change', () => {
+      const handleX = () => {
         config.originX = parseFloat(originXInput.value) || 0;
         if (this.callbacks.onUpdateRuler) this.callbacks.onUpdateRuler(config);
-      });
+      };
+      originXInput.addEventListener('input', handleX);
+      originXInput.addEventListener('change', handleX);
     }
 
     if (originYInput) {
-      originYInput.addEventListener('change', () => {
+      const handleY = () => {
         config.originY = parseFloat(originYInput.value) || 0;
         if (this.callbacks.onUpdateRuler) this.callbacks.onUpdateRuler(config);
-      });
+      };
+      originYInput.addEventListener('input', handleY);
+      originYInput.addEventListener('change', handleY);
     }
 
     if (alignLeftBtn) {

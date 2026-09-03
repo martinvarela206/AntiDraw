@@ -3,7 +3,9 @@ import { VectorModel } from '../engine/VectorModel.js';
 
 export interface RulerViewCallbacks {
   onCornerClick: () => void;
+  onResetOrigin?: () => void;
   onStartDragGuide: (orientation: 'horizontal' | 'vertical', clientPos: { x: number; y: number }) => void;
+  onStartDragOrigin?: (clientPos: { x: number; y: number }) => void;
 }
 
 export class RulerView {
@@ -54,10 +56,57 @@ export class RulerView {
   }
 
   private initEvents(): void {
+    let cornerPointerDownPos: { x: number; y: number } | null = null;
+    let isCornerDragging = false;
+
+    // Pointer down on Corner -> drag to position (0,0) Origin
+    this.cornerBtn.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      cornerPointerDownPos = { x: e.clientX, y: e.clientY };
+      isCornerDragging = false;
+
+      const onPointerMove = (moveEv: PointerEvent) => {
+        if (!cornerPointerDownPos) return;
+        const dist = Math.hypot(moveEv.clientX - cornerPointerDownPos.x, moveEv.clientY - cornerPointerDownPos.y);
+        if (dist > 3 && !isCornerDragging) {
+          isCornerDragging = true;
+          if (this.callbacks.onStartDragOrigin) {
+            this.callbacks.onStartDragOrigin({ x: moveEv.clientX, y: moveEv.clientY });
+          }
+          cleanup();
+        }
+      };
+
+      const cleanup = () => {
+        window.removeEventListener('pointermove', onPointerMove);
+        window.removeEventListener('pointerup', onPointerUp);
+        cornerPointerDownPos = null;
+      };
+
+      const onPointerUp = () => {
+        cleanup();
+      };
+
+      window.addEventListener('pointermove', onPointerMove);
+      window.addEventListener('pointerup', onPointerUp);
+    });
+
     // Corner click opens Ruler configuration in PropertyPanel
     this.cornerBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      this.callbacks.onCornerClick();
+      if (!isCornerDragging) {
+        this.callbacks.onCornerClick();
+      }
+    });
+
+    // Corner double-click resets (0,0) origin to ViewBox top-left
+    this.cornerBtn.addEventListener('dblclick', (e) => {
+      e.stopPropagation();
+      if (this.callbacks.onResetOrigin) {
+        this.callbacks.onResetOrigin();
+      }
     });
 
     // Pointer down on Top ruler -> start dragging horizontal guide

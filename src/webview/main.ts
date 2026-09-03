@@ -49,6 +49,7 @@ class AntiDrawApp {
     | 'guide-move'
     | 'guide-pivot'
     | 'guide-rotate'
+    | 'origin-drag'
     | null = null;
 
   private initialElementState: VectorElement | null = null;
@@ -57,9 +58,10 @@ class AntiDrawApp {
   private initialBox: any = null;
   private dragAnchorPt: Point = { x: 0, y: 0 };
 
-  // Guide dragging state
+  // Guide and Origin dragging state
   private dragGuideOrientation: 'horizontal' | 'vertical' = 'horizontal';
   private dragGuideCurrentPt: Point = { x: 0, y: 0 };
+  private dragOriginPt: Point | null = null;
   private guideInitialState: GuideLine | null = null;
   private activeRotateArrowIdx: 1 | 2 = 1;
 
@@ -92,7 +94,7 @@ class AntiDrawApp {
       <div class="top-bar" id="top-bar"></div>
       <div class="left-toolbar" id="left-toolbar"></div>
       <div class="canvas-container" id="canvas-container">
-        <div class="ruler-corner" id="ruler-corner" title="Ruler Settings (Scale &amp; Units)">
+        <div class="ruler-corner" id="ruler-corner" title="Drag to set (0,0) Origin | Click for Ruler Settings | Double-click to Reset Origin">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 3H3v18h18V3z"/>
             <path d="M3 9h6M3 15h4M9 3v6M15 3v4"/>
@@ -191,6 +193,22 @@ class AntiDrawApp {
           this.propertyPanel.showRulerSettings(this.canvasMgr.rulerConfig);
           this.render();
         },
+        onResetOrigin: () => {
+          this.canvasMgr.rulerConfig.originX = 0;
+          this.canvasMgr.rulerConfig.originY = 0;
+          this.syncRulerScroll();
+          this.propertyPanel.showRulerSettings(this.canvasMgr.rulerConfig);
+          this.render();
+          this.syncMetadataToHost();
+        },
+        onStartDragOrigin: (clientPos) => {
+          const pt = this.getCanvasPointFromClient(clientPos.x, clientPos.y);
+          this.activeHandle = 'origin-drag';
+          this.dragOriginPt = pt;
+          this.isDragging = true;
+          this.canvasWrapper.style.cursor = 'crosshair';
+          this.renderOverlay();
+        },
         onStartDragGuide: (orientation, clientPos) => {
           const pt = this.getCanvasPointFromClient(clientPos.x, clientPos.y);
           this.activeHandle = 'guide-create';
@@ -235,6 +253,7 @@ class AntiDrawApp {
         onUpdateRuler: (cfg) => {
           this.canvasMgr.rulerConfig = cfg;
           this.syncRulerScroll();
+          this.render();
           this.syncMetadataToHost();
         },
         onUpdateGuide: (_guide) => {
@@ -626,6 +645,16 @@ class AntiDrawApp {
     }, 0);
   }
 
+  // Snap point accounting for dynamic ruler (0,0) origin offset
+  private snapPoint(pt: Point, otherVertices: Point[] = []): Point {
+    const vb = this.model.getViewBoxBounds();
+    const origin = {
+      x: vb.minX + (this.canvasMgr.rulerConfig.originX || 0),
+      y: vb.minY + (this.canvasMgr.rulerConfig.originY || 0),
+    };
+    return this.canvasMgr.snapPoint(pt, otherVertices, origin);
+  }
+
   private getCanvasPoint(e: PointerEvent | MouseEvent): Point {
     return this.getCanvasPointFromClient(e.clientX, e.clientY);
   }
@@ -930,10 +959,10 @@ class AntiDrawApp {
       }
     } else if (['rect', 'ellipse', 'line', 'star'].includes(activeTool)) {
       const otherVertices = this.getOtherVertices();
-      this.shapeStartPt = this.canvasMgr.snapPoint(pt, otherVertices);
+      this.shapeStartPt = this.snapPoint(pt, otherVertices);
       this.activeHandle = 'shape';
     } else if (activeTool === 'pen') {
-      const snappedPt = this.canvasMgr.snapPoint(pt);
+      const snappedPt = this.snapPoint(pt);
 
       let hitVertexIdx = -1;
       for (let i = 0; i < this.currentPenVertices.length; i++) {
@@ -1069,6 +1098,13 @@ class AntiDrawApp {
     const dx = pt.x - this.dragStartPt.x;
     const dy = pt.y - this.dragStartPt.y;
 
+    // Handle Origin Drag preview
+    if (this.activeHandle === 'origin-drag') {
+      this.dragOriginPt = this.snapPoint(pt);
+      this.renderOverlay();
+      return;
+    }
+
     // Handle Guide interactions
     if (this.activeHandle === 'guide-create') {
       this.dragGuideCurrentPt = pt;
@@ -1159,7 +1195,7 @@ class AntiDrawApp {
 
         // Compute target position of the anchor and snap it
         const rawTarget: Point = { x: this.dragAnchorPt.x + dx, y: this.dragAnchorPt.y + dy };
-        const snappedTarget = this.canvasMgr.snapPoint(rawTarget, otherVertices);
+        const snappedTarget = this.snapPoint(rawTarget, otherVertices);
         const effectiveDx = snappedTarget.x - this.dragAnchorPt.x;
         const effectiveDy = snappedTarget.y - this.dragAnchorPt.y;
 
@@ -1203,7 +1239,7 @@ class AntiDrawApp {
               });
             }
           });
-          const snappedPt = this.canvasMgr.snapPoint(pt, otherVertices);
+          const snappedPt = this.snapPoint(pt, otherVertices);
           const result = this.nodeEditorTool.moveVertex(
             selectedEl.vertices,
             this.nodeEditorTool.selectedVertexId,
@@ -1253,7 +1289,7 @@ class AntiDrawApp {
       return;
     } else if (this.activeHandle === 'shape' && this.shapeStartPt) {
       const otherVertices = this.getOtherVertices();
-      const snappedPt = this.canvasMgr.snapPoint(pt, otherVertices);
+      const snappedPt = this.snapPoint(pt, otherVertices);
       this.previewShape(this.shapeStartPt, snappedPt, e.shiftKey, e.ctrlKey, e.altKey);
     }
 
@@ -1270,6 +1306,21 @@ class AntiDrawApp {
     if (this.isDragging) {
       this.isDragging = false;
       const pt = this.getCanvasPoint(e);
+
+      // 0. Finishing Origin Drag from ruler corner
+      if (this.activeHandle === 'origin-drag') {
+        const vb = this.model.getViewBoxBounds();
+        const finalPt = this.dragOriginPt || pt;
+        this.canvasMgr.rulerConfig.originX = Math.round(finalPt.x - vb.minX);
+        this.canvasMgr.rulerConfig.originY = Math.round(finalPt.y - vb.minY);
+        this.activeHandle = null;
+        this.dragOriginPt = null;
+        this.syncRulerScroll();
+        this.propertyPanel.showRulerSettings(this.canvasMgr.rulerConfig);
+        this.render();
+        this.syncMetadataToHost();
+        return;
+      }
 
       // 1. Finishing Guide Creation from ruler drag
       if (this.activeHandle === 'guide-create') {
@@ -1352,7 +1403,7 @@ class AntiDrawApp {
         this.render();
       } else if (this.activeHandle === 'shape' && this.shapeStartPt) {
         const otherVertices = this.getOtherVertices();
-        const snappedPt = this.canvasMgr.snapPoint(pt, otherVertices);
+        const snappedPt = this.snapPoint(pt, otherVertices);
         this.commitShape(this.shapeStartPt, snappedPt, e.shiftKey, e.ctrlKey, e.altKey);
         this.shapeStartPt = null;
         this.toolbar.setTool('select');
@@ -1867,19 +1918,29 @@ class AntiDrawApp {
       </g>
     `;
 
-    // 1. Grid Lines Overlay across working bounds
+    // 1. Grid Lines Overlay across working bounds (Origin-Aligned)
     if (this.canvasMgr.showGrid) {
-      const step = this.canvasMgr.gridSpacing;
-      const startX = Math.floor(workBounds.minX / step) * step;
-      const endX = Math.ceil(workBounds.maxX / step) * step;
-      const startY = Math.floor(workBounds.minY / step) * step;
-      const endY = Math.ceil(workBounds.maxY / step) * step;
+      const step = Math.max(1, this.canvasMgr.gridSpacing || 20);
+      const originX = vb.minX + (this.canvasMgr.rulerConfig.originX || 0);
+      const originY = vb.minY + (this.canvasMgr.rulerConfig.originY || 0);
+      const startX = originX + Math.floor((workBounds.minX - originX) / step) * step;
+      const endX = originX + Math.ceil((workBounds.maxX - originX) / step) * step;
+      const startY = originY + Math.floor((workBounds.minY - originY) / step) * step;
+      const endY = originY + Math.ceil((workBounds.maxY - originY) / step) * step;
 
-      for (let x = startX; x <= endX; x += step) {
-        html += `<line x1="${x}" y1="${workBounds.minY}" x2="${x}" y2="${workBounds.maxY}" stroke="#2a2d3d" stroke-width="0.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
+      for (let x = startX; x <= endX + 0.1; x += step) {
+        const isOriginAxis = Math.abs(x - originX) < 0.1;
+        const strokeColor = isOriginAxis ? '#4f566b' : '#2a2d3d';
+        const strokeW = isOriginAxis ? '1' : '0.5';
+        const strokeDash = isOriginAxis ? 'none' : '2 2';
+        html += `<line x1="${x}" y1="${workBounds.minY}" x2="${x}" y2="${workBounds.maxY}" stroke="${strokeColor}" stroke-width="${strokeW}" stroke-dasharray="${strokeDash}" vector-effect="non-scaling-stroke" />`;
       }
-      for (let y = startY; y <= endY; y += step) {
-        html += `<line x1="${workBounds.minX}" y1="${y}" x2="${workBounds.maxX}" y2="${y}" stroke="#2a2d3d" stroke-width="0.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
+      for (let y = startY; y <= endY + 0.1; y += step) {
+        const isOriginAxis = Math.abs(y - originY) < 0.1;
+        const strokeColor = isOriginAxis ? '#4f566b' : '#2a2d3d';
+        const strokeW = isOriginAxis ? '1' : '0.5';
+        const strokeDash = isOriginAxis ? 'none' : '2 2';
+        html += `<line x1="${workBounds.minX}" y1="${y}" x2="${workBounds.maxX}" y2="${y}" stroke="${strokeColor}" stroke-width="${strokeW}" stroke-dasharray="${strokeDash}" vector-effect="non-scaling-stroke" />`;
       }
     }
 
@@ -1927,6 +1988,22 @@ class AntiDrawApp {
           `;
         }
       });
+    }
+
+    // Dynamic Origin Drag Preview
+    if (this.activeHandle === 'origin-drag' && this.dragOriginPt) {
+      const ox = this.dragOriginPt.x;
+      const oy = this.dragOriginPt.y;
+      html += `
+        <g opacity="0.9">
+          <line x1="${workBounds.minX - 500}" y1="${oy}" x2="${workBounds.maxX + 500}" y2="${oy}" stroke="#6366f1" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke" />
+          <line x1="${ox}" y1="${workBounds.minY - 500}" x2="${ox}" y2="${workBounds.maxY + 500}" stroke="#6366f1" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke" />
+          <circle cx="${ox}" cy="${oy}" r="8" fill="none" stroke="#6366f1" stroke-width="1.5" vector-effect="non-scaling-stroke" />
+          <circle cx="${ox}" cy="${oy}" r="2" fill="#6366f1" />
+          <rect x="${ox + 10}" y="${oy - 22}" width="72" height="18" rx="3" fill="#1e1b4b" stroke="#6366f1" stroke-width="1" vector-effect="non-scaling-stroke" />
+          <text x="${ox + 15}" y="${oy - 9}" font-size="10" fill="#c7d2fe" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" font-weight="600">Origin (0,0)</text>
+        </g>
+      `;
     }
 
     // Dynamic Guide Drag Creation Preview

@@ -22,8 +22,8 @@
   "ruler": {
     "unit": "px",
     "scale": 1,
-    "originX": 30,
-    "originY": 20,
+    "originX": 0,
+    "originY": 0,
     "step": 50
   },
   "showGrid": true,

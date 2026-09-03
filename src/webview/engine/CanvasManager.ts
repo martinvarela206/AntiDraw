@@ -65,7 +65,7 @@ export class CanvasManager {
   public activeGuideTransformId: string | null = null;
 
   // Snap point to active vertices, guide lines / guide intersections, or grid lines / grid intersections (3px proximity)
-  public snapPoint(pt: Point, otherVertices: Point[] = []): Point {
+  public snapPoint(pt: Point, otherVertices: Point[] = [], origin?: Point): Point {
     let snappedX = pt.x;
     let snappedY = pt.y;
     const threshold = this.snapThreshold / (this.zoom || 1);
@@ -151,10 +151,13 @@ export class CanvasManager {
       }
     }
 
-    // 3. Snap to Grid Lines & Grid Intersections
+    // 3. Snap to Grid Lines & Grid Intersections (Origin-Aligned)
     if (this.snapToGrid && this.showGrid) {
-      const gx = Math.round(pt.x / this.gridSpacing) * this.gridSpacing;
-      const gy = Math.round(pt.y / this.gridSpacing) * this.gridSpacing;
+      const ox = origin ? origin.x : (this.rulerConfig.originX || 0);
+      const oy = origin ? origin.y : (this.rulerConfig.originY || 0);
+      const step = Math.max(1, this.gridSpacing || 20);
+      const gx = ox + Math.round((pt.x - ox) / step) * step;
+      const gy = oy + Math.round((pt.y - oy) / step) * step;
 
       if (Math.abs(pt.x - gx) <= threshold) {
         snappedX = gx;
