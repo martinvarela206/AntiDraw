@@ -158,14 +158,16 @@ export class SelectionTool {
     };
   }
 
-  // Test which elements intersect or are contained inside a marquee selection rectangle
+  // Test which elements are completely contained inside a marquee selection rectangle
   public hitTestMarquee(
     elements: VectorElement[],
     marquee: { x: number; y: number; width: number; height: number }
   ): string[] {
     const hits: string[] = [];
-    const mRight = marquee.x + marquee.width;
-    const mBottom = marquee.y + marquee.height;
+    const mLeft = Math.min(marquee.x, marquee.x + marquee.width);
+    const mRight = Math.max(marquee.x, marquee.x + marquee.width);
+    const mTop = Math.min(marquee.y, marquee.y + marquee.height);
+    const mBottom = Math.max(marquee.y, marquee.y + marquee.height);
 
     elements.forEach((el) => {
       const box = this.getBoundingBox(el);
@@ -174,14 +176,14 @@ export class SelectionTool {
       const bRight = box.x + box.width;
       const bBottom = box.y + box.height;
 
-      // Check AABB overlap
-      const overlaps =
-        box.x < mRight &&
-        bRight > marquee.x &&
-        box.y < mBottom &&
-        bBottom > marquee.y;
+      // Strict containment: bounding box must be 100% inside marquee selection
+      const isInside =
+        box.x >= mLeft &&
+        bRight <= mRight &&
+        box.y >= mTop &&
+        bBottom <= mBottom;
 
-      if (overlaps) {
+      if (isInside) {
         hits.push(el.id);
       }
     });
