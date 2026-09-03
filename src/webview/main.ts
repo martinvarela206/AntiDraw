@@ -357,6 +357,21 @@ class AntiDrawApp {
           return;
         }
 
+        // 1b. Delete selected vertex in node editor
+        if (this.toolbar.activeTool === 'node' && this.nodeEditorTool.selectedVertexId) {
+          const selectedEl = this.model.elements.find((el) => this.selectionTool.isSelected(el.id));
+          if (selectedEl && selectedEl.vertices && selectedEl.vertices.length > 2) {
+            selectedEl.vertices = this.nodeEditorTool.deleteVertex(selectedEl.vertices, this.nodeEditorTool.selectedVertexId);
+            const isClosed = selectedEl.isClosed ?? (!selectedEl.tagName || ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(selectedEl.tagName) || (selectedEl.attributes.d ? /z/i.test(selectedEl.attributes.d) : false));
+            selectedEl.attributes.d = this.model.compilePathD(selectedEl.vertices, isClosed);
+            this.nodeEditorTool.selectedVertexId = null;
+            this.propertyPanel.update(null, 'node');
+            this.render();
+            this.syncToHost();
+            return;
+          }
+        }
+
         // 2. Delete selected vector elements
         if (this.selectionTool.selectedElementIds.size > 0) {
           this.model.elements = this.model.elements.filter(
@@ -1434,6 +1449,31 @@ class AntiDrawApp {
       this.propertyPanel.showGuideSettings(hitGuide);
       this.render();
       return;
+    }
+
+    // Double-click on an existing vertex in Node mode -> Delete vertex
+    if (this.toolbar.activeTool === 'node') {
+      const selectedEl = this.model.elements.find((el) => this.selectionTool.isSelected(el.id));
+      if (selectedEl && selectedEl.vertices) {
+        const hitNode = this.nodeEditorTool.hitTestVertices(
+          selectedEl.vertices,
+          pt,
+          12,
+          this.nodeEditorTool.selectedVertexId
+        );
+        if (hitNode && hitNode.type === 'vertex') {
+          if (selectedEl.vertices.length > 2) {
+            selectedEl.vertices = this.nodeEditorTool.deleteVertex(selectedEl.vertices, hitNode.vertex.id);
+            const isClosed = selectedEl.isClosed ?? (!selectedEl.tagName || ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(selectedEl.tagName) || (selectedEl.attributes.d ? /z/i.test(selectedEl.attributes.d) : false));
+            selectedEl.attributes.d = this.model.compilePathD(selectedEl.vertices, isClosed);
+            this.nodeEditorTool.selectedVertexId = null;
+            this.propertyPanel.update(null, 'node');
+            this.render();
+            this.syncToHost();
+            return;
+          }
+        }
+      }
     }
 
     // Double-click to add a vertex to path (in node or select tool)

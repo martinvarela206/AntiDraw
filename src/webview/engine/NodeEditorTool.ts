@@ -245,6 +245,29 @@ export class NodeEditorTool {
     return result;
   }
 
+  // Delete a vertex by ID and reconnect adjacent vertices preserving curvature
+  public deleteVertex(vertices: PathVertex[], vertexId: string): PathVertex[] {
+    const idx = vertices.findIndex((v) => v.id === vertexId);
+    if (idx === -1 || vertices.length <= 1) return vertices;
+
+    const updated = [...vertices];
+    const removed = updated.splice(idx, 1)[0];
+
+    // If removed the first vertex of a subpath, ensure new first vertex is 'M'
+    if (idx === 0 && updated.length > 0) {
+      updated[0] = { ...updated[0], command: 'M', handleIn: undefined };
+    } else if (idx > 0 && idx < updated.length) {
+      const prev = updated[idx - 1];
+      if (removed.command === 'C') {
+        if (!prev.handleOut && removed.handleOut) {
+          prev.handleOut = { ...removed.handleOut };
+        }
+      }
+    }
+
+    return updated;
+  }
+
   // Double-click on path segment to insert a new vertex with proper Bezier handles via De Casteljau subdivision
   public insertVertexOnPath(
     vertices: PathVertex[],
