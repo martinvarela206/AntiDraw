@@ -81,6 +81,10 @@ class AntiDrawApp {
   // Flag: avoid re-parsing model when a change was sent from this webview itself
   private isUpdatingFromWebview: boolean = false;
 
+  // Clipboard buffer
+  private clipboardElements: VectorElement[] = [];
+  private clipboardGuides: GuideLine[] = [];
+
   constructor() {
     this.initLayout();
     this.initEvents();
@@ -336,6 +340,40 @@ class AntiDrawApp {
       if (e.key === 'p' || e.key === 'P') this.toolbar.setTool('pen');
       if (e.key === 'r' || e.key === 'R') this.toolbar.setTool('rect');
       if (e.key === 'e' || e.key === 'E') this.toolbar.setTool('ellipse');
+
+      const isCtrl = e.ctrlKey || e.metaKey;
+
+      if (isCtrl && (e.key === 'c' || e.key === 'C')) {
+        if (this.selectionTool.selectedElementIds.size > 0 || this.canvasMgr.selectedGuideId) {
+          e.preventDefault();
+          this.copySelection();
+          return;
+        }
+      }
+
+      if (isCtrl && (e.key === 'x' || e.key === 'X')) {
+        if (this.selectionTool.selectedElementIds.size > 0 || this.canvasMgr.selectedGuideId) {
+          e.preventDefault();
+          this.cutSelection();
+          return;
+        }
+      }
+
+      if (isCtrl && (e.key === 'v' || e.key === 'V')) {
+        if (this.clipboardElements.length > 0 || this.clipboardGuides.length > 0) {
+          e.preventDefault();
+          this.pasteClipboard();
+          return;
+        }
+      }
+
+      if (isCtrl && (e.key === 'd' || e.key === 'D')) {
+        if (this.selectionTool.selectedElementIds.size > 0 || this.canvasMgr.selectedGuideId) {
+          e.preventDefault();
+          this.duplicateSelection();
+          return;
+        }
+      }
 
       if (this.toolbar.activeTool === 'pen') {
         if (e.key === 'Enter') {
@@ -1898,6 +1936,122 @@ class AntiDrawApp {
       this.render();
       this.syncToHost();
     }
+  }
+
+  private copySelection(): void {
+    if (this.selectionTool.selectedElementIds.size > 0) {
+      const selected = this.model.elements.filter((el) => this.selectionTool.isSelected(el.id));
+      this.clipboardElements = JSON.parse(JSON.stringify(selected));
+    } else {
+      this.clipboardElements = [];
+    }
+
+    if (this.canvasMgr.selectedGuideId) {
+      const guide = this.canvasMgr.guides.find((g) => g.id === this.canvasMgr.selectedGuideId);
+      this.clipboardGuides = guide ? [JSON.parse(JSON.stringify(guide))] : [];
+    } else {
+      this.clipboardGuides = [];
+    }
+  }
+
+  private cutSelection(): void {
+    this.copySelection();
+
+    if (this.canvasMgr.selectedGuideId) {
+      this.canvasMgr.removeGuide(this.canvasMgr.selectedGuideId);
+      this.canvasMgr.selectedGuideId = null;
+      this.canvasMgr.activeGuideTransformId = null;
+      this.propertyPanel.resetPanelMode();
+      this.syncMetadataToHost();
+    }
+
+    if (this.selectionTool.selectedElementIds.size > 0) {
+      this.model.elements = this.model.elements.filter((el) => !this.selectionTool.isSelected(el.id));
+      this.selectionTool.deselectAll();
+      this.propertyPanel.resetPanelMode();
+      this.syncToHost();
+    }
+
+    this.render();
+  }
+
+  private pasteClipboard(): void {
+    const offset = 15;
+    const newSelectedIds: string[] = [];
+
+    if (this.clipboardElements.length > 0) {
+      const pastedElements: VectorElement[] = this.clipboardElements.map((srcEl) => {
+        const el: VectorElement = JSON.parse(JSON.stringify(srcEl));
+        el.id = `el_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
+
+        if (el.vertices && el.vertices.length > 0) {
+          el.vertices.forEach((v) => {
+            v.id = `v_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
+            v.x += offset;
+            v.y += offset;
+            if (v.handleIn) {
+              v.handleIn.x += offset;
+              v.handleIn.y += offset;
+            }
+            if (v.handleOut) {
+              v.handleOut.x += offset;
+              v.handleOut.y += offset;
+            }
+          });
+
+          const isClosed = el.isClosed ?? (!el.tagName || ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(el.tagName) || (el.attributes.d ? /z/i.test(el.attributes.d) : false));
+          el.attributes.d = this.model.compilePathD(el.vertices, isClosed);
+        }
+
+        if (el.attributes.x) el.attributes.x = (parseFloat(el.attributes.x) + offset).toString();
+        if (el.attributes.y) el.attributes.y = (parseFloat(el.attributes.y) + offset).toString();
+        if (el.attributes.cx) el.attributes.cx = (parseFloat(el.attributes.cx) + offset).toString();
+        if (el.attributes.cy) el.attributes.cy = (parseFloat(el.attributes.cy) + offset).toString();
+
+        return el;
+      });
+
+      this.selectionTool.deselectAll();
+      pastedElements.forEach((el) => {
+        this.model.elements.push(el);
+        this.selectionTool.selectedElementIds.add(el.id);
+        newSelectedIds.push(el.id);
+      });
+
+      // Update clipboard elements so repeated pastes stagger automatically
+      this.clipboardElements = JSON.parse(JSON.stringify(pastedElements));
+
+      this.propertyPanel.resetPanelMode();
+      this.propertyPanel.update(null, 'select');
+      this.syncToHost();
+    }
+
+    if (this.clipboardGuides.length > 0) {
+      const pastedGuides: GuideLine[] = this.clipboardGuides.map((srcGuide) => {
+        const g: GuideLine = JSON.parse(JSON.stringify(srcGuide));
+        g.id = `guide_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
+        g.position += offset;
+        g.pivotX += offset;
+        g.pivotY += offset;
+        return g;
+      });
+
+      pastedGuides.forEach((g) => {
+        this.canvasMgr.guides.push(g);
+        this.canvasMgr.selectedGuideId = g.id;
+        this.propertyPanel.showGuideSettings(g);
+      });
+
+      this.clipboardGuides = JSON.parse(JSON.stringify(pastedGuides));
+      this.syncMetadataToHost();
+    }
+
+    this.render();
+  }
+
+  private duplicateSelection(): void {
+    this.copySelection();
+    this.pasteClipboard();
   }
 
   private render(autoResize: boolean = true): void {
