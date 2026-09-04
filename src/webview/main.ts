@@ -568,10 +568,42 @@ class AntiDrawApp {
     });
 
     // Pointer events on Canvas Wrapper
-    this.canvasWrapper.addEventListener('pointerdown', (e) => this.onPointerDown(e));
-    this.canvasWrapper.addEventListener('pointermove', (e) => this.onPointerMove(e));
-    this.canvasWrapper.addEventListener('pointerup', (e) => this.onPointerUp(e));
-    this.canvasWrapper.addEventListener('dblclick', (e) => this.onDoubleClick(e));
+    this.canvasWrapper.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      this.onPointerDown(e);
+    });
+    this.canvasWrapper.addEventListener('pointermove', (e) => {
+      e.stopPropagation();
+      this.onPointerMove(e);
+    });
+    this.canvasWrapper.addEventListener('pointerup', (e) => {
+      e.stopPropagation();
+      this.onPointerUp(e);
+    });
+    this.canvasWrapper.addEventListener('dblclick', (e) => {
+      e.stopPropagation();
+      this.onDoubleClick(e);
+    });
+
+    // Pointer events on Canvas Scroll Area (delegating interaction for guides extending outside canvasWrapper)
+    this.canvasScrollArea.addEventListener('pointerdown', (e: PointerEvent) => {
+      if (e.button === 0) {
+        this.onPointerDown(e);
+      }
+    });
+    this.canvasScrollArea.addEventListener('pointermove', (e: PointerEvent) => {
+      if (!this.isMiddlePanning && !this.isDragging) {
+        this.onPointerMove(e);
+      }
+    });
+    this.canvasScrollArea.addEventListener('pointerup', (e: PointerEvent) => {
+      if (e.button === 0 && this.isDragging) {
+        this.onPointerUp(e);
+      }
+    });
+    this.canvasScrollArea.addEventListener('dblclick', (e: MouseEvent) => {
+      this.onDoubleClick(e);
+    });
 
     // Middle mouse button panning (hand cursor and viewport scroll)
     this.canvasScrollArea.addEventListener('pointerdown', (e: PointerEvent) => {
@@ -726,6 +758,7 @@ class AntiDrawApp {
       svg.style.position = 'absolute';
       svg.style.top = '0';
       svg.style.left = '0';
+      svg.style.overflow = 'visible';
     });
 
     // Update ruler sizes
@@ -824,8 +857,8 @@ class AntiDrawApp {
     const px = guide.pivotX ?? (guide.orientation === 'vertical' ? guide.position : w / 2);
     const py = guide.pivotY ?? (guide.orientation === 'horizontal' ? guide.position : h / 2);
 
-    // Large bounding span across canvas
-    const span = Math.max(w, h) * 2;
+    // Large bounding span across workspace
+    const span = 100000;
     const p1 = { x: px - cos * span, y: py - sin * span };
     const p2 = { x: px + cos * span, y: py + sin * span };
 
@@ -853,7 +886,11 @@ class AntiDrawApp {
     const activeTool = this.toolbar.activeTool;
 
     try {
-      this.canvasWrapper.setPointerCapture(e.pointerId);
+      if (e.target && typeof (e.target as any).setPointerCapture === 'function') {
+        (e.target as any).setPointerCapture(e.pointerId);
+      } else {
+        this.canvasWrapper.setPointerCapture(e.pointerId);
+      }
     } catch (_err) {}
 
     if (activeTool === 'select') {
@@ -1140,6 +1177,7 @@ class AntiDrawApp {
             const geom = this.getGuideGeometry(activeG);
             if (Math.hypot(pt.x - geom.pivot.x, pt.y - geom.pivot.y) <= 12) {
               this.canvasWrapper.style.cursor = 'move';
+              this.canvasScrollArea.style.cursor = 'move';
               return;
             }
             if (
@@ -1147,6 +1185,7 @@ class AntiDrawApp {
               Math.hypot(pt.x - geom.arrow2.x, pt.y - geom.arrow2.y) <= 16
             ) {
               this.canvasWrapper.style.cursor = 'grab';
+              this.canvasScrollArea.style.cursor = 'grab';
               return;
             }
           }
@@ -1155,8 +1194,12 @@ class AntiDrawApp {
         // Check guide line hover
         const hitG = this.hitTestGuide(pt, 6);
         if (hitG) {
-          this.canvasWrapper.style.cursor = hitG.orientation === 'vertical' ? 'ew-resize' : hitG.orientation === 'horizontal' ? 'ns-resize' : 'crosshair';
+          const cur = hitG.orientation === 'vertical' ? 'ew-resize' : hitG.orientation === 'horizontal' ? 'ns-resize' : 'crosshair';
+          this.canvasWrapper.style.cursor = cur;
+          this.canvasScrollArea.style.cursor = cur;
           return;
+        } else if (!this.isMiddlePanning) {
+          this.canvasScrollArea.style.cursor = '';
         }
 
         const selectedEls = this.model.elements.filter(

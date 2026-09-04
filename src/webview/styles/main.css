@@ -246,6 +246,7 @@ body {
 #overlay-svg {
   /* Positioned via JS — both at position:absolute; top:0; left:0 */
   display: block;
+  overflow: visible;
 }
 
 /* RIGHT PROPERTY INSPECTOR */
