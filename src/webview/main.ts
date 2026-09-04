@@ -1411,24 +1411,47 @@ class AntiDrawApp {
           (this.activeHandle === 'handleIn' || this.activeHandle === 'handleOut') &&
           this.nodeEditorTool.selectedVertexId
         ) {
+          const otherVertices: Point[] = [];
+          this.model.elements.forEach((el) => {
+            if (el.vertices) {
+              el.vertices.forEach((v) => {
+                otherVertices.push({ x: v.x, y: v.y });
+              });
+            }
+          });
+          const snappedPt = this.snapPoint(pt, otherVertices);
           selectedEl.vertices = this.nodeEditorTool.moveHandle(
             selectedEl.vertices,
             this.nodeEditorTool.selectedVertexId,
             this.activeHandle,
-            pt
+            snappedPt
           );
         }
       }
     } else if (this.toolbar.activeTool === 'pen') {
       if (this.isDragging && this.activeHandle === 'pen') {
         if (this.penMovingVertexIdx !== null && this.currentPenVertices[this.penMovingVertexIdx]) {
-          this.currentPenVertices[this.penMovingVertexIdx].x = pt.x;
-          this.currentPenVertices[this.penMovingVertexIdx].y = pt.y;
+          const otherVertices: Point[] = [];
+          this.model.elements.forEach((el) => {
+            if (el.vertices) {
+              el.vertices.forEach((v) => otherVertices.push({ x: v.x, y: v.y }));
+            }
+          });
+          const snappedPt = this.snapPoint(pt, otherVertices);
+          this.currentPenVertices[this.penMovingVertexIdx].x = snappedPt.x;
+          this.currentPenVertices[this.penMovingVertexIdx].y = snappedPt.y;
         } else if (this.penActiveVertexIdx !== null && this.currentPenVertices[this.penActiveVertexIdx]) {
           const curV = this.currentPenVertices[this.penActiveVertexIdx];
-          const curDx = pt.x - curV.x;
-          const curDy = pt.y - curV.y;
-          curV.handleOut = { x: pt.x, y: pt.y };
+          const otherVertices: Point[] = [];
+          this.model.elements.forEach((el) => {
+            if (el.vertices) {
+              el.vertices.forEach((v) => otherVertices.push({ x: v.x, y: v.y }));
+            }
+          });
+          const snappedPt = this.snapPoint(pt, otherVertices);
+          const curDx = snappedPt.x - curV.x;
+          const curDy = snappedPt.y - curV.y;
+          curV.handleOut = { x: snappedPt.x, y: snappedPt.y };
           const angle = Math.atan2(curDy, curDx) + Math.PI;
           const dist = curV.nodeType === 'symmetric'
             ? Math.hypot(curDx, curDy)
