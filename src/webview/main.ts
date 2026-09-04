@@ -925,6 +925,16 @@ class AntiDrawApp {
             this.render();
             return;
           }
+
+          // Check click anywhere on the active transforming guide line away from the pivot
+          const hitActive = this.hitTestGuide(pt, 8);
+          if (hitActive && hitActive.id === activeG.id) {
+            this.activeHandle = 'guide-rotate';
+            this.activeRotateArrowIdx = 1;
+            this.guideInitialState = { ...activeG };
+            this.render();
+            return;
+          }
         }
       }
 
@@ -1188,6 +1198,12 @@ class AntiDrawApp {
               this.canvasScrollArea.style.cursor = 'grab';
               return;
             }
+            const hitActive = this.hitTestGuide(pt, 6);
+            if (hitActive && hitActive.id === activeG.id) {
+              this.canvasWrapper.style.cursor = 'grab';
+              this.canvasScrollArea.style.cursor = 'grab';
+              return;
+            }
           }
         }
 
@@ -1228,6 +1244,9 @@ class AntiDrawApp {
         }
 
         this.canvasWrapper.style.cursor = cursor;
+        if (!this.isMiddlePanning) {
+          this.canvasScrollArea.style.cursor = '';
+        }
         this.renderOverlay();
       }
       return;
@@ -1281,6 +1300,8 @@ class AntiDrawApp {
     }
 
     if (this.activeHandle === 'guide-rotate' && this.canvasMgr.selectedGuideId) {
+      this.canvasWrapper.style.cursor = 'grabbing';
+      this.canvasScrollArea.style.cursor = 'grabbing';
       const g = this.canvasMgr.getGuide(this.canvasMgr.selectedGuideId);
       if (g) {
         const px = g.pivotX ?? (g.orientation === 'vertical' ? g.position : this.model.canvas.width / 2);
