@@ -125,17 +125,45 @@ export class NodeEditorTool {
 
       const updated = { ...v, nodeType };
 
-      if (nodeType !== 'asymmetric') {
+      if (nodeType === 'sharp') {
+        // Remove handles completely and reset Bézier curvature
+        updated.handleIn = undefined;
+        updated.handleOut = undefined;
+        if (updated.command !== 'M') {
+          updated.command = 'L';
+        }
+        return updated;
+      }
+
+      if (nodeType === 'asymmetric') {
+        // If it had no handles, create default independent handles
+        if (!updated.handleIn && !updated.handleOut) {
+          updated.handleIn = { x: v.x - 20, y: v.y };
+          updated.handleOut = { x: v.x + 20, y: v.y };
+          if (updated.command !== 'M') {
+            updated.command = 'C';
+          }
+        }
+        return updated;
+      }
+
+      if (nodeType === 'smooth' || nodeType === 'symmetric') {
         // Ensure both handles exist before enforcing collinearity
         if (!updated.handleIn && !updated.handleOut) {
           // No handles at all — create default collinear handles (20px each direction)
           updated.handleIn  = { x: v.x - 20, y: v.y };
           updated.handleOut = { x: v.x + 20, y: v.y };
+          if (updated.command !== 'M') {
+            updated.command = 'C';
+          }
         } else if (!updated.handleIn && updated.handleOut) {
           // Mirror handleOut to create handleIn
           const dx = updated.handleOut.x - v.x;
           const dy = updated.handleOut.y - v.y;
           updated.handleIn = { x: v.x - dx, y: v.y - dy };
+          if (updated.command !== 'M') {
+            updated.command = 'C';
+          }
         } else if (updated.handleIn && !updated.handleOut) {
           // Mirror handleIn to create handleOut
           const dx = updated.handleIn.x - v.x;
@@ -154,6 +182,7 @@ export class NodeEditorTool {
           x: v.x + Math.cos(angle) * distOut,
           y: v.y + Math.sin(angle) * distOut,
         };
+        return updated;
       }
 
       return updated;

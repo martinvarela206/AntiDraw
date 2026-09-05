@@ -422,7 +422,10 @@ export class PropertyPanel {
       <div class="panel-section">
         <div class="panel-title">Next Node Type</div>
         <div class="prop-row" style="justify-content: flex-start; gap: 8px;">
-          <button class="btn-icon ${this.penNodeType === 'asymmetric' ? 'active' : ''}" id="btn-pen-asym" title="Asymmetric Node (Corner / Sharp)">
+          <button class="btn-icon ${this.penNodeType === 'sharp' ? 'active' : ''}" id="btn-pen-sharp" title="Sin tiradores (Sharp / Recto)">
+            ${ToolIcons.nodeSharp}
+          </button>
+          <button class="btn-icon ${this.penNodeType === 'asymmetric' ? 'active' : ''}" id="btn-pen-asym" title="Asymmetric Node (Independent Handles)">
             ${ToolIcons.nodeAsymmetric}
           </button>
           <button class="btn-icon ${this.penNodeType === 'smooth' ? 'active' : ''}" id="btn-pen-smooth" title="Uniform / Smooth Node (Curved)">
@@ -462,6 +465,11 @@ export class PropertyPanel {
       </div>
     `;
 
+    this.bindMouseDown('btn-pen-sharp', () => {
+      this.penNodeType = 'sharp';
+      if (this.callbacks.onPenNodeTypeChange) this.callbacks.onPenNodeTypeChange('sharp');
+      this.renderPenProperties();
+    });
     this.bindMouseDown('btn-pen-asym', () => {
       this.penNodeType = 'asymmetric';
       if (this.callbacks.onPenNodeTypeChange) this.callbacks.onPenNodeTypeChange('asymmetric');
@@ -1113,7 +1121,10 @@ export class PropertyPanel {
       <div class="panel-section">
         <div class="panel-title">Node Type</div>
         <div class="prop-row" style="justify-content: flex-start; gap: 8px;">
-          <button class="btn-icon ${v.nodeType === 'asymmetric' ? 'active' : ''}" id="btn-node-asym" title="Asymmetric Node">
+          <button class="btn-icon ${v.nodeType === 'sharp' || (!v.handleIn && !v.handleOut) ? 'active' : ''}" id="btn-node-sharp" title="Sin tiradores (Cúspide / Recto)">
+            ${ToolIcons.nodeSharp}
+          </button>
+          <button class="btn-icon ${v.nodeType === 'asymmetric' && (v.handleIn || v.handleOut) ? 'active' : ''}" id="btn-node-asym" title="Asymmetric Node (Independent Handles)">
             ${ToolIcons.nodeAsymmetric}
           </button>
           <button class="btn-icon ${v.nodeType === 'smooth' ? 'active' : ''}" id="btn-node-smooth" title="Uniform / Smooth Node">
@@ -1135,6 +1146,7 @@ export class PropertyPanel {
     `;
 
     // mousedown + preventDefault: prevents focus stealing / blur from canvas when clicking panel buttons
+    this.bindMouseDown('btn-node-sharp', () => this.callbacks.onNodeTypeChange('sharp'));
     this.bindMouseDown('btn-node-asym', () => this.callbacks.onNodeTypeChange('asymmetric'));
     this.bindMouseDown('btn-node-smooth', () => this.callbacks.onNodeTypeChange('smooth'));
     this.bindMouseDown('btn-node-sym', () => this.callbacks.onNodeTypeChange('symmetric'));

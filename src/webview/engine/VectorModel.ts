@@ -3,7 +3,7 @@ export interface Point {
   y: number;
 }
 
-export type NodeType = 'asymmetric' | 'smooth' | 'symmetric';
+export type NodeType = 'sharp' | 'asymmetric' | 'smooth' | 'symmetric';
 
 export interface PathVertex {
   id: string;
@@ -373,7 +373,7 @@ export class VectorModel {
       const types = nodeTypesStr.split(',');
       vertices.forEach((v, idx) => {
         const t = types[idx] as NodeType;
-        if (t === 'symmetric' || t === 'smooth' || t === 'asymmetric') {
+        if (t === 'symmetric' || t === 'smooth' || t === 'asymmetric' || t === 'sharp') {
           v.nodeType = t;
         }
       });

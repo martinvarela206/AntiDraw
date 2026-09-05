@@ -149,6 +149,7 @@ export const ToolIcons = {
   sendBack: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/><line x1="4" y1="21" x2="20" y2="21"/></svg>`,
 
   // Node modes
+  nodeSharp: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19L12 5L20 19"/><circle cx="12" cy="5" r="3" fill="currentColor"/></svg>`,
   nodeAsymmetric: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3" fill="currentColor"/><path d="M4 18l5-4M15 10l5-4"/><circle cx="4" cy="18" r="2"/><circle cx="20" cy="6" r="2"/></svg>`,
   nodeSmooth: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3" fill="currentColor"/><line x1="4" y1="18" x2="20" y2="6"/><circle cx="4" cy="18" r="2"/><circle cx="20" cy="6" r="2"/></svg>`,
   nodeSymmetric: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3" fill="currentColor"/><line x1="5" y1="17" x2="19" y2="7"/><circle cx="5" cy="17" r="2.5" fill="currentColor"/><circle cx="19" cy="7" r="2.5" fill="currentColor"/></svg>`,

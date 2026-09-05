@@ -2525,6 +2525,9 @@ class AntiDrawApp {
         this.nodeEditorTool.selectedVertexId,
         type
       );
+      const isClosed = selectedEl.isClosed ?? (selectedEl.attributes.d?.endsWith('Z') || false);
+      selectedEl.attributes.d = this.model.compilePathD(selectedEl.vertices, isClosed);
+      selectedEl.attributes['data-node-types'] = selectedEl.vertices.map((v) => v.nodeType).join(',');
       const savedElementId = this.selectionTool.selectedElementId;
       const savedVertexId = this.nodeEditorTool.selectedVertexId;
       this.render();
