@@ -10,6 +10,7 @@ export interface PropertyPanelCallbacks {
   onSplitNode: () => void;
   onPenNodeTypeChange?: (nodeType: NodeType) => void;
   onFinishPenPath?: (close: boolean) => void;
+  onFinishPolylinePath?: (close: boolean) => void;
   onUpdateRuler?: (config: RulerConfig) => void;
   onUpdateGuide?: (guide: GuideLine) => void;
   onDeleteGuide?: (guideId: string) => void;
@@ -26,6 +27,7 @@ export class PropertyPanel {
   private activeTool: string = 'select';
   public penNodeType: NodeType = 'asymmetric';
   public penVertexCount: number = 0;
+  public polylineVertexCount: number = 0;
   private activeRulerConfig: RulerConfig | null = null;
   private activeGuide: GuideLine | null = null;
   public shapeConfig: ShapeToolConfig = {
@@ -38,7 +40,7 @@ export class PropertyPanel {
   private callbacks: PropertyPanelCallbacks;
 
   // Track which panel section is currently rendered to avoid full re-builds
-  private currentPanelMode: 'canvas' | 'element' | 'node' | 'pen' | 'multi' | 'ruler' | 'guide' | 'shape' | null = null;
+  private currentPanelMode: 'canvas' | 'element' | 'node' | 'pen' | 'polyline' | 'multi' | 'ruler' | 'guide' | 'shape' | null = null;
 
   constructor(
     container: HTMLElement,
@@ -58,13 +60,15 @@ export class PropertyPanel {
     activeTool: string = 'select',
     penNodeType: NodeType = 'asymmetric',
     penVertexCount: number = 0,
-    selectedGuide: GuideLine | null = null
+    selectedGuide: GuideLine | null = null,
+    polylineVertexCount: number = 0
   ): void {
     this.activeVertex = selectedVertex;
     this.activeTool = activeTool;
     this.penNodeType = penNodeType;
     this.penVertexCount = penVertexCount;
     this.activeGuide = selectedGuide;
+    this.polylineVertexCount = polylineVertexCount;
 
     if (selectedGuide) {
       this.currentPanelMode = 'guide';
@@ -97,6 +101,12 @@ export class PropertyPanel {
   }
 
   private renderPanel(): void {
+    if (this.activeTool === 'polyline') {
+      this.currentPanelMode = 'polyline';
+      this.renderPolylineProperties();
+      return;
+    }
+
     if (this.activeTool === 'pen') {
       this.currentPanelMode = 'pen';
       this.renderPenProperties();
@@ -472,6 +482,52 @@ export class PropertyPanel {
     });
     this.bindMouseDown('btn-close-path', () => {
       if (this.callbacks.onFinishPenPath) this.callbacks.onFinishPenPath(true);
+    });
+  }
+
+  // Render Polyline Tool Properties & Actions
+  private renderPolylineProperties(): void {
+    const hasEnoughVerts = this.polylineVertexCount >= 2;
+    const canClose = this.polylineVertexCount >= 3;
+
+    this.container.innerHTML = `
+      <div class="panel-section">
+        <div class="panel-title">Polyline Tool (Y)</div>
+        <div class="prop-row">
+          <span class="prop-label">Vertices</span>
+          <span style="font-weight:600; color:var(--text-main);">${this.polylineVertexCount} pts</span>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <div class="panel-title">Path Actions</div>
+        <div class="prop-row" style="flex-direction:column; gap:8px; align-items:stretch;">
+          <button class="prop-input" id="btn-finish-polyline" ${!hasEnoughVerts ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : 'style="cursor:pointer; background:var(--bg-active); text-align:center;"'}>
+            Finalizar Trazo Abierto (Enter / DblClick)
+          </button>
+          <button class="prop-input" id="btn-close-polyline" ${!canClose ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : 'style="cursor:pointer; background:var(--accent); color:#ffffff; text-align:center;"'}>
+            Cerrar Polígono (Z / Clic en Inicio)
+          </button>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <div class="panel-title">Drawing Instructions</div>
+        <div style="font-size:11px; color:var(--text-muted); line-height:1.6;">
+          • <b>Clic</b>: Colocar vértice recto puro (L)<br/>
+          • <b>Clic en inicio</b>: Cerrar figura (Z)<br/>
+          • <b>Enter / Doble Clic</b>: Finalizar trazo abierto<br/>
+          • <b>Escape</b>: Cancelar trazado en curso<br/>
+          • <b>Snap Activo</b>: Imantado a Grilla, Guías y Nodos
+        </div>
+      </div>
+    `;
+
+    this.bindMouseDown('btn-finish-polyline', () => {
+      if (this.callbacks.onFinishPolylinePath) this.callbacks.onFinishPolylinePath(false);
+    });
+    this.bindMouseDown('btn-close-polyline', () => {
+      if (this.callbacks.onFinishPolylinePath) this.callbacks.onFinishPolylinePath(true);
     });
   }
 

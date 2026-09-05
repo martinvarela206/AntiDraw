@@ -76,6 +76,9 @@ class AntiDrawApp {
   private penActiveVertexIdx: number | null = null;
   private penMovingVertexIdx: number | null = null;
 
+  private currentPolylineVertices: PathVertex[] = [];
+  private polylineHoverPoint: Point | null = null;
+
   private shapeStartPt: Point | null = null;
   private isShiftPressed: boolean = false;
   // Flag: avoid re-parsing model when a change was sent from this webview itself
@@ -269,6 +272,9 @@ class AntiDrawApp {
         onFinishPenPath: (close) => {
           this.finishPenPath(close);
         },
+        onFinishPolylinePath: (close) => {
+          this.finishPolylinePath(close);
+        },
         onUpdateRuler: (cfg) => {
           this.canvasMgr.rulerConfig = cfg;
           this.syncRulerScroll();
@@ -355,6 +361,7 @@ class AntiDrawApp {
 
       if (e.key === 'v' || e.key === 'V') this.toolbar.setTool('select');
       if (e.key === 'n' || e.key === 'N') this.toolbar.setTool('node');
+      if (!e.ctrlKey && !e.metaKey && (e.key === 'y' || e.key === 'Y')) this.toolbar.setTool('polyline');
       if (e.key === 'p' || e.key === 'P') this.toolbar.setTool('pen');
       if (e.key === 'r' || e.key === 'R') this.toolbar.setTool('rect');
       if (e.key === 'e' || e.key === 'E') this.toolbar.setTool('ellipse');
@@ -407,6 +414,16 @@ class AntiDrawApp {
         e.preventDefault();
         this.redo();
         return;
+      }
+
+      if (this.toolbar.activeTool === 'polyline') {
+        if (e.key === 'Enter') {
+          this.finishPolylinePath(false);
+        } else if (e.key === 'Escape') {
+          this.currentPolylineVertices = [];
+          this.polylineHoverPoint = null;
+          this.render();
+        }
       }
 
       if (this.toolbar.activeTool === 'pen') {
@@ -816,6 +833,14 @@ class AntiDrawApp {
       this.canvasMgr.selectedGuideId = null;
       this.canvasMgr.activeGuideTransformId = null;
     }
+    if (tool !== 'polyline') {
+      this.currentPolylineVertices = [];
+      this.polylineHoverPoint = null;
+    }
+    if (tool !== 'pen') {
+      this.currentPenVertices = [];
+      this.penHoverPoint = null;
+    }
     this.render();
   }
 
@@ -1103,6 +1128,42 @@ class AntiDrawApp {
       const otherVertices = this.getOtherVertices();
       this.shapeStartPt = this.snapPoint(pt, otherVertices);
       this.activeHandle = 'shape';
+    } else if (activeTool === 'polyline') {
+      const otherVertices = this.getOtherVertices();
+      this.currentPolylineVertices.forEach((v) => otherVertices.push({ x: v.x, y: v.y }));
+      const snappedPt = this.snapPoint(pt, otherVertices);
+
+      // 1. Check if clicking start node to close path
+      if (this.currentPolylineVertices.length >= 3) {
+        const v0 = this.currentPolylineVertices[0];
+        if (Math.hypot(snappedPt.x - v0.x, snappedPt.y - v0.y) <= 14 / this.canvasMgr.zoom) {
+          this.finishPolylinePath(true);
+          return;
+        }
+      }
+
+      // 2. Check if clicking the last placed node to finish open path
+      if (this.currentPolylineVertices.length >= 2) {
+        const lastV = this.currentPolylineVertices[this.currentPolylineVertices.length - 1];
+        if (Math.hypot(snappedPt.x - lastV.x, snappedPt.y - lastV.y) <= 6 / this.canvasMgr.zoom) {
+          this.finishPolylinePath(false);
+          return;
+        }
+      }
+
+      // 3. Add straight vertex
+      const isStart = this.currentPolylineVertices.length === 0;
+      const newV: PathVertex = {
+        id: `v_poly_${Date.now().toString(36)}_${this.currentPolylineVertices.length}`,
+        x: snappedPt.x,
+        y: snappedPt.y,
+        nodeType: 'asymmetric',
+        command: isStart ? 'M' : 'L',
+      };
+      this.currentPolylineVertices.push(newV);
+      this.polylineHoverPoint = snappedPt;
+      this.render();
+      return;
     } else if (activeTool === 'pen') {
       const snappedPt = this.snapPoint(pt);
 
@@ -1247,6 +1308,16 @@ class AntiDrawApp {
         if (!this.isMiddlePanning) {
           this.canvasScrollArea.style.cursor = '';
         }
+        this.renderOverlay();
+      } else if (this.toolbar.activeTool === 'polyline') {
+        this.canvasWrapper.style.cursor = 'crosshair';
+        if (!this.isMiddlePanning) {
+          this.canvasScrollArea.style.cursor = '';
+        }
+        const otherVertices = this.getOtherVertices();
+        this.currentPolylineVertices.forEach((v) => otherVertices.push({ x: v.x, y: v.y }));
+        const snappedPt = this.snapPoint(pt, otherVertices);
+        this.polylineHoverPoint = snappedPt;
         this.renderOverlay();
       }
       return;
@@ -1600,6 +1671,11 @@ class AntiDrawApp {
   }
 
   private onDoubleClick(e: MouseEvent): void {
+    if (this.toolbar.activeTool === 'polyline') {
+      this.finishPolylinePath(false);
+      return;
+    }
+
     if (this.toolbar.activeTool === 'pen') {
       this.finishPenPath(false);
       return;
@@ -1925,6 +2001,55 @@ class AntiDrawApp {
     } else {
       this.currentPenVertices = [];
       this.penHoverPoint = null;
+      this.render();
+    }
+  }
+
+  // Commit polyline path to vector model elements
+  private finishPolylinePath(close: boolean = false): void {
+    // Deduplicate consecutive identical/micro-offset vertices
+    const cleanVerts: PathVertex[] = [];
+    for (let i = 0; i < this.currentPolylineVertices.length; i++) {
+      const v = this.currentPolylineVertices[i];
+      if (cleanVerts.length === 0) {
+        cleanVerts.push(v);
+      } else {
+        const prev = cleanVerts[cleanVerts.length - 1];
+        if (Math.hypot(v.x - prev.x, v.y - prev.y) > 0.5) {
+          cleanVerts.push(v);
+        }
+      }
+    }
+
+    if (cleanVerts.length >= 2) {
+      this.pushUndo();
+      const id = `el_poly_${Date.now().toString(36)}`;
+      const pathD = this.model.compilePathD(cleanVerts, close);
+      const newEl: VectorElement = {
+        id,
+        tagName: 'path',
+        attributes: {
+          id,
+          d: pathD,
+          fill: close ? '#4f46e5' : 'none',
+          stroke: '#ffffff',
+          'stroke-width': '2',
+          'data-node-types': cleanVerts.map(() => 'asymmetric').join(','),
+        },
+        vertices: JSON.parse(JSON.stringify(cleanVerts)),
+        isClosed: close,
+      };
+
+      this.model.elements.push(newEl);
+      this.selectionTool.select(id);
+      this.currentPolylineVertices = [];
+      this.polylineHoverPoint = null;
+      this.toolbar.setTool('select');
+      this.render();
+      this.syncToHost();
+    } else {
+      this.currentPolylineVertices = [];
+      this.polylineHoverPoint = null;
       this.render();
     }
   }
@@ -2280,7 +2405,8 @@ class AntiDrawApp {
       this.toolbar.activeTool,
       this.penNodeType,
       this.currentPenVertices.length,
-      selectedGuide
+      selectedGuide,
+      this.currentPolylineVertices.length
     );
   }
 
@@ -2528,6 +2654,54 @@ class AntiDrawApp {
           html += `<rect x="${v.x - 3.5}" y="${v.y - 3.5}" width="7" height="7" fill="#38bdf8" stroke="#ffffff" stroke-width="1" rx="1" />`;
         }
       });
+    }
+
+    // 8. Polyline Tool In-Progress Path & Rubberband Overlay
+    if (this.currentPolylineVertices.length > 0) {
+      const polyD = this.model.compilePathD(this.currentPolylineVertices, false);
+      html += `<path d="${polyD}" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" />`;
+
+      const lastV = this.currentPolylineVertices[this.currentPolylineVertices.length - 1];
+      const firstV = this.currentPolylineVertices[0];
+
+      if (this.polylineHoverPoint) {
+        const isHoveringStart =
+          this.currentPolylineVertices.length >= 3 &&
+          Math.hypot(this.polylineHoverPoint.x - firstV.x, this.polylineHoverPoint.y - firstV.y) <= 14 / this.canvasMgr.zoom;
+
+        const targetPt = isHoveringStart ? { x: firstV.x, y: firstV.y } : this.polylineHoverPoint;
+
+        // Rubberband line from last vertex to hover point
+        html += `<line x1="${lastV.x}" y1="${lastV.y}" x2="${targetPt.x}" y2="${targetPt.y}" stroke="${isHoveringStart ? '#10b981' : '#60a5fa'}" stroke-width="1.5" stroke-dasharray="4 3" vector-effect="non-scaling-stroke" />`;
+
+        if (isHoveringStart) {
+          html += `<circle cx="${firstV.x}" cy="${firstV.y}" r="8" fill="none" stroke="#10b981" stroke-width="2" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
+        } else {
+          html += `
+            <g opacity="0.9">
+              <circle cx="${targetPt.x}" cy="${targetPt.y}" r="4.5" fill="#38bdf8" fill-opacity="0.35" stroke="#38bdf8" stroke-width="1.5" vector-effect="non-scaling-stroke" />
+              <circle cx="${targetPt.x}" cy="${targetPt.y}" r="1.5" fill="#ffffff" />
+            </g>
+          `;
+        }
+      }
+
+      this.currentPolylineVertices.forEach((v, idx) => {
+        const isStart = idx === 0;
+        if (isStart) {
+          html += `<circle cx="${v.x}" cy="${v.y}" r="5" fill="#10b981" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
+        } else {
+          html += `<rect x="${v.x - 3.5}" y="${v.y - 3.5}" width="7" height="7" fill="#38bdf8" stroke="#ffffff" stroke-width="1" rx="1" vector-effect="non-scaling-stroke" />`;
+        }
+      });
+    } else if (this.toolbar && this.toolbar.activeTool === 'polyline' && this.polylineHoverPoint) {
+      // First point preview under cursor before first click
+      html += `
+        <g opacity="0.9">
+          <circle cx="${this.polylineHoverPoint.x}" cy="${this.polylineHoverPoint.y}" r="5" fill="#10b981" fill-opacity="0.35" stroke="#10b981" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />
+          <circle cx="${this.polylineHoverPoint.x}" cy="${this.polylineHoverPoint.y}" r="1.5" fill="#ffffff" />
+        </g>
+      `;
     }
 
     this.overlaySvg.innerHTML = html;

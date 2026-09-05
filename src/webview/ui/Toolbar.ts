@@ -3,6 +3,7 @@ import { ToolIcons } from '../icons/ToolIcons.js';
 export type ToolType =
   | 'select'
   | 'node'
+  | 'polyline'
   | 'pen'
   | 'rect'
   | 'ellipse'
@@ -38,6 +39,7 @@ export class Toolbar {
     const tools: { id: ToolType; title: string; icon: string }[] = [
       { id: 'select', title: 'Selection Tool (V)', icon: ToolIcons.select },
       { id: 'node', title: 'Node Edit Tool (N)', icon: ToolIcons.node },
+      { id: 'polyline', title: 'Polyline Tool (Y)', icon: ToolIcons.polyline },
       { id: 'pen', title: 'Pen Path Tool (P)', icon: ToolIcons.pen },
       { id: 'rect', title: 'Rectangle Tool (R)', icon: ToolIcons.rect },
       { id: 'ellipse', title: 'Ellipse/Circle Tool (E)', icon: ToolIcons.ellipse },
