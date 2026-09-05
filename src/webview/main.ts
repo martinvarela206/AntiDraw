@@ -1288,9 +1288,10 @@ class AntiDrawApp {
 
       // 4b. Check hit on composite bounding box handles if vector elements are selected
       if (selectedEls.length > 0) {
-        const groupBox = this.selectionTool.getGroupSelectionBoundingBox(selectedEls, 6);
+        const z = this.canvasMgr.zoom || 1;
+        const groupBox = this.selectionTool.getGroupSelectionBoundingBox(selectedEls, 6 / z);
         if (groupBox) {
-          const handle = this.selectionTool.hitTestHandle(groupBox, pt, 14);
+          const handle = this.selectionTool.hitTestHandle(groupBox, pt, 12 / z, 18 / z);
           if (handle) {
             this.activeHandle = handle;
             this.initialElementsMap.clear();
@@ -1342,10 +1343,11 @@ class AntiDrawApp {
       );
 
       if (selectedEl && selectedEl.vertices) {
+        const z = this.canvasMgr.zoom || 1;
         const hitNode = this.nodeEditorTool.hitTestVertices(
           selectedEl.vertices,
           pt,
-          12,
+          10 / z,
           this.nodeEditorTool.selectedVertexId
         );
         if (hitNode) {
@@ -1520,9 +1522,10 @@ class AntiDrawApp {
         let cursor = 'default';
 
         if (selectedEls.length > 0) {
-          const box = this.selectionTool.getGroupSelectionBoundingBox(selectedEls, 6);
+          const z = this.canvasMgr.zoom || 1;
+          const box = this.selectionTool.getGroupSelectionBoundingBox(selectedEls, 6 / z);
           if (box) {
-            const h = this.selectionTool.hitTestHandle(box, pt, 14);
+            const h = this.selectionTool.hitTestHandle(box, pt, 12 / z, 18 / z);
             if (h) {
               if (h === 'nw' || h === 'se') cursor = 'nwse-resize';
               else if (h === 'ne' || h === 'sw') cursor = 'nesw-resize';
@@ -2048,10 +2051,11 @@ class AntiDrawApp {
     if (this.toolbar.activeTool === 'node') {
       const selectedEl = this.model.elements.find((el) => this.selectionTool.isSelected(el.id));
       if (selectedEl && selectedEl.vertices) {
+        const z = this.canvasMgr.zoom || 1;
         const hitNode = this.nodeEditorTool.hitTestVertices(
           selectedEl.vertices,
           pt,
-          12,
+          10 / z,
           this.nodeEditorTool.selectedVertexId
         );
         if (hitNode && hitNode.type === 'vertex') {
@@ -2085,7 +2089,7 @@ class AntiDrawApp {
 
     if (targetEl && targetEl.vertices) {
       const isClosed = targetEl.isClosed ?? (!targetEl.tagName || ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(targetEl.tagName) || (targetEl.attributes.d ? /z/i.test(targetEl.attributes.d) : false));
-      const tol = Math.max(8, 12 / (this.canvasMgr.zoom || 1));
+      const tol = 10 / (this.canvasMgr.zoom || 1);
       const res = this.nodeEditorTool.insertVertexOnPath(targetEl.vertices, pt, tol, isClosed);
       if (res) {
         this.pushUndo();
@@ -2901,9 +2905,10 @@ class AntiDrawApp {
 
     // 5. Bounding Box & 8 Resize Handles + Rotation Handle for Selected Elements
     const selectedEls = this.model.elements.filter((e) => this.selectionTool.isSelected(e.id));
+    const z = this.canvasMgr.zoom || 1;
 
     if (selectedEls.length > 0) {
-      const groupBox = this.selectionTool.getGroupSelectionBoundingBox(selectedEls, 6);
+      const groupBox = this.selectionTool.getGroupSelectionBoundingBox(selectedEls, 6 / z);
       if (groupBox) {
         html += `<rect x="${groupBox.x}" y="${groupBox.y}" width="${groupBox.width}" height="${groupBox.height}" fill="none" stroke="#38bdf8" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke" />`;
 
@@ -2918,18 +2923,23 @@ class AntiDrawApp {
           { x: groupBox.x + groupBox.width, y: groupBox.y + groupBox.height },
         ];
 
+        const hSize = 7 / z;
+        const hHalf = hSize / 2;
+        const hRx = 1 / z;
         handles.forEach((hPos) => {
-          html += `<rect x="${hPos.x - 3.5}" y="${hPos.y - 3.5}" width="7" height="7" fill="#ffffff" stroke="#0284c7" stroke-width="1" rx="1" />`;
+          html += `<rect x="${hPos.x - hHalf}" y="${hPos.y - hHalf}" width="${hSize}" height="${hSize}" fill="#ffffff" stroke="#0284c7" stroke-width="1" rx="${hRx}" vector-effect="non-scaling-stroke" />`;
         });
 
         // Rotation Handle
-        html += `<line x1="${groupBox.cx}" y1="${groupBox.y}" x2="${groupBox.cx}" y2="${groupBox.y - 18}" stroke="#38bdf8" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
-        html += `<circle cx="${groupBox.cx}" cy="${groupBox.y - 18}" r="3.5" fill="#38bdf8" stroke="#ffffff" stroke-width="1" />`;
+        const rotOffset = 18 / z;
+        const rotR = 3.5 / z;
+        html += `<line x1="${groupBox.cx}" y1="${groupBox.y}" x2="${groupBox.cx}" y2="${groupBox.y - rotOffset}" stroke="#38bdf8" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
+        html += `<circle cx="${groupBox.cx}" cy="${groupBox.y - rotOffset}" r="${rotR}" fill="#38bdf8" stroke="#ffffff" stroke-width="1" vector-effect="non-scaling-stroke" />`;
       }
 
       if (selectedEls.length > 1) {
         selectedEls.forEach((el) => {
-          const elBox = this.selectionTool.getSelectionBoundingBox(el, 6);
+          const elBox = this.selectionTool.getSelectionBoundingBox(el, 6 / z);
           if (elBox) {
             html += `<rect x="${elBox.x}" y="${elBox.y}" width="${elBox.width}" height="${elBox.height}" fill="none" stroke="#60a5fa" stroke-width="0.75" stroke-dasharray="2 2" opacity="0.6" vector-effect="non-scaling-stroke" />`;
           }
@@ -2944,7 +2954,8 @@ class AntiDrawApp {
 
           el.vertices.forEach((v) => {
             const isSelectedVertex = isNodeMode && v.id === selectedVertexId;
-            html += `<circle cx="${v.x}" cy="${v.y}" r="${isSelectedVertex ? 4.5 : 3.5}" fill="${isSelectedVertex ? '#38bdf8' : '#ffffff'}" stroke="#0284c7" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
+            const vR = (isSelectedVertex ? 4.5 : 3.5) / z;
+            html += `<circle cx="${v.x}" cy="${v.y}" r="${vR}" fill="${isSelectedVertex ? '#38bdf8' : '#ffffff'}" stroke="#0284c7" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
           });
         }
       });
@@ -2964,15 +2975,16 @@ class AntiDrawApp {
           if (nextIdx >= 0) showHandlesFor.add(nextIdx);
         }
 
+        const bHandleR = 3.5 / z;
         verts.forEach((v, idx) => {
           if (showHandlesFor.has(idx)) {
             if (v.handleIn) {
               html += `<line x1="${v.x}" y1="${v.y}" x2="${v.handleIn.x}" y2="${v.handleIn.y}" stroke="#a855f7" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
-              html += `<circle cx="${v.handleIn.x}" cy="${v.handleIn.y}" r="3.5" fill="#a855f7" stroke="#ffffff" stroke-width="1" />`;
+              html += `<circle cx="${v.handleIn.x}" cy="${v.handleIn.y}" r="${bHandleR}" fill="#a855f7" stroke="#ffffff" stroke-width="1" vector-effect="non-scaling-stroke" />`;
             }
             if (v.handleOut) {
               html += `<line x1="${v.x}" y1="${v.y}" x2="${v.handleOut.x}" y2="${v.handleOut.y}" stroke="#a855f7" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
-              html += `<circle cx="${v.handleOut.x}" cy="${v.handleOut.y}" r="3.5" fill="#a855f7" stroke="#ffffff" stroke-width="1" />`;
+              html += `<circle cx="${v.handleOut.x}" cy="${v.handleOut.y}" r="${bHandleR}" fill="#a855f7" stroke="#ffffff" stroke-width="1" vector-effect="non-scaling-stroke" />`;
             }
           }
         });
@@ -2995,7 +3007,7 @@ class AntiDrawApp {
           const d = this.model.compilePathD(gVerts, isClosed);
           html += `<path d="${d}" fill="rgba(99, 102, 241, 0.25)" stroke="#818cf8" stroke-width="2" stroke-dasharray="5 3" vector-effect="non-scaling-stroke" />`;
           gVerts.forEach((gv) => {
-            html += `<circle cx="${gv.x}" cy="${gv.y}" r="3.5" fill="#a5b4fc" stroke="#4338ca" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
+            html += `<circle cx="${gv.x}" cy="${gv.y}" r="${3.5 / z}" fill="#a5b4fc" stroke="#4338ca" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
           });
         }
       });
@@ -3015,7 +3027,7 @@ class AntiDrawApp {
           const d = this.model.compilePathD(gVerts, isClosed);
           html += `<path d="${d}" fill="rgba(99, 102, 241, 0.25)" stroke="#818cf8" stroke-width="2" stroke-dasharray="5 3" vector-effect="non-scaling-stroke" />`;
           gVerts.forEach((gv) => {
-            html += `<circle cx="${gv.x}" cy="${gv.y}" r="3.5" fill="#a5b4fc" stroke="#4338ca" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
+            html += `<circle cx="${gv.x}" cy="${gv.y}" r="${3.5 / z}" fill="#a5b4fc" stroke="#4338ca" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
           });
         }
       });
@@ -3031,18 +3043,18 @@ class AntiDrawApp {
         this.ghostNodeVertices.forEach((gv) => {
           const isSelected = gv.id === this.nodeEditorTool.selectedVertexId;
           if (isSelected) {
-            html += `<circle cx="${gv.x}" cy="${gv.y}" r="6" fill="none" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
-            html += `<circle cx="${gv.x}" cy="${gv.y}" r="4" fill="#38bdf8" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
+            html += `<circle cx="${gv.x}" cy="${gv.y}" r="${6 / z}" fill="none" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
+            html += `<circle cx="${gv.x}" cy="${gv.y}" r="${4 / z}" fill="#38bdf8" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
             if (gv.handleIn) {
               html += `<line x1="${gv.x}" y1="${gv.y}" x2="${gv.handleIn.x}" y2="${gv.handleIn.y}" stroke="#c084fc" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
-              html += `<circle cx="${gv.handleIn.x}" cy="${gv.handleIn.y}" r="4" fill="#c084fc" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
+              html += `<circle cx="${gv.handleIn.x}" cy="${gv.handleIn.y}" r="${4 / z}" fill="#c084fc" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
             }
             if (gv.handleOut) {
               html += `<line x1="${gv.x}" y1="${gv.y}" x2="${gv.handleOut.x}" y2="${gv.handleOut.y}" stroke="#c084fc" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
-              html += `<circle cx="${gv.handleOut.x}" cy="${gv.handleOut.y}" r="4" fill="#c084fc" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
+              html += `<circle cx="${gv.handleOut.x}" cy="${gv.handleOut.y}" r="${4 / z}" fill="#c084fc" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
             }
           } else {
-            html += `<circle cx="${gv.x}" cy="${gv.y}" r="3.5" fill="#ffffff" stroke="#0284c7" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
+            html += `<circle cx="${gv.x}" cy="${gv.y}" r="${3.5 / z}" fill="#ffffff" stroke="#0284c7" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
           }
         });
       }
@@ -3055,7 +3067,7 @@ class AntiDrawApp {
       html += `<path d="${d}" fill="${isClosed ? 'rgba(99, 102, 241, 0.25)' : 'none'}" stroke="#818cf8" stroke-width="2" stroke-dasharray="5 3" vector-effect="non-scaling-stroke" />`;
       if (this.ghostShapeElement.vertices) {
         this.ghostShapeElement.vertices.forEach((gv) => {
-          html += `<circle cx="${gv.x}" cy="${gv.y}" r="3.5" fill="#ffffff" stroke="#6366f1" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
+          html += `<circle cx="${gv.x}" cy="${gv.y}" r="${3.5 / z}" fill="#ffffff" stroke="#6366f1" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
         });
       }
     }
@@ -3071,7 +3083,7 @@ class AntiDrawApp {
       if (this.penHoverPoint) {
         const isClosing =
           this.currentPenVertices.length >= 3 &&
-          Math.hypot(this.penHoverPoint.x - firstV.x, this.penHoverPoint.y - firstV.y) <= 14 / this.canvasMgr.zoom;
+          Math.hypot(this.penHoverPoint.x - firstV.x, this.penHoverPoint.y - firstV.y) <= 14 / z;
         const targetPt = isClosing ? { x: firstV.x, y: firstV.y } : this.penHoverPoint;
 
         // Ghost Path (Elastic Bézier or Line from last committed vertex to hover point)
@@ -3085,12 +3097,12 @@ class AntiDrawApp {
 
         // Ghost Point under cursor
         if (isClosing) {
-          html += `<circle cx="${firstV.x}" cy="${firstV.y}" r="8" fill="none" stroke="#10b981" stroke-width="2" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
+          html += `<circle cx="${firstV.x}" cy="${firstV.y}" r="${8 / z}" fill="none" stroke="#10b981" stroke-width="2" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
         } else {
           html += `
             <g opacity="0.95">
-              <circle cx="${targetPt.x}" cy="${targetPt.y}" r="5" fill="rgba(56, 189, 248, 0.35)" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />
-              <circle cx="${targetPt.x}" cy="${targetPt.y}" r="1.5" fill="#ffffff" />
+              <circle cx="${targetPt.x}" cy="${targetPt.y}" r="${5 / z}" fill="rgba(56, 189, 248, 0.35)" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />
+              <circle cx="${targetPt.x}" cy="${targetPt.y}" r="${1.5 / z}" fill="#ffffff" />
             </g>
           `;
         }
@@ -3101,25 +3113,25 @@ class AntiDrawApp {
 
         if (v.handleIn) {
           html += `<line x1="${v.x}" y1="${v.y}" x2="${v.handleIn.x}" y2="${v.handleIn.y}" stroke="#a855f7" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
-          html += `<circle cx="${v.handleIn.x}" cy="${v.handleIn.y}" r="3" fill="#a855f7" stroke="#ffffff" stroke-width="1" />`;
+          html += `<circle cx="${v.handleIn.x}" cy="${v.handleIn.y}" r="${3 / z}" fill="#a855f7" stroke="#ffffff" stroke-width="1" vector-effect="non-scaling-stroke" />`;
         }
         if (v.handleOut) {
           html += `<line x1="${v.x}" y1="${v.y}" x2="${v.handleOut.x}" y2="${v.handleOut.y}" stroke="#a855f7" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
-          html += `<circle cx="${v.handleOut.x}" cy="${v.handleOut.y}" r="3" fill="#a855f7" stroke="#ffffff" stroke-width="1" />`;
+          html += `<circle cx="${v.handleOut.x}" cy="${v.handleOut.y}" r="${3 / z}" fill="#a855f7" stroke="#ffffff" stroke-width="1" vector-effect="non-scaling-stroke" />`;
         }
 
         if (isStart) {
-          html += `<circle cx="${v.x}" cy="${v.y}" r="5" fill="#10b981" stroke="#ffffff" stroke-width="1.5" />`;
+          html += `<circle cx="${v.x}" cy="${v.y}" r="${5 / z}" fill="#10b981" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
         } else {
-          html += `<rect x="${v.x - 3.5}" y="${v.y - 3.5}" width="7" height="7" fill="#38bdf8" stroke="#ffffff" stroke-width="1" rx="1" />`;
+          html += `<rect x="${v.x - 3.5 / z}" y="${v.y - 3.5 / z}" width="${7 / z}" height="${7 / z}" fill="#38bdf8" stroke="#ffffff" stroke-width="1" rx="${1 / z}" vector-effect="non-scaling-stroke" />`;
         }
       });
     } else if (this.toolbar && this.toolbar.activeTool === 'pen' && this.penHoverPoint) {
       // First ghost point preview under cursor before first click
       html += `
         <g opacity="0.95">
-          <circle cx="${this.penHoverPoint.x}" cy="${this.penHoverPoint.y}" r="5" fill="rgba(56, 189, 248, 0.35)" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />
-          <circle cx="${this.penHoverPoint.x}" cy="${this.penHoverPoint.y}" r="1.5" fill="#ffffff" />
+          <circle cx="${this.penHoverPoint.x}" cy="${this.penHoverPoint.y}" r="${5 / z}" fill="rgba(56, 189, 248, 0.35)" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />
+          <circle cx="${this.penHoverPoint.x}" cy="${this.penHoverPoint.y}" r="${1.5 / z}" fill="#ffffff" />
         </g>
       `;
     }
@@ -3135,7 +3147,7 @@ class AntiDrawApp {
       if (this.polylineHoverPoint) {
         const isHoveringStart =
           this.currentPolylineVertices.length >= 3 &&
-          Math.hypot(this.polylineHoverPoint.x - firstV.x, this.polylineHoverPoint.y - firstV.y) <= 14 / this.canvasMgr.zoom;
+          Math.hypot(this.polylineHoverPoint.x - firstV.x, this.polylineHoverPoint.y - firstV.y) <= 14 / z;
 
         const targetPt = isHoveringStart ? { x: firstV.x, y: firstV.y } : this.polylineHoverPoint;
 
@@ -3143,12 +3155,12 @@ class AntiDrawApp {
         html += `<line x1="${lastV.x}" y1="${lastV.y}" x2="${targetPt.x}" y2="${targetPt.y}" stroke="${isHoveringStart ? '#10b981' : '#60a5fa'}" stroke-width="1.5" stroke-dasharray="4 3" vector-effect="non-scaling-stroke" />`;
 
         if (isHoveringStart) {
-          html += `<circle cx="${firstV.x}" cy="${firstV.y}" r="8" fill="none" stroke="#10b981" stroke-width="2" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
+          html += `<circle cx="${firstV.x}" cy="${firstV.y}" r="${8 / z}" fill="none" stroke="#10b981" stroke-width="2" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
         } else {
           html += `
             <g opacity="0.9">
-              <circle cx="${targetPt.x}" cy="${targetPt.y}" r="4.5" fill="#38bdf8" fill-opacity="0.35" stroke="#38bdf8" stroke-width="1.5" vector-effect="non-scaling-stroke" />
-              <circle cx="${targetPt.x}" cy="${targetPt.y}" r="1.5" fill="#ffffff" />
+              <circle cx="${targetPt.x}" cy="${targetPt.y}" r="${4.5 / z}" fill="#38bdf8" fill-opacity="0.35" stroke="#38bdf8" stroke-width="1.5" vector-effect="non-scaling-stroke" />
+              <circle cx="${targetPt.x}" cy="${targetPt.y}" r="${1.5 / z}" fill="#ffffff" />
             </g>
           `;
         }
@@ -3157,9 +3169,9 @@ class AntiDrawApp {
       this.currentPolylineVertices.forEach((v, idx) => {
         const isStart = idx === 0;
         if (isStart) {
-          html += `<circle cx="${v.x}" cy="${v.y}" r="5" fill="#10b981" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
+          html += `<circle cx="${v.x}" cy="${v.y}" r="${5 / z}" fill="#10b981" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
         } else {
-          html += `<rect x="${v.x - 3.5}" y="${v.y - 3.5}" width="7" height="7" fill="#38bdf8" stroke="#ffffff" stroke-width="1" rx="1" vector-effect="non-scaling-stroke" />`;
+          html += `<rect x="${v.x - 3.5 / z}" y="${v.y - 3.5 / z}" width="${7 / z}" height="${7 / z}" fill="#38bdf8" stroke="#ffffff" stroke-width="1" rx="${1 / z}" vector-effect="non-scaling-stroke" />`;
         }
       });
     } else if (this.toolbar && this.toolbar.activeTool === 'polyline' && this.polylineHoverPoint) {

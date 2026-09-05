@@ -271,7 +271,8 @@ export class SelectionTool {
   public hitTestHandle(
     box: BoundingBox,
     pt: Point,
-    handleRadius: number = 12
+    handleRadius: number = 12,
+    rotateOffset: number = 20
   ): HandleType | null {
     const handles: { type: HandleType; x: number; y: number }[] = [
       { type: 'nw', x: box.x, y: box.y },
@@ -282,7 +283,7 @@ export class SelectionTool {
       { type: 'sw', x: box.x, y: box.y + box.height },
       { type: 's',  x: box.cx, y: box.y + box.height },
       { type: 'se', x: box.x + box.width, y: box.y + box.height },
-      { type: 'rotate', x: box.cx, y: box.y - 18 },
+      { type: 'rotate', x: box.cx, y: box.y - rotateOffset },
     ];
 
     for (const h of handles) {
