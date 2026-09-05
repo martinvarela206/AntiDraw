@@ -23,3 +23,8 @@ Thumbs.db
 
 # VS Code test and temporary files
 .vscode-test/
+
+# Local test scratch files
+sample_test.json
+sample_test.svg
+

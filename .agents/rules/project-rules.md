@@ -4,7 +4,7 @@ trigger: always_on
 
 # Project Specific Rules
 
-This file contains rules specific to the AntiPaint project. Rules are written in English to optimize context window efficiency and reduce token usage.
+This file contains rules specific to the AntiDraw project. Rules are written in English to optimize context window efficiency and reduce token usage.
 
 ---
 
@@ -22,17 +22,34 @@ This file contains rules specific to the AntiPaint project. Rules are written in
    - **New Features / Functionality**: Increment only the minor version (`X.x+1.X`). The minor counter increments indefinitely without modifying the major version.
    - **User Explicit Milestone / Release Selection**: Only when explicitly requested by the user, increment the major version and reset lower components to zero (`x+1.0.0`).
 3. **Mandatory VSIX Generation & Packaging**:
-   - After completing code modifications and updating the project version, always build and package the extension into a `.vsix` artifact (`pnpm run package` / `vsce package --no-dependencies`).
+   - After completing code modifications and updating the project version for each atomic item, always build and package the extension into a `.vsix` artifact (`pnpm run package` / `vsce package --no-dependencies`).
 4. **File-Specific Metadata Persistence**:
    - All extension configuration, editor state, and visual tool parameters directly associated with the edited SVG file (such as guide lines, ruler origin/positions, grid settings, etc.) must be automatically persisted to and loaded from the companion JSON metadata file associated with the SVG (`.json`).
-5. **Atomic Task Execution & Commit Workflow**:
-   - Apply fixes and features atomically and individually one by one.
-   - Categorization: If a feature already exists partially or has functional defects, classify and implement it as a `fix`. If the capability did not exist previously, classify it as a `feat`.
-   - For each completed item:
-     - Remove or mark complete the corresponding item in `Docs/TODO.md`.
-     - Bump the version in `package.json` (`patch` for fixes, `minor` for features).
-     - Build and package the `.vsix` artifact (`pnpm run package`).
-     - Commit the atomic change using simple format: `fix: <element or problem fixed>` or `feat: <new element or functionality added>`.
-     - Update `Docs/Descripción de las herramientas.md` with any relevant functional details.
-     - Provide a summary checklist of changes for user verification.
+
+---
+
+## Multi-Item Prompt Decomposition & Atomic Loop Execution
+
+5. **Mandatory Decomposition of Multi-Item Prompts**:
+   - Whenever the user prompt contains multiple tasks, bullet points, fixes, additions, or removals (2 or more distinct items):
+     - **NEVER** bundle, combine, or resolve multiple items together in a single step, file edit block, version bump, or commit.
+     - You MUST immediately decompose the prompt into an ordered list of individual, discrete items.
+     - Evaluate and classify each item individually before executing it:
+       - If the feature already exists partially, or has defects/modifications: classify as `fix`.
+       - If the capability is completely new and did not exist before: classify as `feat`.
+
+6. **Strict Sequential Atomic Execution Loop**:
+   - Execute items sequentially, one by one, completing the entire cycle for each item before touching the next:
+     1. **Implement Code**: Make code changes strictly for the single active item.
+     2. **Update Documentation**:
+        - Remove or mark complete the corresponding item in `Docs/TODO.md`.
+        - Update `Docs/Descripción de las herramientas.md` with relevant functional details for this item.
+     3. **Version Bump**: Increment `package.json` (`patch` for `fix`, `minor` for `feat`).
+     4. **Build & Package**: Run `pnpm run package` to compile and create the `.vsix` artifact for that specific version.
+     5. **Atomic Commit**: Stage files and commit with simple conventional format:
+        - `fix: <element or problem fixed>`
+        - `feat: <new element or functionality added>`
+     6. **Advance to Next Item**: Only after the commit has been successfully created, proceed to the next item in the prompt list and repeat steps 1 to 5.
+   - In the final response, provide a distinct verification checklist grouped by each atomic commit for user testing.
+
 
