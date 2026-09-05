@@ -16,8 +16,26 @@ export interface PropertyPanelCallbacks {
   onDeleteGuide?: (guideId: string) => void;
   onClearAllGuides?: () => void;
   onUpdateShapeConfig?: (config: ShapeToolConfig) => void;
-  onBoolean?: (op: 'union' | 'subtract' | 'intersect' | 'exclude' | 'combine' | 'fragment') => void;
 }
+
+export interface ViewBoxPreset {
+  id: string;
+  name: string;
+  width: number;
+  height: number;
+}
+
+export const VIEWBOX_PRESETS: ViewBoxPreset[] = [
+  { id: 'custom', name: 'Personalizado', width: 0, height: 0 },
+  { id: 'icon-16', name: 'Icono 16x16', width: 16, height: 16 },
+  { id: 'icon-32', name: 'Icono 32x32', width: 32, height: 32 },
+  { id: 'icon-64', name: 'Icono 64x64', width: 64, height: 64 },
+  { id: 'icon-128', name: 'Icono 128x128', width: 128, height: 128 },
+  { id: 'a5-72', name: 'A5 (con 72ppp)', width: 420, height: 595 },
+  { id: 'a4-72', name: 'A4 (con 72ppp)', width: 595, height: 842 },
+  { id: '1080p', name: '1080p', width: 1920, height: 1080 },
+  { id: '1440p', name: '1440p', width: 2560, height: 1440 },
+];
 
 export class PropertyPanel {
   private container: HTMLElement;
@@ -802,9 +820,25 @@ export class PropertyPanel {
     const { canvas } = this.model;
     const vb = this.model.getViewBoxBounds();
 
+    const currentW = Math.round(canvas.width);
+    const currentH = Math.round(canvas.height);
+    const matchedPreset = VIEWBOX_PRESETS.slice(1).find(
+      (p) => p.width === currentW && p.height === currentH
+    );
+    const selectedPresetId = matchedPreset ? matchedPreset.id : 'custom';
+
     this.container.innerHTML = `
       <div class="panel-section">
-        <div class="panel-title">Document Size</div>
+        <div class="panel-title">Canvas &amp; ViewBox Size</div>
+        <div class="prop-row">
+          <span class="prop-label">Preset</span>
+          <select class="prop-input" id="canvas-preset" style="cursor:pointer;">
+            ${VIEWBOX_PRESETS.map(
+              (p) =>
+                `<option value="${p.id}" ${selectedPresetId === p.id ? 'selected' : ''}>${p.name}</option>`
+            ).join('')}
+          </select>
+        </div>
         <div class="prop-row">
           <span class="prop-label">Width</span>
           <input type="number" class="prop-input" id="canvas-width" value="${canvas.width}" />
@@ -845,6 +879,7 @@ export class PropertyPanel {
       </div>
     `;
 
+    const presetSelect = this.container.querySelector<HTMLSelectElement>('#canvas-preset');
     const widthInput = this.container.querySelector<HTMLInputElement>('#canvas-width');
     const heightInput = this.container.querySelector<HTMLInputElement>('#canvas-height');
     const vbMinX = this.container.querySelector<HTMLInputElement>('#vb-minx');
@@ -865,19 +900,90 @@ export class PropertyPanel {
       this.callbacks.onUpdateCanvas();
     };
 
-    if (widthInput) widthInput.addEventListener('change', () => {
-      this.model.canvas.width = parseFloat(widthInput.value) || 800;
-      this.callbacks.onUpdateCanvas();
-    });
-    if (heightInput) heightInput.addEventListener('change', () => {
-      this.model.canvas.height = parseFloat(heightInput.value) || 600;
-      this.callbacks.onUpdateCanvas();
-    });
+    const checkPresetOrCustom = () => {
+      if (presetSelect) {
+        const w = parseFloat(widthInput?.value || vbWidth?.value || '0');
+        const h = parseFloat(heightInput?.value || vbHeight?.value || '0');
+        const found = VIEWBOX_PRESETS.slice(1).find((p) => p.width === w && p.height === h);
+        presetSelect.value = found ? found.id : 'custom';
+      }
+    };
+
+    if (presetSelect) {
+      presetSelect.addEventListener('change', () => {
+        const val = presetSelect.value;
+        const preset = VIEWBOX_PRESETS.find((p) => p.id === val);
+        if (preset && preset.id !== 'custom') {
+          this.model.canvas.width = preset.width;
+          this.model.canvas.height = preset.height;
+          const curVb = this.model.getViewBoxBounds();
+          this.model.setViewBoxBounds(curVb.minX, curVb.minY, preset.width, preset.height);
+          if (widthInput) widthInput.value = preset.width.toString();
+          if (heightInput) heightInput.value = preset.height.toString();
+          if (vbWidth) vbWidth.value = preset.width.toString();
+          if (vbHeight) vbHeight.value = preset.height.toString();
+          if (viewBoxInput) viewBoxInput.value = this.model.canvas.viewBox;
+          this.callbacks.onUpdateCanvas();
+        }
+      });
+    }
+
+    if (widthInput) {
+      widthInput.addEventListener('input', checkPresetOrCustom);
+      widthInput.addEventListener('change', () => {
+        checkPresetOrCustom();
+        const newW = parseFloat(widthInput.value) || 800;
+        this.model.canvas.width = newW;
+        const curVb = this.model.getViewBoxBounds();
+        this.model.setViewBoxBounds(curVb.minX, curVb.minY, newW, curVb.height);
+        if (vbWidth) vbWidth.value = newW.toString();
+        if (viewBoxInput) viewBoxInput.value = this.model.canvas.viewBox;
+        this.callbacks.onUpdateCanvas();
+      });
+    }
+
+    if (heightInput) {
+      heightInput.addEventListener('input', checkPresetOrCustom);
+      heightInput.addEventListener('change', () => {
+        checkPresetOrCustom();
+        const newH = parseFloat(heightInput.value) || 600;
+        this.model.canvas.height = newH;
+        const curVb = this.model.getViewBoxBounds();
+        this.model.setViewBoxBounds(curVb.minX, curVb.minY, curVb.width, newH);
+        if (vbHeight) vbHeight.value = newH.toString();
+        if (viewBoxInput) viewBoxInput.value = this.model.canvas.viewBox;
+        this.callbacks.onUpdateCanvas();
+      });
+    }
 
     if (vbMinX) vbMinX.addEventListener('change', syncVbFromNumbers);
     if (vbMinY) vbMinY.addEventListener('change', syncVbFromNumbers);
-    if (vbWidth) vbWidth.addEventListener('change', syncVbFromNumbers);
-    if (vbHeight) vbHeight.addEventListener('change', syncVbFromNumbers);
+
+    if (vbWidth) {
+      vbWidth.addEventListener('input', () => {
+        if (widthInput) widthInput.value = vbWidth.value;
+        checkPresetOrCustom();
+      });
+      vbWidth.addEventListener('change', () => {
+        if (widthInput) widthInput.value = vbWidth.value;
+        this.model.canvas.width = parseFloat(vbWidth.value) || 800;
+        checkPresetOrCustom();
+        syncVbFromNumbers();
+      });
+    }
+
+    if (vbHeight) {
+      vbHeight.addEventListener('input', () => {
+        if (heightInput) heightInput.value = vbHeight.value;
+        checkPresetOrCustom();
+      });
+      vbHeight.addEventListener('change', () => {
+        if (heightInput) heightInput.value = vbHeight.value;
+        this.model.canvas.height = parseFloat(vbHeight.value) || 600;
+        checkPresetOrCustom();
+        syncVbFromNumbers();
+      });
+    }
 
     if (viewBoxInput) viewBoxInput.addEventListener('change', () => {
       this.model.canvas.viewBox = viewBoxInput.value.trim();
@@ -886,6 +992,7 @@ export class PropertyPanel {
       if (vbMinY) vbMinY.value = updatedVb.minY.toString();
       if (vbWidth) vbWidth.value = updatedVb.width.toString();
       if (vbHeight) vbHeight.value = updatedVb.height.toString();
+      checkPresetOrCustom();
       this.callbacks.onUpdateCanvas();
     });
 
