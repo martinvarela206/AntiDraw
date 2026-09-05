@@ -436,7 +436,42 @@ class AntiDrawApp {
 
       if (e.key === 'Escape') {
         e.preventDefault();
-        this.cancelCurrentAction();
+        const hasActiveDrag = !!(
+          this.ghostDragOffset ||
+          this.ghostTransformMap.size > 0 ||
+          this.activeHandle === 'move' ||
+          (this.initialElementsMap.size > 0 && this.isDragging) ||
+          this.ghostNodeVertices ||
+          (this.toolbar.activeTool === 'node' && this.isDragging) ||
+          this.ghostShapeElement ||
+          this.shapeStartPt ||
+          this.activeHandle === 'shape' ||
+          (this.toolbar.activeTool === 'pen' && (this.isDragging || this.currentPenVertices.length > 0)) ||
+          (this.toolbar.activeTool === 'polyline' && this.currentPolylineVertices.length > 0) ||
+          this.activeHandle === 'marquee' ||
+          this.selectionTool.marqueeRect ||
+          this.activeHandle === 'guide-create' ||
+          this.activeHandle === 'guide-move' ||
+          this.activeHandle === 'guide-pivot' ||
+          this.activeHandle === 'guide-rotate' ||
+          this.activeHandle === 'origin-drag'
+        );
+
+        if (hasActiveDrag) {
+          this.cancelCurrentAction();
+        } else {
+          // Deselect elements/nodes/guides and switch to canvas/viewbox properties panel
+          this.selectionTool.deselectAll();
+          this.canvasMgr.selectedGuideId = null;
+          this.canvasMgr.activeGuideTransformId = null;
+          this.nodeEditorTool.selectedVertexId = null;
+          this.nodeEditorTool.selectedHandleType = null;
+          if (this.toolbar.activeTool === 'node') {
+            this.toolbar.setTool('select');
+          }
+          this.propertyPanel.resetPanelMode();
+          this.render();
+        }
         return;
       }
 
@@ -1330,12 +1365,24 @@ class AntiDrawApp {
         this.propertyPanel.resetPanelMode();
       } else {
         // 4d. Clicked on empty canvas space: start Marquee selection
+        const hadSelection =
+          this.selectionTool.selectedElementIds.size > 0 ||
+          this.canvasMgr.selectedGuideId !== null ||
+          this.nodeEditorTool.selectedVertexId !== null;
+
         this.selectionTool.deselectAll();
+        this.canvasMgr.selectedGuideId = null;
+        this.canvasMgr.activeGuideTransformId = null;
+        this.nodeEditorTool.selectedVertexId = null;
         this.shapeStartPt = pt;
         this.activeHandle = 'marquee';
         this.selectionTool.isDeselectMarquee = false;
         this.propertyPanel.resetPanelMode();
         this.canvasMgr.isCanvasSelected = true;
+
+        if (hadSelection) {
+          this.render();
+        }
       }
     } else if (activeTool === 'node') {
       const selectedEl = this.model.elements.find(
@@ -1357,9 +1404,22 @@ class AntiDrawApp {
           this.initialVertices = JSON.parse(JSON.stringify(selectedEl.vertices));
           this.ghostNodeVertices = null;
         } else {
+          // Clicked empty space in node mode: deselect and switch to select tool and canvas properties
+          this.selectionTool.deselectAll();
           this.nodeEditorTool.selectedVertexId = null;
           this.nodeEditorTool.selectedHandleType = null;
+          this.toolbar.setTool('select');
+          this.propertyPanel.resetPanelMode();
+          this.render();
+          return;
         }
+      } else {
+        // No selected element in node mode: switch to select tool and canvas properties
+        this.selectionTool.deselectAll();
+        this.toolbar.setTool('select');
+        this.propertyPanel.resetPanelMode();
+        this.render();
+        return;
       }
     } else if (['rect', 'ellipse', 'line', 'star'].includes(activeTool)) {
       const otherVertices = this.getOtherVertices();
