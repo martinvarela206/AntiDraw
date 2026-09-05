@@ -129,8 +129,8 @@ export class RulerView {
     this.canvasH = canvasHeight;
 
     const dpr = window.devicePixelRatio || 1;
-    const topWidth = Math.max(canvasWidth + 200, 3000);
-    const leftHeight = Math.max(canvasHeight + 200, 3000);
+    const topWidth = Math.max(this.container.clientWidth || 0, canvasWidth + 500, 3000);
+    const leftHeight = Math.max(this.container.clientHeight || 0, canvasHeight + 500, 3000);
 
     if (this.topRulerCanvas.width !== topWidth * dpr || this.topRulerCanvas.height !== 20 * dpr) {
       this.topRulerCanvas.width = topWidth * dpr;
@@ -205,11 +205,11 @@ export class RulerView {
     const step = (cfg.step || 50) * zoom;
     const subStep = step / 5;
 
-    const minScreenX = offsetCanvasXVal - 500;
-    const maxScreenX = offsetCanvasXVal + workBounds.width * zoom + 500;
+    const minScreenX = 0;
+    const maxScreenX = tW;
     const firstTickX = startX - Math.ceil((startX - minScreenX) / subStep) * subStep;
 
-    for (let x = firstTickX; x < maxScreenX; x += subStep) {
+    for (let x = firstTickX; x <= maxScreenX + 0.1; x += subStep) {
       const relVal = Math.round((x - startX) / zoom / cfg.scale);
       const isMajor = Math.abs((x - startX) % step) < 0.5 || Math.abs((x - startX) % step - step) < 0.5;
       const isMedium = Math.abs((x - startX) % (step / 2)) < 0.5;
@@ -274,11 +274,11 @@ export class RulerView {
     lCtx.fillStyle = '#94a3b8';
     lCtx.font = '8px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
 
-    const minScreenY = offsetCanvasYVal - 500;
-    const maxScreenY = offsetCanvasYVal + workBounds.height * zoom + 500;
+    const minScreenY = 0;
+    const maxScreenY = lH;
     const firstTickY = startY - Math.ceil((startY - minScreenY) / subStep) * subStep;
 
-    for (let y = firstTickY; y < maxScreenY; y += subStep) {
+    for (let y = firstTickY; y <= maxScreenY + 0.1; y += subStep) {
       const relVal = Math.round((y - startY) / zoom / cfg.scale);
       const isMajor = Math.abs((y - startY) % step) < 0.5 || Math.abs((y - startY) % step - step) < 0.5;
       const isMedium = Math.abs((y - startY) % (step / 2)) < 0.5;

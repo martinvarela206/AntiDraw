@@ -676,6 +676,10 @@ export class PropertyPanel {
           <span class="prop-label">Selected</span>
           <span style="font-weight:600; color:var(--text-main);">${elements.length} vectors</span>
         </div>
+        <div class="prop-row">
+          <span class="prop-label">Total Nodes</span>
+          <span style="font-weight:600; color:var(--text-main);">${elements.reduce((acc, curr) => acc + (curr.vertices ? curr.vertices.length : 0), 0)} nodes</span>
+        </div>
       </div>
 
       <div class="panel-section">
@@ -914,6 +918,10 @@ export class PropertyPanel {
           <input type="number" class="prop-input" id="el-w" value="${w}" />
           <span class="prop-label" style="width:20px; text-align:right;">H</span>
           <input type="number" class="prop-input" id="el-h" value="${h}" />
+        </div>
+        <div class="prop-row">
+          <span class="prop-label">Nodes</span>
+          <span style="font-weight:600; color:var(--text-main); font-size:12px;">${el.vertices ? el.vertices.length : 0} nodes (${el.isClosed ? 'closed' : 'open'})</span>
         </div>
       </div>
 

@@ -65,10 +65,12 @@ class AntiDrawApp {
   private guideInitialState: GuideLine | null = null;
   private activeRotateArrowIdx: 1 | 2 = 1;
 
-  // Middle mouse button panning state
+  // Camera 2D viewport & middle mouse panning state
   private isMiddlePanning: boolean = false;
   private panStartClient: { x: number; y: number } = { x: 0, y: 0 };
-  private panStartScroll: { left: number; top: number } = { left: 0, top: 0 };
+  private cameraOffset: Point = { x: 0, y: 0 };
+  private panStartOffset: Point = { x: 0, y: 0 };
+  private hasInitialCentered: boolean = false;
 
   public penNodeType: NodeType = 'asymmetric';
   private currentPenVertices: PathVertex[] = [];
@@ -136,6 +138,7 @@ class AntiDrawApp {
           <span id="status-coords">X: 0, Y: 0</span>
         </div>
         <div class="status-right">
+          <button class="status-btn" id="btn-recenter-viewbox" title="Recenter ViewBox / Camera (Artboard)">🎯 Recenter ViewBox</button>
           <span id="status-info">Ready</span>
           <button class="status-zoom-btn" id="status-zoom" title="Click to reset zoom to 100%">100%</button>
         </div>
@@ -358,6 +361,12 @@ class AntiDrawApp {
         this.model.loadSvgString(msg.text);
         this.applyCanvasSize();
         this.render();
+        if (!this.hasInitialCentered) {
+          this.hasInitialCentered = true;
+          setTimeout(() => {
+            this.recenterViewBox();
+          }, 40);
+        }
       }
     });
 
@@ -373,6 +382,7 @@ class AntiDrawApp {
       if (e.key === 'p' || e.key === 'P') this.toolbar.setTool('pen');
       if (e.key === 'r' || e.key === 'R') this.toolbar.setTool('rect');
       if (e.key === 'e' || e.key === 'E') this.toolbar.setTool('ellipse');
+      if (!e.ctrlKey && !e.metaKey && (e.key === 'z' || e.key === 'Z')) this.toolbar.setTool('zoom');
 
       const isCtrl = e.ctrlKey || e.metaKey;
 
@@ -604,6 +614,7 @@ class AntiDrawApp {
 
     // Pointer events on Canvas Wrapper
     this.canvasWrapper.addEventListener('pointerdown', (e) => {
+      if (e.button === 1) return; // Allow middle click to bubble up for panning
       e.stopPropagation();
       this.onPointerDown(e);
     });
@@ -645,34 +656,36 @@ class AntiDrawApp {
       this.onDoubleClick(e);
     });
 
-    // Middle mouse button panning (hand cursor and viewport scroll)
-    this.canvasScrollArea.addEventListener('pointerdown', (e: PointerEvent) => {
+    // Middle mouse button panning (camera 2D pan)
+    const startMiddlePan = (e: PointerEvent) => {
       if (e.button === 1) {
         e.preventDefault();
         this.isMiddlePanning = true;
         this.panStartClient = { x: e.clientX, y: e.clientY };
-        this.panStartScroll = {
-          left: this.canvasScrollArea.scrollLeft,
-          top: this.canvasScrollArea.scrollTop,
-        };
+        this.panStartOffset = { x: this.cameraOffset.x, y: this.cameraOffset.y };
         this.canvasScrollArea.style.cursor = 'grabbing';
         this.canvasWrapper.style.cursor = 'grabbing';
         try {
           this.canvasScrollArea.setPointerCapture(e.pointerId);
         } catch (_) {}
       }
-    });
+    };
+    this.canvasScrollArea.addEventListener('pointerdown', startMiddlePan);
+    this.canvasWrapper.addEventListener('pointerdown', startMiddlePan);
 
-    this.canvasScrollArea.addEventListener('pointermove', (e: PointerEvent) => {
+    const onMiddlePanMove = (e: PointerEvent) => {
       if (this.isMiddlePanning) {
         e.preventDefault();
         const dx = e.clientX - this.panStartClient.x;
         const dy = e.clientY - this.panStartClient.y;
-        this.canvasScrollArea.scrollLeft = this.panStartScroll.left - dx;
-        this.canvasScrollArea.scrollTop = this.panStartScroll.top - dy;
+        this.cameraOffset.x = Math.round(this.panStartOffset.x + dx);
+        this.cameraOffset.y = Math.round(this.panStartOffset.y + dy);
+        this.applyCameraTransform();
         this.syncRulerScroll();
       }
-    });
+    };
+    this.canvasScrollArea.addEventListener('pointermove', onMiddlePanMove);
+    window.addEventListener('pointermove', onMiddlePanMove);
 
     const stopMiddlePan = (e: PointerEvent) => {
       if (this.isMiddlePanning) {
@@ -694,23 +707,26 @@ class AntiDrawApp {
       if (e.button === 1) e.preventDefault();
     });
 
-    // Mouse Wheel: Ctrl + Wheel for Zoom In / Zoom Out (10% increments), Alt + Wheel for Horizontal Scroll
+    // Mouse Wheel: Ctrl + Wheel for Zoom In / Zoom Out (centered on cursor), Alt + Wheel for Horizontal Pan, Wheel for Vertical Pan
     this.canvasScrollArea.addEventListener(
       'wheel',
       (e: WheelEvent) => {
-        if (e.ctrlKey && this.toolbar.activeTool === 'select') {
+        if (e.ctrlKey) {
           e.preventDefault();
           const delta = e.deltaY < 0 ? 0.1 : -0.1;
-          const currentZoom = Math.round(this.canvasMgr.zoom * 10) / 10;
-          const newZoom = Math.round(Math.max(0.1, Math.min(10.0, currentZoom + delta)) * 10) / 10;
-          if (newZoom !== this.canvasMgr.zoom) {
-            this.setZoom(newZoom);
-          }
+          this.zoomAtClientPoint(e.clientX, e.clientY, delta);
         } else if (e.altKey) {
-          // Alt + Scroll -> Horizontal scroll only
+          // Alt + Scroll -> Horizontal camera pan
           e.preventDefault();
           const delta = e.deltaY || e.deltaX;
-          this.canvasScrollArea.scrollLeft += delta;
+          this.cameraOffset.x -= delta;
+          this.applyCameraTransform();
+          this.syncRulerScroll();
+        } else if (!e.shiftKey) {
+          // Regular Wheel -> Vertical camera pan
+          e.preventDefault();
+          this.cameraOffset.y -= e.deltaY;
+          this.applyCameraTransform();
           this.syncRulerScroll();
         }
       },
@@ -724,13 +740,88 @@ class AntiDrawApp {
         this.setZoom(1.0);
       });
     }
+
+    // Status bar recenter viewBox button
+    const recenterBtn = document.getElementById('btn-recenter-viewbox');
+    if (recenterBtn) {
+      recenterBtn.addEventListener('click', () => {
+        this.recenterViewBox();
+      });
+    }
+
+    // Window resize handler to update rulers
+    window.addEventListener('resize', () => {
+      this.rulerView.updateSize(this.model.canvas.width, this.model.canvas.height);
+      this.syncRulerScroll();
+    });
+  }
+
+  public recenterViewBox(): void {
+    const areaW = this.canvasScrollArea.clientWidth;
+    const areaH = this.canvasScrollArea.clientHeight;
+    if (areaW <= 0 || areaH <= 0) return;
+
+    const zoom = this.canvasMgr.zoom || 1.0;
+    const vb = this.model.getViewBoxBounds();
+    const workBounds = this.model.getWorkingCanvasBounds(80);
+
+    const vbCenterX = (vb.minX + vb.width / 2 - workBounds.minX) * zoom;
+    const vbCenterY = (vb.minY + vb.height / 2 - workBounds.minY) * zoom;
+
+    this.cameraOffset.x = Math.round(areaW / 2 - vbCenterX);
+    this.cameraOffset.y = Math.round(areaH / 2 - vbCenterY);
+
+    this.applyCameraTransform();
+    this.syncRulerScroll();
+  }
+
+  public zoomAtClientPoint(clientX: number, clientY: number, delta: number): void {
+    const currentZoom = this.canvasMgr.zoom || 1.0;
+    const newZoom = Math.round(Math.max(0.1, Math.min(10.0, currentZoom + delta)) * 10) / 10;
+    if (newZoom !== currentZoom) {
+      const scrollRect = this.canvasScrollArea.getBoundingClientRect();
+      const cursorViewportX = clientX - scrollRect.left;
+      const cursorViewportY = clientY - scrollRect.top;
+
+      const worldX = (cursorViewportX - this.cameraOffset.x) / currentZoom;
+      const worldY = (cursorViewportY - this.cameraOffset.y) / currentZoom;
+
+      this.cameraOffset.x = Math.round(cursorViewportX - worldX * newZoom);
+      this.cameraOffset.y = Math.round(cursorViewportY - worldY * newZoom);
+
+      this.canvasMgr.zoom = newZoom;
+      this.applyCanvasSize();
+      this.render();
+      this.updateStatusZoom();
+    }
   }
 
   public setZoom(zoom: number): void {
-    this.canvasMgr.zoom = Math.round(Math.max(0.1, Math.min(10.0, zoom)) * 10) / 10;
-    this.applyCanvasSize();
-    this.render();
-    this.updateStatusZoom();
+    const oldZoom = this.canvasMgr.zoom || 1.0;
+    const newZoom = Math.round(Math.max(0.1, Math.min(10.0, zoom)) * 10) / 10;
+    if (newZoom !== oldZoom) {
+      const areaW = this.canvasScrollArea.clientWidth;
+      const areaH = this.canvasScrollArea.clientHeight;
+      const centerViewportX = areaW / 2;
+      const centerViewportY = areaH / 2;
+
+      const worldX = (centerViewportX - this.cameraOffset.x) / oldZoom;
+      const worldY = (centerViewportY - this.cameraOffset.y) / oldZoom;
+
+      this.cameraOffset.x = Math.round(centerViewportX - worldX * newZoom);
+      this.cameraOffset.y = Math.round(centerViewportY - worldY * newZoom);
+
+      this.canvasMgr.zoom = newZoom;
+      this.applyCanvasSize();
+      this.render();
+      this.updateStatusZoom();
+    }
+  }
+
+  private applyCameraTransform(): void {
+    if (this.canvasWrapper) {
+      this.canvasWrapper.style.transform = `translate(${this.cameraOffset.x}px, ${this.cameraOffset.y}px)`;
+    }
   }
 
   private updateStatusZoom(): void {
@@ -778,9 +869,13 @@ class AntiDrawApp {
 
     // Set canvas-wrapper to exact scaled pixel dimensions of the dynamic workspace
     this.canvasWrapper.style.cssText = `
-      position: relative;
+      position: absolute;
+      top: 0;
+      left: 0;
       width: ${displayW}px;
       height: ${displayH}px;
+      transform: translate(${this.cameraOffset.x}px, ${this.cameraOffset.y}px);
+      transform-origin: 0 0;
       background-color: #12131c;
       box-shadow: 0 12px 40px rgba(0,0,0,0.6);
       border: 1px solid #2b2d3d;
@@ -1358,6 +1453,10 @@ class AntiDrawApp {
       this.penActiveVertexIdx = this.currentPenVertices.length - 1;
       this.activeHandle = 'pen';
       this.render();
+    } else if (activeTool === 'zoom') {
+      const delta = e.altKey ? -0.1 : 0.1;
+      this.zoomAtClientPoint(e.clientX, e.clientY, delta);
+      return;
     }
 
     this.render();

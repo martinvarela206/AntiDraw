@@ -232,14 +232,16 @@ body {
 
 .canvas-scroll-area {
   grid-area: scroll-area;
-  overflow: auto;
-  padding: 40px;
+  overflow: hidden;
   position: relative;
+  user-select: none;
 }
 
 .canvas-wrapper {
-  /* Dimensions are set via JS in applyCanvasSize() to exact canvas pixel size */
-  position: relative;
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
 }
 
 #svg-canvas,
@@ -360,7 +362,8 @@ body {
   gap: 12px;
 }
 
-.status-zoom-btn {
+.status-zoom-btn,
+.status-btn {
   padding: 2px 8px;
   border-radius: 4px;
   background-color: var(--bg-surface);
@@ -371,9 +374,13 @@ body {
   border: 1px solid var(--border-color);
   transition: all 0.15s ease;
   user-select: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
-.status-zoom-btn:hover {
+.status-zoom-btn:hover,
+.status-btn:hover {
   background-color: var(--accent-color);
   color: #ffffff;
   border-color: var(--accent-color);
