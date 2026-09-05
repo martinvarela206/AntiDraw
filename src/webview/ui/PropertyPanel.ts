@@ -785,12 +785,16 @@ export class PropertyPanel {
     if (xInput) xInput.value = Math.round(v.x).toString();
     if (yInput) yInput.value = Math.round(v.y).toString();
 
+    const isSharp = v.nodeType === 'sharp' || (!v.handleIn && !v.handleOut);
+    const sharpBtn = this.container.querySelector('#btn-node-sharp');
     const asymBtn = this.container.querySelector('#btn-node-asym');
     const smoothBtn = this.container.querySelector('#btn-node-smooth');
     const symBtn = this.container.querySelector('#btn-node-sym');
-    if (asymBtn) asymBtn.classList.toggle('active', v.nodeType === 'asymmetric');
-    if (smoothBtn) smoothBtn.classList.toggle('active', v.nodeType === 'smooth');
-    if (symBtn) symBtn.classList.toggle('active', v.nodeType === 'symmetric');
+
+    if (sharpBtn) sharpBtn.classList.toggle('active', isSharp);
+    if (asymBtn) asymBtn.classList.toggle('active', !isSharp && v.nodeType === 'asymmetric');
+    if (smoothBtn) smoothBtn.classList.toggle('active', !isSharp && v.nodeType === 'smooth');
+    if (symBtn) symBtn.classList.toggle('active', !isSharp && v.nodeType === 'symmetric');
   }
 
   // Render Canvas & ViewBox Properties
@@ -1106,6 +1110,8 @@ export class PropertyPanel {
 
   // Render Node Properties for single selected vertex
   private renderNodeProperties(el: VectorElement, v: PathVertex): void {
+    const isSharp = v.nodeType === 'sharp' || (!v.handleIn && !v.handleOut);
+
     this.container.innerHTML = `
       <div class="panel-section">
         <div class="panel-title">Vertex Coordinates</div>
@@ -1121,16 +1127,16 @@ export class PropertyPanel {
       <div class="panel-section">
         <div class="panel-title">Node Type</div>
         <div class="prop-row" style="justify-content: flex-start; gap: 8px;">
-          <button class="btn-icon ${v.nodeType === 'sharp' || (!v.handleIn && !v.handleOut) ? 'active' : ''}" id="btn-node-sharp" title="Sin tiradores (Cúspide / Recto)">
+          <button class="btn-icon ${isSharp ? 'active' : ''}" id="btn-node-sharp" title="Sin tiradores (Cúspide / Recto)">
             ${ToolIcons.nodeSharp}
           </button>
-          <button class="btn-icon ${v.nodeType === 'asymmetric' && (v.handleIn || v.handleOut) ? 'active' : ''}" id="btn-node-asym" title="Asymmetric Node (Independent Handles)">
+          <button class="btn-icon ${!isSharp && v.nodeType === 'asymmetric' ? 'active' : ''}" id="btn-node-asym" title="Asymmetric Node (Independent Handles)">
             ${ToolIcons.nodeAsymmetric}
           </button>
-          <button class="btn-icon ${v.nodeType === 'smooth' ? 'active' : ''}" id="btn-node-smooth" title="Uniform / Smooth Node">
+          <button class="btn-icon ${!isSharp && v.nodeType === 'smooth' ? 'active' : ''}" id="btn-node-smooth" title="Uniform / Smooth Node">
             ${ToolIcons.nodeSmooth}
           </button>
-          <button class="btn-icon ${v.nodeType === 'symmetric' ? 'active' : ''}" id="btn-node-sym" title="Symmetric Node">
+          <button class="btn-icon ${!isSharp && v.nodeType === 'symmetric' ? 'active' : ''}" id="btn-node-sym" title="Symmetric Node">
             ${ToolIcons.nodeSymmetric}
           </button>
         </div>
