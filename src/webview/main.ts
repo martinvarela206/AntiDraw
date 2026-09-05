@@ -80,6 +80,11 @@ class AntiDrawApp {
   private polylineHoverPoint: Point | null = null;
 
   private shapeStartPt: Point | null = null;
+  // Ghost manipulation and creation state
+  private ghostDragOffset: Point | null = null;
+  private ghostTransformMap: Map<string, PathVertex[]> = new Map();
+  private ghostNodeVertices: PathVertex[] | null = null;
+  private ghostShapeElement: VectorElement | null = null;
   private isShiftPressed: boolean = false;
   // Flag: avoid re-parsing model when a change was sent from this webview itself
   private isUpdatingFromWebview: boolean = false;
@@ -183,17 +188,20 @@ class AntiDrawApp {
           this.canvasMgr.showGrid = !this.canvasMgr.showGrid;
           this.topBar.update();
           this.render();
+          this.syncMetadataToHost();
         },
         onToggleGuides: () => {
           this.canvasMgr.showGuides = !this.canvasMgr.showGuides;
           this.topBar.update();
           this.render();
+          this.syncMetadataToHost();
         },
         onToggleSnap: (type) => {
           if (type === 'grid') this.canvasMgr.snapToGrid = !this.canvasMgr.snapToGrid;
           if (type === 'guide') this.canvasMgr.snapToGuides = !this.canvasMgr.snapToGuides;
           if (type === 'vertex') this.canvasMgr.snapToVertices = !this.canvasMgr.snapToVertices;
           this.topBar.update();
+          this.syncMetadataToHost();
         },
       }
     );
@@ -416,23 +424,23 @@ class AntiDrawApp {
         return;
       }
 
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        this.cancelCurrentAction();
+        return;
+      }
+
       if (this.toolbar.activeTool === 'polyline') {
         if (e.key === 'Enter') {
           this.finishPolylinePath(false);
-        } else if (e.key === 'Escape') {
-          this.currentPolylineVertices = [];
-          this.polylineHoverPoint = null;
-          this.render();
+          return;
         }
       }
 
       if (this.toolbar.activeTool === 'pen') {
         if (e.key === 'Enter') {
           this.finishPenPath(false);
-        } else if (e.key === 'Escape') {
-          this.currentPenVertices = [];
-          this.penHoverPoint = null;
-          this.render();
+          return;
         }
       }
 
@@ -584,6 +592,16 @@ class AntiDrawApp {
       }
     });
 
+    // Right-click / Context Menu cancellation
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.cancelCurrentAction();
+    };
+    this.canvasContainer.addEventListener('contextmenu', handleContextMenu);
+    this.canvasWrapper.addEventListener('contextmenu', handleContextMenu);
+    this.canvasScrollArea.addEventListener('contextmenu', handleContextMenu);
+
     // Pointer events on Canvas Wrapper
     this.canvasWrapper.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
@@ -604,6 +622,11 @@ class AntiDrawApp {
 
     // Pointer events on Canvas Scroll Area (delegating interaction for guides extending outside canvasWrapper)
     this.canvasScrollArea.addEventListener('pointerdown', (e: PointerEvent) => {
+      if (e.button === 2) {
+        e.preventDefault();
+        this.cancelCurrentAction();
+        return;
+      }
       if (e.button === 0) {
         this.onPointerDown(e);
       }
@@ -725,6 +748,7 @@ class AntiDrawApp {
     this.isUpdatingFromWebview = true;
     const svgText = this.model.toSvgString();
     vscode.postMessage({ type: 'updateDocument', text: svgText });
+    this.syncMetadataToHost();
   }
 
   private syncMetadataToHost(): void {
@@ -895,7 +919,123 @@ class AntiDrawApp {
     return { p1, p2, arrow1, arrow2, pivot: { x: px, y: py } };
   }
 
+  private cancelCurrentAction(): void {
+    let needsRender = false;
+
+    // 1. Moving or transforming elements
+    if (
+      this.ghostDragOffset ||
+      this.ghostTransformMap.size > 0 ||
+      this.activeHandle === 'move' ||
+      (this.initialElementsMap.size > 0 && this.isDragging)
+    ) {
+      this.ghostDragOffset = null;
+      this.ghostTransformMap.clear();
+      this.initialElementsMap.clear();
+      this.initialBox = null;
+      this.activeHandle = null;
+      this.isDragging = false;
+      needsRender = true;
+    }
+
+    // 2. Node tool vertex or handle manipulation
+    if (this.ghostNodeVertices || (this.toolbar.activeTool === 'node' && this.isDragging)) {
+      this.ghostNodeVertices = null;
+      this.initialVertices = [];
+      this.activeHandle = null;
+      this.isDragging = false;
+      needsRender = true;
+    }
+
+    // 3. Shape creation
+    if (this.ghostShapeElement || this.shapeStartPt || this.activeHandle === 'shape') {
+      this.ghostShapeElement = null;
+      this.shapeStartPt = null;
+      this.activeHandle = null;
+      this.isDragging = false;
+      needsRender = true;
+    }
+
+    // 4. Pen tool in-progress path or dragging
+    if (this.toolbar.activeTool === 'pen') {
+      if (this.isDragging && this.activeHandle === 'pen') {
+        this.isDragging = false;
+        this.activeHandle = null;
+        this.penActiveVertexIdx = null;
+        this.penMovingVertexIdx = null;
+        needsRender = true;
+      } else if (this.currentPenVertices.length > 0) {
+        this.currentPenVertices = [];
+        this.penHoverPoint = null;
+        this.isDragging = false;
+        this.activeHandle = null;
+        this.penActiveVertexIdx = null;
+        this.penMovingVertexIdx = null;
+        needsRender = true;
+      }
+    }
+
+    // 5. Polyline tool in-progress path
+    if (this.toolbar.activeTool === 'polyline' && this.currentPolylineVertices.length > 0) {
+      this.currentPolylineVertices = [];
+      this.polylineHoverPoint = null;
+      this.isDragging = false;
+      this.activeHandle = null;
+      needsRender = true;
+    }
+
+    // 6. Marquee selection
+    if (this.activeHandle === 'marquee' || this.selectionTool.marqueeRect) {
+      this.selectionTool.marqueeRect = null;
+      this.selectionTool.isDeselectMarquee = false;
+      this.activeHandle = null;
+      this.isDragging = false;
+      needsRender = true;
+    }
+
+    // 7. Guide creation or transform
+    if (
+      this.activeHandle === 'guide-create' ||
+      this.activeHandle === 'guide-move' ||
+      this.activeHandle === 'guide-pivot' ||
+      this.activeHandle === 'guide-rotate'
+    ) {
+      if (this.guideInitialState && this.canvasMgr.selectedGuideId) {
+        const g = this.canvasMgr.getGuide(this.canvasMgr.selectedGuideId);
+        if (g) {
+          Object.assign(g, this.guideInitialState);
+        }
+      }
+      this.guideInitialState = null;
+      this.dragGuideCurrentPt = { x: 0, y: 0 };
+      this.activeHandle = null;
+      this.isDragging = false;
+      needsRender = true;
+    }
+
+    // 8. Origin drag
+    if (this.activeHandle === 'origin-drag') {
+      this.dragOriginPt = null;
+      this.activeHandle = null;
+      this.isDragging = false;
+      needsRender = true;
+    }
+
+    this.canvasWrapper.style.cursor = '';
+    this.canvasScrollArea.style.cursor = '';
+
+    if (needsRender) {
+      this.render();
+    }
+  }
+
   private onPointerDown(e: PointerEvent): void {
+    if (e.button === 2) {
+      e.preventDefault();
+      e.stopPropagation();
+      this.cancelCurrentAction();
+      return;
+    }
     if (e.button !== 0) return;
     const pt = this.getCanvasPoint(e);
     this.dragStartPt = pt;
@@ -963,26 +1103,29 @@ class AntiDrawApp {
         }
       }
 
-      // 2. Check hit on Guide Lines
+      // 2. Check if clicking on any Guide Line to select it or start dragging it
       const hitGuide = this.hitTestGuide(pt, 8);
       if (hitGuide) {
         this.selectionTool.deselectAll();
         this.canvasMgr.selectedGuideId = hitGuide.id;
+        this.canvasMgr.activeGuideTransformId = null;
         this.activeHandle = 'guide-move';
         this.guideInitialState = { ...hitGuide };
         this.propertyPanel.showGuideSettings(hitGuide);
         this.render();
         return;
-      } else {
-        // Deselect guide if clicking elsewhere
-        if (this.canvasMgr.selectedGuideId) {
-          this.canvasMgr.selectedGuideId = null;
-          this.canvasMgr.activeGuideTransformId = null;
-          this.propertyPanel.resetPanelMode();
-        }
       }
 
-      // 3. Modifier-based selection (Ctrl: Toggle select/deselect; Shift: Deselect)
+      // 3. Clicked somewhere else: clear active guide transform
+      if (this.canvasMgr.activeGuideTransformId) {
+        this.canvasMgr.activeGuideTransformId = null;
+      }
+
+      const selectedEls = this.model.elements.filter((el) =>
+        this.selectionTool.isSelected(el.id)
+      );
+
+      // 4. Modifier-based selection (Ctrl: Toggle select/deselect; Shift: Deselect)
       if (e.ctrlKey || e.metaKey) {
         const hit = this.selectionTool.hitTest(this.model.elements, pt, this.canvasMgr.zoom);
         if (hit) {
@@ -1017,9 +1160,7 @@ class AntiDrawApp {
         }
       }
 
-      // 4. Normal selection (No Ctrl / Shift)
-      // 4a. Check hit directly on a vertex of any selected element (move from vertex)
-      const selectedEls = this.model.elements.filter((el) => this.selectionTool.isSelected(el.id));
+      // 4a. Check hit directly on a selected element's vertex to use that vertex as precise snap anchor
       let hitVertex: Point | null = null;
       if (selectedEls.length > 0) {
         for (const selEl of selectedEls) {
@@ -1036,10 +1177,10 @@ class AntiDrawApp {
       }
 
       if (hitVertex) {
-        this.pushUndo();
         this.activeHandle = 'move';
         this.dragAnchorPt = hitVertex;
         this.initialElementsMap.clear();
+        this.ghostDragOffset = null;
         selectedEls.forEach((el) => {
           if (el.vertices) {
             this.initialElementsMap.set(el.id, JSON.parse(JSON.stringify(el.vertices)));
@@ -1056,9 +1197,9 @@ class AntiDrawApp {
         if (groupBox) {
           const handle = this.selectionTool.hitTestHandle(groupBox, pt, 14);
           if (handle) {
-            this.pushUndo();
             this.activeHandle = handle;
             this.initialElementsMap.clear();
+            this.ghostTransformMap.clear();
             selectedEls.forEach((el) => {
               if (el.vertices) {
                 this.initialElementsMap.set(el.id, JSON.parse(JSON.stringify(el.vertices)));
@@ -1080,10 +1221,10 @@ class AntiDrawApp {
 
         const nowSelected = this.model.elements.filter((el) => this.selectionTool.isSelected(el.id));
         if (nowSelected.length > 0) {
-          this.pushUndo();
           this.activeHandle = 'move';
           this.dragAnchorPt = { x: pt.x, y: pt.y };
           this.initialElementsMap.clear();
+          this.ghostDragOffset = null;
           nowSelected.forEach((el) => {
             if (el.vertices) {
               this.initialElementsMap.set(el.id, JSON.parse(JSON.stringify(el.vertices)));
@@ -1113,20 +1254,20 @@ class AntiDrawApp {
           this.nodeEditorTool.selectedVertexId
         );
         if (hitNode) {
-          this.pushUndo();
           this.nodeEditorTool.selectedVertexId = hitNode.vertex.id;
           this.nodeEditorTool.selectedHandleType = hitNode.type;
           this.activeHandle = hitNode.type;
           this.initialVertices = JSON.parse(JSON.stringify(selectedEl.vertices));
+          this.ghostNodeVertices = null;
         } else {
           this.nodeEditorTool.selectedVertexId = null;
           this.nodeEditorTool.selectedHandleType = null;
         }
       }
     } else if (['rect', 'ellipse', 'line', 'star'].includes(activeTool)) {
-      this.pushUndo();
       const otherVertices = this.getOtherVertices();
       this.shapeStartPt = this.snapPoint(pt, otherVertices);
+      this.ghostShapeElement = null;
       this.activeHandle = 'shape';
     } else if (activeTool === 'polyline') {
       const otherVertices = this.getOtherVertices();
@@ -1319,6 +1460,16 @@ class AntiDrawApp {
         const snappedPt = this.snapPoint(pt, otherVertices);
         this.polylineHoverPoint = snappedPt;
         this.renderOverlay();
+      } else if (this.toolbar.activeTool === 'pen') {
+        this.canvasWrapper.style.cursor = 'crosshair';
+        if (!this.isMiddlePanning) {
+          this.canvasScrollArea.style.cursor = '';
+        }
+        const otherVertices = this.getOtherVertices();
+        this.currentPenVertices.forEach((v) => otherVertices.push({ x: v.x, y: v.y }));
+        const snappedPt = this.snapPoint(pt, otherVertices);
+        this.penHoverPoint = snappedPt;
+        this.renderOverlay();
       }
       return;
     }
@@ -1429,31 +1580,23 @@ class AntiDrawApp {
         const effectiveDx = snappedTarget.x - this.dragAnchorPt.x;
         const effectiveDy = snappedTarget.y - this.dragAnchorPt.y;
 
-        this.initialElementsMap.forEach((origVerts, id) => {
-          const el = this.model.elements.find((e) => e.id === id);
-          if (el) {
-            el.vertices = origVerts.map((v) => ({
-              ...v,
-              x: v.x + effectiveDx,
-              y: v.y + effectiveDy,
-              handleIn: v.handleIn ? { x: v.handleIn.x + effectiveDx, y: v.handleIn.y + effectiveDy } : undefined,
-              handleOut: v.handleOut ? { x: v.handleOut.x + effectiveDx, y: v.handleOut.y + effectiveDy } : undefined,
-            }));
-          }
-        });
+        this.ghostDragOffset = { x: effectiveDx, y: effectiveDy };
+        this.renderOverlay();
+        return;
       } else if (this.initialBox && this.activeHandle !== 'move' && this.initialElementsMap.size > 0) {
+        this.ghostTransformMap.clear();
         this.initialElementsMap.forEach((origVerts, id) => {
-          const el = this.model.elements.find((e) => e.id === id);
-          if (el) {
-            el.vertices = this.selectionTool.transformVertices(
-              origVerts,
-              this.initialBox,
-              this.activeHandle as HandleType,
-              dx,
-              dy
-            );
-          }
+          const transformed = this.selectionTool.transformVertices(
+            origVerts,
+            this.initialBox,
+            this.activeHandle as HandleType,
+            dx,
+            dy
+          );
+          this.ghostTransformMap.set(id, transformed);
         });
+        this.renderOverlay();
+        return;
       }
     } else if (this.toolbar.activeTool === 'node') {
       const selectedEl = this.model.elements.find((el) => this.selectionTool.isSelected(el.id));
@@ -1470,14 +1613,17 @@ class AntiDrawApp {
             }
           });
           const snappedPt = this.snapPoint(pt, otherVertices);
+          const baseVerts = this.initialVertices.length > 0 ? this.initialVertices : selectedEl.vertices;
           const result = this.nodeEditorTool.moveVertex(
-            selectedEl.vertices,
+            baseVerts,
             this.nodeEditorTool.selectedVertexId,
             snappedPt,
             this.isShiftPressed,
             this.model.elements
           );
-          selectedEl.vertices = result.updatedVertices;
+          this.ghostNodeVertices = result.updatedVertices;
+          this.renderOverlay();
+          return;
         } else if (
           (this.activeHandle === 'handleIn' || this.activeHandle === 'handleOut') &&
           this.nodeEditorTool.selectedVertexId
@@ -1491,33 +1637,32 @@ class AntiDrawApp {
             }
           });
           const snappedPt = this.snapPoint(pt, otherVertices);
-          selectedEl.vertices = this.nodeEditorTool.moveHandle(
-            selectedEl.vertices,
+          const baseVerts = this.initialVertices.length > 0 ? this.initialVertices : selectedEl.vertices;
+          this.ghostNodeVertices = this.nodeEditorTool.moveHandle(
+            baseVerts,
             this.nodeEditorTool.selectedVertexId,
             this.activeHandle,
             snappedPt
           );
+          this.renderOverlay();
+          return;
         }
       }
     } else if (this.toolbar.activeTool === 'pen') {
       if (this.isDragging && this.activeHandle === 'pen') {
         if (this.penMovingVertexIdx !== null && this.currentPenVertices[this.penMovingVertexIdx]) {
-          const otherVertices: Point[] = [];
-          this.model.elements.forEach((el) => {
-            if (el.vertices) {
-              el.vertices.forEach((v) => otherVertices.push({ x: v.x, y: v.y }));
-            }
+          const otherVertices = this.getOtherVertices();
+          this.currentPenVertices.forEach((v, idx) => {
+            if (idx !== this.penMovingVertexIdx) otherVertices.push({ x: v.x, y: v.y });
           });
           const snappedPt = this.snapPoint(pt, otherVertices);
           this.currentPenVertices[this.penMovingVertexIdx].x = snappedPt.x;
           this.currentPenVertices[this.penMovingVertexIdx].y = snappedPt.y;
         } else if (this.penActiveVertexIdx !== null && this.currentPenVertices[this.penActiveVertexIdx]) {
           const curV = this.currentPenVertices[this.penActiveVertexIdx];
-          const otherVertices: Point[] = [];
-          this.model.elements.forEach((el) => {
-            if (el.vertices) {
-              el.vertices.forEach((v) => otherVertices.push({ x: v.x, y: v.y }));
-            }
+          const otherVertices = this.getOtherVertices();
+          this.currentPenVertices.forEach((v, idx) => {
+            if (idx !== this.penActiveVertexIdx) otherVertices.push({ x: v.x, y: v.y });
           });
           const snappedPt = this.snapPoint(pt, otherVertices);
           const curDx = snappedPt.x - curV.x;
@@ -1536,14 +1681,26 @@ class AntiDrawApp {
           }
         }
       } else {
-        this.penHoverPoint = pt;
+        const otherVertices = this.getOtherVertices();
+        this.currentPenVertices.forEach((v) => otherVertices.push({ x: v.x, y: v.y }));
+        this.penHoverPoint = this.snapPoint(pt, otherVertices);
       }
       this.renderOverlay();
       return;
     } else if (this.activeHandle === 'shape' && this.shapeStartPt) {
       const otherVertices = this.getOtherVertices();
       const snappedPt = this.snapPoint(pt, otherVertices);
-      this.previewShape(this.shapeStartPt, snappedPt, e.shiftKey, e.ctrlKey, e.altKey);
+      this.ghostShapeElement = this.createShapeElement(
+        this.toolbar.activeTool,
+        this.shapeStartPt,
+        snappedPt,
+        'ghost_shape_preview',
+        e.shiftKey,
+        e.ctrlKey,
+        e.altKey
+      );
+      this.renderOverlay();
+      return;
     }
 
     this.render();
@@ -1633,6 +1790,79 @@ class AntiDrawApp {
         return;
       }
 
+      let hasChangesToCommit = false;
+
+      // Commit Move Ghost
+      if (this.activeHandle === 'move' && this.ghostDragOffset) {
+        if (this.ghostDragOffset.x !== 0 || this.ghostDragOffset.y !== 0) {
+          this.pushUndo();
+          this.initialElementsMap.forEach((origVerts, id) => {
+            const el = this.model.elements.find((e) => e.id === id);
+            if (el) {
+              el.vertices = origVerts.map((v) => ({
+                ...v,
+                x: v.x + this.ghostDragOffset!.x,
+                y: v.y + this.ghostDragOffset!.y,
+                handleIn: v.handleIn
+                  ? { x: v.handleIn.x + this.ghostDragOffset!.x, y: v.handleIn.y + this.ghostDragOffset!.y }
+                  : undefined,
+                handleOut: v.handleOut
+                  ? { x: v.handleOut.x + this.ghostDragOffset!.x, y: v.handleOut.y + this.ghostDragOffset!.y }
+                  : undefined,
+              }));
+              const isClosed =
+                el.isClosed ??
+                (!el.tagName ||
+                  ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(el.tagName) ||
+                  (el.attributes.d ? /z/i.test(el.attributes.d) : false));
+              el.attributes.d = this.model.compilePathD(el.vertices, isClosed);
+            }
+          });
+          hasChangesToCommit = true;
+        }
+        this.ghostDragOffset = null;
+      }
+
+      // Commit Transform Ghost (Scale, Rotate)
+      if (this.activeHandle && this.activeHandle !== 'move' && this.ghostTransformMap.size > 0) {
+        this.pushUndo();
+        this.ghostTransformMap.forEach((transformedVerts, id) => {
+          const el = this.model.elements.find((e) => e.id === id);
+          if (el) {
+            el.vertices = transformedVerts;
+            const isClosed =
+              el.isClosed ??
+              (!el.tagName ||
+                ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(el.tagName) ||
+                (el.attributes.d ? /z/i.test(el.attributes.d) : false));
+            el.attributes.d = this.model.compilePathD(el.vertices, isClosed);
+          }
+        });
+        this.ghostTransformMap.clear();
+        hasChangesToCommit = true;
+      }
+
+      // Commit Node Tool Ghost
+      if (this.ghostNodeVertices) {
+        const selectedEl = this.model.elements.find((el) => this.selectionTool.isSelected(el.id));
+        if (selectedEl) {
+          this.pushUndo();
+          selectedEl.vertices = this.ghostNodeVertices;
+          const isClosed =
+            selectedEl.isClosed ??
+            (!selectedEl.tagName ||
+              ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(selectedEl.tagName) ||
+              (selectedEl.attributes.d ? /z/i.test(selectedEl.attributes.d) : false));
+          selectedEl.attributes.d = this.model.compilePathD(selectedEl.vertices, isClosed);
+          if (this.nodeEditorTool.selectedVertexId) {
+            const activeV = selectedEl.vertices.find((v) => v.id === this.nodeEditorTool.selectedVertexId);
+            this.propertyPanel.update(activeV || null, 'node');
+          }
+          hasChangesToCommit = true;
+        }
+        this.ghostNodeVertices = null;
+      }
+
       if (this.activeHandle === 'pen') {
         this.penActiveVertexIdx = null;
         this.penMovingVertexIdx = null;
@@ -1654,19 +1884,37 @@ class AntiDrawApp {
         this.selectionTool.isDeselectMarquee = false;
         this.shapeStartPt = null;
         this.render();
-      } else if (this.activeHandle === 'shape' && this.shapeStartPt) {
-        const otherVertices = this.getOtherVertices();
-        const snappedPt = this.snapPoint(pt, otherVertices);
-        this.commitShape(this.shapeStartPt, snappedPt, e.shiftKey, e.ctrlKey, e.altKey);
-        this.shapeStartPt = null;
-        this.toolbar.setTool('select');
+      } else if (this.activeHandle === 'shape') {
+        if (this.ghostShapeElement) {
+          this.pushUndo();
+          const id = `el_${Date.now().toString(36)}`;
+          const newEl: VectorElement = {
+            ...this.ghostShapeElement,
+            id,
+            attributes: {
+              ...this.ghostShapeElement.attributes,
+              id,
+            },
+          };
+          this.model.elements.push(newEl);
+          this.selectionTool.select(id);
+          this.ghostShapeElement = null;
+          this.shapeStartPt = null;
+          this.toolbar.setTool('select');
+          hasChangesToCommit = true;
+        } else {
+          this.shapeStartPt = null;
+        }
       }
 
       this.activeHandle = null;
       this.initialElementsMap.clear();
+      this.initialVertices = [];
       this.applyCanvasSize();
       this.render();
-      this.syncToHost();
+      if (hasChangesToCommit) {
+        this.syncToHost();
+      }
     }
   }
 
@@ -2626,14 +2874,121 @@ class AntiDrawApp {
       }
     }
 
-    // 7. Pen Tool In-Progress Path & Rubberband Overlay
+    // Ghost Move Vector and Bounding Box
+    if (this.activeHandle === 'move' && this.ghostDragOffset && (this.ghostDragOffset.x !== 0 || this.ghostDragOffset.y !== 0)) {
+      this.initialElementsMap.forEach((origVerts, id) => {
+        const el = this.model.elements.find((e) => e.id === id);
+        if (el) {
+          const gVerts = origVerts.map((v) => ({
+            ...v,
+            x: v.x + this.ghostDragOffset!.x,
+            y: v.y + this.ghostDragOffset!.y,
+            handleIn: v.handleIn ? { x: v.handleIn.x + this.ghostDragOffset!.x, y: v.handleIn.y + this.ghostDragOffset!.y } : undefined,
+            handleOut: v.handleOut ? { x: v.handleOut.x + this.ghostDragOffset!.x, y: v.handleOut.y + this.ghostDragOffset!.y } : undefined,
+          }));
+          const isClosed = el.isClosed ?? (!el.tagName || ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(el.tagName) || (el.attributes.d ? /z/i.test(el.attributes.d) : false));
+          const d = this.model.compilePathD(gVerts, isClosed);
+          html += `<path d="${d}" fill="rgba(99, 102, 241, 0.25)" stroke="#818cf8" stroke-width="2" stroke-dasharray="5 3" vector-effect="non-scaling-stroke" />`;
+          gVerts.forEach((gv) => {
+            html += `<circle cx="${gv.x}" cy="${gv.y}" r="3.5" fill="#a5b4fc" stroke="#4338ca" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
+          });
+        }
+      });
+      if (this.initialBox) {
+        const bx = this.initialBox.x + this.ghostDragOffset.x;
+        const by = this.initialBox.y + this.ghostDragOffset.y;
+        html += `<rect x="${bx}" y="${by}" width="${this.initialBox.width}" height="${this.initialBox.height}" fill="none" stroke="#818cf8" stroke-width="1.5" stroke-dasharray="4 3" vector-effect="non-scaling-stroke" />`;
+      }
+    }
+
+    // Ghost Transform Vector
+    if (this.ghostTransformMap.size > 0) {
+      this.ghostTransformMap.forEach((gVerts, id) => {
+        const el = this.model.elements.find((e) => e.id === id);
+        if (el) {
+          const isClosed = el.isClosed ?? (!el.tagName || ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(el.tagName) || (el.attributes.d ? /z/i.test(el.attributes.d) : false));
+          const d = this.model.compilePathD(gVerts, isClosed);
+          html += `<path d="${d}" fill="rgba(99, 102, 241, 0.25)" stroke="#818cf8" stroke-width="2" stroke-dasharray="5 3" vector-effect="non-scaling-stroke" />`;
+          gVerts.forEach((gv) => {
+            html += `<circle cx="${gv.x}" cy="${gv.y}" r="3.5" fill="#a5b4fc" stroke="#4338ca" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
+          });
+        }
+      });
+    }
+
+    // Ghost Node Tool Path & Handles
+    if (this.ghostNodeVertices) {
+      const selectedEl = this.model.elements.find((el) => this.selectionTool.isSelected(el.id));
+      if (selectedEl) {
+        const isClosed = selectedEl.isClosed ?? (!selectedEl.tagName || ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(selectedEl.tagName) || (selectedEl.attributes.d ? /z/i.test(selectedEl.attributes.d) : false));
+        const d = this.model.compilePathD(this.ghostNodeVertices, isClosed);
+        html += `<path d="${d}" fill="rgba(56, 189, 248, 0.15)" stroke="#38bdf8" stroke-width="2" stroke-dasharray="4 3" vector-effect="non-scaling-stroke" />`;
+        this.ghostNodeVertices.forEach((gv) => {
+          const isSelected = gv.id === this.nodeEditorTool.selectedVertexId;
+          if (isSelected) {
+            html += `<circle cx="${gv.x}" cy="${gv.y}" r="6" fill="none" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
+            html += `<circle cx="${gv.x}" cy="${gv.y}" r="4" fill="#38bdf8" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
+            if (gv.handleIn) {
+              html += `<line x1="${gv.x}" y1="${gv.y}" x2="${gv.handleIn.x}" y2="${gv.handleIn.y}" stroke="#c084fc" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
+              html += `<circle cx="${gv.handleIn.x}" cy="${gv.handleIn.y}" r="4" fill="#c084fc" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
+            }
+            if (gv.handleOut) {
+              html += `<line x1="${gv.x}" y1="${gv.y}" x2="${gv.handleOut.x}" y2="${gv.handleOut.y}" stroke="#c084fc" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
+              html += `<circle cx="${gv.handleOut.x}" cy="${gv.handleOut.y}" r="4" fill="#c084fc" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
+            }
+          } else {
+            html += `<circle cx="${gv.x}" cy="${gv.y}" r="3.5" fill="#ffffff" stroke="#0284c7" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
+          }
+        });
+      }
+    }
+
+    // Ghost Shape Tool Preview
+    if (this.ghostShapeElement) {
+      const d = this.ghostShapeElement.attributes.d;
+      const isClosed = this.ghostShapeElement.isClosed;
+      html += `<path d="${d}" fill="${isClosed ? 'rgba(99, 102, 241, 0.25)' : 'none'}" stroke="#818cf8" stroke-width="2" stroke-dasharray="5 3" vector-effect="non-scaling-stroke" />`;
+      if (this.ghostShapeElement.vertices) {
+        this.ghostShapeElement.vertices.forEach((gv) => {
+          html += `<circle cx="${gv.x}" cy="${gv.y}" r="3.5" fill="#ffffff" stroke="#6366f1" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
+        });
+      }
+    }
+
+    // 7. Pen Tool In-Progress Path, Ghost Point & Ghost Path
     if (this.currentPenVertices.length > 0) {
       const penD = this.model.compilePathD(this.currentPenVertices, false);
       html += `<path d="${penD}" fill="none" stroke="#38bdf8" stroke-width="2" vector-effect="non-scaling-stroke" />`;
 
       const lastV = this.currentPenVertices[this.currentPenVertices.length - 1];
+      const firstV = this.currentPenVertices[0];
+
       if (this.penHoverPoint) {
-        html += `<line x1="${lastV.x}" y1="${lastV.y}" x2="${this.penHoverPoint.x}" y2="${this.penHoverPoint.y}" stroke="#60a5fa" stroke-width="1.5" stroke-dasharray="3 3" vector-effect="non-scaling-stroke" />`;
+        const isClosing =
+          this.currentPenVertices.length >= 3 &&
+          Math.hypot(this.penHoverPoint.x - firstV.x, this.penHoverPoint.y - firstV.y) <= 14 / this.canvasMgr.zoom;
+        const targetPt = isClosing ? { x: firstV.x, y: firstV.y } : this.penHoverPoint;
+
+        // Ghost Path (Elastic Bézier or Line from last committed vertex to hover point)
+        let ghostPathD = '';
+        if (lastV.handleOut) {
+          ghostPathD = `M ${lastV.x},${lastV.y} C ${lastV.handleOut.x},${lastV.handleOut.y} ${targetPt.x},${targetPt.y} ${targetPt.x},${targetPt.y}`;
+        } else {
+          ghostPathD = `M ${lastV.x},${lastV.y} L ${targetPt.x},${targetPt.y}`;
+        }
+        html += `<path d="${ghostPathD}" fill="none" stroke="${isClosing ? '#10b981' : '#60a5fa'}" stroke-width="1.5" stroke-dasharray="4 3" vector-effect="non-scaling-stroke" />`;
+
+        // Ghost Point under cursor
+        if (isClosing) {
+          html += `<circle cx="${firstV.x}" cy="${firstV.y}" r="8" fill="none" stroke="#10b981" stroke-width="2" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
+        } else {
+          html += `
+            <g opacity="0.95">
+              <circle cx="${targetPt.x}" cy="${targetPt.y}" r="5" fill="rgba(56, 189, 248, 0.35)" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />
+              <circle cx="${targetPt.x}" cy="${targetPt.y}" r="1.5" fill="#ffffff" />
+            </g>
+          `;
+        }
       }
 
       this.currentPenVertices.forEach((v, idx) => {
@@ -2654,6 +3009,14 @@ class AntiDrawApp {
           html += `<rect x="${v.x - 3.5}" y="${v.y - 3.5}" width="7" height="7" fill="#38bdf8" stroke="#ffffff" stroke-width="1" rx="1" />`;
         }
       });
+    } else if (this.toolbar && this.toolbar.activeTool === 'pen' && this.penHoverPoint) {
+      // First ghost point preview under cursor before first click
+      html += `
+        <g opacity="0.95">
+          <circle cx="${this.penHoverPoint.x}" cy="${this.penHoverPoint.y}" r="5" fill="rgba(56, 189, 248, 0.35)" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />
+          <circle cx="${this.penHoverPoint.x}" cy="${this.penHoverPoint.y}" r="1.5" fill="#ffffff" />
+        </g>
+      `;
     }
 
     // 8. Polyline Tool In-Progress Path & Rubberband Overlay

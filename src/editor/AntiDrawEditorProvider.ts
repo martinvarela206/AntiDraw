@@ -77,6 +77,8 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
       }
     };
 
+    let lastSavedSvgText: string = document.getText();
+
     // Receive messages from the webview
     webviewPanel.webview.onDidReceiveMessage(async (message) => {
       switch (message.type) {
@@ -87,6 +89,7 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
         case 'updateDocument': {
           if (message.text !== undefined && message.text !== document.getText()) {
             pendingWebviewEdits++;
+            lastSavedSvgText = message.text;
             const edit = new vscode.WorkspaceEdit();
             const fullRange = new vscode.Range(
               document.positionAt(0),
@@ -94,8 +97,7 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
             );
             edit.replace(document.uri, fullRange, message.text);
             await vscode.workspace.applyEdit(edit);
-            // Decrement AFTER a microtask tick so onDidChangeTextDocument fires first
-            setTimeout(() => { pendingWebviewEdits = Math.max(0, pendingWebviewEdits - 1); }, 0);
+            setTimeout(() => { pendingWebviewEdits = Math.max(0, pendingWebviewEdits - 1); }, 150);
           }
           break;
         }
@@ -121,7 +123,8 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
     const changeDocumentSubscription = vscode.workspace.onDidChangeTextDocument(
       (e) => {
         if (e.document.uri.toString() === document.uri.toString()) {
-          if (pendingWebviewEdits === 0) {
+          if (pendingWebviewEdits === 0 && e.document.getText() !== lastSavedSvgText) {
+            lastSavedSvgText = e.document.getText();
             updateWebview();
           }
         }
