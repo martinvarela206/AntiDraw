@@ -1432,21 +1432,16 @@ class AntiDrawApp {
       }
 
       const isStart = this.currentPenVertices.length === 0;
-      let hIn: Point | undefined = undefined;
-      let hOut: Point | undefined = undefined;
-      if (this.penNodeType !== 'asymmetric') {
-        hIn = { x: snappedPt.x - 20, y: snappedPt.y };
-        hOut = { x: snappedPt.x + 20, y: snappedPt.y };
-      }
+      const initialNodeType = this.penNodeType === 'sharp' ? 'sharp' : 'asymmetric';
 
       const newV: PathVertex = {
         id: `v_pen_${this.currentPenVertices.length}`,
         x: snappedPt.x,
         y: snappedPt.y,
-        handleIn: hIn,
-        handleOut: hOut,
-        nodeType: this.penNodeType,
-        command: isStart ? 'M' : this.penNodeType === 'asymmetric' ? 'L' : 'C',
+        handleIn: undefined,
+        handleOut: undefined,
+        nodeType: initialNodeType,
+        command: isStart ? 'M' : 'L',
       };
 
       this.currentPenVertices.push(newV);
@@ -1766,17 +1761,23 @@ class AntiDrawApp {
           const snappedPt = this.snapPoint(pt, otherVertices);
           const curDx = snappedPt.x - curV.x;
           const curDy = snappedPt.y - curV.y;
-          curV.handleOut = { x: snappedPt.x, y: snappedPt.y };
-          const angle = Math.atan2(curDy, curDx) + Math.PI;
-          const dist = curV.nodeType === 'symmetric'
-            ? Math.hypot(curDx, curDy)
-            : (curV.handleIn ? Math.hypot(curV.handleIn.x - curV.x, curV.handleIn.y - curV.y) : Math.hypot(curDx, curDy));
-          curV.handleIn = {
-            x: curV.x + Math.cos(angle) * dist,
-            y: curV.y + Math.sin(angle) * dist,
-          };
-          if (curV.command === 'L' && (curDx !== 0 || curDy !== 0)) {
-            curV.command = 'C';
+          const dragDist = Math.hypot(curDx, curDy);
+          if (dragDist > 3) {
+            curV.handleOut = { x: snappedPt.x, y: snappedPt.y };
+            const angle = Math.atan2(curDy, curDx) + Math.PI;
+            const dist = curV.nodeType === 'symmetric'
+              ? dragDist
+              : (curV.handleIn ? Math.hypot(curV.handleIn.x - curV.x, curV.handleIn.y - curV.y) : dragDist);
+            curV.handleIn = {
+              x: curV.x + Math.cos(angle) * dist,
+              y: curV.y + Math.sin(angle) * dist,
+            };
+            if (curV.command === 'L') {
+              curV.command = 'C';
+            }
+            if (this.penNodeType !== 'sharp') {
+              curV.nodeType = this.penNodeType;
+            }
           }
         }
       } else {
@@ -2007,6 +2008,8 @@ class AntiDrawApp {
       }
 
       this.activeHandle = null;
+      this.penActiveVertexIdx = null;
+      this.penMovingVertexIdx = null;
       this.initialElementsMap.clear();
       this.initialVertices = [];
       this.applyCanvasSize();
