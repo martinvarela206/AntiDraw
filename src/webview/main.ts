@@ -112,9 +112,6 @@ class AntiDrawApp {
       syncMetadataToHost: () => {
         this.syncMetadataToHost();
       },
-      onVertexAddedToNodeMode: (vertex) => {
-        this.propertyPanel.update(vertex, 'node');
-      },
     });
     this.shapeToolHandler = new ShapeToolHandler(toolCtx);
     this.polylineToolHandler = new PolylineToolHandler(toolCtx);

@@ -11,7 +11,6 @@ export interface SelectToolCallbacks {
   onClearPanelMode?: () => void;
   setCursor?: (cursor: string) => void;
   syncMetadataToHost?: () => void;
-  onVertexAddedToNodeMode?: (vertex: PathVertex) => void;
 }
 
 /**
@@ -585,7 +584,7 @@ export class SelectToolHandler implements IToolHandler {
   }
 
   public onDoubleClick(e: MouseEvent, pt: Point): boolean {
-    // 1. Double-click on guide line -> enter angle / pivot transform mode
+    // Double-click on guide line -> enter angle / pivot transform mode
     const hitGuide = this.ctx.canvasMgr.hitTestGuide(pt, this.ctx.model.canvas.width, this.ctx.model.canvas.height, 8);
     if (hitGuide) {
       this.ctx.selectionTool.deselectAll();
@@ -594,40 +593,6 @@ export class SelectToolHandler implements IToolHandler {
       this.callbacks.onGuideSelected?.(hitGuide);
       this.ctx.render();
       return true;
-    }
-
-    // 2. Double-click on element segment -> insert vertex & switch to Node mode
-    let targetEl = this.ctx.model.elements.find((el) =>
-      this.ctx.selectionTool.isSelected(el.id)
-    );
-
-    if (!targetEl) {
-      const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, this.ctx.canvasMgr.zoom);
-      if (hit) {
-        targetEl = hit.element;
-        this.ctx.selectionTool.select(targetEl.id);
-        this.callbacks.onSelectionChanged?.();
-      }
-    }
-
-    if (targetEl && targetEl.vertices) {
-      const isClosed = this.ctx.model.isElementClosed(targetEl);
-      const tol = 14 / (this.ctx.canvasMgr.zoom || 1);
-      const res = this.nodeEditorTool.insertVertexOnPath(targetEl.vertices, pt, tol, isClosed);
-      if (res) {
-        this.ctx.pushUndo();
-        targetEl.vertices = res.updatedVertices;
-        targetEl.attributes.d = this.ctx.model.compilePathD(targetEl.vertices, isClosed);
-        this.nodeEditorTool.selectedVertexId = res.newVertexId;
-        this.ctx.setTool('node');
-        const newV = targetEl.vertices.find((v) => v.id === res.newVertexId) || null;
-        if (newV) {
-          this.callbacks.onVertexAddedToNodeMode?.(newV);
-        }
-        this.ctx.render();
-        this.ctx.syncToHost();
-        return true;
-      }
     }
 
     return false;
