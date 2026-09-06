@@ -731,4 +731,52 @@ export class CanvasManager {
   public getGuide(id: string): GuideLine | undefined {
     return this.guides.find((g) => g.id === id);
   }
+
+  // Hit test for guide line under point
+  public hitTestGuide(pt: Point, canvasW: number, canvasH: number, tolerance: number = 8): GuideLine | null {
+    if (!this.showGuides) return null;
+    const threshold = tolerance / (this.zoom || 1);
+
+    for (let i = this.guides.length - 1; i >= 0; i--) {
+      const g = this.guides[i];
+      if (g.visible === false || g.locked) continue;
+      const rad = ((g.angle || 0) * Math.PI) / 180;
+      const nx = -Math.sin(rad);
+      const ny = Math.cos(rad);
+      const px = g.pivotX ?? (g.orientation === 'vertical' ? g.position : canvasW / 2);
+      const py = g.pivotY ?? (g.orientation === 'horizontal' ? g.position : canvasH / 2);
+
+      const dist = Math.abs(nx * (pt.x - px) + ny * (pt.y - py));
+      if (dist <= threshold) {
+        return g;
+      }
+    }
+    return null;
+  }
+
+  // Calculate guide endpoints and control handles
+  public getGuideGeometry(guide: GuideLine, canvasW: number, canvasH: number): {
+    p1: Point;
+    p2: Point;
+    arrow1: Point;
+    arrow2: Point;
+    pivot: Point;
+  } {
+    const rad = ((guide.angle || 0) * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+
+    const px = guide.pivotX ?? (guide.orientation === 'vertical' ? guide.position : canvasW / 2);
+    const py = guide.pivotY ?? (guide.orientation === 'horizontal' ? guide.position : canvasH / 2);
+
+    const span = 100000;
+    const p1 = { x: px - cos * span, y: py - sin * span };
+    const p2 = { x: px + cos * span, y: py + sin * span };
+
+    const arrowDist = Math.min(canvasW, canvasH) * 0.4;
+    const arrow1 = { x: px - cos * arrowDist, y: py - sin * arrowDist };
+    const arrow2 = { x: px + cos * arrowDist, y: py + sin * arrowDist };
+
+    return { p1, p2, arrow1, arrow2, pivot: { x: px, y: py } };
+  }
 }

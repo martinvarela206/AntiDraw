@@ -1,11 +1,13 @@
 import { VectorModel, VectorElement, PathVertex, NodeType, Point } from './engine/VectorModel.js';
-import { SelectionTool, HandleType } from './engine/SelectionTool.js';
+import { SelectionTool } from './engine/SelectionTool.js';
 import { NodeEditorTool } from './engine/NodeEditorTool.js';
 import { CanvasManager, GuideLine, RulerConfig } from './engine/CanvasManager.js';
 import { BooleanOperations } from './engine/BooleanOperations.js';
 import { ViewportController } from './engine/ViewportController.js';
+import { OverlayRenderer } from './engine/OverlayRenderer.js';
 import { VsCodeBridge } from './bridge/VsCodeBridge.js';
 import { ToolContext } from './tools/IToolHandler.js';
+import { SelectToolHandler } from './tools/SelectToolHandler.js';
 import { ShapeToolHandler } from './tools/ShapeToolHandler.js';
 import { PolylineToolHandler } from './tools/PolylineToolHandler.js';
 import { PenToolHandler } from './tools/PenToolHandler.js';
@@ -19,6 +21,8 @@ import './styles/main.css';
 class AntiDrawApp {
   private vscodeBridge: VsCodeBridge = VsCodeBridge.getInstance();
   private viewportCtrl!: ViewportController;
+  private overlayRenderer: OverlayRenderer = new OverlayRenderer();
+  private selectToolHandler!: SelectToolHandler;
   private shapeToolHandler!: ShapeToolHandler;
   private polylineToolHandler!: PolylineToolHandler;
   private penToolHandler!: PenToolHandler;
@@ -42,44 +46,17 @@ class AntiDrawApp {
 
   private isDragging: boolean = false;
   private dragStartPt: Point = { x: 0, y: 0 };
-  private activeHandle:
-    | HandleType
-    | 'move'
-    | 'vertex'
-    | 'handleIn'
-    | 'handleOut'
-    | 'pen'
-    | 'shape'
-    | 'marquee'
-    | 'guide-create'
-    | 'guide-move'
-    | 'guide-pivot'
-    | 'guide-rotate'
-    | 'origin-drag'
-    | 'segment'
-    | null = null;
+  private activeHandle: 'origin-drag' | 'guide-create' | 'shape' | null = null;
 
-  private initialElementState: VectorElement | null = null;
-  private initialElementsMap: Map<string, PathVertex[]> = new Map();
-  private initialBox: any = null;
-  private dragAnchorPt: Point = { x: 0, y: 0 };
-
-  // Guide and Origin dragging state
+  // Ruler drag state
   private dragGuideOrientation: 'horizontal' | 'vertical' = 'horizontal';
   private dragGuideCurrentPt: Point = { x: 0, y: 0 };
   private dragOriginPt: Point | null = null;
-  private guideInitialState: GuideLine | null = null;
-  private activeRotateArrowIdx: 1 | 2 = 1;
 
   private hasInitialCentered: boolean = false;
   private get isMiddlePanning(): boolean {
     return this.viewportCtrl?.isMiddlePanning ?? false;
   }
-
-  // Ghost manipulation and creation state
-  private ghostDragOffset: Point | null = null;
-  private ghostTransformMap: Map<string, PathVertex[]> = new Map();
-  private marqueeStartPt: Point | null = null;
 
   private isShiftPressed: boolean = false;
 
@@ -115,6 +92,30 @@ class AntiDrawApp {
       getActiveTool: () => this.toolbar.activeTool,
       applyCanvasSize: () => this.applyCanvasSize(),
     };
+    this.selectToolHandler = new SelectToolHandler(toolCtx, this.nodeEditorTool, {
+      onSelectionChanged: () => {
+        this.propertyPanel.update(null, 'select');
+      },
+      onGuideSelected: (guide) => {
+        this.propertyPanel.showGuideSettings(guide);
+        this.syncMetadataToHost();
+      },
+      onClearPanelMode: () => {
+        this.propertyPanel.resetPanelMode();
+      },
+      setCursor: (cursor) => {
+        this.canvasWrapper.style.cursor = cursor;
+        if (!this.isMiddlePanning) {
+          this.canvasScrollArea.style.cursor = cursor === 'default' ? '' : cursor;
+        }
+      },
+      syncMetadataToHost: () => {
+        this.syncMetadataToHost();
+      },
+      onVertexAddedToNodeMode: (vertex) => {
+        this.propertyPanel.update(vertex, 'node');
+      },
+    });
     this.shapeToolHandler = new ShapeToolHandler(toolCtx);
     this.polylineToolHandler = new PolylineToolHandler(toolCtx);
     this.penToolHandler = new PenToolHandler(toolCtx);
@@ -504,21 +505,14 @@ class AntiDrawApp {
       if (e.key === 'Escape') {
         e.preventDefault();
         const hasActiveDrag = !!(
-          this.ghostDragOffset ||
-          this.ghostTransformMap.size > 0 ||
-          this.activeHandle === 'move' ||
-          (this.initialElementsMap.size > 0 && this.isDragging) ||
+          this.isDragging ||
           this.nodeToolHandler.isDragging ||
           this.shapeToolHandler.shapeStartPt ||
           this.activeHandle === 'shape' ||
           (this.toolbar.activeTool === 'pen' && (this.penToolHandler.isDragging || this.penToolHandler.vertexCount > 0)) ||
           (this.toolbar.activeTool === 'polyline' && this.polylineToolHandler.vertexCount > 0) ||
-          this.activeHandle === 'marquee' ||
           this.selectionTool.marqueeRect ||
           this.activeHandle === 'guide-create' ||
-          this.activeHandle === 'guide-move' ||
-          this.activeHandle === 'guide-pivot' ||
-          this.activeHandle === 'guide-rotate' ||
           this.activeHandle === 'origin-drag'
         );
 
@@ -683,13 +677,13 @@ class AntiDrawApp {
 
     // Window level pointer events for dragging across boundaries
     window.addEventListener('pointermove', (e) => {
-      if (this.isDragging && (this.activeHandle === 'guide-create' || this.activeHandle === 'guide-move' || this.activeHandle === 'guide-pivot' || this.activeHandle === 'guide-rotate')) {
+      if (this.isDragging && (this.activeHandle === 'guide-create' || this.toolbar.activeTool === 'select')) {
         this.onPointerMove(e);
       }
     });
 
     window.addEventListener('pointerup', (e) => {
-      if (this.isDragging && (this.activeHandle === 'guide-create' || this.activeHandle === 'guide-move' || this.activeHandle === 'guide-pivot' || this.activeHandle === 'guide-rotate')) {
+      if (this.isDragging && (this.activeHandle === 'guide-create' || this.toolbar.activeTool === 'select')) {
         this.onPointerUp(e);
       }
     });
@@ -898,74 +892,11 @@ class AntiDrawApp {
     this.render();
   }
 
-  // Hit test for guide line under point
-  private hitTestGuide(pt: Point, tolerance: number = 8): GuideLine | null {
-    if (!this.canvasMgr.showGuides) return null;
-    const threshold = tolerance / this.canvasMgr.zoom;
-
-    for (let i = this.canvasMgr.guides.length - 1; i >= 0; i--) {
-      const g = this.canvasMgr.guides[i];
-      if (g.visible === false || g.locked) continue;
-      const rad = ((g.angle || 0) * Math.PI) / 180;
-      const nx = -Math.sin(rad);
-      const ny = Math.cos(rad);
-      const px = g.pivotX ?? (g.orientation === 'vertical' ? g.position : this.model.canvas.width / 2);
-      const py = g.pivotY ?? (g.orientation === 'horizontal' ? g.position : this.model.canvas.height / 2);
-
-      const dist = Math.abs(nx * (pt.x - px) + ny * (pt.y - py));
-      if (dist <= threshold) {
-        return g;
-      }
-    }
-    return null;
-  }
-
-  // Calculate guide endpoints and control handles
-  private getGuideGeometry(guide: GuideLine): {
-    p1: Point;
-    p2: Point;
-    arrow1: Point;
-    arrow2: Point;
-    pivot: Point;
-  } {
-    const w = this.model.canvas.width;
-    const h = this.model.canvas.height;
-    const rad = ((guide.angle || 0) * Math.PI) / 180;
-    const cos = Math.cos(rad);
-    const sin = Math.sin(rad);
-
-    const px = guide.pivotX ?? (guide.orientation === 'vertical' ? guide.position : w / 2);
-    const py = guide.pivotY ?? (guide.orientation === 'horizontal' ? guide.position : h / 2);
-
-    // Large bounding span across workspace
-    const span = 100000;
-    const p1 = { x: px - cos * span, y: py - sin * span };
-    const p2 = { x: px + cos * span, y: py + sin * span };
-
-    // Curved arrows positioned at visible bounds relative to pivot
-    const arrowDist = Math.min(w, h) * 0.4;
-    const arrow1 = { x: px - cos * arrowDist, y: py - sin * arrowDist };
-    const arrow2 = { x: px + cos * arrowDist, y: py + sin * arrowDist };
-
-    return { p1, p2, arrow1, arrow2, pivot: { x: px, y: py } };
-  }
-
   private cancelCurrentAction(): void {
     let needsRender = false;
 
-    // 1. Moving or transforming elements
-    if (
-      this.ghostDragOffset ||
-      this.ghostTransformMap.size > 0 ||
-      this.activeHandle === 'move' ||
-      (this.initialElementsMap.size > 0 && this.isDragging)
-    ) {
-      this.ghostDragOffset = null;
-      this.ghostTransformMap.clear();
-      this.initialElementsMap.clear();
-      this.initialBox = null;
-      this.activeHandle = null;
-      this.isDragging = false;
+    // 1. Select tool cancellation
+    if (this.selectToolHandler.cancel()) {
       needsRender = true;
     }
 
@@ -995,37 +926,15 @@ class AntiDrawApp {
       needsRender = true;
     }
 
-    // 6. Marquee selection
-    if (this.activeHandle === 'marquee' || this.selectionTool.marqueeRect || this.marqueeStartPt) {
-      this.selectionTool.marqueeRect = null;
-      this.selectionTool.isDeselectMarquee = false;
-      this.marqueeStartPt = null;
-      this.activeHandle = null;
-      this.isDragging = false;
-      needsRender = true;
-    }
-
-    // 7. Guide creation or transform
-    if (
-      this.activeHandle === 'guide-create' ||
-      this.activeHandle === 'guide-move' ||
-      this.activeHandle === 'guide-pivot' ||
-      this.activeHandle === 'guide-rotate'
-    ) {
-      if (this.guideInitialState && this.canvasMgr.selectedGuideId) {
-        const g = this.canvasMgr.getGuide(this.canvasMgr.selectedGuideId);
-        if (g) {
-          Object.assign(g, this.guideInitialState);
-        }
-      }
-      this.guideInitialState = null;
+    // 6. Ruler guide creation
+    if (this.activeHandle === 'guide-create') {
       this.dragGuideCurrentPt = { x: 0, y: 0 };
       this.activeHandle = null;
       this.isDragging = false;
       needsRender = true;
     }
 
-    // 8. Origin drag
+    // 7. Ruler origin drag
     if (this.activeHandle === 'origin-drag') {
       this.dragOriginPt = null;
       this.activeHandle = null;
@@ -1067,200 +976,8 @@ class AntiDrawApp {
     } catch (_err) {}
 
     if (activeTool === 'select') {
-      // 1. Check if clicking on active Guide Transform controls (pivot or curved arrows)
-      if (this.canvasMgr.activeGuideTransformId) {
-        const activeG = this.canvasMgr.getGuide(this.canvasMgr.activeGuideTransformId);
-        if (activeG) {
-          const geom = this.getGuideGeometry(activeG);
-
-          // Check pivot click
-          if (Math.hypot(pt.x - geom.pivot.x, pt.y - geom.pivot.y) <= 12) {
-            this.activeHandle = 'guide-pivot';
-            this.guideInitialState = { ...activeG };
-            this.render();
-            return;
-          }
-
-          // Check arrow 1 click
-          if (Math.hypot(pt.x - geom.arrow1.x, pt.y - geom.arrow1.y) <= 16) {
-            this.activeHandle = 'guide-rotate';
-            this.activeRotateArrowIdx = 1;
-            this.guideInitialState = { ...activeG };
-            this.render();
-            return;
-          }
-
-          // Check arrow 2 click
-          if (Math.hypot(pt.x - geom.arrow2.x, pt.y - geom.arrow2.y) <= 16) {
-            this.activeHandle = 'guide-rotate';
-            this.activeRotateArrowIdx = 2;
-            this.guideInitialState = { ...activeG };
-            this.render();
-            return;
-          }
-
-          // Check click anywhere on the active transforming guide line away from the pivot
-          const hitActive = this.hitTestGuide(pt, 8);
-          if (hitActive && hitActive.id === activeG.id) {
-            this.activeHandle = 'guide-rotate';
-            this.activeRotateArrowIdx = 1;
-            this.guideInitialState = { ...activeG };
-            this.render();
-            return;
-          }
-        }
-      }
-
-      // 2. Check if clicking on any Guide Line to select it or start dragging it
-      const hitGuide = this.hitTestGuide(pt, 8);
-      if (hitGuide) {
-        this.selectionTool.deselectAll();
-        this.canvasMgr.selectedGuideId = hitGuide.id;
-        this.canvasMgr.activeGuideTransformId = null;
-        this.activeHandle = 'guide-move';
-        this.guideInitialState = { ...hitGuide };
-        this.propertyPanel.showGuideSettings(hitGuide);
-        this.render();
+      if (this.selectToolHandler.onPointerDown(e, pt)) {
         return;
-      }
-
-      // 3. Clicked somewhere else: clear active guide transform
-      if (this.canvasMgr.activeGuideTransformId) {
-        this.canvasMgr.activeGuideTransformId = null;
-      }
-
-      const selectedEls = this.model.elements.filter((el) =>
-        this.selectionTool.isSelected(el.id)
-      );
-
-      // 4. Modifier-based selection (Ctrl: Toggle select/deselect; Shift: Deselect)
-      if (e.ctrlKey || e.metaKey) {
-        const hit = this.selectionTool.hitTest(this.model.elements, pt, this.canvasMgr.zoom);
-        if (hit) {
-          this.selectionTool.toggleSelect(hit.element.id);
-          this.propertyPanel.resetPanelMode();
-          this.render();
-          return;
-        } else {
-          // Ctrl + Drag on canvas: Marquee selection that adds to selection
-          this.marqueeStartPt = pt;
-          this.activeHandle = 'marquee';
-          this.selectionTool.isDeselectMarquee = false;
-          this.render();
-          return;
-        }
-      }
-
-      if (e.shiftKey) {
-        const hit = this.selectionTool.hitTest(this.model.elements, pt, this.canvasMgr.zoom);
-        if (hit) {
-          this.selectionTool.deselect(hit.element.id);
-          this.propertyPanel.resetPanelMode();
-          this.render();
-          return;
-        } else {
-          // Shift + Drag on canvas: Deselect marquee
-          this.marqueeStartPt = pt;
-          this.activeHandle = 'marquee';
-          this.selectionTool.isDeselectMarquee = true;
-          this.render();
-          return;
-        }
-      }
-
-      // 4a. Check hit directly on a selected element's vertex to use that vertex as precise snap anchor
-      let hitVertex: Point | null = null;
-      if (selectedEls.length > 0) {
-        for (const selEl of selectedEls) {
-          if (selEl.vertices) {
-            for (const v of selEl.vertices) {
-              if (Math.hypot(pt.x - v.x, pt.y - v.y) <= 8 / (this.canvasMgr.zoom || 1)) {
-                hitVertex = { x: v.x, y: v.y };
-                break;
-              }
-            }
-            if (hitVertex) break;
-          }
-        }
-      }
-
-      if (hitVertex) {
-        this.activeHandle = 'move';
-        this.dragAnchorPt = hitVertex;
-        this.initialElementsMap.clear();
-        this.ghostDragOffset = null;
-        selectedEls.forEach((el) => {
-          if (el.vertices) {
-            this.initialElementsMap.set(el.id, JSON.parse(JSON.stringify(el.vertices)));
-          }
-        });
-        this.propertyPanel.resetPanelMode();
-        this.render();
-        return;
-      }
-
-      // 4b. Check hit on composite bounding box handles if vector elements are selected
-      if (selectedEls.length > 0) {
-        const z = this.canvasMgr.zoom || 1;
-        const groupBox = this.selectionTool.getGroupSelectionBoundingBox(selectedEls, 6 / z);
-        if (groupBox) {
-          const handle = this.selectionTool.hitTestHandle(groupBox, pt, 12 / z, 18 / z);
-          if (handle) {
-            this.activeHandle = handle;
-            this.initialElementsMap.clear();
-            this.ghostTransformMap.clear();
-            selectedEls.forEach((el) => {
-              if (el.vertices) {
-                this.initialElementsMap.set(el.id, JSON.parse(JSON.stringify(el.vertices)));
-              }
-            });
-            this.initialBox = groupBox;
-            this.render();
-            return;
-          }
-        }
-      }
-
-      // 4c. Hit test vector elements under cursor (fill or stroke/border)
-      const hit = this.selectionTool.hitTest(this.model.elements, pt, this.canvasMgr.zoom);
-      if (hit) {
-        if (!this.selectionTool.isSelected(hit.element.id)) {
-          this.selectionTool.select(hit.element.id);
-        }
-
-        const nowSelected = this.model.elements.filter((el) => this.selectionTool.isSelected(el.id));
-        if (nowSelected.length > 0) {
-          this.activeHandle = 'move';
-          this.dragAnchorPt = { x: pt.x, y: pt.y };
-          this.initialElementsMap.clear();
-          this.ghostDragOffset = null;
-          nowSelected.forEach((el) => {
-            if (el.vertices) {
-              this.initialElementsMap.set(el.id, JSON.parse(JSON.stringify(el.vertices)));
-            }
-          });
-        }
-        this.propertyPanel.resetPanelMode();
-      } else {
-        // 4d. Clicked on empty canvas space: start Marquee selection
-        const hadSelection =
-          this.selectionTool.selectedElementIds.size > 0 ||
-          this.canvasMgr.selectedGuideId !== null ||
-          this.nodeEditorTool.selectedVertexId !== null;
-
-        this.selectionTool.deselectAll();
-        this.canvasMgr.selectedGuideId = null;
-        this.canvasMgr.activeGuideTransformId = null;
-        this.nodeEditorTool.selectedVertexId = null;
-        this.marqueeStartPt = pt;
-        this.activeHandle = 'marquee';
-        this.selectionTool.isDeselectMarquee = false;
-        this.propertyPanel.resetPanelMode();
-        this.canvasMgr.isCanvasSelected = true;
-
-        if (hadSelection) {
-          this.render();
-        }
       }
     } else if (activeTool === 'node') {
       if (this.nodeToolHandler.onPointerDown(e, pt)) {
@@ -1305,7 +1022,7 @@ class AntiDrawApp {
     // Update cursor indicator on rulers
     this.rulerView.setCursorPos(pt.x, pt.y);
 
-    // Node Tool Delegation: handle active drag or hover feedback without blocking on main.ts drag state
+    // Node Tool Delegation
     if (this.toolbar.activeTool === 'node') {
       if (this.nodeToolHandler.onPointerMove(e, pt)) {
         return;
@@ -1331,224 +1048,39 @@ class AntiDrawApp {
       return;
     }
 
-    if (!this.isDragging || !this.activeHandle) {
-      // Hover testing for cursors
-      if (this.toolbar.activeTool === 'select') {
-        // Check active guide controls hover
-        if (this.canvasMgr.activeGuideTransformId) {
-          const activeG = this.canvasMgr.getGuide(this.canvasMgr.activeGuideTransformId);
-          if (activeG) {
-            const geom = this.getGuideGeometry(activeG);
-            if (Math.hypot(pt.x - geom.pivot.x, pt.y - geom.pivot.y) <= 12) {
-              this.canvasWrapper.style.cursor = 'move';
-              this.canvasScrollArea.style.cursor = 'move';
-              return;
-            }
-            if (
-              Math.hypot(pt.x - geom.arrow1.x, pt.y - geom.arrow1.y) <= 16 ||
-              Math.hypot(pt.x - geom.arrow2.x, pt.y - geom.arrow2.y) <= 16
-            ) {
-              this.canvasWrapper.style.cursor = 'grab';
-              this.canvasScrollArea.style.cursor = 'grab';
-              return;
-            }
-            const hitActive = this.hitTestGuide(pt, 6);
-            if (hitActive && hitActive.id === activeG.id) {
-              this.canvasWrapper.style.cursor = 'grab';
-              this.canvasScrollArea.style.cursor = 'grab';
-              return;
-            }
-          }
-        }
-
-        // Check guide line hover
-        const hitG = this.hitTestGuide(pt, 6);
-        if (hitG) {
-          const cur = hitG.orientation === 'vertical' ? 'ew-resize' : hitG.orientation === 'horizontal' ? 'ns-resize' : 'crosshair';
-          this.canvasWrapper.style.cursor = cur;
-          this.canvasScrollArea.style.cursor = cur;
-          return;
-        } else if (!this.isMiddlePanning) {
-          this.canvasScrollArea.style.cursor = '';
-        }
-
-        const selectedEls = this.model.elements.filter(
-          (el) => this.selectionTool.isSelected(el.id)
-        );
-        let cursor = 'default';
-
-        if (selectedEls.length > 0) {
-          const z = this.canvasMgr.zoom || 1;
-          const box = this.selectionTool.getGroupSelectionBoundingBox(selectedEls, 6 / z);
-          if (box) {
-            const h = this.selectionTool.hitTestHandle(box, pt, 12 / z, 18 / z);
-            if (h) {
-              if (h === 'nw' || h === 'se') cursor = 'nwse-resize';
-              else if (h === 'ne' || h === 'sw') cursor = 'nesw-resize';
-              else if (h === 'n' || h === 's') cursor = 'ns-resize';
-              else if (h === 'w' || h === 'e') cursor = 'ew-resize';
-              else if (h === 'rotate') cursor = 'grab';
-            }
-          }
-        }
-
-        if (cursor === 'default') {
-          const hit = this.selectionTool.hitTest(this.model.elements, pt);
-          this.selectionTool.hoveredElementId = hit ? hit.element.id : null;
-          if (hit) cursor = 'move';
-        }
-
-        this.canvasWrapper.style.cursor = cursor;
-        if (!this.isMiddlePanning) {
-          this.canvasScrollArea.style.cursor = '';
-        }
-        this.renderOverlay();
-      } else if (this.toolbar.activeTool === 'polyline') {
-        this.canvasWrapper.style.cursor = 'crosshair';
-        if (!this.isMiddlePanning) {
-          this.canvasScrollArea.style.cursor = '';
-        }
-        this.polylineToolHandler.onPointerMove(e, pt);
-        return;
-      } else if (this.toolbar.activeTool === 'pen') {
-        this.canvasWrapper.style.cursor = 'crosshair';
-        if (!this.isMiddlePanning) {
-          this.canvasScrollArea.style.cursor = '';
-        }
-        this.penToolHandler.onPointerMove(e, pt);
-        return;
-      }
-      return;
-    }
-
-    const dx = pt.x - this.dragStartPt.x;
-    const dy = pt.y - this.dragStartPt.y;
-
-    // Handle Origin Drag preview
+    // Handle Origin Drag preview from ruler corner
     if (this.activeHandle === 'origin-drag') {
       this.dragOriginPt = this.snapPoint(pt);
       this.renderOverlay();
       return;
     }
 
-    // Handle Guide interactions
+    // Handle Guide creation preview from ruler drag
     if (this.activeHandle === 'guide-create') {
       this.dragGuideCurrentPt = pt;
       this.renderOverlay();
       return;
     }
 
-    if (this.activeHandle === 'guide-move' && this.canvasMgr.selectedGuideId && this.guideInitialState) {
-      const g = this.canvasMgr.getGuide(this.canvasMgr.selectedGuideId);
-      if (g) {
-        if (g.orientation === 'horizontal') {
-          g.position = Math.round(this.guideInitialState.position + dy);
-          g.pivotY = g.position;
-        } else if (g.orientation === 'vertical') {
-          g.position = Math.round(this.guideInitialState.position + dx);
-          g.pivotX = g.position;
-        } else {
-          g.pivotX = Math.round((this.guideInitialState.pivotX || 0) + dx);
-          g.pivotY = Math.round((this.guideInitialState.pivotY || 0) + dy);
-        }
-      }
-      this.render();
-      return;
-    }
-
-    if (this.activeHandle === 'guide-pivot' && this.canvasMgr.selectedGuideId) {
-      const g = this.canvasMgr.getGuide(this.canvasMgr.selectedGuideId);
-      if (g) {
-        g.pivotX = Math.round(pt.x);
-        g.pivotY = Math.round(pt.y);
-        if (g.orientation === 'horizontal') g.position = g.pivotY;
-        if (g.orientation === 'vertical') g.position = g.pivotX;
-      }
-      this.render();
-      return;
-    }
-
-    if (this.activeHandle === 'guide-rotate' && this.canvasMgr.selectedGuideId) {
-      this.canvasWrapper.style.cursor = 'grabbing';
-      this.canvasScrollArea.style.cursor = 'grabbing';
-      const g = this.canvasMgr.getGuide(this.canvasMgr.selectedGuideId);
-      if (g) {
-        const px = g.pivotX ?? (g.orientation === 'vertical' ? g.position : this.model.canvas.width / 2);
-        const py = g.pivotY ?? (g.orientation === 'horizontal' ? g.position : this.model.canvas.height / 2);
-        const angleRad = Math.atan2(pt.y - py, pt.x - px);
-        let deg = Math.round((angleRad * 180) / Math.PI);
-        if (deg < 0) deg += 360;
-
-        // Snap angle to 0, 45, 90, 135, 180, 225, 270, 315 if within 3 degrees
-        const snapAngles = [0, 45, 90, 135, 180, 225, 270, 315, 360];
-        for (const sa of snapAngles) {
-          if (Math.abs(deg - sa) <= 3) {
-            deg = sa % 360;
-            break;
-          }
-        }
-
-        g.angle = deg;
-        if (g.angle === 0 || g.angle === 180) {
-          g.orientation = 'horizontal';
-          g.position = g.pivotY;
-        } else if (g.angle === 90 || g.angle === 270) {
-          g.orientation = 'vertical';
-          g.position = g.pivotX;
-        } else {
-          g.orientation = 'angled';
-        }
-      }
-      this.render();
-      return;
-    }
-
+    // Select Tool Delegation
     if (this.toolbar.activeTool === 'select') {
-      if (this.activeHandle === 'marquee' && this.marqueeStartPt) {
-        const minX = Math.min(this.marqueeStartPt.x, pt.x);
-        const minY = Math.min(this.marqueeStartPt.y, pt.y);
-        const w = Math.abs(pt.x - this.marqueeStartPt.x);
-        const h = Math.abs(pt.y - this.marqueeStartPt.y);
-        this.selectionTool.marqueeRect = { x: minX, y: minY, width: w, height: h };
-        this.renderOverlay();
-        return;
-      } else if (this.activeHandle === 'move' && this.initialElementsMap.size > 0) {
-        // Collect other unselected vertices for snapToVertices
-        const otherVertices: Point[] = [];
-        this.model.elements.forEach((el) => {
-          if (!this.selectionTool.isSelected(el.id) && el.vertices) {
-            el.vertices.forEach((v) => otherVertices.push({ x: v.x, y: v.y }));
-          }
-        });
-
-        // Compute target position of the anchor and snap it
-        const rawTarget: Point = { x: this.dragAnchorPt.x + dx, y: this.dragAnchorPt.y + dy };
-        const snappedTarget = this.snapPoint(rawTarget, otherVertices);
-        const effectiveDx = snappedTarget.x - this.dragAnchorPt.x;
-        const effectiveDy = snappedTarget.y - this.dragAnchorPt.y;
-
-        this.ghostDragOffset = { x: effectiveDx, y: effectiveDy };
-        this.renderOverlay();
-        return;
-      } else if (this.initialBox && this.activeHandle !== 'move' && this.initialElementsMap.size > 0) {
-        this.ghostTransformMap.clear();
-        this.initialElementsMap.forEach((origVerts, id) => {
-          const transformed = this.selectionTool.transformVertices(
-            origVerts,
-            this.initialBox,
-            this.activeHandle as HandleType,
-            dx,
-            dy
-          );
-          this.ghostTransformMap.set(id, transformed);
-        });
-        this.renderOverlay();
+      if (this.selectToolHandler.onPointerMove(e, pt)) {
         return;
       }
+    } else if (this.toolbar.activeTool === 'polyline') {
+      this.canvasWrapper.style.cursor = 'crosshair';
+      if (!this.isMiddlePanning) {
+        this.canvasScrollArea.style.cursor = '';
+      }
+      this.polylineToolHandler.onPointerMove(e, pt);
+      return;
     } else if (this.toolbar.activeTool === 'pen') {
-      if (this.penToolHandler.onPointerMove(e, pt)) {
-        return;
+      this.canvasWrapper.style.cursor = 'crosshair';
+      if (!this.isMiddlePanning) {
+        this.canvasScrollArea.style.cursor = '';
       }
+      this.penToolHandler.onPointerMove(e, pt);
+      return;
     } else if (this.activeHandle === 'shape') {
       this.shapeToolHandler.onPointerMove(e, pt);
       return;
@@ -1566,7 +1098,7 @@ class AntiDrawApp {
 
     const pt = this.getCanvasPoint(e);
 
-    // Node Tool Delegation: finish drag or commit ghost transformations cleanly
+    // Node Tool Delegation
     if (this.toolbar.activeTool === 'node') {
       this.isDragging = false;
       if (this.nodeToolHandler.onPointerUp(e, pt)) {
@@ -1575,185 +1107,80 @@ class AntiDrawApp {
       return;
     }
 
-    if (this.isDragging) {
+    // Finishing Origin Drag from ruler corner
+    if (this.activeHandle === 'origin-drag') {
       this.isDragging = false;
-
-      // 0. Finishing Origin Drag from ruler corner
-      if (this.activeHandle === 'origin-drag') {
-        const vb = this.model.getViewBoxBounds();
-        const finalPt = this.dragOriginPt || pt;
-        this.canvasMgr.rulerConfig.originX = Math.round(finalPt.x - vb.minX);
-        this.canvasMgr.rulerConfig.originY = Math.round(finalPt.y - vb.minY);
-        this.activeHandle = null;
-        this.dragOriginPt = null;
-        this.syncRulerScroll();
-        this.propertyPanel.showRulerSettings(this.canvasMgr.rulerConfig);
-        this.render();
-        this.syncMetadataToHost();
-        return;
-      }
-
-      // 1. Finishing Guide Creation from ruler drag
-      if (this.activeHandle === 'guide-create') {
-        const isHoriz = this.dragGuideOrientation === 'horizontal';
-        const pos = Math.round(isHoriz ? pt.y : pt.x);
-
-        // Check if dragged into canvas bounds (if dropped back inside ruler area, ignore)
-        const isInside = isHoriz
-          ? pt.y >= 0 && pt.y <= this.model.canvas.height
-          : pt.x >= 0 && pt.x <= this.model.canvas.width;
-
-        if (isInside) {
-          const newG = this.canvasMgr.addGuide(
-            this.dragGuideOrientation,
-            pos,
-            this.model.canvas.width,
-            this.model.canvas.height
-          );
-          this.canvasMgr.selectedGuideId = newG.id;
-          this.propertyPanel.showGuideSettings(newG);
-          this.syncMetadataToHost();
-        }
-        this.activeHandle = null;
-        this.render();
-        return;
-      }
-
-      // 2. Finishing Guide Move (Check if dragged back to ruler to delete)
-      if (this.activeHandle === 'guide-move' && this.canvasMgr.selectedGuideId) {
-        const g = this.canvasMgr.getGuide(this.canvasMgr.selectedGuideId);
-        if (g) {
-          let shouldDelete = false;
-          if (g.orientation === 'horizontal' && (pt.y < 0 || pt.y > this.model.canvas.height)) {
-            shouldDelete = true;
-          } else if (g.orientation === 'vertical' && (pt.x < 0 || pt.x > this.model.canvas.width)) {
-            shouldDelete = true;
-          }
-
-          if (shouldDelete) {
-            this.canvasMgr.removeGuide(g.id);
-            this.propertyPanel.resetPanelMode();
-          }
-          this.syncMetadataToHost();
-        }
-        this.activeHandle = null;
-        this.guideInitialState = null;
-        this.render();
-        return;
-      }
-
-      // 3. Finishing Guide Transform (Pivot / Rotate)
-      if (this.activeHandle === 'guide-pivot' || this.activeHandle === 'guide-rotate') {
-        this.activeHandle = null;
-        this.guideInitialState = null;
-        this.syncMetadataToHost();
-        this.render();
-        return;
-      }
-
-      let hasChangesToCommit = false;
-
-      // Commit Move Ghost
-      if (this.activeHandle === 'move' && this.ghostDragOffset) {
-        if (this.ghostDragOffset.x !== 0 || this.ghostDragOffset.y !== 0) {
-          this.pushUndo();
-          this.initialElementsMap.forEach((origVerts, id) => {
-            const el = this.model.elements.find((e) => e.id === id);
-            if (el) {
-              el.vertices = origVerts.map((v) => ({
-                ...v,
-                x: v.x + this.ghostDragOffset!.x,
-                y: v.y + this.ghostDragOffset!.y,
-                handleIn: v.handleIn
-                  ? { x: v.handleIn.x + this.ghostDragOffset!.x, y: v.handleIn.y + this.ghostDragOffset!.y }
-                  : undefined,
-                handleOut: v.handleOut
-                  ? { x: v.handleOut.x + this.ghostDragOffset!.x, y: v.handleOut.y + this.ghostDragOffset!.y }
-                  : undefined,
-              }));
-              const isClosed =
-                el.isClosed ??
-                (!el.tagName ||
-                  ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(el.tagName) ||
-                  (el.attributes.d ? /z/i.test(el.attributes.d) : false));
-              el.attributes.d = this.model.compilePathD(el.vertices, isClosed);
-            }
-          });
-          hasChangesToCommit = true;
-        }
-        this.ghostDragOffset = null;
-      }
-
-      // Commit Transform Ghost (Scale, Rotate)
-      if (this.activeHandle && this.activeHandle !== 'move' && this.ghostTransformMap.size > 0) {
-        this.pushUndo();
-        this.ghostTransformMap.forEach((transformedVerts, id) => {
-          const el = this.model.elements.find((e) => e.id === id);
-          if (el) {
-            el.vertices = transformedVerts;
-            const isClosed =
-              el.isClosed ??
-              (!el.tagName ||
-                ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(el.tagName) ||
-                (el.attributes.d ? /z/i.test(el.attributes.d) : false));
-            el.attributes.d = this.model.compilePathD(el.vertices, isClosed);
-          }
-        });
-        this.ghostTransformMap.clear();
-        hasChangesToCommit = true;
-      }
-
-      // Delegate Pen Tool pointer up
-      if (this.toolbar.activeTool === 'pen') {
-        if (this.penToolHandler.onPointerUp(e, pt)) {
-          return;
-        }
-      }
-
-      if (this.activeHandle === 'marquee' && this.selectionTool.marqueeRect) {
-        const hitIds = this.selectionTool.hitTestMarquee(
-          this.model.elements,
-          this.selectionTool.marqueeRect
-        );
-
-        if (this.selectionTool.isDeselectMarquee) {
-          hitIds.forEach((id) => this.selectionTool.deselect(id));
-        } else if (e.ctrlKey || e.metaKey) {
-          hitIds.forEach((id) => this.selectionTool.selectedElementIds.add(id));
-        } else {
-          this.selectionTool.selectedElementIds = new Set(hitIds);
-        }
-
-        this.selectionTool.marqueeRect = null;
-        this.selectionTool.isDeselectMarquee = false;
-        this.marqueeStartPt = null;
-        this.render();
-      } else if (this.activeHandle === 'shape') {
-        this.shapeToolHandler.onPointerUp(e, pt);
-        this.toolbar.setTool('select');
-      }
-
+      const vb = this.model.getViewBoxBounds();
+      const finalPt = this.dragOriginPt || pt;
+      this.canvasMgr.rulerConfig.originX = Math.round(finalPt.x - vb.minX);
+      this.canvasMgr.rulerConfig.originY = Math.round(finalPt.y - vb.minY);
       this.activeHandle = null;
-      this.initialElementsMap.clear();
-      this.applyCanvasSize();
+      this.dragOriginPt = null;
+      this.syncRulerScroll();
+      this.propertyPanel.showRulerSettings(this.canvasMgr.rulerConfig);
       this.render();
-      if (hasChangesToCommit) {
-        this.syncToHost();
+      this.syncMetadataToHost();
+      return;
+    }
+
+    // Finishing Guide Creation from ruler drag
+    if (this.activeHandle === 'guide-create') {
+      this.isDragging = false;
+      const isHoriz = this.dragGuideOrientation === 'horizontal';
+      const pos = Math.round(isHoriz ? pt.y : pt.x);
+
+      const isInside = isHoriz
+        ? pt.y >= 0 && pt.y <= this.model.canvas.height
+        : pt.x >= 0 && pt.x <= this.model.canvas.width;
+
+      if (isInside) {
+        const newG = this.canvasMgr.addGuide(
+          this.dragGuideOrientation,
+          pos,
+          this.model.canvas.width,
+          this.model.canvas.height
+        );
+        this.canvasMgr.selectedGuideId = newG.id;
+        this.propertyPanel.showGuideSettings(newG);
+        this.syncMetadataToHost();
+      }
+      this.activeHandle = null;
+      this.render();
+      return;
+    }
+
+    // Select Tool Delegation
+    if (this.toolbar.activeTool === 'select') {
+      this.isDragging = false;
+      if (this.selectToolHandler.onPointerUp(e, pt)) {
+        return;
       }
     }
+
+    // Pen Tool Delegation
+    if (this.toolbar.activeTool === 'pen') {
+      this.isDragging = false;
+      if (this.penToolHandler.onPointerUp(e, pt)) {
+        return;
+      }
+    }
+
+    // Shape Tool Delegation
+    if (this.activeHandle === 'shape') {
+      this.isDragging = false;
+      this.shapeToolHandler.onPointerUp(e, pt);
+      this.activeHandle = null;
+      this.toolbar.setTool('select');
+      this.applyCanvasSize();
+      this.render();
+      return;
+    }
+
+    this.isDragging = false;
+    this.activeHandle = null;
+    this.render();
   }
 
-  /**
-   * ARCHITECTURAL RATIONALE: Hierarchical Disambiguation of Double-Click Gestures
-   * Why this execution order is enforced:
-   * 1. Guide Lines (Highest Precedence): Double-clicking a guide line enters angle/pivot edit mode,
-   *    avoiding unintended path edits on artwork directly underneath.
-   * 2. Existing Vertex Anchor (Node Mode): Double-clicking an existing anchor vertex deletes it.
-   *    Prioritizing vertex deletion over segment insertion prevents accidental creation of micro-segments
-   *    when trying to remove points.
-   * 3. Segment Subdivision: If no anchor is hit, test proximity to the path contour. If hit, insert
-   *    a new vertex via De Casteljau subdivision and switch seamlessly to Node editing mode.
-   */
   private onDoubleClick(e: MouseEvent): void {
     if (this.toolbar.activeTool === 'zoom') {
       this.zoomAtClientPoint(e.clientX, e.clientY, -0.2);
@@ -1770,52 +1197,14 @@ class AntiDrawApp {
       if (this.penToolHandler.onDoubleClick(e, pt)) return;
     }
 
-    // Double-click on guide line -> enter angle / pivot transform mode
-    const hitGuide = this.hitTestGuide(pt, 8);
-    if (hitGuide) {
-      this.selectionTool.deselectAll();
-      this.canvasMgr.selectedGuideId = hitGuide.id;
-      this.canvasMgr.activeGuideTransformId = hitGuide.id;
-      this.propertyPanel.showGuideSettings(hitGuide);
-      this.render();
-      return;
-    }
-
-    // Double-click on existing vertex or segment in Node mode
+    // Node Tool Delegation
     if (this.toolbar.activeTool === 'node') {
       if (this.nodeToolHandler.onDoubleClick(e, pt)) return;
     }
 
-    // Double-click to add a vertex to path (in node or select tool)
-    let targetEl = this.model.elements.find(
-      (el) => this.selectionTool.isSelected(el.id)
-    );
-
-    if (!targetEl) {
-      const hit = this.selectionTool.hitTest(this.model.elements, pt, this.canvasMgr.zoom);
-      if (hit) {
-        targetEl = hit.element;
-        this.selectionTool.select(targetEl.id);
-      }
-    }
-
-    if (targetEl && targetEl.vertices) {
-      const isClosed = this.model.isElementClosed(targetEl);
-      const tol = 14 / (this.canvasMgr.zoom || 1);
-      const res = this.nodeEditorTool.insertVertexOnPath(targetEl.vertices, pt, tol, isClosed);
-      if (res) {
-        this.pushUndo();
-        targetEl.vertices = res.updatedVertices;
-        targetEl.attributes.d = this.model.compilePathD(targetEl.vertices, isClosed);
-        this.nodeEditorTool.selectedVertexId = res.newVertexId;
-        if (this.toolbar.activeTool !== 'node') {
-          this.toolbar.setTool('node');
-        }
-        const newV = targetEl.vertices.find((v) => v.id === res.newVertexId) || null;
-        this.propertyPanel.update(newV, 'node');
-        this.render();
-        this.syncToHost();
-      }
+    // Select Tool Delegation (Guide angle/pivot or segment subdivision)
+    if (this.toolbar.activeTool === 'select') {
+      if (this.selectToolHandler.onDoubleClick(e, pt)) return;
     }
   }
 
@@ -2159,243 +1548,27 @@ class AntiDrawApp {
 
   // Render Overlays: Artboard ViewBox Frame, Grid lines, Guide lines, Bounding box + handles, Vertices
   private renderOverlay(): void {
-    let html = '';
-    const vb = this.model.getViewBoxBounds();
-    const workBounds = this.model.getWorkingCanvasBounds(80);
-
-    // 0. Artboard (ViewBox Guide Frame - transparent fill so vectors underneath are visible)
-    html += `<rect x="${vb.minX}" y="${vb.minY}" width="${vb.width}" height="${vb.height}" fill="none" stroke="#6366f1" stroke-width="1.5" stroke-dasharray="6 3" opacity="0.85" vector-effect="non-scaling-stroke" />`;
-
-    // Artboard Badge Tag at top-left
-    const tagW = 160;
-    const tagH = 16;
-    html += `
-      <g opacity="0.95">
-        <rect x="${vb.minX}" y="${vb.minY - 20}" width="${tagW}" height="${tagH}" rx="3" fill="#1e1b4b" stroke="#6366f1" stroke-width="1" vector-effect="non-scaling-stroke" />
-        <text x="${vb.minX + 6}" y="${vb.minY - 8}" font-size="10" fill="#c7d2fe" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" font-weight="600">ViewBox: ${vb.width} × ${vb.height}</text>
-      </g>
-    `;
-
-    // 1. High-Performance GPU-Accelerated Parametric Grid Overlay (<defs><pattern>)
-    if (this.canvasMgr.showGrid) {
-      const originX = vb.minX + (this.canvasMgr.rulerConfig.originX || 0);
-      const originY = vb.minY + (this.canvasMgr.rulerConfig.originY || 0);
-      const gridData = this.canvasMgr.generateGridDefsAndLayers(workBounds, originX, originY);
-      if (gridData.defsHtml) {
-        html += `<defs>${gridData.defsHtml}</defs>`;
-      }
-      if (gridData.layersHtml) {
-        html += `<g id="grid-pattern-layers">${gridData.layersHtml}</g>`;
-      }
-    }
-
-    // 2. Guide Lines Overlay (Always 1px width, inverted highlight on select, transform controls on double click)
-    if (this.canvasMgr.showGuides) {
-      this.canvasMgr.guides.forEach((g) => {
-        if (g.visible === false) return;
-        const isSelected = g.id === this.canvasMgr.selectedGuideId;
-        const isTransforming = g.id === this.canvasMgr.activeGuideTransformId;
-
-        // Inverted color on selection (default cyan #00f0ff -> bright inverse red #ff1a40)
-        const guideColor = isSelected ? '#ff1a40' : (g.color || '#00f0ff');
-        const dashArray = isSelected ? 'none' : '4 2';
-        const geom = this.getGuideGeometry(g);
-
-        // Render full guide line across visible canvas span
-        html += `<line x1="${geom.p1.x}" y1="${geom.p1.y}" x2="${geom.p2.x}" y2="${geom.p2.y}" stroke="${guideColor}" stroke-width="1" stroke-dasharray="${dashArray}" vector-effect="non-scaling-stroke" />`;
-
-        // Render Transform Controls when in active Guide Double-Click Mode
-        if (isTransforming) {
-          // Center Pivot Node Handle
-          html += `
-            <circle cx="${geom.pivot.x}" cy="${geom.pivot.y}" r="6" fill="#1e293b" stroke="${guideColor}" stroke-width="2" vector-effect="non-scaling-stroke" />
-            <circle cx="${geom.pivot.x}" cy="${geom.pivot.y}" r="2" fill="${guideColor}" />
-            <line x1="${geom.pivot.x - 9}" y1="${geom.pivot.y}" x2="${geom.pivot.x + 9}" y2="${geom.pivot.y}" stroke="${guideColor}" stroke-width="1" vector-effect="non-scaling-stroke" />
-            <line x1="${geom.pivot.x}" y1="${geom.pivot.y - 9}" x2="${geom.pivot.x}" y2="${geom.pivot.y + 9}" stroke="${guideColor}" stroke-width="1" vector-effect="non-scaling-stroke" />
-          `;
-
-          // Curved Double-Ended Arrows at both visible limits
-          const arrowRot = (g.angle || 0) + 90;
-
-          // Arrow 1
-          html += `
-            <g transform="translate(${geom.arrow1.x}, ${geom.arrow1.y}) rotate(${arrowRot})">
-              <path d="M -8,-5 C -4,-10 4,-10 8,-5 M 8,-5 L 4,-7 M 8,-5 L 8,-1 M -8,-5 L -4,-7 M -8,-5 L -8,-1 M -8,5 C -4,10 4,10 8,5 M 8,5 L 4,7 M 8,5 L 8,1 M -8,5 L -4,7 M -8,5 L -8,1" fill="none" stroke="${guideColor}" stroke-width="2" vector-effect="non-scaling-stroke" />
-              <circle cx="0" cy="0" r="14" fill="transparent" />
-            </g>
-          `;
-
-          // Arrow 2
-          html += `
-            <g transform="translate(${geom.arrow2.x}, ${geom.arrow2.y}) rotate(${arrowRot})">
-              <path d="M -8,-5 C -4,-10 4,-10 8,-5 M 8,-5 L 4,-7 M 8,-5 L 8,-1 M -8,-5 L -4,-7 M -8,-5 L -8,-1 M -8,5 C -4,10 4,10 8,5 M 8,5 L 4,7 M 8,5 L 8,1 M -8,5 L -4,7 M -8,5 L -8,1" fill="none" stroke="${guideColor}" stroke-width="2" vector-effect="non-scaling-stroke" />
-              <circle cx="0" cy="0" r="14" fill="transparent" />
-            </g>
-          `;
-        }
-      });
-    }
-
-    // Dynamic Origin Drag Preview
-    if (this.activeHandle === 'origin-drag' && this.dragOriginPt) {
-      const ox = this.dragOriginPt.x;
-      const oy = this.dragOriginPt.y;
-      html += `
-        <g opacity="0.9">
-          <line x1="${workBounds.minX - 500}" y1="${oy}" x2="${workBounds.maxX + 500}" y2="${oy}" stroke="#6366f1" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke" />
-          <line x1="${ox}" y1="${workBounds.minY - 500}" x2="${ox}" y2="${workBounds.maxY + 500}" stroke="#6366f1" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke" />
-          <circle cx="${ox}" cy="${oy}" r="8" fill="none" stroke="#6366f1" stroke-width="1.5" vector-effect="non-scaling-stroke" />
-          <circle cx="${ox}" cy="${oy}" r="2" fill="#6366f1" />
-          <rect x="${ox + 10}" y="${oy - 22}" width="72" height="18" rx="3" fill="#1e1b4b" stroke="#6366f1" stroke-width="1" vector-effect="non-scaling-stroke" />
-          <text x="${ox + 15}" y="${oy - 9}" font-size="10" fill="#c7d2fe" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" font-weight="600">Origin (0,0)</text>
-        </g>
-      `;
-    }
-
-    // Dynamic Guide Drag Creation Preview
-    if (this.activeHandle === 'guide-create') {
-      const isHoriz = this.dragGuideOrientation === 'horizontal';
-      if (isHoriz) {
-        html += `<line x1="${workBounds.minX - 500}" y1="${this.dragGuideCurrentPt.y}" x2="${workBounds.maxX + 500}" y2="${this.dragGuideCurrentPt.y}" stroke="#00f0ff" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
-      } else {
-        html += `<line x1="${this.dragGuideCurrentPt.x}" y1="${workBounds.minY - 500}" x2="${this.dragGuideCurrentPt.x}" y2="${workBounds.maxY + 500}" stroke="#00f0ff" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
-      }
-    }
-
-    // 3. Marquee Selection Rectangle Overlay
-    if (this.selectionTool.marqueeRect) {
-      const m = this.selectionTool.marqueeRect;
-      const isDesel = this.selectionTool.isDeselectMarquee;
-      html += `<rect x="${m.x}" y="${m.y}" width="${m.width}" height="${m.height}" fill="${isDesel ? 'rgba(239, 68, 68, 0.12)' : 'rgba(59, 130, 246, 0.12)'}" stroke="${isDesel ? '#ef4444' : '#3b82f6'}" stroke-width="1" stroke-dasharray="4 2" vector-effect="non-scaling-stroke" />`;
-    }
-
-    // 4. Hover Highlight
-    if (
-      this.selectionTool.hoveredElementId &&
-      !this.selectionTool.isSelected(this.selectionTool.hoveredElementId)
-    ) {
-      const hEl = this.model.elements.find((e) => e.id === this.selectionTool.hoveredElementId);
-      if (hEl && hEl.vertices) {
-        const d = this.model.compilePathD(hEl.vertices, hEl.isClosed);
-        html += `<path d="${d}" fill="none" stroke="#6366f1" stroke-width="2" stroke-dasharray="4 2" opacity="0.8" vector-effect="non-scaling-stroke" />`;
-      }
-    }
-
-    // 5. Bounding Box & 8 Resize Handles + Rotation Handle for Selected Elements
-    const selectedEls = this.model.elements.filter((e) => this.selectionTool.isSelected(e.id));
     const z = this.canvasMgr.zoom || 1;
-
-    if (selectedEls.length > 0) {
-      const groupBox = this.selectionTool.getGroupSelectionBoundingBox(selectedEls, 6 / z);
-      if (groupBox) {
-        html += `<rect x="${groupBox.x}" y="${groupBox.y}" width="${groupBox.width}" height="${groupBox.height}" fill="none" stroke="#38bdf8" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke" />`;
-
-        const handles = [
-          { x: groupBox.x, y: groupBox.y },
-          { x: groupBox.cx, y: groupBox.y },
-          { x: groupBox.x + groupBox.width, y: groupBox.y },
-          { x: groupBox.x, y: groupBox.cy },
-          { x: groupBox.x + groupBox.width, y: groupBox.cy },
-          { x: groupBox.x, y: groupBox.y + groupBox.height },
-          { x: groupBox.cx, y: groupBox.y + groupBox.height },
-          { x: groupBox.x + groupBox.width, y: groupBox.y + groupBox.height },
-        ];
-
-        const hSize = 7 / z;
-        const hHalf = hSize / 2;
-        const hRx = 1 / z;
-        handles.forEach((hPos) => {
-          html += `<rect x="${hPos.x - hHalf}" y="${hPos.y - hHalf}" width="${hSize}" height="${hSize}" fill="#ffffff" stroke="#0284c7" stroke-width="1" rx="${hRx}" vector-effect="non-scaling-stroke" />`;
-        });
-
-        // Rotation Handle
-        const rotOffset = 18 / z;
-        const rotR = 3.5 / z;
-        html += `<line x1="${groupBox.cx}" y1="${groupBox.y}" x2="${groupBox.cx}" y2="${groupBox.y - rotOffset}" stroke="#38bdf8" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
-        html += `<circle cx="${groupBox.cx}" cy="${groupBox.y - rotOffset}" r="${rotR}" fill="#38bdf8" stroke="#ffffff" stroke-width="1" vector-effect="non-scaling-stroke" />`;
-      }
-
-      if (selectedEls.length > 1) {
-        selectedEls.forEach((el) => {
-          const elBox = this.selectionTool.getSelectionBoundingBox(el, 6 / z);
-          if (elBox) {
-            html += `<rect x="${elBox.x}" y="${elBox.y}" width="${elBox.width}" height="${elBox.height}" fill="none" stroke="#60a5fa" stroke-width="0.75" stroke-dasharray="2 2" opacity="0.6" vector-effect="non-scaling-stroke" />`;
-          }
-        });
-      }
-
-      // 6. Always visible vertices for all selected elements (Selection mode & Node mode)
-      if (!this.nodeToolHandler.ghostNodeVertices) {
-        selectedEls.forEach((el) => {
-          if (el.vertices) {
-            const isNodeMode = this.toolbar.activeTool === 'node' && selectedEls.length === 1;
-            const selectedVertexId = this.nodeEditorTool.selectedVertexId;
-
-            el.vertices.forEach((v) => {
-              const isSelectedVertex = isNodeMode && v.id === selectedVertexId;
-              const vR = (isSelectedVertex ? 4.5 : 3.5) / z;
-              html += `<circle cx="${v.x}" cy="${v.y}" r="${vR}" fill="${isSelectedVertex ? '#38bdf8' : '#ffffff'}" stroke="#0284c7" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
-            });
-          }
-        });
-      }
-    }
-
-    // 7. Node Tool Overlay (Bézier handles, segment highlight, ghost drag paths)
-    html += this.nodeToolHandler.renderOverlay(z);
-
-    // Ghost Move Vector and Bounding Box
-    if (this.activeHandle === 'move' && this.ghostDragOffset && (this.ghostDragOffset.x !== 0 || this.ghostDragOffset.y !== 0)) {
-      this.initialElementsMap.forEach((origVerts, id) => {
-        const el = this.model.elements.find((e) => e.id === id);
-        if (el) {
-          const gVerts = origVerts.map((v) => ({
-            ...v,
-            x: v.x + this.ghostDragOffset!.x,
-            y: v.y + this.ghostDragOffset!.y,
-            handleIn: v.handleIn ? { x: v.handleIn.x + this.ghostDragOffset!.x, y: v.handleIn.y + this.ghostDragOffset!.y } : undefined,
-            handleOut: v.handleOut ? { x: v.handleOut.x + this.ghostDragOffset!.x, y: v.handleOut.y + this.ghostDragOffset!.y } : undefined,
-          }));
-          const isClosed = el.isClosed ?? (!el.tagName || ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(el.tagName) || (el.attributes.d ? /z/i.test(el.attributes.d) : false));
-          const d = this.model.compilePathD(gVerts, isClosed);
-          html += `<path d="${d}" fill="rgba(99, 102, 241, 0.25)" stroke="#818cf8" stroke-width="2" stroke-dasharray="5 3" vector-effect="non-scaling-stroke" />`;
-          gVerts.forEach((gv) => {
-            html += `<circle cx="${gv.x}" cy="${gv.y}" r="${3.5 / z}" fill="#a5b4fc" stroke="#4338ca" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
-          });
-        }
-      });
-      if (this.initialBox) {
-        const bx = this.initialBox.x + this.ghostDragOffset.x;
-        const by = this.initialBox.y + this.ghostDragOffset.y;
-        html += `<rect x="${bx}" y="${by}" width="${this.initialBox.width}" height="${this.initialBox.height}" fill="none" stroke="#818cf8" stroke-width="1.5" stroke-dasharray="4 3" vector-effect="non-scaling-stroke" />`;
-      }
-    }
-
-    // Ghost Transform Vector
-    if (this.ghostTransformMap.size > 0) {
-      this.ghostTransformMap.forEach((gVerts, id) => {
-        const el = this.model.elements.find((e) => e.id === id);
-        if (el) {
-          const isClosed = el.isClosed ?? (!el.tagName || ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(el.tagName) || (el.attributes.d ? /z/i.test(el.attributes.d) : false));
-          const d = this.model.compilePathD(gVerts, isClosed);
-          html += `<path d="${d}" fill="rgba(99, 102, 241, 0.25)" stroke="#818cf8" stroke-width="2" stroke-dasharray="5 3" vector-effect="non-scaling-stroke" />`;
-          gVerts.forEach((gv) => {
-            html += `<circle cx="${gv.x}" cy="${gv.y}" r="${3.5 / z}" fill="#a5b4fc" stroke="#4338ca" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
-          });
-        }
-      });
-    }
-
-    // Ghost Shape Tool Preview
-    html += this.shapeToolHandler.renderOverlay(z);
-
-    // 8. Pen Tool In-Progress Path, Ghost Point & Ghost Path
-    html += this.penToolHandler.renderOverlay(z);
-
-    // 9. Polyline Tool In-Progress Path & Rubberband Overlay
-    html += this.polylineToolHandler.renderOverlay(z);
-
-    this.overlaySvg.innerHTML = html;
+    this.overlaySvg.innerHTML = this.overlayRenderer.render({
+      model: this.model,
+      canvasMgr: this.canvasMgr,
+      selectionTool: this.selectionTool,
+      nodeEditorTool: this.nodeEditorTool,
+      activeTool: this.toolbar.activeTool,
+      dragOriginPt: this.dragOriginPt,
+      dragGuideOrientation: this.dragGuideOrientation,
+      dragGuideCurrentPt: this.dragGuideCurrentPt,
+      isDraggingGuideCreate: this.activeHandle === 'guide-create',
+      isDraggingOrigin: this.activeHandle === 'origin-drag',
+      hasGhostNodeVertices: !!this.nodeToolHandler.ghostNodeVertices,
+      tools: [
+        this.selectToolHandler,
+        this.nodeToolHandler,
+        this.shapeToolHandler,
+        this.penToolHandler,
+        this.polylineToolHandler,
+      ],
+    }, z);
   }
 }
 
