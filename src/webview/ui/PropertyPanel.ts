@@ -16,6 +16,11 @@ export interface PropertyPanelCallbacks {
   onDeleteGuide?: (guideId: string) => void;
   onClearAllGuides?: () => void;
   onUpdateShapeConfig?: (config: ShapeToolConfig) => void;
+  /**
+   * Boolean Operations callback: Dispatches constructive geometry operations (union, subtract,
+   * intersect, exclude, combine, fragment) directly to BooleanOperations engine.
+   */
+  onBoolean?: (op: 'union' | 'subtract' | 'intersect' | 'exclude' | 'combine' | 'fragment') => void;
 }
 
 export interface ViewBoxPreset {
@@ -796,7 +801,15 @@ export class PropertyPanel {
     }
   }
 
-  // Update only the dynamic parts of the node panel without destroying DOM
+  /**
+   * ARCHITECTURAL RATIONALE: High-Frequency In-Place DOM Mutation
+   * Why this exists:
+   * During active node dragging, `update()` is called on every animation frame/mousemove event.
+   * If `renderNodeProperties()` were invoked each time, it would completely wipe `innerHTML`,
+   * forcing browser reflow, destroying active input cursor focus, and producing perceptible frame drops.
+   * By mutating only the existing text inputs and active CSS classes in place, 60fps responsiveness
+   * is preserved without flickering or focus loss.
+   */
   private updateNodePropertiesInPlace(v: PathVertex): void {
     const xInput = this.container.querySelector<HTMLInputElement>('#node-pos-x');
     const yInput = this.container.querySelector<HTMLInputElement>('#node-pos-y');
@@ -1266,7 +1279,17 @@ export class PropertyPanel {
     this.bindMouseDown('btn-split-node', () => this.callbacks.onSplitNode());
   }
 
-  // mousedown + preventDefault prevents focus change on canvas; stopPropagation blocks canvasWrapper pointerdown
+  /**
+   * ARCHITECTURAL RATIONALE: Focus Preservation & Event Propagation Isolation
+   * Why mousedown + preventDefault + stopPropagation is required:
+   * 1. Standard HTML button 'click' events fire AFTER 'pointerdown' and 'mousedown'.
+   * 2. In browser environments (and VS Code webviews), clicking an element steals focus from the
+   *    active SVG canvas or focused inputs, firing unintended blur events.
+   * 3. Furthermore, click events bubble up to container wrappers. In AntiDraw, bubbling to
+   *    #canvas-wrapper or #canvas-scroll-area would trigger canvas deselect or pan/selection routines.
+   * 4. Calling e.preventDefault() on 'mousedown' suppresses document-level focus switching while
+   *    e.stopPropagation() prevents the event from reaching canvas pointer listeners.
+   */
   private bindMouseDown(id: string, fn: () => void): void {
     const el = this.container.querySelector(`#${id}`);
     if (el) {

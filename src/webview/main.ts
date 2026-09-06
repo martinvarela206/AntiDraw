@@ -810,6 +810,19 @@ class AntiDrawApp {
     this.syncRulerScroll();
   }
 
+  /**
+   * ARCHITECTURAL RATIONALE: Cursor-Invariant Zoom Geometry
+   * Mathematical Derivation:
+   * 1. Screen-to-World: A point on the screen (cursorViewportX) maps to world space via:
+   *    worldX = (cursorViewportX - cameraOffset.x) / currentZoom
+   * 2. Invariance Requirement: When zoom scales to newZoom, the same worldX coordinate MUST
+   *    remain exactly beneath cursorViewportX on screen:
+   *    cursorViewportX = worldX * newZoom + newCameraOffset.x
+   * 3. Solving for new camera offset:
+   *    newCameraOffset.x = cursorViewportX - worldX * newZoom
+   * This formula eliminates viewport displacement and visual jumping, guaranteeing natural,
+   * predictable zooming focused directly at the mouse cursor.
+   */
   public zoomAtClientPoint(clientX: number, clientY: number, delta: number): void {
     const currentZoom = this.canvasMgr.zoom || 1.0;
     const newZoom = Math.round(Math.max(0.1, Math.min(10.0, currentZoom + delta)) * 10) / 10;
@@ -877,6 +890,17 @@ class AntiDrawApp {
     this.syncMetadataToHost();
   }
 
+  /**
+   * ARCHITECTURAL RATIONALE: Companion JSON Metadata File Segregation
+   * Why metadata is not injected into the SVG XML directly:
+   * 1. Standard SVG Portability: Storing proprietary editor state (guidelines, ruler origins,
+   *    grid spacing, snapping toggles) inside the SVG document via custom XML attributes
+   *    (e.g., data-antidraw-*) causes schema validation warnings and risks being stripped by
+   *    strict SVG processors, minifiers, or other vector editors (Figma, Illustrator, Inkscape).
+   * 2. Clean Vector Code: Exported SVGs remain 100% clean and web-ready without proprietary clutter.
+   * 3. Persistence: By syncing editor state to a companion <name>.json file managed by the extension host,
+   *    all workspace customizations survive session restarts without polluting the vector graphic.
+   */
   private syncMetadataToHost(): void {
     vscode.postMessage({
       type: 'updateMetadata',
@@ -2083,7 +2107,23 @@ class AntiDrawApp {
     }
   }
 
+  /**
+   * ARCHITECTURAL RATIONALE: Hierarchical Disambiguation of Double-Click Gestures
+   * Why this execution order is enforced:
+   * 1. Guide Lines (Highest Precedence): Double-clicking a guide line enters angle/pivot edit mode,
+   *    avoiding unintended path edits on artwork directly underneath.
+   * 2. Existing Vertex Anchor (Node Mode): Double-clicking an existing anchor vertex deletes it.
+   *    Prioritizing vertex deletion over segment insertion prevents accidental creation of micro-segments
+   *    when trying to remove points.
+   * 3. Segment Subdivision: If no anchor is hit, test proximity to the path contour. If hit, insert
+   *    a new vertex via De Casteljau subdivision and switch seamlessly to Node editing mode.
+   */
   private onDoubleClick(e: MouseEvent): void {
+    if (this.toolbar.activeTool === 'zoom') {
+      this.zoomAtClientPoint(e.clientX, e.clientY, -0.2);
+      return;
+    }
+
     if (this.toolbar.activeTool === 'polyline') {
       this.finishPolylinePath(false);
       return;
@@ -3132,6 +3172,18 @@ class AntiDrawApp {
       }
     }
 
+    /**
+     * ARCHITECTURAL RATIONALE: Elastic Real-Time Curvature Feedback & Non-Scaling Overlays
+     * Why this solution is engineered this way:
+     * 1. Dynamic Bézier Ghosting: Traditional pen tools show only a straight rubberband line to the cursor,
+     *    forcing the illustrator to mentally calculate the outgoing tangent curve. By synthesizing a cubic
+     *    Bézier path (M lastV.x,lastV.y C lastV.handleOut ... targetPt targetPt) directly from the outgoing handle
+     *    of the committed node to the hovering cursor point, the user visualizes the precise mathematical curve
+     *    prior to committing the click.
+     * 2. Physical Screen-Pixel Scale Normalization: Control points and stroke widths use vector-effect="non-scaling-stroke"
+     *    and radii divided by z (e.g. 5 / z). This ensures interactive handles remain crisp, constant-size, and comfortable
+     *    to target across all zoom factors (from 10% overview to 1000% macro editing).
+     */
     // 7. Pen Tool In-Progress Path, Ghost Point & Ghost Path
     if (this.currentPenVertices.length > 0) {
       const penD = this.model.compilePathD(this.currentPenVertices, false);

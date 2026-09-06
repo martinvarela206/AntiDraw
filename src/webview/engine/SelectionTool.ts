@@ -158,7 +158,16 @@ export class SelectionTool {
     };
   }
 
-  // Test which elements are completely contained inside a marquee selection rectangle
+  /**
+   * ARCHITECTURAL RATIONALE: Strict Containment Marquee vs Box Intersection
+   * Why this solution is engineered this way:
+   * In vector illustration workflows, drawings frequently feature large background rectangles, containers,
+   * or surrounding artboards. An intersection-based marquee selection (capturing any element touched by the box)
+   * leads to severe friction because dragging a selection box almost invariably touches the large background object,
+   * selecting it unintentionally.
+   * Strict 100% containment (box.x >= mLeft && bRight <= mRight && ...) guarantees that only elements
+   * intentionally encapsulated inside the marquee are selected.
+   */
   public hitTestMarquee(
     elements: VectorElement[],
     marquee: { x: number; y: number; width: number; height: number }
@@ -191,7 +200,16 @@ export class SelectionTool {
     return hits;
   }
 
-  // Hit test vector elements based on fill or stroke tolerance
+  /**
+   * ARCHITECTURAL RATIONALE: Zoom-Independent Physical Screen Hit Tolerances
+   * Why effectiveTolerance is scaled by (1 / zoomScale):
+   * Without zoom compensation, hit-test radii are fixed in SVG world coordinates:
+   * - At high zoom (e.g. 800%), a 10px world tolerance equates to an enormous 80px physical area on screen,
+   *   causing clicks far away from a path to erroneously trigger selection.
+   * - At low zoom (e.g. 20%), a 10px world tolerance shrinks to 2 physical pixels, making thin paths
+   *   infuriatingly difficult to hit.
+   * Scaling tolerance inversely by zoomScale maintains a consistent, comfortable physical screen-pixel hit target.
+   */
   public hitTest(
     elements: VectorElement[],
     pt: Point,

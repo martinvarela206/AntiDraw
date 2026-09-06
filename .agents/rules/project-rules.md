@@ -52,4 +52,16 @@ This file contains rules specific to the AntiDraw project. Rules are written in 
      6. **Advance to Next Item**: Only after the commit has been successfully created, proceed to the next item in the prompt list and repeat steps 1 to 5.
    - In the final response, provide a distinct verification checklist grouped by each atomic commit for user testing.
 
+---
+
+## Code Hygiene & Architectural Rationale
+
+7. **Mandatory In-Code Rationale & Technical Solution Comments**:
+   - Whenever a specific technical solution, algorithm, non-obvious workaround, or architectural choice is implemented in code, comprehensive comments MUST be placed directly in the code explaining the exact rationale:
+     - **Why it was built this way and not another** (the underlying technical justification).
+     - **Which edge cases, race conditions, focus/blur quirks, or numerical stability issues it solves**.
+     - **Which naive or alternate approaches were discarded and why**.
+   - Comments must be placed immediately above or within the relevant functions, event handlers, and data structures.
+
+
 

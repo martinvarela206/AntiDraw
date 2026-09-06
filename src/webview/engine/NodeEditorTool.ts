@@ -52,7 +52,17 @@ export class NodeEditorTool {
     return null;
   }
 
-  // Update vertex position during drag, with Endpoint Auto-Fusion (unless shiftKey is held)
+  /**
+   * ARCHITECTURAL RATIONALE: Topological Endpoint Auto-Fusion
+   * Why this solution is engineered this way:
+   * 1. Scope Restriction (isFreeEndpoint): Auto-fusion is strictly limited to the first (index 0)
+   *    or last (index n-1) vertex of an open path. Merging an interior vertex would create an invalid
+   *    non-manifold branch in standard SVG path geometry (SVG paths cannot represent 3-way branch points).
+   * 2. Proximity Snapping (fusionThreshold = 8px): Provides tactile magnetic snapping when closing
+   *    a contour or joining two separate path endpoints together.
+   * 3. Override Modifier (isShiftPressed): Holding Shift deliberately bypasses fusion, enabling users
+   *    to place endpoints intimately close to other vertices without accidental joining.
+   */
   public moveVertex(
     vertices: PathVertex[],
     vertexId: string,
@@ -118,7 +128,22 @@ export class NodeEditorTool {
     return { updatedVertices: updated, fused: isFused };
   }
 
-  // Set Node Type (Asymmetric, Smooth/Uniform, Symmetric)
+  /**
+   * ARCHITECTURAL RATIONALE: Continuous Geometric Node Class Transitions
+   * Why node conversion behaves this way:
+   * 1. 'sharp' (Cusp / Angular):
+   *    Completely deletes handleIn/handleOut and converts command 'C' -> 'L' (unless first vertex 'M').
+   *    Rationale: Leaving zero-length or collapsed handles introduces numerical edge cases in SVG exporters
+   *    and rendering engines. Explicit 'L' commands produce pure linear vectors.
+   * 2. 'asymmetric' (Free Handles):
+   *    Allows handleIn and handleOut to rotate and scale independently without collinearity constraint.
+   * 3. 'smooth' (Collinear Tangents, Independent Lengths):
+   *    Enforces 180° opposite angle (angle = atan2(dy, dx) + PI) ensuring C1 slope continuity across
+   *    the vertex while allowing asymmetric curvature intensity on each side.
+   * 4. 'symmetric' (Mirrored Tangents):
+   *    Enforces both 180° opposite angle and identical Euclidean distance (distOut = distIn) ensuring
+   *    balanced curvature on both incoming and outgoing curve segments.
+   */
   public setNodeType(vertices: PathVertex[], vertexId: string, nodeType: NodeType): PathVertex[] {
     return vertices.map((v) => {
       if (v.id !== vertexId) return v;
@@ -274,7 +299,14 @@ export class NodeEditorTool {
     return result;
   }
 
-  // Delete a vertex by ID and reconnect adjacent vertices preserving curvature
+  /**
+   * ARCHITECTURAL RATIONALE: Vertex Removal Topology Preservation
+   * Why this solution is engineered this way:
+   * 1. Subpath Origin Preservation: If removing index 0 (initial point), the subsequent vertex
+   *    must adopt command 'M' and clear handleIn to maintain valid SVG grammar without an orphaned start tangent.
+   * 2. Curvature Continuity: If removing a cubic curve vertex ('C'), the preceding vertex inherits
+   *    the removed vertex's handleOut, preventing a jarring collapse of the adjacent curve segment.
+   */
   public deleteVertex(vertices: PathVertex[], vertexId: string): PathVertex[] {
     const idx = vertices.findIndex((v) => v.id === vertexId);
     if (idx === -1 || vertices.length <= 1) return vertices;
@@ -297,7 +329,17 @@ export class NodeEditorTool {
     return updated;
   }
 
-  // Double-click on path segment to insert a new vertex with proper Bezier handles via De Casteljau subdivision
+  /**
+   * ARCHITECTURAL RATIONALE: Exact Bézier Subdivision via De Casteljau Algorithm
+   * Why this solution is engineered this way:
+   * Inserting a vertex onto an existing cubic Bézier segment MUST NOT alter the curve's visible trajectory.
+   * Naive solutions (e.g. placing a linear node or guessing handle directions) distort the curvature.
+   * By:
+   * 1. Finding parameter t in [0, 1] on the cubic polynomial minimizing distance to the click point, and
+   * 2. Applying De Casteljau's geometric construction,
+   * the segment is split into two cubic sub-curves (v1 -> p01 -> p012 -> p0123) and (p0123 -> p123 -> p23 -> v2)
+   * that reproduce 100% of the original polynomial contour with mathematical precision and C1 smoothness.
+   */
   public insertVertexOnPath(
     vertices: PathVertex[],
     pt: Point,
