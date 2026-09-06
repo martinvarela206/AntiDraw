@@ -50,15 +50,30 @@ export class NodeToolHandler implements IToolHandler {
     this.callbacks = callbacks;
   }
 
+  private isElementClosed(el: VectorElement): boolean {
+    return this.ctx.model.isElementClosed(el);
+  }
+
   public onPointerDown(e: PointerEvent, pt: Point): boolean {
     const activeTool = this.ctx.getActiveTool();
     if (activeTool !== 'node') return false;
     if (e.button !== 0) return false;
 
     const z = this.ctx.canvasMgr.zoom || 1;
-    const selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
+    let selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
+
+    // If no element is selected yet in node tool, try to hit-test any element under cursor
+    if (!selectedEl) {
+      const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, z);
+      if (hit) {
+        this.ctx.selectionTool.select(hit.element.id);
+        selectedEl = hit.element;
+      }
+    }
 
     if (selectedEl && selectedEl.vertices && selectedEl.vertices.length > 0) {
+      const isClosed = this.isElementClosed(selectedEl);
+
       // 1. Check if clicking on an existing vertex or Bézier handle
       const hitNode = this.nodeEditorTool.hitTestVertices(
         selectedEl.vertices,
@@ -88,8 +103,8 @@ export class NodeToolHandler implements IToolHandler {
       const hitSegment = this.nodeEditorTool.hitTestSegment(
         selectedEl.vertices,
         pt,
-        8 / z,
-        selectedEl.isClosed ?? false
+        10 / z,
+        isClosed
       );
 
       if (hitSegment !== null) {
@@ -110,7 +125,21 @@ export class NodeToolHandler implements IToolHandler {
         return true;
       }
 
-      // 3. Clicked empty area in node mode: deselect active vertex/segment
+      // Check if clicking another element on canvas while in node mode
+      const hitOther = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, z);
+      if (hitOther && hitOther.element.id !== selectedEl.id) {
+        this.ctx.selectionTool.select(hitOther.element.id);
+        this.nodeEditorTool.selectedVertexId = null;
+        this.nodeEditorTool.selectedHandleType = null;
+        this.nodeEditorTool.selectedSegmentIdx = null;
+        if (this.callbacks.onDeselectNode) {
+          this.callbacks.onDeselectNode();
+        }
+        this.ctx.render();
+        return true;
+      }
+
+      // 3. Clicked empty area: deselect active vertex/segment
       this.nodeEditorTool.selectedVertexId = null;
       this.nodeEditorTool.selectedHandleType = null;
       this.nodeEditorTool.selectedSegmentIdx = null;
@@ -139,10 +168,8 @@ export class NodeToolHandler implements IToolHandler {
       const selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
       if (!selectedEl || !this.initialVertices || this.initialVertices.length === 0) return false;
 
-      const isClosed = selectedEl.isClosed ?? false;
+      const isClosed = this.isElementClosed(selectedEl);
       const isShift = e.shiftKey;
-      const isCtrl = e.ctrlKey || e.metaKey;
-      const isAlt = e.altKey;
 
       if (this.activeHandle === 'vertex' && this.nodeEditorTool.selectedVertexId) {
         const otherVertices: Point[] = [];
@@ -227,7 +254,7 @@ export class NodeToolHandler implements IToolHandler {
 
       if (selectedEl && this.ghostNodeVertices) {
         this.ctx.pushUndo();
-        const isClosed = selectedEl.isClosed ?? false;
+        const isClosed = this.isElementClosed(selectedEl);
         selectedEl.vertices = this.ghostNodeVertices;
         selectedEl.attributes.d = this.ctx.model.compilePathD(selectedEl.vertices, isClosed);
         selectedEl.attributes['data-node-types'] = selectedEl.vertices.map((v) => v.nodeType).join(',');
@@ -263,8 +290,17 @@ export class NodeToolHandler implements IToolHandler {
     if (activeTool !== 'node') return false;
 
     const z = this.ctx.canvasMgr.zoom || 1;
-    const selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
+    let selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
+    if (!selectedEl) {
+      const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, z);
+      if (hit) {
+        this.ctx.selectionTool.select(hit.element.id);
+        selectedEl = hit.element;
+      }
+    }
     if (!selectedEl || !selectedEl.vertices || selectedEl.vertices.length === 0) return false;
+
+    const isClosed = this.isElementClosed(selectedEl);
 
     // 1. Double-click on existing vertex -> Delete vertex
     const hitNode = this.nodeEditorTool.hitTestVertices(
@@ -278,10 +314,14 @@ export class NodeToolHandler implements IToolHandler {
       if (selectedEl.vertices.length > 2) {
         this.ctx.pushUndo();
         selectedEl.vertices = this.nodeEditorTool.deleteVertex(selectedEl.vertices, hitNode.vertex.id);
-        const isClosed = selectedEl.isClosed ?? false;
         selectedEl.attributes.d = this.ctx.model.compilePathD(selectedEl.vertices, isClosed);
         selectedEl.attributes['data-node-types'] = selectedEl.vertices.map((v) => v.nodeType).join(',');
         this.nodeEditorTool.selectedVertexId = null;
+        this.nodeEditorTool.selectedHandleType = null;
+        this.nodeEditorTool.selectedSegmentIdx = null;
+        if (this.callbacks.onDeselectNode) {
+          this.callbacks.onDeselectNode();
+        }
         if (this.ctx.applyCanvasSize) this.ctx.applyCanvasSize();
         this.ctx.render();
         this.ctx.syncToHost();
@@ -290,8 +330,7 @@ export class NodeToolHandler implements IToolHandler {
     }
 
     // 2. Double-click on path segment -> Insert vertex via De Casteljau subdivision
-    const tol = 8 / z;
-    const isClosed = selectedEl.isClosed ?? false;
+    const tol = 12 / z;
     const res = this.nodeEditorTool.insertVertexOnPath(selectedEl.vertices, pt, tol, isClosed);
     if (res) {
       this.ctx.pushUndo();
@@ -300,6 +339,11 @@ export class NodeToolHandler implements IToolHandler {
       selectedEl.attributes['data-node-types'] = selectedEl.vertices.map((v) => v.nodeType).join(',');
       this.nodeEditorTool.selectedVertexId = res.newVertexId;
       this.nodeEditorTool.selectedHandleType = 'vertex';
+      this.nodeEditorTool.selectedSegmentIdx = null;
+      const newV = selectedEl.vertices.find((v) => v.id === res.newVertexId);
+      if (newV && this.callbacks.onNodeSelected) {
+        this.callbacks.onNodeSelected(newV, selectedEl);
+      }
       if (this.ctx.applyCanvasSize) this.ctx.applyCanvasSize();
       this.ctx.render();
       this.ctx.syncToHost();
@@ -338,7 +382,7 @@ export class NodeToolHandler implements IToolHandler {
     if (selectedEl && selectedEl.vertices && selectedEl.vertices.length > 2) {
       this.ctx.pushUndo();
       selectedEl.vertices = this.nodeEditorTool.deleteVertex(selectedEl.vertices, this.nodeEditorTool.selectedVertexId);
-      const isClosed = selectedEl.isClosed ?? false;
+      const isClosed = this.isElementClosed(selectedEl);
       selectedEl.attributes.d = this.ctx.model.compilePathD(selectedEl.vertices, isClosed);
       selectedEl.attributes['data-node-types'] = selectedEl.vertices.map((v) => v.nodeType).join(',');
       this.nodeEditorTool.selectedVertexId = null;
@@ -366,7 +410,7 @@ export class NodeToolHandler implements IToolHandler {
     if (segIdx === null) return;
 
     this.ctx.pushUndo();
-    const isClosed = selectedEl.isClosed ?? false;
+    const isClosed = this.isElementClosed(selectedEl);
     selectedEl.vertices = this.nodeEditorTool.convertSegmentToLine(selectedEl.vertices, segIdx, isClosed);
     selectedEl.attributes.d = this.ctx.model.compilePathD(selectedEl.vertices, isClosed);
     this.ctx.render();
@@ -389,7 +433,7 @@ export class NodeToolHandler implements IToolHandler {
     if (segIdx === null) return;
 
     this.ctx.pushUndo();
-    const isClosed = selectedEl.isClosed ?? false;
+    const isClosed = this.isElementClosed(selectedEl);
     selectedEl.vertices = this.nodeEditorTool.convertSegmentToCurve(selectedEl.vertices, segIdx, isClosed);
     selectedEl.attributes.d = this.ctx.model.compilePathD(selectedEl.vertices, isClosed);
     this.ctx.render();
@@ -422,7 +466,7 @@ export class NodeToolHandler implements IToolHandler {
         this.nodeEditorTool.selectedVertexId,
         type
       );
-      const isClosed = selectedEl.isClosed ?? false;
+      const isClosed = this.isElementClosed(selectedEl);
       selectedEl.attributes.d = this.ctx.model.compilePathD(selectedEl.vertices, isClosed);
       selectedEl.attributes['data-node-types'] = selectedEl.vertices.map((v) => v.nodeType).join(',');
 
@@ -455,18 +499,19 @@ export class NodeToolHandler implements IToolHandler {
 
     const selectedEls = this.ctx.model.elements.filter((el) => this.ctx.selectionTool.isSelected(el.id));
 
-    // 1. Node Edit Mode Bézier Handles for Selected Element
-    if (selectedEls.length === 1 && selectedEls[0].vertices && this.ctx.getActiveTool() === 'node') {
+    // 1. Node Edit Mode Bézier Handles for Selected Element (rendered when not actively dragging ghost)
+    if (!this.ghostNodeVertices && selectedEls.length === 1 && selectedEls[0].vertices && this.ctx.getActiveTool() === 'node') {
       const selectedEl = selectedEls[0];
       const verts = selectedEl.vertices!;
       const selectedIdx = verts.findIndex((v) => v.id === this.nodeEditorTool.selectedVertexId);
+      const isClosed = this.isElementClosed(selectedEl);
 
       const showHandlesFor = new Set<number>();
       if (selectedIdx >= 0) {
         showHandlesFor.add(selectedIdx);
-        const prevIdx = selectedIdx > 0 ? selectedIdx - 1 : selectedEl.isClosed ? verts.length - 1 : -1;
+        const prevIdx = selectedIdx > 0 ? selectedIdx - 1 : isClosed ? verts.length - 1 : -1;
         if (prevIdx >= 0) showHandlesFor.add(prevIdx);
-        const nextIdx = selectedIdx < verts.length - 1 ? selectedIdx + 1 : selectedEl.isClosed ? 0 : -1;
+        const nextIdx = selectedIdx < verts.length - 1 ? selectedIdx + 1 : isClosed ? 0 : -1;
         if (nextIdx >= 0) showHandlesFor.add(nextIdx);
       }
 
@@ -509,7 +554,7 @@ export class NodeToolHandler implements IToolHandler {
     if (this.ghostNodeVertices) {
       const selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
       if (selectedEl) {
-        const isClosed = selectedEl.isClosed ?? (!selectedEl.tagName || ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(selectedEl.tagName) || (selectedEl.attributes.d ? /z/i.test(selectedEl.attributes.d) : false));
+        const isClosed = this.isElementClosed(selectedEl);
         const d = this.ctx.model.compilePathD(this.ghostNodeVertices, isClosed);
         html += `<path d="${d}" fill="rgba(56, 189, 248, 0.15)" stroke="#38bdf8" stroke-width="2" stroke-dasharray="4 3" vector-effect="non-scaling-stroke" />`;
         this.ghostNodeVertices.forEach((gv) => {

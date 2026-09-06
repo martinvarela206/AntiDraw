@@ -13,44 +13,82 @@ export class NodeEditorTool {
   public selectedHandleType: 'vertex' | 'handleIn' | 'handleOut' | null = null;
   public fusionThreshold: number = 8.0; // Proximity distance in px to auto-fuse endpoints
 
-  // Find vertex or handle under mouse cursor with priority for selected handles
+  /**
+   * ARCHITECTURAL RATIONALE: Anchor vs. Handle Hit Priority and Collapsed Handle Immunity
+   *
+   * Why this solution is engineered this way:
+   * 1. Distance-Proportional Disambiguation:
+   *    Naive implementations check either handles first or vertices first with fixed radii.
+   *    When a handle is close to its anchor (or collapsed at length < 2px), a handle-first check
+   *    falsely intercepts clicks intended for the anchor vertex, blocking node dragging and
+   *    preventing double-click node deletion (`hitNode.type` returning 'handleIn' instead of 'vertex').
+   *    By comparing exact Euclidean distance `dAnchor` vs `dHandle`, the control point closest to
+   *    the cursor wins unambiguously.
+   * 2. Collapsed Handle Immunity (`handleLen >= 2`):
+   *    Handles residing at (v.x, v.y) represent linear/sharp endpoints or unextended tangents.
+   *    They must never intercept clicks over the anchor.
+   * 3. Visibility-Constrained Hit Testing:
+   *    Only the selected vertex (and immediately adjacent segments) display interactive handles
+   *    in the UI. Evaluating handles of unselected vertices creates invisible phantom click targets.
+   */
   public hitTestVertices(
     vertices: PathVertex[],
     pt: Point,
     radius: number = 12,
     selectedVertexId: string | null = null
   ): { vertex: PathVertex; type: 'vertex' | 'handleIn' | 'handleOut' } | null {
-    // 1. Priority: check handles of the currently selected vertex first
+    let bestHit: { vertex: PathVertex; type: 'vertex' | 'handleIn' | 'handleOut'; dist: number } | null = null;
+
+    // 1. Check all anchor vertices
+    for (const v of vertices) {
+      const dAnchor = Math.hypot(pt.x - v.x, pt.y - v.y);
+      if (dAnchor <= radius) {
+        if (!bestHit || dAnchor < bestHit.dist) {
+          bestHit = { vertex: v, type: 'vertex', dist: dAnchor };
+        }
+      }
+    }
+
+    // 2. Check handles of selected vertex and adjacent visible handles
     if (selectedVertexId) {
-      const selV = vertices.find((v) => v.id === selectedVertexId);
-      if (selV) {
-        if (selV.handleIn && Math.hypot(pt.x - selV.handleIn.x, pt.y - selV.handleIn.y) <= radius) {
-          return { vertex: selV, type: 'handleIn' };
+      const selIdx = vertices.findIndex((v) => v.id === selectedVertexId);
+      if (selIdx >= 0) {
+        const candidateIndices = [selIdx];
+        const prevIdx = selIdx > 0 ? selIdx - 1 : vertices.length - 1;
+        const nextIdx = (selIdx + 1) % vertices.length;
+        candidateIndices.push(prevIdx, nextIdx);
+
+        for (const idx of candidateIndices) {
+          const v = vertices[idx];
+          if (!v) continue;
+
+          if (v.handleIn) {
+            const dIn = Math.hypot(pt.x - v.handleIn.x, pt.y - v.handleIn.y);
+            const handleLen = Math.hypot(v.handleIn.x - v.x, v.handleIn.y - v.y);
+            // Ignore collapsed handles (< 2px from anchor)
+            if (handleLen >= 2 && dIn <= radius) {
+              // Handle overrides anchor only if it is strictly closer than anchor
+              if (!bestHit || dIn < bestHit.dist) {
+                bestHit = { vertex: v, type: 'handleIn', dist: dIn };
+              }
+            }
+          }
+
+          if (v.handleOut) {
+            const dOut = Math.hypot(pt.x - v.handleOut.x, pt.y - v.handleOut.y);
+            const handleLen = Math.hypot(v.handleOut.x - v.x, v.handleOut.y - v.y);
+            // Ignore collapsed handles (< 2px from anchor)
+            if (handleLen >= 2 && dOut <= radius) {
+              if (!bestHit || dOut < bestHit.dist) {
+                bestHit = { vertex: v, type: 'handleOut', dist: dOut };
+              }
+            }
+          }
         }
-        if (selV.handleOut && Math.hypot(pt.x - selV.handleOut.x, pt.y - selV.handleOut.y) <= radius) {
-          return { vertex: selV, type: 'handleOut' };
-        }
       }
     }
 
-    // 2. Check handles of all vertices
-    for (const v of vertices) {
-      if (v.handleIn && Math.hypot(pt.x - v.handleIn.x, pt.y - v.handleIn.y) <= radius) {
-        return { vertex: v, type: 'handleIn' };
-      }
-      if (v.handleOut && Math.hypot(pt.x - v.handleOut.x, pt.y - v.handleOut.y) <= radius) {
-        return { vertex: v, type: 'handleOut' };
-      }
-    }
-
-    // 3. Check main vertex anchor positions
-    for (const v of vertices) {
-      if (Math.hypot(pt.x - v.x, pt.y - v.y) <= radius) {
-        return { vertex: v, type: 'vertex' };
-      }
-    }
-
-    return null;
+    return bestHit ? { vertex: bestHit.vertex, type: bestHit.type } : null;
   }
 
   /**

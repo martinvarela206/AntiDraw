@@ -438,6 +438,16 @@ export class VectorModel {
     return dParts.join(' ');
   }
 
+  /**
+   * Determine whether an element is topologically closed ('Z' subpath, explicit flag, or closed SVG shape).
+   */
+  public isElementClosed(el: VectorElement): boolean {
+    if (el.isClosed !== undefined) return el.isClosed;
+    if (el.tagName && ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(el.tagName)) return true;
+    if (el.attributes?.d && /z/i.test(el.attributes.d)) return true;
+    return false;
+  }
+
   // Convert shape tags (rect, circle, ellipse, star, line, polygon) to path vertices
   public convertShapeToVertices(tag: string, attrs: Record<string, string>): PathVertex[] {
     const vertices: PathVertex[] = [];

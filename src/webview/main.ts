@@ -1309,6 +1309,32 @@ class AntiDrawApp {
     // Update cursor indicator on rulers
     this.rulerView.setCursorPos(pt.x, pt.y);
 
+    // Node Tool Delegation: handle active drag or hover feedback without blocking on main.ts drag state
+    if (this.toolbar.activeTool === 'node') {
+      if (this.nodeToolHandler.onPointerMove(e, pt)) {
+        return;
+      }
+      const z = this.canvasMgr.zoom || 1;
+      const selectedEl = this.model.elements.find((el) => this.selectionTool.isSelected(el.id));
+      if (selectedEl && selectedEl.vertices) {
+        const hit = this.nodeEditorTool.hitTestVertices(selectedEl.vertices, pt, 12 / z, this.nodeEditorTool.selectedVertexId);
+        if (hit) {
+          this.canvasWrapper.style.cursor = 'pointer';
+          this.canvasScrollArea.style.cursor = 'pointer';
+          return;
+        }
+        const hitSeg = this.nodeEditorTool.hitTestSegment(selectedEl.vertices, pt, 10 / z, this.model.isElementClosed(selectedEl));
+        if (hitSeg !== null) {
+          this.canvasWrapper.style.cursor = 'crosshair';
+          this.canvasScrollArea.style.cursor = 'crosshair';
+          return;
+        }
+      }
+      this.canvasWrapper.style.cursor = 'default';
+      this.canvasScrollArea.style.cursor = '';
+      return;
+    }
+
     if (!this.isDragging || !this.activeHandle) {
       // Hover testing for cursors
       if (this.toolbar.activeTool === 'select') {
@@ -1523,10 +1549,6 @@ class AntiDrawApp {
         this.renderOverlay();
         return;
       }
-    } else if (this.toolbar.activeTool === 'node') {
-      if (this.nodeToolHandler.onPointerMove(e, pt)) {
-        return;
-      }
     } else if (this.toolbar.activeTool === 'pen') {
       if (this.penToolHandler.onPointerMove(e, pt)) {
         return;
@@ -1546,9 +1568,19 @@ class AntiDrawApp {
       }
     } catch (_err) {}
 
+    const pt = this.getCanvasPoint(e);
+
+    // Node Tool Delegation: finish drag or commit ghost transformations cleanly
+    if (this.toolbar.activeTool === 'node') {
+      this.isDragging = false;
+      if (this.nodeToolHandler.onPointerUp(e, pt)) {
+        return;
+      }
+      return;
+    }
+
     if (this.isDragging) {
       this.isDragging = false;
-      const pt = this.getCanvasPoint(e);
 
       // 0. Finishing Origin Drag from ruler corner
       if (this.activeHandle === 'origin-drag') {
@@ -1675,12 +1707,8 @@ class AntiDrawApp {
         hasChangesToCommit = true;
       }
 
-      // Delegate Node Tool and Pen Tool pointer up
-      if (this.toolbar.activeTool === 'node') {
-        if (this.nodeToolHandler.onPointerUp(e, pt)) {
-          return;
-        }
-      } else if (this.toolbar.activeTool === 'pen') {
+      // Delegate Pen Tool pointer up
+      if (this.toolbar.activeTool === 'pen') {
         if (this.penToolHandler.onPointerUp(e, pt)) {
           return;
         }
@@ -2301,18 +2329,20 @@ class AntiDrawApp {
       }
 
       // 6. Always visible vertices for all selected elements (Selection mode & Node mode)
-      selectedEls.forEach((el) => {
-        if (el.vertices) {
-          const isNodeMode = this.toolbar.activeTool === 'node' && selectedEls.length === 1;
-          const selectedVertexId = this.nodeEditorTool.selectedVertexId;
+      if (!this.nodeToolHandler.ghostNodeVertices) {
+        selectedEls.forEach((el) => {
+          if (el.vertices) {
+            const isNodeMode = this.toolbar.activeTool === 'node' && selectedEls.length === 1;
+            const selectedVertexId = this.nodeEditorTool.selectedVertexId;
 
-          el.vertices.forEach((v) => {
-            const isSelectedVertex = isNodeMode && v.id === selectedVertexId;
-            const vR = (isSelectedVertex ? 4.5 : 3.5) / z;
-            html += `<circle cx="${v.x}" cy="${v.y}" r="${vR}" fill="${isSelectedVertex ? '#38bdf8' : '#ffffff'}" stroke="#0284c7" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
-          });
-        }
-      });
+            el.vertices.forEach((v) => {
+              const isSelectedVertex = isNodeMode && v.id === selectedVertexId;
+              const vR = (isSelectedVertex ? 4.5 : 3.5) / z;
+              html += `<circle cx="${v.x}" cy="${v.y}" r="${vR}" fill="${isSelectedVertex ? '#38bdf8' : '#ffffff'}" stroke="#0284c7" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
+            });
+          }
+        });
+      }
     }
 
     // 7. Node Tool Overlay (Bézier handles, segment highlight, ghost drag paths)
