@@ -195,6 +195,22 @@ export class NodeEditorTool {
   }
 
   /**
+   * ARCHITECTURAL RATIONALE: Topological Contour Auto-Closure ('Z')
+   * Why this solution is engineered this way:
+   * 1. Vector Graph Closure: An open path in SVG does not fill predictably across different renderers
+   *    unless explicitly terminated with the 'Z' (closepath) operator.
+   * 2. Preserves Node Identities: Instead of mutating vertex indices or discarding vertices,
+   *    marking the contour as closed connects the last vertex back to the initial 'M' anchor point
+   *    while retaining all handle tangents and individual node ids for subsequent editing.
+   * 3. Idempotent: If the path is already closed or has fewer than 2 vertices, this operation is a safe no-op.
+   */
+  public closePath(vertices: PathVertex[]): { updatedVertices: PathVertex[]; isClosed: boolean } {
+    if (!vertices || vertices.length < 2) return { updatedVertices: vertices, isClosed: false };
+    const updated = vertices.map((v) => ({ ...v }));
+    return { updatedVertices: updated, isClosed: true };
+  }
+
+  /**
    * ARCHITECTURAL RATIONALE: Topological Endpoint Auto-Fusion
    * Why this solution is engineered this way:
    * 1. Scope Restriction (isFreeEndpoint): Auto-fusion is strictly limited to the first (index 0)

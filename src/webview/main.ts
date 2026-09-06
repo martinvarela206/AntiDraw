@@ -277,6 +277,7 @@ class AntiDrawApp {
         },
         onNodeTypeChange: (type) => this.handleNodeTypeChange(type),
         onSplitNode: () => this.handleSplitNode(),
+        onClosePath: () => this.handleCloseOpenPath(),
         onConvertSegmentToLine: () => this.handleConvertSegmentToLine(),
         onConvertSegmentToCurve: () => this.handleConvertSegmentToCurve(),
         onPenNodeTypeChange: (nodeType) => {
@@ -2732,6 +2733,35 @@ class AntiDrawApp {
       this.render();
       this.syncToHost();
     }
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Topological Path Auto-Closure Action
+   * Why this solution is engineered this way:
+   * 1. Vector Graph Closure: Connects the final vertex of an open path back to the starting vertex
+   *    by updating the element's isClosed property and re-compiling SVG path 'd' with the 'Z' operator.
+   * 2. Preserves Tangent Geometry: If the first or last node possesses active Bézier handles,
+   *    VectorModel.compilePathD generates a smooth closing Bézier curve ('C ... Z') instead of a harsh line.
+   * 3. Undo/Redo & State Synchronization: Captures an undo snapshot prior to mutation, keeps the active
+   *    node selected, and updates the PropertyPanel so the closing state reflects immediately in the UI.
+   */
+  private handleCloseOpenPath(): void {
+    const selectedEl = this.model.elements.find(
+      (el) => el.id === this.selectionTool.selectedElementId
+    );
+    if (!selectedEl || !selectedEl.vertices || selectedEl.vertices.length < 2) return;
+
+    this.pushUndo();
+    const result = this.nodeEditorTool.closePath(selectedEl.vertices);
+    selectedEl.vertices = result.updatedVertices;
+    selectedEl.isClosed = true;
+    selectedEl.attributes.d = this.model.compilePathD(selectedEl.vertices, true);
+    if (this.nodeEditorTool.selectedVertexId) {
+      const activeV = selectedEl.vertices.find((v) => v.id === this.nodeEditorTool.selectedVertexId);
+      this.propertyPanel.update(activeV || null, 'node');
+    }
+    this.render();
+    this.syncToHost();
   }
 
   /**

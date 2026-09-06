@@ -8,6 +8,7 @@ export interface PropertyPanelCallbacks {
   onUpdateCanvas: () => void;
   onNodeTypeChange: (nodeType: NodeType) => void;
   onSplitNode: () => void;
+  onClosePath?: () => void;
   onConvertSegmentToLine?: () => void;
   onConvertSegmentToCurve?: () => void;
   onPenNodeTypeChange?: (nodeType: NodeType) => void;
@@ -1233,6 +1234,11 @@ export class PropertyPanel {
   // Render Node Properties for single selected vertex
   private renderNodeProperties(el: VectorElement, v: PathVertex): void {
     const isSharp = v.nodeType === 'sharp' || (!v.handleIn && !v.handleOut);
+    const isClosed =
+      el.isClosed ??
+      (!el.tagName ||
+        ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(el.tagName) ||
+        (el.attributes.d ? /z/i.test(el.attributes.d) : false));
 
     this.container.innerHTML = `
       <div class="panel-section">
@@ -1264,8 +1270,15 @@ export class PropertyPanel {
         </div>
       </div>
       <div class="panel-section">
-        <div class="panel-title">Node Actions</div>
-        <div class="prop-row">
+        <div class="panel-title">Path &amp; Node Actions</div>
+        <div class="prop-row" style="flex-direction:column; gap:6px;">
+          ${!isClosed ? `
+            <button class="prop-input" id="btn-close-curve" style="cursor:pointer; background:var(--accent-color); color:#fff; text-align:center; font-weight:600;" title="Auto-Cerrar trazado uniendo extremos con comando Z">
+              ⟳ Auto-Cerrar Curva (Z)
+            </button>
+          ` : `
+            <div style="font-size:11px; color:var(--text-muted); text-align:center; padding: 3px 0;">✓ Contorno cerrado (Z)</div>
+          `}
           <button class="prop-input" id="btn-split-node" style="cursor:pointer; background:var(--bg-active); text-align:center;">
             ${ToolIcons.splitNode} Split Node into 2 Vertices
           </button>
@@ -1289,6 +1302,9 @@ export class PropertyPanel {
     this.bindMouseDown('btn-node-asym', () => this.callbacks.onNodeTypeChange('asymmetric'));
     this.bindMouseDown('btn-node-smooth', () => this.callbacks.onNodeTypeChange('smooth'));
     this.bindMouseDown('btn-node-sym', () => this.callbacks.onNodeTypeChange('symmetric'));
+    this.bindMouseDown('btn-close-curve', () => {
+      if (this.callbacks.onClosePath) this.callbacks.onClosePath();
+    });
     this.bindMouseDown('btn-split-node', () => this.callbacks.onSplitNode());
     this.bindMouseDown('btn-segment-to-line', () => {
       if (this.callbacks.onConvertSegmentToLine) this.callbacks.onConvertSegmentToLine();
