@@ -9,6 +9,7 @@ export interface SelectedNodeRef {
 
 export class NodeEditorTool {
   public selectedVertexId: string | null = null;
+  public selectedSegmentIdx: number | null = null;
   public selectedHandleType: 'vertex' | 'handleIn' | 'handleOut' | null = null;
   public fusionThreshold: number = 8.0; // Proximity distance in px to auto-fuse endpoints
 
@@ -50,6 +51,147 @@ export class NodeEditorTool {
     }
 
     return null;
+  }
+
+  /**
+   * Hit test to find if cursor is near a path segment (straight line or cubic Bézier).
+   */
+  public hitTestSegment(
+    vertices: PathVertex[],
+    pt: Point,
+    tolerance: number = 8,
+    isClosed: boolean = true
+  ): number | null {
+    const n = vertices.length;
+    if (n < 2) return null;
+    const segmentCount = isClosed ? n : n - 1;
+
+    for (let i = 0; i < segmentCount; i++) {
+      const v1 = vertices[i];
+      const nextIdx = (i + 1) % n;
+      const v2 = vertices[nextIdx];
+      const isCurve = !!(v1.handleOut || v2.handleIn);
+
+      const h1 = v1.handleOut || { x: v1.x, y: v1.y };
+      const h2 = v2.handleIn || { x: v2.x, y: v2.y };
+
+      const dist = isCurve
+        ? distToBezierPoint(pt, v1, h1, h2, v2)
+        : distToSegmentPoint(pt, v1, v2);
+
+      if (dist <= tolerance) {
+        return i;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Solidary Segment Translation
+   * Why both boundary vertices move together solidarily:
+   * 1. Vector Manipulation Standard (CorelDraw / Illustrator): Dragging a segment path directly
+   *    allows the user to reposition an entire edge without requiring marquee or multi-shift selection.
+   * 2. Zero Curvature Distortion: By shifting both bounding vertices (index i and nextIdx) and their
+   *    respective handleIn and handleOut coordinates by the exact same delta (dx, dy), the segment's
+   *    internal polynomial curvature and geometric tangent continuity remain 100% intact.
+   * 3. Numerical Stability: Operating via delta translation instead of non-linear projection avoids
+   *    runaway coordinates or oscillation when dragging close to zero length.
+   */
+  public moveSegment(
+    vertices: PathVertex[],
+    segmentIdx: number,
+    dx: number,
+    dy: number,
+    isClosed: boolean = true
+  ): PathVertex[] {
+    const n = vertices.length;
+    if (segmentIdx < 0 || segmentIdx >= n) return vertices;
+    const nextIdx = (segmentIdx + 1) % n;
+    if (!isClosed && segmentIdx === n - 1) return vertices;
+
+    return vertices.map((v, idx) => {
+      if (idx === segmentIdx || idx === nextIdx) {
+        const nextV: PathVertex = {
+          ...v,
+          x: v.x + dx,
+          y: v.y + dy,
+        };
+        if (v.handleIn) {
+          nextV.handleIn = { x: v.handleIn.x + dx, y: v.handleIn.y + dy };
+        }
+        if (v.handleOut) {
+          nextV.handleOut = { x: v.handleOut.x + dx, y: v.handleOut.y + dy };
+        }
+        return nextV;
+      }
+      return v;
+    });
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Segment Mode Transitions (To Line / To Curve)
+   * Why explicit segment conversion is engineered this way:
+   * 1. CorelDraw Paradigm: In professional vector workflows, users often block out shapes with
+   *    straight lines, then convert individual segments to Bézier curves on demand.
+   * 2. To Line (C -> L): Deletes outgoing handle from v1 and incoming handle into v2, setting command to 'L'.
+   *    This immediately flattens the segment with zero residual curvature artifacts or orphaned handles.
+   * 3. To Curve (L -> C): Calculates standard 1/3 and 2/3 control points along the secant chord.
+   *    This creates a cubic Bézier polynomial that starts identical to the straight line, providing
+   *    immediate handles that the user can pull or tweak without distorting the initial layout.
+   */
+  public convertSegmentToLine(vertices: PathVertex[], segmentIdx: number, isClosed: boolean = true): PathVertex[] {
+    const n = vertices.length;
+    if (segmentIdx < 0 || segmentIdx >= n) return vertices;
+    const nextIdx = (segmentIdx + 1) % n;
+    if (!isClosed && segmentIdx === n - 1) return vertices;
+
+    return vertices.map((v, idx) => {
+      if (idx === segmentIdx) {
+        return { ...v, handleOut: undefined };
+      }
+      if (idx === nextIdx) {
+        return {
+          ...v,
+          handleIn: undefined,
+          command: v.command === 'M' ? 'M' : 'L',
+        };
+      }
+      return v;
+    });
+  }
+
+  public convertSegmentToCurve(vertices: PathVertex[], segmentIdx: number, isClosed: boolean = true): PathVertex[] {
+    const n = vertices.length;
+    if (segmentIdx < 0 || segmentIdx >= n) return vertices;
+    const nextIdx = (segmentIdx + 1) % n;
+    if (!isClosed && segmentIdx === n - 1) return vertices;
+
+    const v1 = vertices[segmentIdx];
+    const v2 = vertices[nextIdx];
+
+    const h1 = {
+      x: v1.x + (v2.x - v1.x) / 3,
+      y: v1.y + (v2.y - v1.y) / 3,
+    };
+    const h2 = {
+      x: v1.x + (2 * (v2.x - v1.x)) / 3,
+      y: v1.y + (2 * (v2.y - v1.y)) / 3,
+    };
+
+    return vertices.map((v, idx) => {
+      if (idx === segmentIdx) {
+        return { ...v, handleOut: h1 };
+      }
+      if (idx === nextIdx) {
+        return {
+          ...v,
+          handleIn: h2,
+          command: 'C',
+          nodeType: v.nodeType === 'sharp' ? 'smooth' : v.nodeType,
+        };
+      }
+      return v;
+    });
   }
 
   /**

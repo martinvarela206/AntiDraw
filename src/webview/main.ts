@@ -50,6 +50,7 @@ class AntiDrawApp {
     | 'guide-pivot'
     | 'guide-rotate'
     | 'origin-drag'
+    | 'segment'
     | null = null;
 
   private initialElementState: VectorElement | null = null;
@@ -276,6 +277,8 @@ class AntiDrawApp {
         },
         onNodeTypeChange: (type) => this.handleNodeTypeChange(type),
         onSplitNode: () => this.handleSplitNode(),
+        onConvertSegmentToLine: () => this.handleConvertSegmentToLine(),
+        onConvertSegmentToCurve: () => this.handleConvertSegmentToCurve(),
         onPenNodeTypeChange: (nodeType) => {
           this.penNodeType = nodeType;
           this.render();
@@ -1098,6 +1101,7 @@ class AntiDrawApp {
       this.initialVertices = [];
       this.activeHandle = null;
       this.isDragging = false;
+      this.nodeEditorTool.selectedSegmentIdx = null;
       needsRender = true;
     }
 
@@ -1424,14 +1428,41 @@ class AntiDrawApp {
         if (hitNode) {
           this.nodeEditorTool.selectedVertexId = hitNode.vertex.id;
           this.nodeEditorTool.selectedHandleType = hitNode.type;
+          this.nodeEditorTool.selectedSegmentIdx = null;
           this.activeHandle = hitNode.type;
           this.initialVertices = JSON.parse(JSON.stringify(selectedEl.vertices));
           this.ghostNodeVertices = null;
         } else {
+          // Check if clicked on a segment between nodes
+          const isClosed =
+            selectedEl.isClosed ??
+            (!selectedEl.tagName ||
+              ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(selectedEl.tagName) ||
+              (selectedEl.attributes.d ? /z/i.test(selectedEl.attributes.d) : false));
+          const hitSegment = this.nodeEditorTool.hitTestSegment(
+            selectedEl.vertices,
+            pt,
+            8 / z,
+            isClosed
+          );
+          if (hitSegment !== null) {
+            this.nodeEditorTool.selectedSegmentIdx = hitSegment;
+            const nextIdx = (hitSegment + 1) % selectedEl.vertices.length;
+            this.nodeEditorTool.selectedVertexId = selectedEl.vertices[nextIdx].id;
+            this.nodeEditorTool.selectedHandleType = null;
+            this.activeHandle = 'segment';
+            this.dragStartPt = { ...pt };
+            this.initialVertices = JSON.parse(JSON.stringify(selectedEl.vertices));
+            this.ghostNodeVertices = null;
+            this.renderOverlay();
+            return;
+          }
+
           // Clicked empty space in node mode: deselect and switch to select tool and canvas properties
           this.selectionTool.deselectAll();
           this.nodeEditorTool.selectedVertexId = null;
           this.nodeEditorTool.selectedHandleType = null;
+          this.nodeEditorTool.selectedSegmentIdx = null;
           this.toolbar.setTool('select');
           this.propertyPanel.resetPanelMode();
           this.render();
@@ -1824,6 +1855,27 @@ class AntiDrawApp {
             this.nodeEditorTool.selectedVertexId,
             this.activeHandle,
             snappedPt
+          );
+          this.renderOverlay();
+          return;
+        } else if (
+          this.activeHandle === 'segment' &&
+          this.nodeEditorTool.selectedSegmentIdx !== null
+        ) {
+          const dx = pt.x - this.dragStartPt.x;
+          const dy = pt.y - this.dragStartPt.y;
+          const baseVerts = this.initialVertices.length > 0 ? this.initialVertices : selectedEl.vertices;
+          const isClosed =
+            selectedEl.isClosed ??
+            (!selectedEl.tagName ||
+              ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(selectedEl.tagName) ||
+              (selectedEl.attributes.d ? /z/i.test(selectedEl.attributes.d) : false));
+          this.ghostNodeVertices = this.nodeEditorTool.moveSegment(
+            baseVerts,
+            this.nodeEditorTool.selectedSegmentIdx,
+            dx,
+            dy,
+            isClosed
           );
           this.renderOverlay();
           return;
@@ -2682,6 +2734,86 @@ class AntiDrawApp {
     }
   }
 
+  /**
+   * ARCHITECTURAL RATIONALE: Segment to Straight Line ('L') Conversion
+   * Why this solution is engineered this way:
+   * 1. Resolves Active or Inferred Segment: If the user clicked directly on a segment (selectedSegmentIdx),
+   *    that segment is explicitly targeted. If only a single vertex is selected, the segment leading into
+   *    that vertex is intuitively converted, avoiding ambiguity.
+   * 2. Pure Geometry Transformation: Strips out outgoing handle from v1 and incoming handle into v2,
+   *    and enforces command 'L' (unless v2 is origin 'M'). This eliminates numerical wobbles and
+   *    flattens the segment instantly.
+   * 3. Undo History and Reactive Host Sync: Pushes an atomic snapshot before mutation, updates SVG 'd'
+   *    attribute, and notifies host editor.
+   */
+  private handleConvertSegmentToLine(): void {
+    const selectedEl = this.model.elements.find(
+      (el) => el.id === this.selectionTool.selectedElementId
+    );
+    if (!selectedEl || !selectedEl.vertices || selectedEl.vertices.length < 2) return;
+
+    let segIdx = this.nodeEditorTool.selectedSegmentIdx;
+    if (segIdx === null && this.nodeEditorTool.selectedVertexId) {
+      const vIdx = selectedEl.vertices.findIndex((v) => v.id === this.nodeEditorTool.selectedVertexId);
+      if (vIdx > 0) {
+        segIdx = vIdx - 1;
+      } else if (vIdx === 0 && selectedEl.vertices.length > 2) {
+        segIdx = selectedEl.vertices.length - 1;
+      }
+    }
+    if (segIdx === null) return;
+
+    this.pushUndo();
+    const isClosed =
+      selectedEl.isClosed ??
+      (!selectedEl.tagName ||
+        ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(selectedEl.tagName) ||
+        (selectedEl.attributes.d ? /z/i.test(selectedEl.attributes.d) : false));
+    selectedEl.vertices = this.nodeEditorTool.convertSegmentToLine(selectedEl.vertices, segIdx, isClosed);
+    selectedEl.attributes.d = this.model.compilePathD(selectedEl.vertices, isClosed);
+    this.render();
+    this.syncToHost();
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Segment to Cubic Bézier ('C') Conversion
+   * Why this solution is engineered this way:
+   * 1. Baseline Polynomial Generation: Straight lines have no Bézier handles. Converting to 'C'
+   *    synthesizes two initial collinear handles located at 1/3 and 2/3 along the secant chord.
+   * 2. Zero Visual Jump: The initial curve at 1/3 and 2/3 control points represents a flat line,
+   *    preventing any unwanted deformation until the designer decides to drag the handles.
+   * 3. Robust Interaction: Works seamlessly both when a segment is directly highlighted or when
+   *    an adjacent node is active in the inspector panel.
+   */
+  private handleConvertSegmentToCurve(): void {
+    const selectedEl = this.model.elements.find(
+      (el) => el.id === this.selectionTool.selectedElementId
+    );
+    if (!selectedEl || !selectedEl.vertices || selectedEl.vertices.length < 2) return;
+
+    let segIdx = this.nodeEditorTool.selectedSegmentIdx;
+    if (segIdx === null && this.nodeEditorTool.selectedVertexId) {
+      const vIdx = selectedEl.vertices.findIndex((v) => v.id === this.nodeEditorTool.selectedVertexId);
+      if (vIdx > 0) {
+        segIdx = vIdx - 1;
+      } else if (vIdx === 0 && selectedEl.vertices.length > 2) {
+        segIdx = selectedEl.vertices.length - 1;
+      }
+    }
+    if (segIdx === null) return;
+
+    this.pushUndo();
+    const isClosed =
+      selectedEl.isClosed ??
+      (!selectedEl.tagName ||
+        ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(selectedEl.tagName) ||
+        (selectedEl.attributes.d ? /z/i.test(selectedEl.attributes.d) : false));
+    selectedEl.vertices = this.nodeEditorTool.convertSegmentToCurve(selectedEl.vertices, segIdx, isClosed);
+    selectedEl.attributes.d = this.model.compilePathD(selectedEl.vertices, isClosed);
+    this.render();
+    this.syncToHost();
+  }
+
   private pushUndo(): void {
     const state = JSON.stringify(this.model.elements);
     this.undoStack.push(state);
@@ -3111,6 +3243,26 @@ class AntiDrawApp {
             }
           }
         });
+
+        // 8. Highlight Selected Path Segment in Node Mode
+        if (this.nodeEditorTool.selectedSegmentIdx !== null) {
+          const segIdx = this.nodeEditorTool.selectedSegmentIdx;
+          if (segIdx >= 0 && segIdx < verts.length) {
+            const nextIdx = (segIdx + 1) % verts.length;
+            const v1 = verts[segIdx];
+            const v2 = verts[nextIdx];
+            const isCurve = !!(v1.handleOut || v2.handleIn);
+            let segD = '';
+            if (isCurve) {
+              const h1 = v1.handleOut || { x: v1.x, y: v1.y };
+              const h2 = v2.handleIn || { x: v2.x, y: v2.y };
+              segD = `M ${v1.x} ${v1.y} C ${h1.x} ${h1.y} ${h2.x} ${h2.y} ${v2.x} ${v2.y}`;
+            } else {
+              segD = `M ${v1.x} ${v1.y} L ${v2.x} ${v2.y}`;
+            }
+            html += `<path d="${segD}" fill="none" stroke="#38bdf8" stroke-width="${3 / z}" stroke-dasharray="4 2" vector-effect="non-scaling-stroke" />`;
+          }
+        }
       }
     }
 

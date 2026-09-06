@@ -8,6 +8,8 @@ export interface PropertyPanelCallbacks {
   onUpdateCanvas: () => void;
   onNodeTypeChange: (nodeType: NodeType) => void;
   onSplitNode: () => void;
+  onConvertSegmentToLine?: () => void;
+  onConvertSegmentToCurve?: () => void;
   onPenNodeTypeChange?: (nodeType: NodeType) => void;
   onFinishPenPath?: (close: boolean) => void;
   onFinishPolylinePath?: (close: boolean) => void;
@@ -1269,6 +1271,17 @@ export class PropertyPanel {
           </button>
         </div>
       </div>
+      <div class="panel-section">
+        <div class="panel-title">Segment Conversion</div>
+        <div class="prop-row" style="display:flex; gap:6px;">
+          <button class="prop-input" id="btn-segment-to-line" style="cursor:pointer; background:var(--bg-active); text-align:center; flex:1;" title="Convertir tramo a recta pura (L)">
+            ― A Recta
+          </button>
+          <button class="prop-input" id="btn-segment-to-curve" style="cursor:pointer; background:var(--bg-active); text-align:center; flex:1;" title="Convertir tramo a curva Bézier (C)">
+            ∿ A Curva
+          </button>
+        </div>
+      </div>
     `;
 
     // mousedown + preventDefault: prevents focus stealing / blur from canvas when clicking panel buttons
@@ -1277,6 +1290,12 @@ export class PropertyPanel {
     this.bindMouseDown('btn-node-smooth', () => this.callbacks.onNodeTypeChange('smooth'));
     this.bindMouseDown('btn-node-sym', () => this.callbacks.onNodeTypeChange('symmetric'));
     this.bindMouseDown('btn-split-node', () => this.callbacks.onSplitNode());
+    this.bindMouseDown('btn-segment-to-line', () => {
+      if (this.callbacks.onConvertSegmentToLine) this.callbacks.onConvertSegmentToLine();
+    });
+    this.bindMouseDown('btn-segment-to-curve', () => {
+      if (this.callbacks.onConvertSegmentToCurve) this.callbacks.onConvertSegmentToCurve();
+    });
   }
 
   /**
