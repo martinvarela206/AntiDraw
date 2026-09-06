@@ -69,7 +69,7 @@ export class SelectToolHandler implements IToolHandler {
         const geom = this.ctx.canvasMgr.getGuideGeometry(activeG, this.ctx.model.canvas.width, this.ctx.model.canvas.height);
 
         // Check pivot click
-        if (Math.hypot(pt.x - geom.pivot.x, pt.y - geom.pivot.y) <= 12) {
+        if (Math.hypot(pt.x - geom.pivot.x, pt.y - geom.pivot.y) <= 14) {
           this.activeHandle = 'guide-pivot';
           this.guideInitialState = { ...activeG };
           this.ctx.render();
@@ -106,15 +106,33 @@ export class SelectToolHandler implements IToolHandler {
       }
     }
 
-    // 2. Check if clicking on any Guide Line to select it or start dragging it
+    // 2. Check if clicking on any Guide Line to select it and activate rotation controls immediately
+    // ARCHITECTURAL RATIONALE: Instant Guide Transformation on Single Click
+    // In earlier versions, guide rotation controls (pivot and curved arrows) required an explicit
+    // double-click gesture. This caused friction and broke expected workflow where clicking, holding,
+    // and dragging a guide line directly performs angular rotation, while dragging the central pivot
+    // translates its center of rotation. Activating `activeGuideTransformId` and assigning
+    // `activeHandle = 'guide-rotate'` on first click ensures instant feedback and interactive rotation.
     const hitGuide = this.ctx.canvasMgr.hitTestGuide(pt, this.ctx.model.canvas.width, this.ctx.model.canvas.height, 8);
     if (hitGuide) {
       this.ctx.selectionTool.deselectAll();
       this.ctx.canvasMgr.selectedGuideId = hitGuide.id;
-      this.ctx.canvasMgr.activeGuideTransformId = null;
-      this.activeHandle = 'guide-move';
+      this.ctx.canvasMgr.activeGuideTransformId = hitGuide.id;
       this.guideInitialState = { ...hitGuide };
       this.callbacks.onGuideSelected?.(hitGuide);
+
+      const geom = this.ctx.canvasMgr.getGuideGeometry(hitGuide, this.ctx.model.canvas.width, this.ctx.model.canvas.height);
+      if (Math.hypot(pt.x - geom.pivot.x, pt.y - geom.pivot.y) <= 14) {
+        this.activeHandle = 'guide-pivot';
+      } else {
+        this.activeHandle = 'guide-rotate';
+        if (Math.hypot(pt.x - geom.arrow2.x, pt.y - geom.arrow2.y) <= 16) {
+          this.activeRotateArrowIdx = 2;
+        } else {
+          this.activeRotateArrowIdx = 1;
+        }
+      }
+
       this.ctx.render();
       return true;
     }
