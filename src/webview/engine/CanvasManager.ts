@@ -299,6 +299,95 @@ export class CanvasManager {
     }
   }
 
+  /**
+   * ARCHITECTURAL RATIONALE: High-Performance GPU-Accelerated SVG Pattern Grids
+   * Why <defs><pattern> tiling is used instead of individual <line> elements:
+   * 1. DOM Complexity & Memory: Rendering individual <line> elements across large or zoomed-out
+   *    canvases produces thousands of DOM nodes (e.g. 5000x5000 canvas with 10px spacing = 1,000 lines).
+   *    In SVG, this triggers severe garbage collection pauses and DOM layout recalculations on every pan/zoom frame.
+   * 2. Hardware Acceleration: SVG native <pattern> rendering is handled directly by the browser's GPU graphics
+   *    pipeline in userSpaceOnUse coordinates, rendering any canvas extent with exactly 1 <rect> per grid layer (O(1) DOM nodes).
+   * 3. Geometric Rigor for Non-Orthogonal Meshes: Isometric (30°/60°) and Axonometric (45°) grids require
+   *    trigonometrically precise tiling (e.g. W = S * sqrt(3), H = S) so diagonal seams match seamlessly without
+   *    visual drifting or moiré artifacts.
+   */
+  public generateGridDefsAndLayers(
+    workBounds: { minX: number; minY: number; width: number; height: number; maxX?: number; maxY?: number },
+    originX: number,
+    originY: number
+  ): { defsHtml: string; layersHtml: string } {
+    let defsHtml = '';
+    let layersHtml = '';
+
+    if (!this.showGrid) {
+      return { defsHtml, layersHtml };
+    }
+
+    const visibleGrids = this.grids.filter((g) => g.visible);
+    if (visibleGrids.length === 0) {
+      return { defsHtml, layersHtml };
+    }
+
+    const maxX = workBounds.maxX !== undefined ? workBounds.maxX : workBounds.minX + workBounds.width;
+    const maxY = workBounds.maxY !== undefined ? workBounds.maxY : workBounds.minY + workBounds.height;
+
+    visibleGrids.forEach((grid, idx) => {
+      const patternId = `antidraw_pattern_${grid.id || idx}`;
+      const color = grid.color || 'rgba(255, 255, 255, 0.15)';
+      let tileW = 20;
+      let tileH = 20;
+      let pathD = '';
+
+      if (grid.type === 'isometric') {
+        const S = Math.max(5, grid.spacing || 20);
+        tileH = S;
+        tileW = Math.round(S * Math.sqrt(3) * 1000) / 1000;
+        const halfW = tileW / 2;
+        const halfH = tileH / 2;
+        // Seamless 3-axis isometric lines: vertical, +30 deg, -30 deg
+        const vLines = `M 0 0 L 0 ${tileH} M ${halfW} 0 L ${halfW} ${tileH}`;
+        const diamond = `M 0 ${halfH} L ${halfW} 0 L ${tileW} ${halfH} L ${halfW} ${tileH} Z`;
+        const corners = `M 0 0 L ${halfW} ${halfH} L ${tileW} 0 M 0 ${tileH} L ${halfW} ${halfH} L ${tileW} ${tileH}`;
+        pathD = `${vLines} ${diamond} ${corners}`;
+      } else if (grid.type === 'axonometric') {
+        const S = Math.max(5, grid.spacing || 20);
+        tileW = S;
+        tileH = S;
+        // 45-degree crossing diagonals + vertical axis
+        pathD = `M 0 0 L ${tileW} ${tileH} M 0 ${tileH} L ${tileW} 0 M 0 0 L 0 ${tileH}`;
+      } else {
+        // Orthogonal
+        const S = Math.max(2, grid.spacing || 20);
+        tileW = S;
+        tileH = S;
+        pathD = `M ${tileW} 0 L 0 0 0 ${tileH}`;
+      }
+
+      let patX = originX;
+      let patY = originY;
+      if (grid.alignmentMode === 'cell-center') {
+        patX += tileW / 2;
+        patY += tileH / 2;
+      }
+
+      defsHtml += `
+        <pattern id="${patternId}" x="${patX}" y="${patY}" width="${tileW}" height="${tileH}" patternUnits="userSpaceOnUse">
+          <path d="${pathD}" fill="none" stroke="${color}" stroke-width="0.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />
+        </pattern>
+      `;
+
+      layersHtml += `<rect x="${workBounds.minX}" y="${workBounds.minY}" width="${workBounds.width}" height="${workBounds.height}" fill="url(#${patternId})" pointer-events="none" />`;
+    });
+
+    // Origin calibration reference axes
+    layersHtml += `
+      <line x1="${originX}" y1="${workBounds.minY}" x2="${originX}" y2="${maxY}" stroke="#4f566b" stroke-width="1" vector-effect="non-scaling-stroke" pointer-events="none" />
+      <line x1="${workBounds.minX}" y1="${originY}" x2="${maxX}" y2="${originY}" stroke="#4f566b" stroke-width="1" vector-effect="non-scaling-stroke" pointer-events="none" />
+    `;
+
+    return { defsHtml, layersHtml };
+  }
+
   public addGuide(
     orientation: 'horizontal' | 'vertical' | 'angled',
     position: number,

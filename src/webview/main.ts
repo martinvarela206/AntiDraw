@@ -3080,29 +3080,16 @@ class AntiDrawApp {
       </g>
     `;
 
-    // 1. Grid Lines Overlay across working bounds (Origin-Aligned)
+    // 1. High-Performance GPU-Accelerated Parametric Grid Overlay (<defs><pattern>)
     if (this.canvasMgr.showGrid) {
-      const step = Math.max(1, this.canvasMgr.gridSpacing || 20);
       const originX = vb.minX + (this.canvasMgr.rulerConfig.originX || 0);
       const originY = vb.minY + (this.canvasMgr.rulerConfig.originY || 0);
-      const startX = originX + Math.floor((workBounds.minX - originX) / step) * step;
-      const endX = originX + Math.ceil((workBounds.maxX - originX) / step) * step;
-      const startY = originY + Math.floor((workBounds.minY - originY) / step) * step;
-      const endY = originY + Math.ceil((workBounds.maxY - originY) / step) * step;
-
-      for (let x = startX; x <= endX + 0.1; x += step) {
-        const isOriginAxis = Math.abs(x - originX) < 0.1;
-        const strokeColor = isOriginAxis ? '#4f566b' : '#2a2d3d';
-        const strokeW = isOriginAxis ? '1' : '0.5';
-        const strokeDash = isOriginAxis ? 'none' : '2 2';
-        html += `<line x1="${x}" y1="${workBounds.minY}" x2="${x}" y2="${workBounds.maxY}" stroke="${strokeColor}" stroke-width="${strokeW}" stroke-dasharray="${strokeDash}" vector-effect="non-scaling-stroke" />`;
+      const gridData = this.canvasMgr.generateGridDefsAndLayers(workBounds, originX, originY);
+      if (gridData.defsHtml) {
+        html += `<defs>${gridData.defsHtml}</defs>`;
       }
-      for (let y = startY; y <= endY + 0.1; y += step) {
-        const isOriginAxis = Math.abs(y - originY) < 0.1;
-        const strokeColor = isOriginAxis ? '#4f566b' : '#2a2d3d';
-        const strokeW = isOriginAxis ? '1' : '0.5';
-        const strokeDash = isOriginAxis ? 'none' : '2 2';
-        html += `<line x1="${workBounds.minX}" y1="${y}" x2="${workBounds.maxX}" y2="${y}" stroke="${strokeColor}" stroke-width="${strokeW}" stroke-dasharray="${strokeDash}" vector-effect="non-scaling-stroke" />`;
+      if (gridData.layersHtml) {
+        html += `<g id="grid-pattern-layers">${gridData.layersHtml}</g>`;
       }
     }
 
