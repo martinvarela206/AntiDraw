@@ -1063,11 +1063,7 @@ class AntiDrawApp {
     const activeTool = this.toolbar.activeTool;
 
     try {
-      if (e.target && typeof (e.target as any).setPointerCapture === 'function') {
-        (e.target as any).setPointerCapture(e.pointerId);
-      } else {
-        this.canvasWrapper.setPointerCapture(e.pointerId);
-      }
+      this.canvasWrapper.setPointerCapture(e.pointerId);
     } catch (_err) {}
 
     if (activeTool === 'select') {
@@ -1804,8 +1800,8 @@ class AntiDrawApp {
     }
 
     if (targetEl && targetEl.vertices) {
-      const isClosed = targetEl.isClosed ?? (!targetEl.tagName || ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(targetEl.tagName) || (targetEl.attributes.d ? /z/i.test(targetEl.attributes.d) : false));
-      const tol = 10 / (this.canvasMgr.zoom || 1);
+      const isClosed = this.model.isElementClosed(targetEl);
+      const tol = 14 / (this.canvasMgr.zoom || 1);
       const res = this.nodeEditorTool.insertVertexOnPath(targetEl.vertices, pt, tol, isClosed);
       if (res) {
         this.pushUndo();

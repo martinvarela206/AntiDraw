@@ -44,6 +44,10 @@ export class NodeToolHandler implements IToolHandler {
   public initialVertices: PathVertex[] = [];
   public isDragging: boolean = false;
 
+  private lastClickTime: number = 0;
+  private lastClickPt: Point = { x: 0, y: 0 };
+  private lastDoubleClickHandledTime: number = 0;
+
   constructor(ctx: ToolContext, nodeEditorTool: NodeEditorTool, callbacks: NodeToolCallbacks = {}) {
     this.ctx = ctx;
     this.nodeEditorTool = nodeEditorTool;
@@ -54,12 +58,117 @@ export class NodeToolHandler implements IToolHandler {
     return this.ctx.model.isElementClosed(el);
   }
 
+  /**
+   * ARCHITECTURAL RATIONALE: Deterministic Software Double-Click Resolution
+   *
+   * Why software double-click resolution is essential in SVG webviews:
+   * 1. DOM Re-render / Target Detachment Gotcha:
+   *    Whenever `render()` or `renderOverlay()` rebuilds `svgCanvas.innerHTML` during pointerdown,
+   *    the native DOM element underneath the pointer is destroyed and replaced by a newly created node.
+   *    Standard browser engines (Blink/Chromium) compare event target identity between click 1 and click 2;
+   *    if the target element reference was destroyed or differs, Blink resets its internal click count to 1
+   *    and completely suppresses the native `dblclick` event.
+   * 2. Temporal & Spatial Window:
+   *    Tracking consecutive clicks within 400ms and <= 12 / z canvas units guarantees 100% reliable
+   *    double-click detection regardless of browser event lifecycle quirks or lost pointer capture.
+   * 3. Precedence Order:
+   *    Check anchor vertex hit first -> deletes the vertex if element has > 2 vertices.
+   *    If no vertex is hit, test proximity to contour segments -> inserts new vertex via De Casteljau subdivision.
+   */
+  public executeDoubleClick(pt: Point, z: number): boolean {
+    this.lastDoubleClickHandledTime = Date.now();
+
+    let selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
+    if (!selectedEl) {
+      const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, z);
+      if (hit) {
+        this.ctx.selectionTool.select(hit.element.id);
+        selectedEl = hit.element;
+      }
+    }
+    if (!selectedEl || !selectedEl.vertices || selectedEl.vertices.length === 0) return false;
+
+    const isClosed = this.isElementClosed(selectedEl);
+
+    // 1. Double-click on existing vertex -> Delete vertex
+    const hitNode = this.nodeEditorTool.hitTestVertices(
+      selectedEl.vertices,
+      pt,
+      14 / z,
+      this.nodeEditorTool.selectedVertexId
+    );
+
+    if (hitNode && hitNode.type === 'vertex') {
+      if (selectedEl.vertices.length > 2) {
+        this.ctx.pushUndo();
+        selectedEl.vertices = this.nodeEditorTool.deleteVertex(selectedEl.vertices, hitNode.vertex.id);
+        selectedEl.attributes.d = this.ctx.model.compilePathD(selectedEl.vertices, isClosed);
+        selectedEl.attributes['data-node-types'] = selectedEl.vertices.map((v) => v.nodeType).join(',');
+        this.nodeEditorTool.selectedVertexId = null;
+        this.nodeEditorTool.selectedHandleType = null;
+        this.nodeEditorTool.selectedSegmentIdx = null;
+        this.isDragging = false;
+        this.activeHandle = null;
+        this.ghostNodeVertices = null;
+        if (this.callbacks.onDeselectNode) {
+          this.callbacks.onDeselectNode();
+        }
+        if (this.ctx.applyCanvasSize) this.ctx.applyCanvasSize();
+        this.ctx.render();
+        this.ctx.syncToHost();
+        return true;
+      }
+    }
+
+    // 2. Double-click on path segment -> Insert vertex via De Casteljau subdivision
+    const tol = 14 / z;
+    const res = this.nodeEditorTool.insertVertexOnPath(selectedEl.vertices, pt, tol, isClosed);
+    if (res) {
+      this.ctx.pushUndo();
+      selectedEl.vertices = res.updatedVertices;
+      selectedEl.attributes.d = this.ctx.model.compilePathD(selectedEl.vertices, isClosed);
+      selectedEl.attributes['data-node-types'] = selectedEl.vertices.map((v) => v.nodeType).join(',');
+      this.nodeEditorTool.selectedVertexId = res.newVertexId;
+      this.nodeEditorTool.selectedHandleType = 'vertex';
+      this.nodeEditorTool.selectedSegmentIdx = null;
+      this.isDragging = false;
+      this.activeHandle = null;
+      this.ghostNodeVertices = null;
+      const newV = selectedEl.vertices.find((v) => v.id === res.newVertexId);
+      if (newV && this.callbacks.onNodeSelected) {
+        this.callbacks.onNodeSelected(newV, selectedEl);
+      }
+      if (this.ctx.applyCanvasSize) this.ctx.applyCanvasSize();
+      this.ctx.render();
+      this.ctx.syncToHost();
+      return true;
+    }
+
+    return false;
+  }
+
   public onPointerDown(e: PointerEvent, pt: Point): boolean {
     const activeTool = this.ctx.getActiveTool();
     if (activeTool !== 'node') return false;
     if (e.button !== 0) return false;
 
     const z = this.ctx.canvasMgr.zoom || 1;
+    const now = Date.now();
+    const timeSinceLast = now - this.lastClickTime;
+    const distSinceLast = Math.hypot(pt.x - this.lastClickPt.x, pt.y - this.lastClickPt.y);
+
+    // Fast double-click detection: 2 clicks within 400ms and within 12 screen-pixels
+    if (timeSinceLast < 400 && distSinceLast <= 12 / z) {
+      this.lastClickTime = 0;
+      this.lastClickPt = { x: 0, y: 0 };
+      if (this.executeDoubleClick(pt, z)) {
+        return true;
+      }
+    }
+
+    this.lastClickTime = now;
+    this.lastClickPt = { x: pt.x, y: pt.y };
+
     let selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
 
     // If no element is selected yet in node tool, try to hit-test any element under cursor
@@ -165,6 +274,11 @@ export class NodeToolHandler implements IToolHandler {
     if (activeTool !== 'node') return false;
 
     if (this.isDragging && this.activeHandle) {
+      const z = this.ctx.canvasMgr.zoom || 1;
+      if (Math.hypot(pt.x - this.dragStartPt.x, pt.y - this.dragStartPt.y) > 4 / z) {
+        this.lastClickTime = 0;
+      }
+
       const selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
       if (!selectedEl || !this.initialVertices || this.initialVertices.length === 0) return false;
 
@@ -289,64 +403,13 @@ export class NodeToolHandler implements IToolHandler {
     const activeTool = this.ctx.getActiveTool();
     if (activeTool !== 'node') return false;
 
+    const now = Date.now();
+    if (now - this.lastDoubleClickHandledTime < 500) {
+      return true;
+    }
+
     const z = this.ctx.canvasMgr.zoom || 1;
-    let selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
-    if (!selectedEl) {
-      const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, z);
-      if (hit) {
-        this.ctx.selectionTool.select(hit.element.id);
-        selectedEl = hit.element;
-      }
-    }
-    if (!selectedEl || !selectedEl.vertices || selectedEl.vertices.length === 0) return false;
-
-    const isClosed = this.isElementClosed(selectedEl);
-
-    // 1. Double-click on existing vertex -> Delete vertex
-    const hitNode = this.nodeEditorTool.hitTestVertices(
-      selectedEl.vertices,
-      pt,
-      12 / z,
-      this.nodeEditorTool.selectedVertexId
-    );
-
-    if (hitNode && hitNode.type === 'vertex') {
-      if (selectedEl.vertices.length > 2) {
-        this.ctx.pushUndo();
-        selectedEl.vertices = this.nodeEditorTool.deleteVertex(selectedEl.vertices, hitNode.vertex.id);
-        selectedEl.attributes.d = this.ctx.model.compilePathD(selectedEl.vertices, isClosed);
-        selectedEl.attributes['data-node-types'] = selectedEl.vertices.map((v) => v.nodeType).join(',');
-        this.nodeEditorTool.selectedVertexId = null;
-        this.nodeEditorTool.selectedHandleType = null;
-        this.nodeEditorTool.selectedSegmentIdx = null;
-        if (this.callbacks.onDeselectNode) {
-          this.callbacks.onDeselectNode();
-        }
-        if (this.ctx.applyCanvasSize) this.ctx.applyCanvasSize();
-        this.ctx.render();
-        this.ctx.syncToHost();
-        return true;
-      }
-    }
-
-    // 2. Double-click on path segment -> Insert vertex via De Casteljau subdivision
-    const tol = 12 / z;
-    const res = this.nodeEditorTool.insertVertexOnPath(selectedEl.vertices, pt, tol, isClosed);
-    if (res) {
-      this.ctx.pushUndo();
-      selectedEl.vertices = res.updatedVertices;
-      selectedEl.attributes.d = this.ctx.model.compilePathD(selectedEl.vertices, isClosed);
-      selectedEl.attributes['data-node-types'] = selectedEl.vertices.map((v) => v.nodeType).join(',');
-      this.nodeEditorTool.selectedVertexId = res.newVertexId;
-      this.nodeEditorTool.selectedHandleType = 'vertex';
-      this.nodeEditorTool.selectedSegmentIdx = null;
-      const newV = selectedEl.vertices.find((v) => v.id === res.newVertexId);
-      if (newV && this.callbacks.onNodeSelected) {
-        this.callbacks.onNodeSelected(newV, selectedEl);
-      }
-      if (this.ctx.applyCanvasSize) this.ctx.applyCanvasSize();
-      this.ctx.render();
-      this.ctx.syncToHost();
+    if (this.executeDoubleClick(pt, z)) {
       return true;
     }
 
