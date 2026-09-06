@@ -26,11 +26,68 @@ export interface ShapeToolConfig {
   rectCornerRadius: number; // default 0
 }
 
+export type GridType = 'orthogonal' | 'isometric' | 'axonometric';
+export type GridAlignmentMode = 'origin' | 'cell-center';
+
+export interface GridConfig {
+  id: string;
+  type: GridType;
+  spacing: number;      // Spacing in canvas pixels (e.g. 20)
+  angle: number;        // Primary slant or inclination in degrees (e.g. 30 for isometric, 45 for axonometric)
+  color: string;        // Render stroke color
+  visible: boolean;     // Visibility toggle
+  alignmentMode: GridAlignmentMode; // 'origin' (cross at 0,0) or 'cell-center' (center of virtual cell at 0,0)
+}
+
 export class CanvasManager {
   public showRulers: boolean = true;
-  public showGrid: boolean = true;
   public showGuides: boolean = true;
-  public gridSpacing: number = 20;
+
+  /**
+   * ARCHITECTURAL RATIONALE: Parametric Multi-Grid Architecture
+   * Why a unified GridConfig collection is used instead of monolithic scalar flags:
+   * 1. Multi-Disciplinary CAD/Design workflows: Vector illustration requires simultaneous or switchable
+   *    orthogonal, isometric (game assets, 2.5D), and axonometric grids with independent spacings, slants, and visual hierarchy.
+   * 2. Non-Destructive Layering: Users can configure background guides (e.g. 100px major isometric) alongside a fine
+   *    orthogonal grid (10px) without state collisions or loss of calibration.
+   * 3. Backwards Compatibility & Graceful Degradation: Legacy properties (showGrid, gridSpacing) act as transparent proxies
+   *    to the primary grid, ensuring zero breakage for top bar buttons, existing files, or regression tests.
+   */
+  public grids: GridConfig[] = [
+    {
+      id: 'default_grid',
+      type: 'orthogonal',
+      spacing: 20,
+      angle: 0,
+      color: 'rgba(255, 255, 255, 0.15)',
+      visible: true,
+      alignmentMode: 'origin',
+    },
+  ];
+
+  public get showGrid(): boolean {
+    return this.grids.some((g) => g.visible);
+  }
+
+  public set showGrid(val: boolean) {
+    if (this.grids.length === 0) {
+      this.addGrid('orthogonal', 20);
+    }
+    this.grids.forEach((g) => (g.visible = val));
+  }
+
+  public get gridSpacing(): number {
+    const primary = this.grids[0];
+    return primary ? primary.spacing : 20;
+  }
+
+  public set gridSpacing(val: number) {
+    if (this.grids.length === 0) {
+      this.addGrid('orthogonal', val);
+    } else {
+      this.grids[0].spacing = val;
+    }
+  }
 
   public shapeConfig: ShapeToolConfig = {
     aspectRatioW: 4,
@@ -172,23 +229,74 @@ export class CanvasManager {
       }
     }
 
-    // 3. Snap to Grid Lines & Grid Intersections (Origin-Aligned)
+    // 3. Snap to Grid Lines & Grid Intersections (Origin-Aligned or Cell-Center)
     if (this.snapToGrid && this.showGrid) {
-      const ox = origin ? origin.x : (this.rulerConfig.originX || 0);
-      const oy = origin ? origin.y : (this.rulerConfig.originY || 0);
-      const step = Math.max(1, this.gridSpacing || 20);
-      const gx = ox + Math.round((pt.x - ox) / step) * step;
-      const gy = oy + Math.round((pt.y - oy) / step) * step;
+      for (const grid of this.grids) {
+        if (!grid.visible) continue;
+        const step = Math.max(1, grid.spacing || 20);
+        let ox = origin ? origin.x : (this.rulerConfig.originX || 0);
+        let oy = origin ? origin.y : (this.rulerConfig.originY || 0);
 
-      if (Math.abs(pt.x - gx) <= threshold) {
-        snappedX = gx;
-      }
-      if (Math.abs(pt.y - gy) <= threshold) {
-        snappedY = gy;
+        // Alignment mode offset: 'cell-center' shifts grid lines by half-spacing
+        if (grid.alignmentMode === 'cell-center') {
+          ox += step / 2;
+          oy += step / 2;
+        }
+
+        if (grid.type === 'orthogonal') {
+          const gx = ox + Math.round((pt.x - ox) / step) * step;
+          const gy = oy + Math.round((pt.y - oy) / step) * step;
+
+          if (Math.abs(pt.x - gx) <= threshold) {
+            snappedX = gx;
+          }
+          if (Math.abs(pt.y - gy) <= threshold) {
+            snappedY = gy;
+          }
+        }
       }
     }
 
     return { x: snappedX, y: snappedY };
+  }
+
+  /**
+   * Parametric Grid Management
+   * Allows creating, deleting, and modifying multi-type grids (orthogonal, isometric, axonometric).
+   */
+  public addGrid(
+    type: GridType = 'orthogonal',
+    spacing: number = 20,
+    angle: number = type === 'isometric' ? 30 : type === 'axonometric' ? 45 : 0,
+    color: string = 'rgba(255, 255, 255, 0.15)',
+    alignmentMode: GridAlignmentMode = 'origin'
+  ): GridConfig {
+    const grid: GridConfig = {
+      id: `grid_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`,
+      type,
+      spacing: Math.max(1, spacing),
+      angle,
+      color,
+      visible: true,
+      alignmentMode,
+    };
+    this.grids.push(grid);
+    return grid;
+  }
+
+  public removeGrid(id: string): void {
+    this.grids = this.grids.filter((g) => g.id !== id);
+  }
+
+  public getGrid(id: string): GridConfig | undefined {
+    return this.grids.find((g) => g.id === id);
+  }
+
+  public updateGrid(id: string, partial: Partial<GridConfig>): void {
+    const g = this.getGrid(id);
+    if (g) {
+      Object.assign(g, partial);
+    }
   }
 
   public addGuide(

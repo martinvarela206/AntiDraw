@@ -347,6 +347,7 @@ class AntiDrawApp {
             this.canvasMgr.rulerConfig = { ...this.canvasMgr.rulerConfig, ...msg.metadata.ruler };
           }
           if (msg.metadata.showRulers !== undefined) this.canvasMgr.showRulers = msg.metadata.showRulers;
+          if (Array.isArray(msg.metadata.grids)) this.canvasMgr.grids = msg.metadata.grids;
           if (msg.metadata.showGrid !== undefined) this.canvasMgr.showGrid = msg.metadata.showGrid;
           if (msg.metadata.showGuides !== undefined) this.canvasMgr.showGuides = msg.metadata.showGuides;
           if (msg.metadata.gridSpacing !== undefined) this.canvasMgr.gridSpacing = msg.metadata.gridSpacing;
@@ -916,6 +917,7 @@ class AntiDrawApp {
     vscode.postMessage({
       type: 'updateMetadata',
       metadata: {
+        grids: this.canvasMgr.grids,
         guides: this.canvasMgr.guides,
         ruler: this.canvasMgr.rulerConfig,
         showRulers: this.canvasMgr.showRulers,
