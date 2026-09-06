@@ -15,6 +15,7 @@ export interface ToolContext {
   getOtherVertices(): Point[];
   setTool(tool: ToolType): void;
   getActiveTool(): ToolType;
+  applyCanvasSize?(): void;
 }
 
 /**

@@ -8,6 +8,8 @@ import { VsCodeBridge } from './bridge/VsCodeBridge.js';
 import { ToolContext } from './tools/IToolHandler.js';
 import { ShapeToolHandler } from './tools/ShapeToolHandler.js';
 import { PolylineToolHandler } from './tools/PolylineToolHandler.js';
+import { PenToolHandler } from './tools/PenToolHandler.js';
+import { NodeToolHandler } from './tools/NodeToolHandler.js';
 import { Toolbar, ToolType } from './ui/Toolbar.js';
 import { TopBar } from './ui/TopBar.js';
 import { PropertyPanel } from './ui/PropertyPanel.js';
@@ -19,6 +21,8 @@ class AntiDrawApp {
   private viewportCtrl!: ViewportController;
   private shapeToolHandler!: ShapeToolHandler;
   private polylineToolHandler!: PolylineToolHandler;
+  private penToolHandler!: PenToolHandler;
+  private nodeToolHandler!: NodeToolHandler;
 
   private model: VectorModel = new VectorModel();
   private selectionTool: SelectionTool = new SelectionTool();
@@ -56,7 +60,6 @@ class AntiDrawApp {
     | null = null;
 
   private initialElementState: VectorElement | null = null;
-  private initialVertices: PathVertex[] = [];
   private initialElementsMap: Map<string, PathVertex[]> = new Map();
   private initialBox: any = null;
   private dragAnchorPt: Point = { x: 0, y: 0 };
@@ -73,18 +76,10 @@ class AntiDrawApp {
     return this.viewportCtrl?.isMiddlePanning ?? false;
   }
 
-  public penNodeType: NodeType = 'asymmetric';
-  private currentPenVertices: PathVertex[] = [];
-  private penHoverPoint: Point | null = null;
-  private penActiveVertexIdx: number | null = null;
-  private penMovingVertexIdx: number | null = null;
-
   // Ghost manipulation and creation state
   private ghostDragOffset: Point | null = null;
   private ghostTransformMap: Map<string, PathVertex[]> = new Map();
-  private ghostNodeVertices: PathVertex[] | null = null;
   private marqueeStartPt: Point | null = null;
-
 
   private isShiftPressed: boolean = false;
 
@@ -118,9 +113,19 @@ class AntiDrawApp {
       getOtherVertices: () => this.getOtherVertices(),
       setTool: (t) => this.toolbar.setTool(t),
       getActiveTool: () => this.toolbar.activeTool,
+      applyCanvasSize: () => this.applyCanvasSize(),
     };
     this.shapeToolHandler = new ShapeToolHandler(toolCtx);
     this.polylineToolHandler = new PolylineToolHandler(toolCtx);
+    this.penToolHandler = new PenToolHandler(toolCtx);
+    this.nodeToolHandler = new NodeToolHandler(toolCtx, this.nodeEditorTool, {
+      onNodeSelected: (vertex, _element) => {
+        this.propertyPanel.update(vertex, 'node');
+      },
+      onDeselectNode: () => {
+        this.propertyPanel.resetPanelMode();
+      },
+    });
   }
 
   private initViewport(): void {
@@ -305,17 +310,17 @@ class AntiDrawApp {
           this.render();
           this.syncToHost();
         },
-        onNodeTypeChange: (type) => this.handleNodeTypeChange(type),
-        onSplitNode: () => this.handleSplitNode(),
-        onClosePath: () => this.handleCloseOpenPath(),
-        onConvertSegmentToLine: () => this.handleConvertSegmentToLine(),
-        onConvertSegmentToCurve: () => this.handleConvertSegmentToCurve(),
+        onNodeTypeChange: (type) => this.nodeToolHandler.handleNodeTypeChange(type),
+        onSplitNode: () => this.nodeToolHandler.handleSplitNode(),
+        onClosePath: () => this.nodeToolHandler.handleCloseOpenPath(),
+        onConvertSegmentToLine: () => this.nodeToolHandler.handleConvertSegmentToLine(),
+        onConvertSegmentToCurve: () => this.nodeToolHandler.handleConvertSegmentToCurve(),
         onPenNodeTypeChange: (nodeType) => {
-          this.penNodeType = nodeType;
+          this.penToolHandler.penNodeType = nodeType;
           this.render();
         },
         onFinishPenPath: (close) => {
-          this.finishPenPath(close);
+          this.penToolHandler.finishPenPath(close);
         },
         onFinishPolylinePath: (close) => {
           this.polylineToolHandler.finishPolylinePath(close);
@@ -503,11 +508,10 @@ class AntiDrawApp {
           this.ghostTransformMap.size > 0 ||
           this.activeHandle === 'move' ||
           (this.initialElementsMap.size > 0 && this.isDragging) ||
-          this.ghostNodeVertices ||
-          (this.toolbar.activeTool === 'node' && this.isDragging) ||
+          this.nodeToolHandler.isDragging ||
           this.shapeToolHandler.shapeStartPt ||
           this.activeHandle === 'shape' ||
-          (this.toolbar.activeTool === 'pen' && (this.isDragging || this.currentPenVertices.length > 0)) ||
+          (this.toolbar.activeTool === 'pen' && (this.penToolHandler.isDragging || this.penToolHandler.vertexCount > 0)) ||
           (this.toolbar.activeTool === 'polyline' && this.polylineToolHandler.vertexCount > 0) ||
           this.activeHandle === 'marquee' ||
           this.selectionTool.marqueeRect ||
@@ -545,7 +549,7 @@ class AntiDrawApp {
 
       if (this.toolbar.activeTool === 'pen') {
         if (e.key === 'Enter') {
-          this.finishPenPath(false);
+          this.penToolHandler.finishPenPath(false);
           return;
         }
       }
@@ -562,16 +566,8 @@ class AntiDrawApp {
 
         // 1b. Delete selected vertex in node editor
         if (this.toolbar.activeTool === 'node' && this.nodeEditorTool.selectedVertexId) {
-          const selectedEl = this.model.elements.find((el) => this.selectionTool.isSelected(el.id));
-          if (selectedEl && selectedEl.vertices && selectedEl.vertices.length > 2) {
-            this.pushUndo();
-            selectedEl.vertices = this.nodeEditorTool.deleteVertex(selectedEl.vertices, this.nodeEditorTool.selectedVertexId);
-            const isClosed = selectedEl.isClosed ?? (!selectedEl.tagName || ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(selectedEl.tagName) || (selectedEl.attributes.d ? /z/i.test(selectedEl.attributes.d) : false));
-            selectedEl.attributes.d = this.model.compilePathD(selectedEl.vertices, isClosed);
-            this.nodeEditorTool.selectedVertexId = null;
+          if (this.nodeToolHandler.deleteSelectedVertex()) {
             this.propertyPanel.update(null, 'node');
-            this.render();
-            this.syncToHost();
             return;
           }
         }
@@ -894,8 +890,10 @@ class AntiDrawApp {
       this.shapeToolHandler.cancel();
     }
     if (tool !== 'pen') {
-      this.currentPenVertices = [];
-      this.penHoverPoint = null;
+      this.penToolHandler.deactivate();
+    }
+    if (tool !== 'node') {
+      this.nodeToolHandler.deactivate();
     }
     this.render();
   }
@@ -972,12 +970,7 @@ class AntiDrawApp {
     }
 
     // 2. Node tool vertex or handle manipulation
-    if (this.ghostNodeVertices || (this.toolbar.activeTool === 'node' && this.isDragging)) {
-      this.ghostNodeVertices = null;
-      this.initialVertices = [];
-      this.activeHandle = null;
-      this.isDragging = false;
-      this.nodeEditorTool.selectedSegmentIdx = null;
+    if (this.nodeToolHandler.cancel()) {
       needsRender = true;
     }
 
@@ -989,22 +982,10 @@ class AntiDrawApp {
     }
 
     // 4. Pen tool in-progress path or dragging
-    if (this.toolbar.activeTool === 'pen') {
-      if (this.isDragging && this.activeHandle === 'pen') {
-        this.isDragging = false;
-        this.activeHandle = null;
-        this.penActiveVertexIdx = null;
-        this.penMovingVertexIdx = null;
-        needsRender = true;
-      } else if (this.currentPenVertices.length > 0) {
-        this.currentPenVertices = [];
-        this.penHoverPoint = null;
-        this.isDragging = false;
-        this.activeHandle = null;
-        this.penActiveVertexIdx = null;
-        this.penMovingVertexIdx = null;
-        needsRender = true;
-      }
+    if (this.toolbar.activeTool === 'pen' && this.penToolHandler.cancel()) {
+      this.activeHandle = null;
+      this.isDragging = false;
+      needsRender = true;
     }
 
     // 5. Polyline tool in-progress path
@@ -1286,67 +1267,7 @@ class AntiDrawApp {
         }
       }
     } else if (activeTool === 'node') {
-      const selectedEl = this.model.elements.find(
-        (el) => el.id === this.selectionTool.selectedElementId
-      );
-
-      if (selectedEl && selectedEl.vertices) {
-        const z = this.canvasMgr.zoom || 1;
-        const hitNode = this.nodeEditorTool.hitTestVertices(
-          selectedEl.vertices,
-          pt,
-          10 / z,
-          this.nodeEditorTool.selectedVertexId
-        );
-        if (hitNode) {
-          this.nodeEditorTool.selectedVertexId = hitNode.vertex.id;
-          this.nodeEditorTool.selectedHandleType = hitNode.type;
-          this.nodeEditorTool.selectedSegmentIdx = null;
-          this.activeHandle = hitNode.type;
-          this.initialVertices = JSON.parse(JSON.stringify(selectedEl.vertices));
-          this.ghostNodeVertices = null;
-        } else {
-          // Check if clicked on a segment between nodes
-          const isClosed =
-            selectedEl.isClosed ??
-            (!selectedEl.tagName ||
-              ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(selectedEl.tagName) ||
-              (selectedEl.attributes.d ? /z/i.test(selectedEl.attributes.d) : false));
-          const hitSegment = this.nodeEditorTool.hitTestSegment(
-            selectedEl.vertices,
-            pt,
-            8 / z,
-            isClosed
-          );
-          if (hitSegment !== null) {
-            this.nodeEditorTool.selectedSegmentIdx = hitSegment;
-            const nextIdx = (hitSegment + 1) % selectedEl.vertices.length;
-            this.nodeEditorTool.selectedVertexId = selectedEl.vertices[nextIdx].id;
-            this.nodeEditorTool.selectedHandleType = null;
-            this.activeHandle = 'segment';
-            this.dragStartPt = { ...pt };
-            this.initialVertices = JSON.parse(JSON.stringify(selectedEl.vertices));
-            this.ghostNodeVertices = null;
-            this.renderOverlay();
-            return;
-          }
-
-          // Clicked empty space in node mode: deselect and switch to select tool and canvas properties
-          this.selectionTool.deselectAll();
-          this.nodeEditorTool.selectedVertexId = null;
-          this.nodeEditorTool.selectedHandleType = null;
-          this.nodeEditorTool.selectedSegmentIdx = null;
-          this.toolbar.setTool('select');
-          this.propertyPanel.resetPanelMode();
-          this.render();
-          return;
-        }
-      } else {
-        // No selected element in node mode: switch to select tool and canvas properties
-        this.selectionTool.deselectAll();
-        this.toolbar.setTool('select');
-        this.propertyPanel.resetPanelMode();
-        this.render();
+      if (this.nodeToolHandler.onPointerDown(e, pt)) {
         return;
       }
     } else if (['rect', 'ellipse', 'line', 'star'].includes(activeTool)) {
@@ -1360,53 +1281,9 @@ class AntiDrawApp {
         return;
       }
     } else if (activeTool === 'pen') {
-      const snappedPt = this.snapPoint(pt);
-
-      let hitVertexIdx = -1;
-      for (let i = 0; i < this.currentPenVertices.length; i++) {
-        const v = this.currentPenVertices[i];
-        if (Math.hypot(snappedPt.x - v.x, snappedPt.y - v.y) <= 12) {
-          hitVertexIdx = i;
-          break;
-        }
+      if (this.penToolHandler.onPointerDown(e, pt)) {
+        return;
       }
-
-      if (hitVertexIdx >= 0) {
-        if (e.shiftKey) {
-          this.currentPenVertices.splice(hitVertexIdx, 1);
-          if (this.currentPenVertices.length > 0) {
-            this.currentPenVertices[0].command = 'M';
-          }
-          this.render();
-          return;
-        } else if (e.ctrlKey || e.metaKey) {
-          this.penMovingVertexIdx = hitVertexIdx;
-          this.activeHandle = 'pen';
-          this.render();
-          return;
-        } else if (hitVertexIdx === 0 && this.currentPenVertices.length >= 3) {
-          this.finishPenPath(true);
-          return;
-        }
-      }
-
-      const isStart = this.currentPenVertices.length === 0;
-      const initialNodeType = this.penNodeType === 'sharp' ? 'sharp' : 'asymmetric';
-
-      const newV: PathVertex = {
-        id: `v_pen_${this.currentPenVertices.length}`,
-        x: snappedPt.x,
-        y: snappedPt.y,
-        handleIn: undefined,
-        handleOut: undefined,
-        nodeType: initialNodeType,
-        command: isStart ? 'M' : 'L',
-      };
-
-      this.currentPenVertices.push(newV);
-      this.penActiveVertexIdx = this.currentPenVertices.length - 1;
-      this.activeHandle = 'pen';
-      this.render();
     } else if (activeTool === 'zoom') {
       const delta = e.altKey ? -0.1 : 0.1;
       this.zoomAtClientPoint(e.clientX, e.clientY, delta);
@@ -1516,11 +1393,8 @@ class AntiDrawApp {
         if (!this.isMiddlePanning) {
           this.canvasScrollArea.style.cursor = '';
         }
-        const otherVertices = this.getOtherVertices();
-        this.currentPenVertices.forEach((v) => otherVertices.push({ x: v.x, y: v.y }));
-        const snappedPt = this.snapPoint(pt, otherVertices);
-        this.penHoverPoint = snappedPt;
-        this.renderOverlay();
+        this.penToolHandler.onPointerMove(e, pt);
+        return;
       }
       return;
     }
@@ -1650,144 +1524,13 @@ class AntiDrawApp {
         return;
       }
     } else if (this.toolbar.activeTool === 'node') {
-      const selectedEl = this.model.elements.find((el) => this.selectionTool.isSelected(el.id));
-      if (selectedEl && selectedEl.vertices) {
-        if (this.activeHandle === 'vertex' && this.nodeEditorTool.selectedVertexId) {
-          const otherVertices: Point[] = [];
-          this.model.elements.forEach((el) => {
-            if (el.vertices) {
-              el.vertices.forEach((v) => {
-                if (v.id !== this.nodeEditorTool.selectedVertexId) {
-                  otherVertices.push({ x: v.x, y: v.y });
-                }
-              });
-            }
-          });
-          const snappedPt = this.snapPoint(pt, otherVertices);
-          const baseVerts = this.initialVertices.length > 0 ? this.initialVertices : selectedEl.vertices;
-          const result = this.nodeEditorTool.moveVertex(
-            baseVerts,
-            this.nodeEditorTool.selectedVertexId,
-            snappedPt,
-            this.isShiftPressed,
-            this.model.elements
-          );
-          this.ghostNodeVertices = result.updatedVertices;
-          this.renderOverlay();
-          return;
-        } else if (
-          (this.activeHandle === 'handleIn' || this.activeHandle === 'handleOut') &&
-          this.nodeEditorTool.selectedVertexId
-        ) {
-          const otherVertices: Point[] = [];
-          this.model.elements.forEach((el) => {
-            if (el.vertices) {
-              el.vertices.forEach((v) => {
-                otherVertices.push({ x: v.x, y: v.y });
-              });
-            }
-          });
-          const snappedPt = this.snapPoint(pt, otherVertices);
-          const baseVerts = this.initialVertices.length > 0 ? this.initialVertices : selectedEl.vertices;
-          this.ghostNodeVertices = this.nodeEditorTool.moveHandle(
-            baseVerts,
-            this.nodeEditorTool.selectedVertexId,
-            this.activeHandle,
-            snappedPt
-          );
-          this.renderOverlay();
-          return;
-        } else if (
-          this.activeHandle === 'segment' &&
-          this.nodeEditorTool.selectedSegmentIdx !== null
-        ) {
-          const dx = pt.x - this.dragStartPt.x;
-          const dy = pt.y - this.dragStartPt.y;
-          const baseVerts = this.initialVertices.length > 0 ? this.initialVertices : selectedEl.vertices;
-          const isClosed =
-            selectedEl.isClosed ??
-            (!selectedEl.tagName ||
-              ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(selectedEl.tagName) ||
-              (selectedEl.attributes.d ? /z/i.test(selectedEl.attributes.d) : false));
-          this.ghostNodeVertices = this.nodeEditorTool.moveSegment(
-            baseVerts,
-            this.nodeEditorTool.selectedSegmentIdx,
-            dx,
-            dy,
-            isClosed
-          );
-          this.renderOverlay();
-          return;
-        }
+      if (this.nodeToolHandler.onPointerMove(e, pt)) {
+        return;
       }
     } else if (this.toolbar.activeTool === 'pen') {
-      if (this.isDragging && this.activeHandle === 'pen') {
-        if (this.penMovingVertexIdx !== null && this.currentPenVertices[this.penMovingVertexIdx]) {
-          const otherVertices = this.getOtherVertices();
-          this.currentPenVertices.forEach((v, idx) => {
-            if (idx !== this.penMovingVertexIdx) otherVertices.push({ x: v.x, y: v.y });
-          });
-          const snappedPt = this.snapPoint(pt, otherVertices);
-          this.currentPenVertices[this.penMovingVertexIdx].x = snappedPt.x;
-          this.currentPenVertices[this.penMovingVertexIdx].y = snappedPt.y;
-        } else if (this.penActiveVertexIdx !== null && this.currentPenVertices[this.penActiveVertexIdx]) {
-          const curV = this.currentPenVertices[this.penActiveVertexIdx];
-          const otherVertices = this.getOtherVertices();
-          this.currentPenVertices.forEach((v, idx) => {
-            if (idx !== this.penActiveVertexIdx) otherVertices.push({ x: v.x, y: v.y });
-          });
-          const snappedPt = this.snapPoint(pt, otherVertices);
-          const curDx = snappedPt.x - curV.x;
-          const curDy = snappedPt.y - curV.y;
-          const dragDist = Math.hypot(curDx, curDy);
-          if (dragDist > 3) {
-            curV.handleOut = { x: snappedPt.x, y: snappedPt.y };
-
-            /**
-             * ARCHITECTURAL RATIONALE: Instant Cusp / Tangent Decoupling via Alt Key
-             * Why decoupling handles dynamically with Alt is implemented:
-             * 1. Standard Bézier Drawing Workflow (CorelDraw / Illustrator / Figma):
-             *    When dragging out a curve node, handles are normally collinear (180° opposed). Holding
-             *    the Alt modifier breaks this collinear constraint instantaneously during active pointer movement.
-             * 2. Edge Cases and Preservation of Incoming Segment:
-             *    If handleIn was already established by a prior drag or segment creation, modifying handleOut
-             *    while Alt is pressed preserves handleIn exactly as it was, preventing the incoming curve
-             *    segment from warping or glitching.
-             * 3. Discarded Alternate Approaches:
-             *    Requiring a second tool switch or post-drag Alt click was rejected because it breaks the continuous
-             *    drawing flow of vector artists. Decoupling on active drag allows single-stroke cusp creation.
-             * 4. State Consistency:
-             *    The vertex nodeType is explicitly converted to 'asymmetric' so subsequent edits respect independent
-             *    tangents without snapping back to symmetric or smooth constraints.
-             */
-            if (e.altKey) {
-              curV.nodeType = 'asymmetric';
-            } else {
-              const angle = Math.atan2(curDy, curDx) + Math.PI;
-              const dist = curV.nodeType === 'symmetric'
-                ? dragDist
-                : (curV.handleIn ? Math.hypot(curV.handleIn.x - curV.x, curV.handleIn.y - curV.y) : dragDist);
-              curV.handleIn = {
-                x: curV.x + Math.cos(angle) * dist,
-                y: curV.y + Math.sin(angle) * dist,
-              };
-              if (this.penNodeType !== 'sharp') {
-                curV.nodeType = this.penNodeType;
-              }
-            }
-
-            if (curV.command === 'L') {
-              curV.command = 'C';
-            }
-          }
-        }
-      } else {
-        const otherVertices = this.getOtherVertices();
-        this.currentPenVertices.forEach((v) => otherVertices.push({ x: v.x, y: v.y }));
-        this.penHoverPoint = this.snapPoint(pt, otherVertices);
+      if (this.penToolHandler.onPointerMove(e, pt)) {
+        return;
       }
-      this.renderOverlay();
-      return;
     } else if (this.activeHandle === 'shape') {
       this.shapeToolHandler.onPointerMove(e, pt);
       return;
@@ -1932,31 +1675,18 @@ class AntiDrawApp {
         hasChangesToCommit = true;
       }
 
-      // Commit Node Tool Ghost
-      if (this.ghostNodeVertices) {
-        const selectedEl = this.model.elements.find((el) => this.selectionTool.isSelected(el.id));
-        if (selectedEl) {
-          this.pushUndo();
-          selectedEl.vertices = this.ghostNodeVertices;
-          const isClosed =
-            selectedEl.isClosed ??
-            (!selectedEl.tagName ||
-              ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(selectedEl.tagName) ||
-              (selectedEl.attributes.d ? /z/i.test(selectedEl.attributes.d) : false));
-          selectedEl.attributes.d = this.model.compilePathD(selectedEl.vertices, isClosed);
-          if (this.nodeEditorTool.selectedVertexId) {
-            const activeV = selectedEl.vertices.find((v) => v.id === this.nodeEditorTool.selectedVertexId);
-            this.propertyPanel.update(activeV || null, 'node');
-          }
-          hasChangesToCommit = true;
+      // Delegate Node Tool and Pen Tool pointer up
+      if (this.toolbar.activeTool === 'node') {
+        if (this.nodeToolHandler.onPointerUp(e, pt)) {
+          return;
         }
-        this.ghostNodeVertices = null;
+      } else if (this.toolbar.activeTool === 'pen') {
+        if (this.penToolHandler.onPointerUp(e, pt)) {
+          return;
+        }
       }
 
-      if (this.activeHandle === 'pen') {
-        this.penActiveVertexIdx = null;
-        this.penMovingVertexIdx = null;
-      } else if (this.activeHandle === 'marquee' && this.selectionTool.marqueeRect) {
+      if (this.activeHandle === 'marquee' && this.selectionTool.marqueeRect) {
         const hitIds = this.selectionTool.hitTestMarquee(
           this.model.elements,
           this.selectionTool.marqueeRect
@@ -1980,10 +1710,7 @@ class AntiDrawApp {
       }
 
       this.activeHandle = null;
-      this.penActiveVertexIdx = null;
-      this.penMovingVertexIdx = null;
       this.initialElementsMap.clear();
-      this.initialVertices = [];
       this.applyCanvasSize();
       this.render();
       if (hasChangesToCommit) {
@@ -2016,8 +1743,7 @@ class AntiDrawApp {
     }
 
     if (this.toolbar.activeTool === 'pen') {
-      this.finishPenPath(false);
-      return;
+      if (this.penToolHandler.onDoubleClick(e, pt)) return;
     }
 
     // Double-click on guide line -> enter angle / pivot transform mode
@@ -2031,31 +1757,9 @@ class AntiDrawApp {
       return;
     }
 
-    // Double-click on an existing vertex in Node mode -> Delete vertex
+    // Double-click on existing vertex or segment in Node mode
     if (this.toolbar.activeTool === 'node') {
-      const selectedEl = this.model.elements.find((el) => this.selectionTool.isSelected(el.id));
-      if (selectedEl && selectedEl.vertices) {
-        const z = this.canvasMgr.zoom || 1;
-        const hitNode = this.nodeEditorTool.hitTestVertices(
-          selectedEl.vertices,
-          pt,
-          10 / z,
-          this.nodeEditorTool.selectedVertexId
-        );
-        if (hitNode && hitNode.type === 'vertex') {
-          if (selectedEl.vertices.length > 2) {
-            this.pushUndo();
-            selectedEl.vertices = this.nodeEditorTool.deleteVertex(selectedEl.vertices, hitNode.vertex.id);
-            const isClosed = selectedEl.isClosed ?? (!selectedEl.tagName || ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(selectedEl.tagName) || (selectedEl.attributes.d ? /z/i.test(selectedEl.attributes.d) : false));
-            selectedEl.attributes.d = this.model.compilePathD(selectedEl.vertices, isClosed);
-            this.nodeEditorTool.selectedVertexId = null;
-            this.propertyPanel.update(null, 'node');
-            this.render();
-            this.syncToHost();
-            return;
-          }
-        }
-      }
+      if (this.nodeToolHandler.onDoubleClick(e, pt)) return;
     }
 
     // Double-click to add a vertex to path (in node or select tool)
@@ -2102,40 +1806,6 @@ class AntiDrawApp {
     return pts;
   }
 
-  // Commit pen path to vector model elements
-  private finishPenPath(close: boolean = false): void {
-    if (this.currentPenVertices.length >= 2) {
-      this.pushUndo();
-      const id = `el_pen_${Date.now().toString(36)}`;
-      const pathD = this.model.compilePathD(this.currentPenVertices, close);
-      const newEl: VectorElement = {
-        id,
-        tagName: 'path',
-        attributes: {
-          id,
-          d: pathD,
-          fill: close ? '#4f46e5' : 'none',
-          stroke: '#ffffff',
-          'stroke-width': '2',
-          'data-node-types': this.currentPenVertices.map((v) => v.nodeType).join(','),
-        },
-        vertices: JSON.parse(JSON.stringify(this.currentPenVertices)),
-        isClosed: close,
-      };
-
-      this.model.elements.push(newEl);
-      this.selectionTool.select(id);
-      this.currentPenVertices = [];
-      this.penHoverPoint = null;
-      this.toolbar.setTool('select');
-      this.render();
-      this.syncToHost();
-    } else {
-      this.currentPenVertices = [];
-      this.penHoverPoint = null;
-      this.render();
-    }
-  }
 
   private handleAlign(type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom'): void {
     const selectedIds = Array.from(this.selectionTool.selectedElementIds);
@@ -2250,152 +1920,7 @@ class AntiDrawApp {
     this.syncToHost();
   }
 
-  private handleNodeTypeChange(type: NodeType): void {
-    const selectedEl = this.model.elements.find(
-      (el) => el.id === this.selectionTool.selectedElementId
-    );
-    if (selectedEl && selectedEl.vertices && this.nodeEditorTool.selectedVertexId) {
-      this.pushUndo();
-      selectedEl.vertices = this.nodeEditorTool.setNodeType(
-        selectedEl.vertices,
-        this.nodeEditorTool.selectedVertexId,
-        type
-      );
-      const isClosed = selectedEl.isClosed ?? (selectedEl.attributes.d?.endsWith('Z') || false);
-      selectedEl.attributes.d = this.model.compilePathD(selectedEl.vertices, isClosed);
-      selectedEl.attributes['data-node-types'] = selectedEl.vertices.map((v) => v.nodeType).join(',');
-      const savedElementId = this.selectionTool.selectedElementId;
-      const savedVertexId = this.nodeEditorTool.selectedVertexId;
-      this.render();
-      this.selectionTool.selectedElementId = savedElementId;
-      this.nodeEditorTool.selectedVertexId = savedVertexId;
-      this.syncToHost();
-    }
-  }
 
-  private handleSplitNode(): void {
-    const selectedEl = this.model.elements.find(
-      (el) => el.id === this.selectionTool.selectedElementId
-    );
-    if (selectedEl && selectedEl.vertices && this.nodeEditorTool.selectedVertexId) {
-      this.pushUndo();
-      selectedEl.vertices = this.nodeEditorTool.splitNode(
-        selectedEl.vertices,
-        this.nodeEditorTool.selectedVertexId
-      );
-      this.render();
-      this.syncToHost();
-    }
-  }
-
-  /**
-   * ARCHITECTURAL RATIONALE: Topological Path Auto-Closure Action
-   * Why this solution is engineered this way:
-   * 1. Vector Graph Closure: Connects the final vertex of an open path back to the starting vertex
-   *    by updating the element's isClosed property and re-compiling SVG path 'd' with the 'Z' operator.
-   * 2. Preserves Tangent Geometry: If the first or last node possesses active Bézier handles,
-   *    VectorModel.compilePathD generates a smooth closing Bézier curve ('C ... Z') instead of a harsh line.
-   * 3. Undo/Redo & State Synchronization: Captures an undo snapshot prior to mutation, keeps the active
-   *    node selected, and updates the PropertyPanel so the closing state reflects immediately in the UI.
-   */
-  private handleCloseOpenPath(): void {
-    const selectedEl = this.model.elements.find(
-      (el) => el.id === this.selectionTool.selectedElementId
-    );
-    if (!selectedEl || !selectedEl.vertices || selectedEl.vertices.length < 2) return;
-
-    this.pushUndo();
-    const result = this.nodeEditorTool.closePath(selectedEl.vertices);
-    selectedEl.vertices = result.updatedVertices;
-    selectedEl.isClosed = true;
-    selectedEl.attributes.d = this.model.compilePathD(selectedEl.vertices, true);
-    if (this.nodeEditorTool.selectedVertexId) {
-      const activeV = selectedEl.vertices.find((v) => v.id === this.nodeEditorTool.selectedVertexId);
-      this.propertyPanel.update(activeV || null, 'node');
-    }
-    this.render();
-    this.syncToHost();
-  }
-
-  /**
-   * ARCHITECTURAL RATIONALE: Segment to Straight Line ('L') Conversion
-   * Why this solution is engineered this way:
-   * 1. Resolves Active or Inferred Segment: If the user clicked directly on a segment (selectedSegmentIdx),
-   *    that segment is explicitly targeted. If only a single vertex is selected, the segment leading into
-   *    that vertex is intuitively converted, avoiding ambiguity.
-   * 2. Pure Geometry Transformation: Strips out outgoing handle from v1 and incoming handle into v2,
-   *    and enforces command 'L' (unless v2 is origin 'M'). This eliminates numerical wobbles and
-   *    flattens the segment instantly.
-   * 3. Undo History and Reactive Host Sync: Pushes an atomic snapshot before mutation, updates SVG 'd'
-   *    attribute, and notifies host editor.
-   */
-  private handleConvertSegmentToLine(): void {
-    const selectedEl = this.model.elements.find(
-      (el) => el.id === this.selectionTool.selectedElementId
-    );
-    if (!selectedEl || !selectedEl.vertices || selectedEl.vertices.length < 2) return;
-
-    let segIdx = this.nodeEditorTool.selectedSegmentIdx;
-    if (segIdx === null && this.nodeEditorTool.selectedVertexId) {
-      const vIdx = selectedEl.vertices.findIndex((v) => v.id === this.nodeEditorTool.selectedVertexId);
-      if (vIdx > 0) {
-        segIdx = vIdx - 1;
-      } else if (vIdx === 0 && selectedEl.vertices.length > 2) {
-        segIdx = selectedEl.vertices.length - 1;
-      }
-    }
-    if (segIdx === null) return;
-
-    this.pushUndo();
-    const isClosed =
-      selectedEl.isClosed ??
-      (!selectedEl.tagName ||
-        ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(selectedEl.tagName) ||
-        (selectedEl.attributes.d ? /z/i.test(selectedEl.attributes.d) : false));
-    selectedEl.vertices = this.nodeEditorTool.convertSegmentToLine(selectedEl.vertices, segIdx, isClosed);
-    selectedEl.attributes.d = this.model.compilePathD(selectedEl.vertices, isClosed);
-    this.render();
-    this.syncToHost();
-  }
-
-  /**
-   * ARCHITECTURAL RATIONALE: Segment to Cubic Bézier ('C') Conversion
-   * Why this solution is engineered this way:
-   * 1. Baseline Polynomial Generation: Straight lines have no Bézier handles. Converting to 'C'
-   *    synthesizes two initial collinear handles located at 1/3 and 2/3 along the secant chord.
-   * 2. Zero Visual Jump: The initial curve at 1/3 and 2/3 control points represents a flat line,
-   *    preventing any unwanted deformation until the designer decides to drag the handles.
-   * 3. Robust Interaction: Works seamlessly both when a segment is directly highlighted or when
-   *    an adjacent node is active in the inspector panel.
-   */
-  private handleConvertSegmentToCurve(): void {
-    const selectedEl = this.model.elements.find(
-      (el) => el.id === this.selectionTool.selectedElementId
-    );
-    if (!selectedEl || !selectedEl.vertices || selectedEl.vertices.length < 2) return;
-
-    let segIdx = this.nodeEditorTool.selectedSegmentIdx;
-    if (segIdx === null && this.nodeEditorTool.selectedVertexId) {
-      const vIdx = selectedEl.vertices.findIndex((v) => v.id === this.nodeEditorTool.selectedVertexId);
-      if (vIdx > 0) {
-        segIdx = vIdx - 1;
-      } else if (vIdx === 0 && selectedEl.vertices.length > 2) {
-        segIdx = selectedEl.vertices.length - 1;
-      }
-    }
-    if (segIdx === null) return;
-
-    this.pushUndo();
-    const isClosed =
-      selectedEl.isClosed ??
-      (!selectedEl.tagName ||
-        ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(selectedEl.tagName) ||
-        (selectedEl.attributes.d ? /z/i.test(selectedEl.attributes.d) : false));
-    selectedEl.vertices = this.nodeEditorTool.convertSegmentToCurve(selectedEl.vertices, segIdx, isClosed);
-    selectedEl.attributes.d = this.model.compilePathD(selectedEl.vertices, isClosed);
-    this.render();
-    this.syncToHost();
-  }
 
   private pushUndo(): void {
     const state = JSON.stringify(this.model.elements);
@@ -2598,8 +2123,8 @@ class AntiDrawApp {
     this.propertyPanel.update(
       selectedV,
       this.toolbar.activeTool,
-      this.penNodeType,
-      this.currentPenVertices.length,
+      this.penToolHandler.penNodeType,
+      this.penToolHandler.vertexCount,
       selectedGuide,
       this.polylineToolHandler.vertexCount,
       this.canvasMgr.gridAlignmentMode,
@@ -2788,57 +2313,10 @@ class AntiDrawApp {
           });
         }
       });
-
-      // 7. Node Edit Mode Bezier Handles for Selected Vertex
-      if (selectedEls.length === 1 && selectedEls[0].vertices && this.toolbar.activeTool === 'node') {
-        const selectedEl = selectedEls[0];
-        const verts = selectedEl.vertices!;
-        const selectedIdx = verts.findIndex((v) => v.id === this.nodeEditorTool.selectedVertexId);
-
-        const showHandlesFor = new Set<number>();
-        if (selectedIdx >= 0) {
-          showHandlesFor.add(selectedIdx);
-          const prevIdx = selectedIdx > 0 ? selectedIdx - 1 : selectedEl.isClosed ? verts.length - 1 : -1;
-          if (prevIdx >= 0) showHandlesFor.add(prevIdx);
-          const nextIdx = selectedIdx < verts.length - 1 ? selectedIdx + 1 : selectedEl.isClosed ? 0 : -1;
-          if (nextIdx >= 0) showHandlesFor.add(nextIdx);
-        }
-
-        const bHandleR = 3.5 / z;
-        verts.forEach((v, idx) => {
-          if (showHandlesFor.has(idx)) {
-            if (v.handleIn) {
-              html += `<line x1="${v.x}" y1="${v.y}" x2="${v.handleIn.x}" y2="${v.handleIn.y}" stroke="#a855f7" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
-              html += `<circle cx="${v.handleIn.x}" cy="${v.handleIn.y}" r="${bHandleR}" fill="#a855f7" stroke="#ffffff" stroke-width="1" vector-effect="non-scaling-stroke" />`;
-            }
-            if (v.handleOut) {
-              html += `<line x1="${v.x}" y1="${v.y}" x2="${v.handleOut.x}" y2="${v.handleOut.y}" stroke="#a855f7" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
-              html += `<circle cx="${v.handleOut.x}" cy="${v.handleOut.y}" r="${bHandleR}" fill="#a855f7" stroke="#ffffff" stroke-width="1" vector-effect="non-scaling-stroke" />`;
-            }
-          }
-        });
-
-        // 8. Highlight Selected Path Segment in Node Mode
-        if (this.nodeEditorTool.selectedSegmentIdx !== null) {
-          const segIdx = this.nodeEditorTool.selectedSegmentIdx;
-          if (segIdx >= 0 && segIdx < verts.length) {
-            const nextIdx = (segIdx + 1) % verts.length;
-            const v1 = verts[segIdx];
-            const v2 = verts[nextIdx];
-            const isCurve = !!(v1.handleOut || v2.handleIn);
-            let segD = '';
-            if (isCurve) {
-              const h1 = v1.handleOut || { x: v1.x, y: v1.y };
-              const h2 = v2.handleIn || { x: v2.x, y: v2.y };
-              segD = `M ${v1.x} ${v1.y} C ${h1.x} ${h1.y} ${h2.x} ${h2.y} ${v2.x} ${v2.y}`;
-            } else {
-              segD = `M ${v1.x} ${v1.y} L ${v2.x} ${v2.y}`;
-            }
-            html += `<path d="${segD}" fill="none" stroke="#38bdf8" stroke-width="${3 / z}" stroke-dasharray="4 2" vector-effect="non-scaling-stroke" />`;
-          }
-        }
-      }
     }
+
+    // 7. Node Tool Overlay (Bézier handles, segment highlight, ghost drag paths)
+    html += this.nodeToolHandler.renderOverlay(z);
 
     // Ghost Move Vector and Bounding Box
     if (this.activeHandle === 'move' && this.ghostDragOffset && (this.ghostDragOffset.x !== 0 || this.ghostDragOffset.y !== 0)) {
@@ -2882,113 +2360,13 @@ class AntiDrawApp {
       });
     }
 
-    // Ghost Node Tool Path & Handles
-    if (this.ghostNodeVertices) {
-      const selectedEl = this.model.elements.find((el) => this.selectionTool.isSelected(el.id));
-      if (selectedEl) {
-        const isClosed = selectedEl.isClosed ?? (!selectedEl.tagName || ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(selectedEl.tagName) || (selectedEl.attributes.d ? /z/i.test(selectedEl.attributes.d) : false));
-        const d = this.model.compilePathD(this.ghostNodeVertices, isClosed);
-        html += `<path d="${d}" fill="rgba(56, 189, 248, 0.15)" stroke="#38bdf8" stroke-width="2" stroke-dasharray="4 3" vector-effect="non-scaling-stroke" />`;
-        this.ghostNodeVertices.forEach((gv) => {
-          const isSelected = gv.id === this.nodeEditorTool.selectedVertexId;
-          if (isSelected) {
-            html += `<circle cx="${gv.x}" cy="${gv.y}" r="${6 / z}" fill="none" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
-            html += `<circle cx="${gv.x}" cy="${gv.y}" r="${4 / z}" fill="#38bdf8" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
-            if (gv.handleIn) {
-              html += `<line x1="${gv.x}" y1="${gv.y}" x2="${gv.handleIn.x}" y2="${gv.handleIn.y}" stroke="#c084fc" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
-              html += `<circle cx="${gv.handleIn.x}" cy="${gv.handleIn.y}" r="${4 / z}" fill="#c084fc" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
-            }
-            if (gv.handleOut) {
-              html += `<line x1="${gv.x}" y1="${gv.y}" x2="${gv.handleOut.x}" y2="${gv.handleOut.y}" stroke="#c084fc" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
-              html += `<circle cx="${gv.handleOut.x}" cy="${gv.handleOut.y}" r="${4 / z}" fill="#c084fc" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
-            }
-          } else {
-            html += `<circle cx="${gv.x}" cy="${gv.y}" r="${3.5 / z}" fill="#ffffff" stroke="#0284c7" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
-          }
-        });
-      }
-    }
-
     // Ghost Shape Tool Preview
     html += this.shapeToolHandler.renderOverlay(z);
 
-    /**
-     * ARCHITECTURAL RATIONALE: Elastic Real-Time Curvature Feedback & Non-Scaling Overlays
-     * Why this solution is engineered this way:
-     * 1. Dynamic Bézier Ghosting: Traditional pen tools show only a straight rubberband line to the cursor,
-     *    forcing the illustrator to mentally calculate the outgoing tangent curve. By synthesizing a cubic
-     *    Bézier path (M lastV.x,lastV.y C lastV.handleOut ... targetPt targetPt) directly from the outgoing handle
-     *    of the committed node to the hovering cursor point, the user visualizes the precise mathematical curve
-     *    prior to committing the click.
-     * 2. Physical Screen-Pixel Scale Normalization: Control points and stroke widths use vector-effect="non-scaling-stroke"
-     *    and radii divided by z (e.g. 5 / z). This ensures interactive handles remain crisp, constant-size, and comfortable
-     *    to target across all zoom factors (from 10% overview to 1000% macro editing).
-     */
-    // 7. Pen Tool In-Progress Path, Ghost Point & Ghost Path
-    if (this.currentPenVertices.length > 0) {
-      const penD = this.model.compilePathD(this.currentPenVertices, false);
-      html += `<path d="${penD}" fill="none" stroke="#38bdf8" stroke-width="2" vector-effect="non-scaling-stroke" />`;
+    // 8. Pen Tool In-Progress Path, Ghost Point & Ghost Path
+    html += this.penToolHandler.renderOverlay(z);
 
-      const lastV = this.currentPenVertices[this.currentPenVertices.length - 1];
-      const firstV = this.currentPenVertices[0];
-
-      if (this.penHoverPoint) {
-        const isClosing =
-          this.currentPenVertices.length >= 3 &&
-          Math.hypot(this.penHoverPoint.x - firstV.x, this.penHoverPoint.y - firstV.y) <= 14 / z;
-        const targetPt = isClosing ? { x: firstV.x, y: firstV.y } : this.penHoverPoint;
-
-        // Ghost Path (Elastic Bézier or Line from last committed vertex to hover point)
-        let ghostPathD = '';
-        if (lastV.handleOut) {
-          ghostPathD = `M ${lastV.x},${lastV.y} C ${lastV.handleOut.x},${lastV.handleOut.y} ${targetPt.x},${targetPt.y} ${targetPt.x},${targetPt.y}`;
-        } else {
-          ghostPathD = `M ${lastV.x},${lastV.y} L ${targetPt.x},${targetPt.y}`;
-        }
-        html += `<path d="${ghostPathD}" fill="none" stroke="${isClosing ? '#10b981' : '#60a5fa'}" stroke-width="1.5" stroke-dasharray="4 3" vector-effect="non-scaling-stroke" />`;
-
-        // Ghost Point under cursor
-        if (isClosing) {
-          html += `<circle cx="${firstV.x}" cy="${firstV.y}" r="${8 / z}" fill="none" stroke="#10b981" stroke-width="2" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
-        } else {
-          html += `
-            <g opacity="0.95">
-              <circle cx="${targetPt.x}" cy="${targetPt.y}" r="${5 / z}" fill="rgba(56, 189, 248, 0.35)" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />
-              <circle cx="${targetPt.x}" cy="${targetPt.y}" r="${1.5 / z}" fill="#ffffff" />
-            </g>
-          `;
-        }
-      }
-
-      this.currentPenVertices.forEach((v, idx) => {
-        const isStart = idx === 0;
-
-        if (v.handleIn) {
-          html += `<line x1="${v.x}" y1="${v.y}" x2="${v.handleIn.x}" y2="${v.handleIn.y}" stroke="#a855f7" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
-          html += `<circle cx="${v.handleIn.x}" cy="${v.handleIn.y}" r="${3 / z}" fill="#a855f7" stroke="#ffffff" stroke-width="1" vector-effect="non-scaling-stroke" />`;
-        }
-        if (v.handleOut) {
-          html += `<line x1="${v.x}" y1="${v.y}" x2="${v.handleOut.x}" y2="${v.handleOut.y}" stroke="#a855f7" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
-          html += `<circle cx="${v.handleOut.x}" cy="${v.handleOut.y}" r="${3 / z}" fill="#a855f7" stroke="#ffffff" stroke-width="1" vector-effect="non-scaling-stroke" />`;
-        }
-
-        if (isStart) {
-          html += `<circle cx="${v.x}" cy="${v.y}" r="${5 / z}" fill="#10b981" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
-        } else {
-          html += `<rect x="${v.x - 3.5 / z}" y="${v.y - 3.5 / z}" width="${7 / z}" height="${7 / z}" fill="#38bdf8" stroke="#ffffff" stroke-width="1" rx="${1 / z}" vector-effect="non-scaling-stroke" />`;
-        }
-      });
-    } else if (this.toolbar && this.toolbar.activeTool === 'pen' && this.penHoverPoint) {
-      // First ghost point preview under cursor before first click
-      html += `
-        <g opacity="0.95">
-          <circle cx="${this.penHoverPoint.x}" cy="${this.penHoverPoint.y}" r="${5 / z}" fill="rgba(56, 189, 248, 0.35)" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />
-          <circle cx="${this.penHoverPoint.x}" cy="${this.penHoverPoint.y}" r="${1.5 / z}" fill="#ffffff" />
-        </g>
-      `;
-    }
-
-    // 8. Polyline Tool In-Progress Path & Rubberband Overlay
+    // 9. Polyline Tool In-Progress Path & Rubberband Overlay
     html += this.polylineToolHandler.renderOverlay(z);
 
     this.overlaySvg.innerHTML = html;
