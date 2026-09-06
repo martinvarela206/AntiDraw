@@ -310,6 +310,13 @@ body {
   border-color: var(--accent-color);
 }
 
+button.prop-input.active {
+  background-color: var(--accent-color);
+  color: #ffffff;
+  border-color: var(--accent-color);
+  font-weight: 600;
+}
+
 .color-picker-row {
   display: flex;
   align-items: center;

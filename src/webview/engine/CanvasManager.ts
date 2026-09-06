@@ -89,6 +89,30 @@ export class CanvasManager {
     }
   }
 
+  /**
+   * ARCHITECTURAL RATIONALE: Dual-Mode Grid Alignment (Origin vs Cell-Center)
+   * Why a global alignmentMode switch is provided:
+   * 1. Mode A ('origin'): Lines and intersections coincide exactly with ruler (0, 0).
+   *    Essential for precision engineering, boundary drawing, and direct coordinate tracing.
+   * 2. Mode B ('cell-center'): Centers of virtual cells coincide with ruler (0, 0).
+   *    Crucial for icon design, pixel art, sprite work, and typography where visual masses
+   *    and optical centroids sit within cell interiors rather than straddling dividing gridlines.
+   * 3. Unified Phase Shift: Sets alignmentMode uniformly across active grids, updating pattern
+   *    phase offsets in generateGridDefsAndLayers and snapping calculations in snapPoint simultaneously.
+   */
+  public get gridAlignmentMode(): GridAlignmentMode {
+    const primary = this.grids[0];
+    return primary ? primary.alignmentMode : 'origin';
+  }
+
+  public set gridAlignmentMode(val: GridAlignmentMode) {
+    if (this.grids.length === 0) {
+      this.addGrid('orthogonal', 20, 0, 'rgba(255, 255, 255, 0.15)', val);
+    } else {
+      this.grids.forEach((g) => (g.alignmentMode = val));
+    }
+  }
+
   public shapeConfig: ShapeToolConfig = {
     aspectRatioW: 4,
     aspectRatioH: 3,

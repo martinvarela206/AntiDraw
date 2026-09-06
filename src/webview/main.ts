@@ -224,14 +224,14 @@ class AntiDrawApp {
           this.canvasMgr.activeGuideTransformId = null;
           const statusTool = document.getElementById('status-tool');
           if (statusTool) statusTool.innerText = `Tool: Ruler`;
-          this.propertyPanel.showRulerSettings(this.canvasMgr.rulerConfig);
+          this.propertyPanel.showRulerSettings(this.canvasMgr.rulerConfig, this.canvasMgr.gridAlignmentMode);
           this.render();
         },
         onResetOrigin: () => {
           this.canvasMgr.rulerConfig.originX = 0;
           this.canvasMgr.rulerConfig.originY = 0;
           this.syncRulerScroll();
-          this.propertyPanel.showRulerSettings(this.canvasMgr.rulerConfig);
+          this.propertyPanel.showRulerSettings(this.canvasMgr.rulerConfig, this.canvasMgr.gridAlignmentMode);
           this.render();
           this.syncMetadataToHost();
         },
@@ -316,6 +316,11 @@ class AntiDrawApp {
         },
         onUpdateShapeConfig: (cfg) => {
           this.canvasMgr.shapeConfig = cfg;
+        },
+        onGridAlignmentChange: (mode) => {
+          this.canvasMgr.gridAlignmentMode = mode;
+          this.render();
+          this.syncMetadataToHost();
         },
         onBoolean: (op) => this.handleBoolean(op),
       }
@@ -3057,7 +3062,8 @@ class AntiDrawApp {
       this.penNodeType,
       this.currentPenVertices.length,
       selectedGuide,
-      this.currentPolylineVertices.length
+      this.currentPolylineVertices.length,
+      this.canvasMgr.gridAlignmentMode
     );
   }
 

@@ -1,6 +1,6 @@
 import { VectorModel, VectorElement, PathVertex, NodeType } from '../engine/VectorModel.js';
 import { SelectionTool, BoundingBox } from '../engine/SelectionTool.js';
-import { GuideLine, RulerConfig, ShapeToolConfig } from '../engine/CanvasManager.js';
+import { GuideLine, RulerConfig, ShapeToolConfig, GridAlignmentMode } from '../engine/CanvasManager.js';
 import { ToolIcons } from '../icons/ToolIcons.js';
 
 export interface PropertyPanelCallbacks {
@@ -19,6 +19,7 @@ export interface PropertyPanelCallbacks {
   onDeleteGuide?: (guideId: string) => void;
   onClearAllGuides?: () => void;
   onUpdateShapeConfig?: (config: ShapeToolConfig) => void;
+  onGridAlignmentChange?: (mode: GridAlignmentMode) => void;
   /**
    * Boolean Operations callback: Dispatches constructive geometry operations (union, subtract,
    * intersect, exclude, combine, fragment) directly to BooleanOperations engine.
@@ -54,6 +55,7 @@ export class PropertyPanel {
   public penNodeType: NodeType = 'asymmetric';
   public penVertexCount: number = 0;
   public polylineVertexCount: number = 0;
+  public gridAlignmentMode: GridAlignmentMode = 'origin';
   private activeRulerConfig: RulerConfig | null = null;
   private activeGuide: GuideLine | null = null;
   public shapeConfig: ShapeToolConfig = {
@@ -87,7 +89,8 @@ export class PropertyPanel {
     penNodeType: NodeType = 'asymmetric',
     penVertexCount: number = 0,
     selectedGuide: GuideLine | null = null,
-    polylineVertexCount: number = 0
+    polylineVertexCount: number = 0,
+    gridAlignmentMode: GridAlignmentMode = 'origin'
   ): void {
     this.activeVertex = selectedVertex;
     this.activeTool = activeTool;
@@ -95,6 +98,7 @@ export class PropertyPanel {
     this.penVertexCount = penVertexCount;
     this.activeGuide = selectedGuide;
     this.polylineVertexCount = polylineVertexCount;
+    this.gridAlignmentMode = gridAlignmentMode;
 
     if (selectedGuide) {
       this.currentPanelMode = 'guide';
@@ -114,9 +118,10 @@ export class PropertyPanel {
     this.activeRulerConfig = null;
   }
 
-  public showRulerSettings(config: RulerConfig): void {
+  public showRulerSettings(config: RulerConfig, gridAlignmentMode: GridAlignmentMode = 'origin'): void {
     this.currentPanelMode = 'ruler';
     this.activeRulerConfig = config;
+    this.gridAlignmentMode = gridAlignmentMode;
     this.renderRulerProperties(config);
   }
 
@@ -230,6 +235,18 @@ export class PropertyPanel {
       </div>
 
       <div class="panel-section">
+        <div class="panel-title">Grid-Ruler Alignment</div>
+        <div class="prop-row" style="display:flex; gap:6px;">
+          <button class="prop-input ${this.gridAlignmentMode === 'origin' ? 'active' : ''}" id="btn-grid-align-origin" style="cursor:pointer; text-align:center; flex:1; padding:6px 4px; font-size:11px;" title="Modo A: Línea o cruce de grilla coincidente con (0, 0)">
+            ┼ Línea en (0, 0)
+          </button>
+          <button class="prop-input ${this.gridAlignmentMode === 'cell-center' ? 'active' : ''}" id="btn-grid-align-center" style="cursor:pointer; text-align:center; flex:1; padding:6px 4px; font-size:11px;" title="Modo B: Centro de la celda virtual coincidente con (0, 0)">
+            ◫ Celda en (0, 0)
+          </button>
+        </div>
+      </div>
+
+      <div class="panel-section">
         <div class="panel-title">Guide Actions</div>
         <div class="prop-row" style="flex-direction:column; gap:6px;">
           <button class="prop-input" id="btn-clear-guides" style="cursor:pointer; background:#ef4444; color:#fff; text-align:center; font-weight:600;">
@@ -336,6 +353,17 @@ export class PropertyPanel {
         if (this.callbacks.onClearAllGuides) this.callbacks.onClearAllGuides();
       });
     }
+
+    this.bindMouseDown('btn-grid-align-origin', () => {
+      this.gridAlignmentMode = 'origin';
+      if (this.callbacks.onGridAlignmentChange) this.callbacks.onGridAlignmentChange('origin');
+      this.renderRulerProperties(config);
+    });
+    this.bindMouseDown('btn-grid-align-center', () => {
+      this.gridAlignmentMode = 'cell-center';
+      if (this.callbacks.onGridAlignmentChange) this.callbacks.onGridAlignmentChange('cell-center');
+      this.renderRulerProperties(config);
+    });
   }
 
   // Render Guide Line Properties
@@ -893,6 +921,18 @@ export class PropertyPanel {
           </div>
         </div>
       </div>
+
+      <div class="panel-section">
+        <div class="panel-title">Grid-Ruler Alignment</div>
+        <div class="prop-row" style="display:flex; gap:6px;">
+          <button class="prop-input ${this.gridAlignmentMode === 'origin' ? 'active' : ''}" id="btn-canvas-grid-align-origin" style="cursor:pointer; text-align:center; flex:1; padding:6px 4px; font-size:11px;" title="Modo A: Línea o cruce de grilla coincidente con (0, 0)">
+            ┼ Línea en (0, 0)
+          </button>
+          <button class="prop-input ${this.gridAlignmentMode === 'cell-center' ? 'active' : ''}" id="btn-canvas-grid-align-center" style="cursor:pointer; text-align:center; flex:1; padding:6px 4px; font-size:11px;" title="Modo B: Centro de la celda virtual coincidente con (0, 0)">
+            ◫ Celda en (0, 0)
+          </button>
+        </div>
+      </div>
     `;
 
     const presetSelect = this.container.querySelector<HTMLSelectElement>('#canvas-preset');
@@ -1021,6 +1061,17 @@ export class PropertyPanel {
       this.model.canvas.backgroundColor = bgHex.value;
       if (bgColor) bgColor.value = bgHex.value;
       this.callbacks.onUpdateCanvas();
+    });
+
+    this.bindMouseDown('btn-canvas-grid-align-origin', () => {
+      this.gridAlignmentMode = 'origin';
+      if (this.callbacks.onGridAlignmentChange) this.callbacks.onGridAlignmentChange('origin');
+      this.renderCanvasProperties();
+    });
+    this.bindMouseDown('btn-canvas-grid-align-center', () => {
+      this.gridAlignmentMode = 'cell-center';
+      if (this.callbacks.onGridAlignmentChange) this.callbacks.onGridAlignmentChange('cell-center');
+      this.renderCanvasProperties();
     });
   }
 
