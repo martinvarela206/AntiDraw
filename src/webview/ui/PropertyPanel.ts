@@ -1254,6 +1254,20 @@ export class PropertyPanel {
     const strokeLinecap = el.attributes['stroke-linecap'] || 'butt';
     const strokeLinejoin = el.attributes['stroke-linejoin'] || 'miter';
 
+    const parseMarkerId = (val?: string): string => {
+      if (!val || val === 'none') return 'none';
+      if (val.includes('arrow-open')) return 'arrow-open';
+      if (val.includes('arrow-filled')) return 'arrow-filled';
+      if (val.includes('circle-dot')) return 'circle-dot';
+      if (val.includes('square-block')) return 'square-block';
+      if (val.includes('bar-cap')) return 'bar-cap';
+      return 'none';
+    };
+
+    const markerStart = parseMarkerId(el.attributes['marker-start']);
+    const markerMid = parseMarkerId(el.attributes['marker-mid']);
+    const markerEnd = parseMarkerId(el.attributes['marker-end']);
+
     const box = this.selectionTool.getBoundingBox(el);
     const x = box ? Math.round(box.x) : 0;
     const y = box ? Math.round(box.y) : 0;
@@ -1323,6 +1337,37 @@ export class PropertyPanel {
             <option value="miter" ${strokeLinejoin === 'miter' ? 'selected' : ''}>Miter</option>
             <option value="round" ${strokeLinejoin === 'round' ? 'selected' : ''}>Round</option>
             <option value="bevel" ${strokeLinejoin === 'bevel' ? 'selected' : ''}>Bevel</option>
+          </select>
+        </div>
+        <div class="prop-row">
+          <span class="prop-label">Start Mkr</span>
+          <select class="prop-input" id="el-marker-start" style="cursor:pointer;" title="Marcador de inicio de trazo (marker-start)">
+            <option value="none" ${markerStart === 'none' ? 'selected' : ''}>None</option>
+            <option value="arrow-open" ${markerStart === 'arrow-open' ? 'selected' : ''}>Arrow (Open)</option>
+            <option value="arrow-filled" ${markerStart === 'arrow-filled' ? 'selected' : ''}>Arrow (Filled)</option>
+            <option value="circle-dot" ${markerStart === 'circle-dot' ? 'selected' : ''}>Circle Dot</option>
+            <option value="square-block" ${markerStart === 'square-block' ? 'selected' : ''}>Square</option>
+            <option value="bar-cap" ${markerStart === 'bar-cap' ? 'selected' : ''}>Bar Cap</option>
+          </select>
+        </div>
+        <div class="prop-row">
+          <span class="prop-label">Mid Mkr</span>
+          <select class="prop-input" id="el-marker-mid" style="cursor:pointer;" title="Marcador en vértices intermedios (marker-mid)">
+            <option value="none" ${markerMid === 'none' ? 'selected' : ''}>None</option>
+            <option value="arrow-filled" ${markerMid === 'arrow-filled' ? 'selected' : ''}>Arrow (Directional)</option>
+            <option value="circle-dot" ${markerMid === 'circle-dot' ? 'selected' : ''}>Circle Dot</option>
+            <option value="square-block" ${markerMid === 'square-block' ? 'selected' : ''}>Square</option>
+          </select>
+        </div>
+        <div class="prop-row">
+          <span class="prop-label">End Mkr</span>
+          <select class="prop-input" id="el-marker-end" style="cursor:pointer;" title="Marcador de final de trazo (marker-end)">
+            <option value="none" ${markerEnd === 'none' ? 'selected' : ''}>None</option>
+            <option value="arrow-open" ${markerEnd === 'arrow-open' ? 'selected' : ''}>Arrow (Open)</option>
+            <option value="arrow-filled" ${markerEnd === 'arrow-filled' ? 'selected' : ''}>Arrow (Filled)</option>
+            <option value="circle-dot" ${markerEnd === 'circle-dot' ? 'selected' : ''}>Circle Dot</option>
+            <option value="square-block" ${markerEnd === 'square-block' ? 'selected' : ''}>Square</option>
+            <option value="bar-cap" ${markerEnd === 'bar-cap' ? 'selected' : ''}>Bar Cap</option>
           </select>
         </div>
       </div>
@@ -1440,6 +1485,52 @@ export class PropertyPanel {
     if (elStrokeJoin) {
       elStrokeJoin.addEventListener('change', () => {
         el.attributes['stroke-linejoin'] = elStrokeJoin.value;
+        this.callbacks.onUpdateElement(el);
+      });
+    }
+
+    const elMarkerStart = this.container.querySelector<HTMLSelectElement>('#el-marker-start');
+    const elMarkerMid = this.container.querySelector<HTMLSelectElement>('#el-marker-mid');
+    const elMarkerEnd = this.container.querySelector<HTMLSelectElement>('#el-marker-end');
+
+    if (elMarkerStart) {
+      elMarkerStart.addEventListener('change', () => {
+        const val = elMarkerStart.value;
+        if (val === 'none') {
+          delete el.attributes['marker-start'];
+        } else if (val === 'circle-dot' || val === 'square-block') {
+          el.attributes['marker-start'] = `url(#ad-marker-${val})`;
+        } else {
+          el.attributes['marker-start'] = `url(#ad-marker-${val}-start)`;
+        }
+        this.callbacks.onUpdateElement(el);
+      });
+    }
+
+    if (elMarkerMid) {
+      elMarkerMid.addEventListener('change', () => {
+        const val = elMarkerMid.value;
+        if (val === 'none') {
+          delete el.attributes['marker-mid'];
+        } else if (val === 'arrow-filled') {
+          el.attributes['marker-mid'] = 'url(#ad-marker-arrow-filled-mid)';
+        } else {
+          el.attributes['marker-mid'] = `url(#ad-marker-${val})`;
+        }
+        this.callbacks.onUpdateElement(el);
+      });
+    }
+
+    if (elMarkerEnd) {
+      elMarkerEnd.addEventListener('change', () => {
+        const val = elMarkerEnd.value;
+        if (val === 'none') {
+          delete el.attributes['marker-end'];
+        } else if (val === 'circle-dot' || val === 'square-block') {
+          el.attributes['marker-end'] = `url(#ad-marker-${val})`;
+        } else {
+          el.attributes['marker-end'] = `url(#ad-marker-${val}-end)`;
+        }
         this.callbacks.onUpdateElement(el);
       });
     }

@@ -36,6 +36,66 @@ export interface CanvasSettings {
   backgroundColor: string;
 }
 
+/**
+ * ARCHITECTURAL RATIONALE: Standard SVG Marker Catalog (<marker>)
+ * 
+ * 1. Hardware-Accelerated Contextual Inheritance (context-stroke):
+ *    In modern SVG2 (Chromium/Webkit/Gecko), `fill="context-stroke"` and `stroke="context-stroke"`
+ *    allow marker primitives to automatically inherit the runtime stroke color and opacity of the
+ *    referencing vector element without generating duplicate <marker> entries for every color variant.
+ * 
+ * 2. Explicit Forward & Reverse Orientation Geometry:
+ *    Rather than relying on inconsistent browser edge cases with `orient="auto-start-reverse"`,
+ *    dedicated `-start` (pointing outward backwards, refX=1 or 2) and `-end` (pointing forward, refX=8 or 9)
+ *    markers are generated with explicit `orient="auto"`. This guarantees absolute geometric fidelity
+ *    across standalone vector viewers, Inkscape, Illustrator, and web browsers.
+ * 
+ * 3. Proportional Scaling (markerUnits="strokeWidth"):
+ *    Default markerUnits="strokeWidth" ensures that when an illustrator thickens the path stroke,
+ *    dimension arrows and end caps scale up proportionally without clipping or visual disconnect.
+ */
+export const STANDARD_MARKERS_INNER_XML = `    <!-- AntiDraw Standard SVG Markers -->
+    <!-- Arrow Open Start (Cota abierta inicial) -->
+    <marker id="ad-marker-arrow-open-start" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 9 1.5 L 1 5 L 9 8.5" fill="none" stroke="context-stroke" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+    </marker>
+    <!-- Arrow Open End (Cota abierta final) -->
+    <marker id="ad-marker-arrow-open-end" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 1 1.5 L 9 5 L 1 8.5" fill="none" stroke="context-stroke" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+    </marker>
+
+    <!-- Arrow Filled Start (Triángulo lleno inicial) -->
+    <marker id="ad-marker-arrow-filled-start" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 10 1.5 L 1 5 L 10 8.5 Z" fill="context-stroke" />
+    </marker>
+    <!-- Arrow Filled End (Triángulo lleno final) -->
+    <marker id="ad-marker-arrow-filled-end" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 1.5 L 9 5 L 0 8.5 Z" fill="context-stroke" />
+    </marker>
+    <!-- Arrow Filled Mid (Flecha direccional intermedia) -->
+    <marker id="ad-marker-arrow-filled-mid" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 1 1.5 L 9 5 L 1 8.5 Z" fill="context-stroke" />
+    </marker>
+
+    <!-- Circle Dot (Punto circular terminal/nodo) -->
+    <marker id="ad-marker-circle-dot" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+      <circle cx="5" cy="5" r="3.5" fill="context-stroke" />
+    </marker>
+
+    <!-- Square Block (Terminal cuadrado) -->
+    <marker id="ad-marker-square-block" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+      <rect x="2" y="2" width="6" height="6" fill="context-stroke" />
+    </marker>
+
+    <!-- Bar Cap Start (Remate perpendicular en T inicial) -->
+    <marker id="ad-marker-bar-cap-start" viewBox="0 0 10 10" refX="2" refY="5" markerWidth="5" markerHeight="6" orient="auto">
+      <line x1="2" y1="1" x2="2" y2="9" stroke="context-stroke" stroke-width="2" stroke-linecap="round" />
+    </marker>
+    <!-- Bar Cap End (Remate perpendicular en T final) -->
+    <marker id="ad-marker-bar-cap-end" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="6" orient="auto">
+      <line x1="8" y1="1" x2="8" y2="9" stroke="context-stroke" stroke-width="2" stroke-linecap="round" />
+    </marker>\n`;
+
 export class VectorModel {
   public canvas: CanvasSettings = {
     width: 800,
@@ -45,6 +105,7 @@ export class VectorModel {
   };
 
   public elements: VectorElement[] = [];
+  public customDefs: string = '';
 
   constructor() {}
 
@@ -87,6 +148,25 @@ export class VectorModel {
 
       this.canvas = { width, height, viewBox, backgroundColor: bg };
       this.elements = [];
+
+      // Parse external <defs> if present, filtering out our standard markers to avoid duplicates
+      const defsEl = svgEl.querySelector('defs');
+      if (defsEl) {
+        const clone = defsEl.cloneNode(true) as HTMLElement;
+        const markerIds = [
+          'ad-marker-arrow-open-start', 'ad-marker-arrow-open-end',
+          'ad-marker-arrow-filled-start', 'ad-marker-arrow-filled-end',
+          'ad-marker-arrow-filled-mid', 'ad-marker-circle-dot',
+          'ad-marker-square-block', 'ad-marker-bar-cap-start', 'ad-marker-bar-cap-end'
+        ];
+        markerIds.forEach((id) => {
+          const m = clone.querySelector(`#${id}`);
+          if (m) m.remove();
+        });
+        this.customDefs = clone.innerHTML.trim();
+      } else {
+        this.customDefs = '';
+      }
 
       // Parse child vector elements
       const children = Array.from(svgEl.children);
@@ -138,6 +218,22 @@ export class VectorModel {
   public toSvgString(): string {
     const { width, height, viewBox, backgroundColor } = this.canvas;
     let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${viewBox}" style="background-color: ${backgroundColor};">\n`;
+
+    // Detect if any vector element makes use of SVG marker terminations
+    const hasMarkers = this.elements.some(
+      (el) => !!(el.attributes['marker-start'] || el.attributes['marker-mid'] || el.attributes['marker-end'])
+    );
+
+    if (hasMarkers || (this.customDefs && this.customDefs.length > 0)) {
+      svg += `  <defs id="antidraw-marker-defs">\n`;
+      if (hasMarkers) {
+        svg += STANDARD_MARKERS_INNER_XML;
+      }
+      if (this.customDefs && this.customDefs.length > 0) {
+        svg += `    ${this.customDefs}\n`;
+      }
+      svg += `  </defs>\n`;
+    }
 
     this.elements.forEach((el) => {
       if (el.vertices && el.vertices.length > 0) {
