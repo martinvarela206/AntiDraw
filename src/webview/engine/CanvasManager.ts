@@ -8,6 +8,8 @@ export interface GuideLine {
   pivotX: number;      // Center pivot point X in canvas coordinates
   pivotY: number;      // Center pivot point Y in canvas coordinates
   color?: string;      // Guide line color, default cyan (#00f0ff)
+  visible?: boolean;   // Visibility toggle (default true)
+  locked?: boolean;    // Lock toggle preventing accidental selection or drag
 }
 
 export interface RulerConfig {
@@ -37,6 +39,7 @@ export interface GridConfig {
   color: string;        // Render stroke color
   visible: boolean;     // Visibility toggle
   alignmentMode: GridAlignmentMode; // 'origin' (cross at 0,0) or 'cell-center' (center of virtual cell at 0,0)
+  locked?: boolean;     // Optional lock
 }
 
 export class CanvasManager {
@@ -195,9 +198,11 @@ export class CanvasManager {
       let bestIntersection: Point | null = null;
 
       for (let i = 0; i < this.guides.length; i++) {
+        const g1 = this.guides[i];
+        if (g1.visible === false) continue;
         for (let j = i + 1; j < this.guides.length; j++) {
-          const g1 = this.guides[i];
           const g2 = this.guides[j];
+          if (g2.visible === false) continue;
           const rad1 = ((g1.angle || 0) * Math.PI) / 180;
           const rad2 = ((g2.angle || 0) * Math.PI) / 180;
           const n1x = -Math.sin(rad1), n1y = Math.cos(rad1);
@@ -231,6 +236,7 @@ export class CanvasManager {
       let bestLineSnap: Point | null = null;
 
       for (const g of this.guides) {
+        if (g.visible === false) continue;
         const rad = ((g.angle || 0) * Math.PI) / 180;
         const nx = -Math.sin(rad);
         const ny = Math.cos(rad);
@@ -321,6 +327,15 @@ export class CanvasManager {
     if (g) {
       Object.assign(g, partial);
     }
+  }
+
+  public reorderGrid(id: string, direction: 'up' | 'down'): void {
+    const idx = this.grids.findIndex((g) => g.id === id);
+    if (idx === -1) return;
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= this.grids.length) return;
+    const [removed] = this.grids.splice(idx, 1);
+    this.grids.splice(targetIdx, 0, removed);
   }
 
   /**

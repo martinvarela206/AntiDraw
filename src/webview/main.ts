@@ -224,14 +224,14 @@ class AntiDrawApp {
           this.canvasMgr.activeGuideTransformId = null;
           const statusTool = document.getElementById('status-tool');
           if (statusTool) statusTool.innerText = `Tool: Ruler`;
-          this.propertyPanel.showRulerSettings(this.canvasMgr.rulerConfig, this.canvasMgr.gridAlignmentMode);
+          this.propertyPanel.showRulerSettings(this.canvasMgr.rulerConfig, this.canvasMgr.gridAlignmentMode, this.canvasMgr.grids, this.canvasMgr.guides);
           this.render();
         },
         onResetOrigin: () => {
           this.canvasMgr.rulerConfig.originX = 0;
           this.canvasMgr.rulerConfig.originY = 0;
           this.syncRulerScroll();
-          this.propertyPanel.showRulerSettings(this.canvasMgr.rulerConfig, this.canvasMgr.gridAlignmentMode);
+          this.propertyPanel.showRulerSettings(this.canvasMgr.rulerConfig, this.canvasMgr.gridAlignmentMode, this.canvasMgr.grids, this.canvasMgr.guides);
           this.render();
           this.syncMetadataToHost();
         },
@@ -321,6 +321,37 @@ class AntiDrawApp {
           this.canvasMgr.gridAlignmentMode = mode;
           this.render();
           this.syncMetadataToHost();
+        },
+        onAddGrid: (type) => {
+          this.canvasMgr.addGrid(type, 20);
+          this.propertyPanel.showRulerSettings(this.canvasMgr.rulerConfig, this.canvasMgr.gridAlignmentMode, this.canvasMgr.grids, this.canvasMgr.guides);
+          this.render();
+          this.syncMetadataToHost();
+        },
+        onRemoveGrid: (gridId) => {
+          this.canvasMgr.removeGrid(gridId);
+          this.propertyPanel.showRulerSettings(this.canvasMgr.rulerConfig, this.canvasMgr.gridAlignmentMode, this.canvasMgr.grids, this.canvasMgr.guides);
+          this.render();
+          this.syncMetadataToHost();
+        },
+        onUpdateGrid: (gridId, partial) => {
+          this.canvasMgr.updateGrid(gridId, partial);
+          this.render();
+          this.syncMetadataToHost();
+        },
+        onReorderGrid: (gridId, direction) => {
+          this.canvasMgr.reorderGrid(gridId, direction);
+          this.propertyPanel.showRulerSettings(this.canvasMgr.rulerConfig, this.canvasMgr.gridAlignmentMode, this.canvasMgr.grids, this.canvasMgr.guides);
+          this.render();
+          this.syncMetadataToHost();
+        },
+        onSelectGuide: (guideId) => {
+          this.canvasMgr.selectedGuideId = guideId;
+          const g = this.canvasMgr.getGuide(guideId);
+          if (g) {
+            this.propertyPanel.showGuideSettings(g);
+          }
+          this.render();
         },
         onBoolean: (op) => this.handleBoolean(op),
       }
@@ -1047,6 +1078,7 @@ class AntiDrawApp {
 
     for (let i = this.canvasMgr.guides.length - 1; i >= 0; i--) {
       const g = this.canvasMgr.guides[i];
+      if (g.visible === false || g.locked) continue;
       const rad = ((g.angle || 0) * Math.PI) / 180;
       const nx = -Math.sin(rad);
       const ny = Math.cos(rad);
@@ -3063,7 +3095,9 @@ class AntiDrawApp {
       this.currentPenVertices.length,
       selectedGuide,
       this.currentPolylineVertices.length,
-      this.canvasMgr.gridAlignmentMode
+      this.canvasMgr.gridAlignmentMode,
+      this.canvasMgr.grids,
+      this.canvasMgr.guides
     );
   }
 
@@ -3102,6 +3136,7 @@ class AntiDrawApp {
     // 2. Guide Lines Overlay (Always 1px width, inverted highlight on select, transform controls on double click)
     if (this.canvasMgr.showGuides) {
       this.canvasMgr.guides.forEach((g) => {
+        if (g.visible === false) return;
         const isSelected = g.id === this.canvasMgr.selectedGuideId;
         const isTransforming = g.id === this.canvasMgr.activeGuideTransformId;
 

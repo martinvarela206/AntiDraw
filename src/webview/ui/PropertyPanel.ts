@@ -1,6 +1,6 @@
 import { VectorModel, VectorElement, PathVertex, NodeType } from '../engine/VectorModel.js';
 import { SelectionTool, BoundingBox } from '../engine/SelectionTool.js';
-import { GuideLine, RulerConfig, ShapeToolConfig, GridAlignmentMode } from '../engine/CanvasManager.js';
+import { GuideLine, RulerConfig, ShapeToolConfig, GridAlignmentMode, GridConfig, GridType } from '../engine/CanvasManager.js';
 import { ToolIcons } from '../icons/ToolIcons.js';
 
 export interface PropertyPanelCallbacks {
@@ -20,6 +20,11 @@ export interface PropertyPanelCallbacks {
   onClearAllGuides?: () => void;
   onUpdateShapeConfig?: (config: ShapeToolConfig) => void;
   onGridAlignmentChange?: (mode: GridAlignmentMode) => void;
+  onAddGrid?: (type: GridType) => void;
+  onRemoveGrid?: (gridId: string) => void;
+  onUpdateGrid?: (gridId: string, partial: Partial<GridConfig>) => void;
+  onReorderGrid?: (gridId: string, direction: 'up' | 'down') => void;
+  onSelectGuide?: (guideId: string) => void;
   /**
    * Boolean Operations callback: Dispatches constructive geometry operations (union, subtract,
    * intersect, exclude, combine, fragment) directly to BooleanOperations engine.
@@ -56,6 +61,8 @@ export class PropertyPanel {
   public penVertexCount: number = 0;
   public polylineVertexCount: number = 0;
   public gridAlignmentMode: GridAlignmentMode = 'origin';
+  public grids: GridConfig[] = [];
+  public guides: GuideLine[] = [];
   private activeRulerConfig: RulerConfig | null = null;
   private activeGuide: GuideLine | null = null;
   public shapeConfig: ShapeToolConfig = {
@@ -90,7 +97,9 @@ export class PropertyPanel {
     penVertexCount: number = 0,
     selectedGuide: GuideLine | null = null,
     polylineVertexCount: number = 0,
-    gridAlignmentMode: GridAlignmentMode = 'origin'
+    gridAlignmentMode: GridAlignmentMode = 'origin',
+    grids: GridConfig[] = [],
+    guides: GuideLine[] = []
   ): void {
     this.activeVertex = selectedVertex;
     this.activeTool = activeTool;
@@ -99,6 +108,8 @@ export class PropertyPanel {
     this.activeGuide = selectedGuide;
     this.polylineVertexCount = polylineVertexCount;
     this.gridAlignmentMode = gridAlignmentMode;
+    if (grids.length > 0 || this.grids.length === 0) this.grids = grids;
+    if (guides.length > 0 || this.guides.length === 0) this.guides = guides;
 
     if (selectedGuide) {
       this.currentPanelMode = 'guide';
@@ -118,10 +129,17 @@ export class PropertyPanel {
     this.activeRulerConfig = null;
   }
 
-  public showRulerSettings(config: RulerConfig, gridAlignmentMode: GridAlignmentMode = 'origin'): void {
+  public showRulerSettings(
+    config: RulerConfig,
+    gridAlignmentMode: GridAlignmentMode = 'origin',
+    grids: GridConfig[] = [],
+    guides: GuideLine[] = []
+  ): void {
     this.currentPanelMode = 'ruler';
     this.activeRulerConfig = config;
     this.gridAlignmentMode = gridAlignmentMode;
+    if (grids.length > 0) this.grids = grids;
+    if (guides.length > 0) this.guides = guides;
     this.renderRulerProperties(config);
   }
 
@@ -246,13 +264,94 @@ export class PropertyPanel {
         </div>
       </div>
 
+      <!-- EXPLORADOR DE GRILLAS -->
       <div class="panel-section">
-        <div class="panel-title">Guide Actions</div>
-        <div class="prop-row" style="flex-direction:column; gap:6px;">
-          <button class="prop-input" id="btn-clear-guides" style="cursor:pointer; background:#ef4444; color:#fff; text-align:center; font-weight:600;">
-            🗑 Clear All Guides
+        <div class="panel-title">Grillas Activas (${this.grids.length})</div>
+        <div style="display:flex; flex-direction:column; gap:6px; margin-top:4px;">
+          ${this.grids.map((g, idx) => `
+            <div class="grid-item-card" style="background:var(--bg-dark); border:1px solid var(--border-color); border-radius:4px; padding:6px 8px; display:flex; flex-direction:column; gap:6px;">
+              <div style="display:flex; align-items:center; justify-content:space-between;">
+                <span style="font-weight:600; font-size:11px; text-transform:capitalize; color:var(--text-main);">
+                  ${g.type === 'isometric' ? '📐 Isométrica' : g.type === 'axonometric' ? '📐 Axonométrica (45°)' : '⊞ Ortogonal'}
+                </span>
+                <div style="display:flex; gap:4px; align-items:center;">
+                  <button class="btn-icon" id="btn-grid-vis-${g.id}" title="${g.visible ? 'Ocultar Grilla' : 'Mostrar Grilla'}" style="width:20px; height:20px; font-size:11px;">
+                    ${g.visible ? '👁' : '🚫'}
+                  </button>
+                  <button class="btn-icon" id="btn-grid-up-${g.id}" title="Subir orden Z" ${idx === 0 ? 'disabled style="opacity:0.3;"' : ''} style="width:20px; height:20px; font-size:9px;">
+                    ▲
+                  </button>
+                  <button class="btn-icon" id="btn-grid-down-${g.id}" title="Bajar orden Z" ${idx === this.grids.length - 1 ? 'disabled style="opacity:0.3;"' : ''} style="width:20px; height:20px; font-size:9px;">
+                    ▼
+                  </button>
+                  ${this.grids.length > 1 ? `
+                    <button class="btn-icon" id="btn-grid-del-${g.id}" title="Eliminar Grilla" style="width:20px; height:20px; font-size:11px; color:#ef4444;">
+                      🗑
+                    </button>
+                  ` : ''}
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span class="prop-label" style="width:50px;">Paso (px)</span>
+                <input type="number" class="prop-input" id="grid-spacing-${g.id}" value="${g.spacing}" min="2" step="5" style="flex:1; height:22px;" />
+                <input type="color" class="color-swatch" id="grid-color-${g.id}" value="${g.color?.startsWith('#') ? g.color : '#4f566b'}" style="width:22px; height:22px;" title="Color de trazo de grilla" />
+              </div>
+            </div>
+          `).join('')}
+        </div>
+
+        <div style="display:flex; gap:4px; margin-top:8px;">
+          <button class="prop-input" id="btn-add-grid-ortho" style="cursor:pointer; text-align:center; font-size:10px; padding:4px 2px; flex:1;" title="Añadir Grilla Ortogonal">
+            + Ortogonal
+          </button>
+          <button class="prop-input" id="btn-add-grid-iso" style="cursor:pointer; text-align:center; font-size:10px; padding:4px 2px; flex:1;" title="Añadir Grilla Isométrica">
+            + Isométrica
+          </button>
+          <button class="prop-input" id="btn-add-grid-axono" style="cursor:pointer; text-align:center; font-size:10px; padding:4px 2px; flex:1;" title="Añadir Grilla Axonométrica">
+            + Axonométrica
           </button>
         </div>
+      </div>
+
+      <!-- EXPLORADOR DE LÍNEAS DE GUÍA -->
+      <div class="panel-section">
+        <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
+          <span>Líneas de Guía (${this.guides.length})</span>
+        </div>
+        ${this.guides.length === 0 ? `
+          <div style="font-size:11px; color:var(--text-muted); padding:4px 0;">
+            No hay guías activas. Arrastra desde las reglas métricas para crear una.
+          </div>
+        ` : `
+          <div style="display:flex; flex-direction:column; gap:4px; max-height:160px; overflow-y:auto; margin-top:4px;">
+            ${this.guides.map((g) => `
+              <div style="background:var(--bg-dark); border:1px solid var(--border-color); border-radius:4px; padding:4px 8px; display:flex; align-items:center; justify-content:space-between;">
+                <div style="display:flex; align-items:center; gap:6px; cursor:pointer;" id="guide-item-select-${g.id}" title="Seleccionar guía en el lienzo">
+                  <span style="display:inline-block; width:10px; height:10px; border-radius:2px; background:${g.color || '#00f0ff'};"></span>
+                  <span style="font-size:11px; font-weight:500; color:var(--text-main);">
+                    ${g.orientation === 'horizontal' ? `H: ${Math.round(g.position)}px` : g.orientation === 'vertical' ? `V: ${Math.round(g.position)}px` : `∠ ${Math.round(g.angle)}°`}
+                  </span>
+                </div>
+                <div style="display:flex; gap:4px; align-items:center;">
+                  <button class="btn-icon" id="btn-guide-vis-${g.id}" title="${g.visible !== false ? 'Ocultar Guía' : 'Mostrar Guía'}" style="width:20px; height:20px; font-size:11px;">
+                    ${g.visible !== false ? '👁' : '🚫'}
+                  </button>
+                  <button class="btn-icon" id="btn-guide-lock-${g.id}" title="${g.locked ? 'Desbloquear Guía' : 'Bloquear Guía'}" style="width:20px; height:20px; font-size:11px;">
+                    ${g.locked ? '🔒' : '🔓'}
+                  </button>
+                  <button class="btn-icon" id="btn-guide-del-${g.id}" title="Eliminar Guía" style="width:20px; height:20px; font-size:11px; color:#ef4444;">
+                    🗑
+                  </button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+          <div style="margin-top:8px;">
+            <button class="prop-input" id="btn-clear-guides" style="cursor:pointer; background:#ef4444; color:#fff; text-align:center; font-weight:600;">
+              🗑 Limpiar Todas las Guías
+            </button>
+          </div>
+        `}
       </div>
 
       <div class="panel-section">
@@ -363,6 +462,78 @@ export class PropertyPanel {
       this.gridAlignmentMode = 'cell-center';
       if (this.callbacks.onGridAlignmentChange) this.callbacks.onGridAlignmentChange('cell-center');
       this.renderRulerProperties(config);
+    });
+
+    // Bind Grid Explorer actions
+    this.grids.forEach((g) => {
+      this.bindMouseDown(`btn-grid-vis-${g.id}`, () => {
+        const nextVis = !g.visible;
+        g.visible = nextVis;
+        if (this.callbacks.onUpdateGrid) this.callbacks.onUpdateGrid(g.id, { visible: nextVis });
+        this.renderRulerProperties(config);
+      });
+      this.bindMouseDown(`btn-grid-up-${g.id}`, () => {
+        if (this.callbacks.onReorderGrid) this.callbacks.onReorderGrid(g.id, 'up');
+      });
+      this.bindMouseDown(`btn-grid-down-${g.id}`, () => {
+        if (this.callbacks.onReorderGrid) this.callbacks.onReorderGrid(g.id, 'down');
+      });
+      this.bindMouseDown(`btn-grid-del-${g.id}`, () => {
+        if (this.callbacks.onRemoveGrid) this.callbacks.onRemoveGrid(g.id);
+      });
+
+      const spInput = this.container.querySelector<HTMLInputElement>(`#grid-spacing-${g.id}`);
+      if (spInput) {
+        spInput.addEventListener('change', () => {
+          const val = Math.max(1, parseFloat(spInput.value) || 20);
+          g.spacing = val;
+          if (this.callbacks.onUpdateGrid) this.callbacks.onUpdateGrid(g.id, { spacing: val });
+        });
+      }
+
+      const colInput = this.container.querySelector<HTMLInputElement>(`#grid-color-${g.id}`);
+      if (colInput) {
+        colInput.addEventListener('input', () => {
+          g.color = colInput.value;
+          if (this.callbacks.onUpdateGrid) this.callbacks.onUpdateGrid(g.id, { color: colInput.value });
+        });
+      }
+    });
+
+    this.bindMouseDown('btn-add-grid-ortho', () => {
+      if (this.callbacks.onAddGrid) this.callbacks.onAddGrid('orthogonal');
+    });
+    this.bindMouseDown('btn-add-grid-iso', () => {
+      if (this.callbacks.onAddGrid) this.callbacks.onAddGrid('isometric');
+    });
+    this.bindMouseDown('btn-add-grid-axono', () => {
+      if (this.callbacks.onAddGrid) this.callbacks.onAddGrid('axonometric');
+    });
+
+    // Bind Guide Explorer actions
+    this.guides.forEach((guide) => {
+      const selectRow = this.container.querySelector(`#guide-item-select-${guide.id}`);
+      if (selectRow) {
+        selectRow.addEventListener('click', () => {
+          if (this.callbacks.onSelectGuide) this.callbacks.onSelectGuide(guide.id);
+        });
+      }
+
+      this.bindMouseDown(`btn-guide-vis-${guide.id}`, () => {
+        guide.visible = guide.visible === false ? true : false;
+        if (this.callbacks.onUpdateGuide) this.callbacks.onUpdateGuide(guide);
+        this.renderRulerProperties(config);
+      });
+
+      this.bindMouseDown(`btn-guide-lock-${guide.id}`, () => {
+        guide.locked = !guide.locked;
+        if (this.callbacks.onUpdateGuide) this.callbacks.onUpdateGuide(guide);
+        this.renderRulerProperties(config);
+      });
+
+      this.bindMouseDown(`btn-guide-del-${guide.id}`, () => {
+        if (this.callbacks.onDeleteGuide) this.callbacks.onDeleteGuide(guide.id);
+      });
     });
   }
 
