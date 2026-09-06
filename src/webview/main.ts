@@ -5,6 +5,9 @@ import { CanvasManager, GuideLine, RulerConfig } from './engine/CanvasManager.js
 import { BooleanOperations } from './engine/BooleanOperations.js';
 import { ViewportController } from './engine/ViewportController.js';
 import { VsCodeBridge } from './bridge/VsCodeBridge.js';
+import { ToolContext } from './tools/IToolHandler.js';
+import { ShapeToolHandler } from './tools/ShapeToolHandler.js';
+import { PolylineToolHandler } from './tools/PolylineToolHandler.js';
 import { Toolbar, ToolType } from './ui/Toolbar.js';
 import { TopBar } from './ui/TopBar.js';
 import { PropertyPanel } from './ui/PropertyPanel.js';
@@ -14,6 +17,8 @@ import './styles/main.css';
 class AntiDrawApp {
   private vscodeBridge: VsCodeBridge = VsCodeBridge.getInstance();
   private viewportCtrl!: ViewportController;
+  private shapeToolHandler!: ShapeToolHandler;
+  private polylineToolHandler!: PolylineToolHandler;
 
   private model: VectorModel = new VectorModel();
   private selectionTool: SelectionTool = new SelectionTool();
@@ -74,15 +79,11 @@ class AntiDrawApp {
   private penActiveVertexIdx: number | null = null;
   private penMovingVertexIdx: number | null = null;
 
-  private currentPolylineVertices: PathVertex[] = [];
-  private polylineHoverPoint: Point | null = null;
-
-  private shapeStartPt: Point | null = null;
   // Ghost manipulation and creation state
   private ghostDragOffset: Point | null = null;
   private ghostTransformMap: Map<string, PathVertex[]> = new Map();
   private ghostNodeVertices: PathVertex[] | null = null;
-  private ghostShapeElement: VectorElement | null = null;
+  private marqueeStartPt: Point | null = null;
 
 
   private isShiftPressed: boolean = false;
@@ -97,10 +98,29 @@ class AntiDrawApp {
   private maxHistory: number = 50;
 
   constructor() {
+    this.initTools();
     this.initLayout();
     this.initViewport();
     this.initEvents();
     this.notifyReady();
+  }
+
+  private initTools(): void {
+    const toolCtx: ToolContext = {
+      model: this.model,
+      selectionTool: this.selectionTool,
+      canvasMgr: this.canvasMgr,
+      pushUndo: () => this.pushUndo(),
+      syncToHost: () => this.syncToHost(),
+      render: () => this.render(),
+      renderOverlay: () => this.renderOverlay(),
+      snapPoint: (pt, others) => this.snapPoint(pt, others),
+      getOtherVertices: () => this.getOtherVertices(),
+      setTool: (t) => this.toolbar.setTool(t),
+      getActiveTool: () => this.toolbar.activeTool,
+    };
+    this.shapeToolHandler = new ShapeToolHandler(toolCtx);
+    this.polylineToolHandler = new PolylineToolHandler(toolCtx);
   }
 
   private initViewport(): void {
@@ -298,7 +318,7 @@ class AntiDrawApp {
           this.finishPenPath(close);
         },
         onFinishPolylinePath: (close) => {
-          this.finishPolylinePath(close);
+          this.polylineToolHandler.finishPolylinePath(close);
         },
         onUpdateRuler: (cfg) => {
           this.canvasMgr.rulerConfig = cfg;
@@ -485,11 +505,10 @@ class AntiDrawApp {
           (this.initialElementsMap.size > 0 && this.isDragging) ||
           this.ghostNodeVertices ||
           (this.toolbar.activeTool === 'node' && this.isDragging) ||
-          this.ghostShapeElement ||
-          this.shapeStartPt ||
+          this.shapeToolHandler.shapeStartPt ||
           this.activeHandle === 'shape' ||
           (this.toolbar.activeTool === 'pen' && (this.isDragging || this.currentPenVertices.length > 0)) ||
-          (this.toolbar.activeTool === 'polyline' && this.currentPolylineVertices.length > 0) ||
+          (this.toolbar.activeTool === 'polyline' && this.polylineToolHandler.vertexCount > 0) ||
           this.activeHandle === 'marquee' ||
           this.selectionTool.marqueeRect ||
           this.activeHandle === 'guide-create' ||
@@ -519,7 +538,7 @@ class AntiDrawApp {
 
       if (this.toolbar.activeTool === 'polyline') {
         if (e.key === 'Enter') {
-          this.finishPolylinePath(false);
+          this.polylineToolHandler.finishPolylinePath(false);
           return;
         }
       }
@@ -869,8 +888,10 @@ class AntiDrawApp {
       this.canvasMgr.activeGuideTransformId = null;
     }
     if (tool !== 'polyline') {
-      this.currentPolylineVertices = [];
-      this.polylineHoverPoint = null;
+      this.polylineToolHandler.deactivate();
+    }
+    if (!['rect', 'ellipse', 'line', 'star'].includes(tool)) {
+      this.shapeToolHandler.cancel();
     }
     if (tool !== 'pen') {
       this.currentPenVertices = [];
@@ -961,9 +982,7 @@ class AntiDrawApp {
     }
 
     // 3. Shape creation
-    if (this.ghostShapeElement || this.shapeStartPt || this.activeHandle === 'shape') {
-      this.ghostShapeElement = null;
-      this.shapeStartPt = null;
+    if (this.shapeToolHandler.cancel()) {
       this.activeHandle = null;
       this.isDragging = false;
       needsRender = true;
@@ -989,18 +1008,17 @@ class AntiDrawApp {
     }
 
     // 5. Polyline tool in-progress path
-    if (this.toolbar.activeTool === 'polyline' && this.currentPolylineVertices.length > 0) {
-      this.currentPolylineVertices = [];
-      this.polylineHoverPoint = null;
+    if (this.toolbar.activeTool === 'polyline' && this.polylineToolHandler.cancel()) {
       this.isDragging = false;
       this.activeHandle = null;
       needsRender = true;
     }
 
     // 6. Marquee selection
-    if (this.activeHandle === 'marquee' || this.selectionTool.marqueeRect) {
+    if (this.activeHandle === 'marquee' || this.selectionTool.marqueeRect || this.marqueeStartPt) {
       this.selectionTool.marqueeRect = null;
       this.selectionTool.isDeselectMarquee = false;
+      this.marqueeStartPt = null;
       this.activeHandle = null;
       this.isDragging = false;
       needsRender = true;
@@ -1148,7 +1166,7 @@ class AntiDrawApp {
           return;
         } else {
           // Ctrl + Drag on canvas: Marquee selection that adds to selection
-          this.shapeStartPt = pt;
+          this.marqueeStartPt = pt;
           this.activeHandle = 'marquee';
           this.selectionTool.isDeselectMarquee = false;
           this.render();
@@ -1165,7 +1183,7 @@ class AntiDrawApp {
           return;
         } else {
           // Shift + Drag on canvas: Deselect marquee
-          this.shapeStartPt = pt;
+          this.marqueeStartPt = pt;
           this.activeHandle = 'marquee';
           this.selectionTool.isDeselectMarquee = true;
           this.render();
@@ -1257,7 +1275,7 @@ class AntiDrawApp {
         this.canvasMgr.selectedGuideId = null;
         this.canvasMgr.activeGuideTransformId = null;
         this.nodeEditorTool.selectedVertexId = null;
-        this.shapeStartPt = pt;
+        this.marqueeStartPt = pt;
         this.activeHandle = 'marquee';
         this.selectionTool.isDeselectMarquee = false;
         this.propertyPanel.resetPanelMode();
@@ -1332,46 +1350,15 @@ class AntiDrawApp {
         return;
       }
     } else if (['rect', 'ellipse', 'line', 'star'].includes(activeTool)) {
-      const otherVertices = this.getOtherVertices();
-      this.shapeStartPt = this.snapPoint(pt, otherVertices);
-      this.ghostShapeElement = null;
-      this.activeHandle = 'shape';
+      if (this.shapeToolHandler.onPointerDown(e, pt)) {
+        this.activeHandle = 'shape';
+        return;
+      }
     } else if (activeTool === 'polyline') {
-      const otherVertices = this.getOtherVertices();
-      this.currentPolylineVertices.forEach((v) => otherVertices.push({ x: v.x, y: v.y }));
-      const snappedPt = this.snapPoint(pt, otherVertices);
-
-      // 1. Check if clicking start node to close path
-      if (this.currentPolylineVertices.length >= 3) {
-        const v0 = this.currentPolylineVertices[0];
-        if (Math.hypot(snappedPt.x - v0.x, snappedPt.y - v0.y) <= 14 / this.canvasMgr.zoom) {
-          this.finishPolylinePath(true);
-          return;
-        }
+      if (this.polylineToolHandler.onPointerDown(e, pt)) {
+        this.render();
+        return;
       }
-
-      // 2. Check if clicking the last placed node to finish open path
-      if (this.currentPolylineVertices.length >= 2) {
-        const lastV = this.currentPolylineVertices[this.currentPolylineVertices.length - 1];
-        if (Math.hypot(snappedPt.x - lastV.x, snappedPt.y - lastV.y) <= 6 / this.canvasMgr.zoom) {
-          this.finishPolylinePath(false);
-          return;
-        }
-      }
-
-      // 3. Add straight vertex
-      const isStart = this.currentPolylineVertices.length === 0;
-      const newV: PathVertex = {
-        id: `v_poly_${Date.now().toString(36)}_${this.currentPolylineVertices.length}`,
-        x: snappedPt.x,
-        y: snappedPt.y,
-        nodeType: 'asymmetric',
-        command: isStart ? 'M' : 'L',
-      };
-      this.currentPolylineVertices.push(newV);
-      this.polylineHoverPoint = snappedPt;
-      this.render();
-      return;
     } else if (activeTool === 'pen') {
       const snappedPt = this.snapPoint(pt);
 
@@ -1522,11 +1509,8 @@ class AntiDrawApp {
         if (!this.isMiddlePanning) {
           this.canvasScrollArea.style.cursor = '';
         }
-        const otherVertices = this.getOtherVertices();
-        this.currentPolylineVertices.forEach((v) => otherVertices.push({ x: v.x, y: v.y }));
-        const snappedPt = this.snapPoint(pt, otherVertices);
-        this.polylineHoverPoint = snappedPt;
-        this.renderOverlay();
+        this.polylineToolHandler.onPointerMove(e, pt);
+        return;
       } else if (this.toolbar.activeTool === 'pen') {
         this.canvasWrapper.style.cursor = 'crosshair';
         if (!this.isMiddlePanning) {
@@ -1624,11 +1608,11 @@ class AntiDrawApp {
     }
 
     if (this.toolbar.activeTool === 'select') {
-      if (this.activeHandle === 'marquee' && this.shapeStartPt) {
-        const minX = Math.min(this.shapeStartPt.x, pt.x);
-        const minY = Math.min(this.shapeStartPt.y, pt.y);
-        const w = Math.abs(pt.x - this.shapeStartPt.x);
-        const h = Math.abs(pt.y - this.shapeStartPt.y);
+      if (this.activeHandle === 'marquee' && this.marqueeStartPt) {
+        const minX = Math.min(this.marqueeStartPt.x, pt.x);
+        const minY = Math.min(this.marqueeStartPt.y, pt.y);
+        const w = Math.abs(pt.x - this.marqueeStartPt.x);
+        const h = Math.abs(pt.y - this.marqueeStartPt.y);
         this.selectionTool.marqueeRect = { x: minX, y: minY, width: w, height: h };
         this.renderOverlay();
         return;
@@ -1804,19 +1788,8 @@ class AntiDrawApp {
       }
       this.renderOverlay();
       return;
-    } else if (this.activeHandle === 'shape' && this.shapeStartPt) {
-      const otherVertices = this.getOtherVertices();
-      const snappedPt = this.snapPoint(pt, otherVertices);
-      this.ghostShapeElement = this.createShapeElement(
-        this.toolbar.activeTool,
-        this.shapeStartPt,
-        snappedPt,
-        'ghost_shape_preview',
-        e.shiftKey,
-        e.ctrlKey,
-        e.altKey
-      );
-      this.renderOverlay();
+    } else if (this.activeHandle === 'shape') {
+      this.shapeToolHandler.onPointerMove(e, pt);
       return;
     }
 
@@ -1999,29 +1972,11 @@ class AntiDrawApp {
 
         this.selectionTool.marqueeRect = null;
         this.selectionTool.isDeselectMarquee = false;
-        this.shapeStartPt = null;
+        this.marqueeStartPt = null;
         this.render();
       } else if (this.activeHandle === 'shape') {
-        if (this.ghostShapeElement) {
-          this.pushUndo();
-          const id = `el_${Date.now().toString(36)}`;
-          const newEl: VectorElement = {
-            ...this.ghostShapeElement,
-            id,
-            attributes: {
-              ...this.ghostShapeElement.attributes,
-              id,
-            },
-          };
-          this.model.elements.push(newEl);
-          this.selectionTool.select(id);
-          this.ghostShapeElement = null;
-          this.shapeStartPt = null;
-          this.toolbar.setTool('select');
-          hasChangesToCommit = true;
-        } else {
-          this.shapeStartPt = null;
-        }
+        this.shapeToolHandler.onPointerUp(e, pt);
+        this.toolbar.setTool('select');
       }
 
       this.activeHandle = null;
@@ -2054,17 +2009,16 @@ class AntiDrawApp {
       return;
     }
 
+    const pt = this.getCanvasPoint(e);
+
     if (this.toolbar.activeTool === 'polyline') {
-      this.finishPolylinePath(false);
-      return;
+      if (this.polylineToolHandler.onDoubleClick(e, pt)) return;
     }
 
     if (this.toolbar.activeTool === 'pen') {
       this.finishPenPath(false);
       return;
     }
-
-    const pt = this.getCanvasPoint(e);
 
     // Double-click on guide line -> enter angle / pivot transform mode
     const hitGuide = this.hitTestGuide(pt, 8);
@@ -2148,212 +2102,6 @@ class AntiDrawApp {
     return pts;
   }
 
-  private calculateShapeBounds(
-    start: Point,
-    current: Point,
-    shiftKey: boolean,
-    ctrlKey: boolean,
-    altKey: boolean
-  ): { x: number; y: number; w: number; h: number; cx: number; cy: number; rx: number; ry: number } {
-    const dx = current.x - start.x;
-    const dy = current.y - start.y;
-    const sx = dx >= 0 ? 1 : -1;
-    const sy = dy >= 0 ? 1 : -1;
-    const rawW = Math.abs(dx);
-    const rawH = Math.abs(dy);
-
-    let targetW = Math.max(rawW, 2);
-    let targetH = Math.max(rawH, 2);
-
-    // Priority: ctrlKey (1:1 ratio) takes precedence over altKey
-    if (ctrlKey) {
-      const size = Math.max(rawW, rawH, 2);
-      targetW = size;
-      targetH = size;
-    } else if (altKey) {
-      const ratioW = this.canvasMgr.shapeConfig?.aspectRatioW || 4;
-      const ratioH = this.canvasMgr.shapeConfig?.aspectRatioH || 3;
-      const ratio = ratioW / (ratioH || 1);
-
-      if (rawW / ratio > rawH) {
-        targetW = Math.max(rawW, 2);
-        targetH = Math.max(targetW / ratio, 2);
-      } else {
-        targetH = Math.max(rawH, 2);
-        targetW = Math.max(targetH * ratio, 2);
-      }
-    }
-
-    let x = 0;
-    let y = 0;
-    let w = 0;
-    let h = 0;
-    let cx = 0;
-    let cy = 0;
-    let rx = 0;
-    let ry = 0;
-
-    if (shiftKey) {
-      // Shift: Expand from center
-      cx = start.x;
-      cy = start.y;
-      rx = targetW;
-      ry = targetH;
-      w = targetW * 2;
-      h = targetH * 2;
-      x = cx - targetW;
-      y = cy - targetH;
-    } else {
-      // Corner-to-corner expansion
-      x = sx > 0 ? start.x : start.x - targetW;
-      y = sy > 0 ? start.y : start.y - targetH;
-      w = targetW;
-      h = targetH;
-      cx = x + w / 2;
-      cy = y + h / 2;
-      rx = w / 2;
-      ry = h / 2;
-    }
-
-    return { x, y, w, h, cx, cy, rx, ry };
-  }
-
-  private createShapeElement(
-    tool: string,
-    start: Point,
-    current: Point,
-    id: string,
-    shiftKey: boolean = false,
-    ctrlKey: boolean = false,
-    altKey: boolean = false
-  ): VectorElement {
-    const isLine = tool === 'line';
-    const isClosed = !isLine;
-    let vertices: PathVertex[] = [];
-
-    if (isLine) {
-      let pStart = start;
-      let pEnd = current;
-      if (shiftKey) {
-        const dx = current.x - start.x;
-        const dy = current.y - start.y;
-        pStart = { x: start.x - dx, y: start.y - dy };
-        pEnd = { x: start.x + dx, y: start.y + dy };
-      }
-      if (ctrlKey) {
-        const dx = pEnd.x - pStart.x;
-        const dy = pEnd.y - pStart.y;
-        const len = Math.hypot(dx, dy);
-        let angle = Math.atan2(dy, dx);
-        const snap = Math.PI / 4;
-        angle = Math.round(angle / snap) * snap;
-        pEnd = {
-          x: pStart.x + len * Math.cos(angle),
-          y: pStart.y + len * Math.sin(angle),
-        };
-      }
-      vertices = this.model.convertShapeToVertices('line', {
-        x1: pStart.x.toString(),
-        y1: pStart.y.toString(),
-        x2: pEnd.x.toString(),
-        y2: pEnd.y.toString(),
-      });
-    } else {
-      const bounds = this.calculateShapeBounds(start, current, shiftKey, ctrlKey, altKey);
-
-      if (tool === 'rect') {
-        vertices = this.model.convertShapeToVertices('rect', {
-          x: bounds.x.toString(),
-          y: bounds.y.toString(),
-          width: bounds.w.toString(),
-          height: bounds.h.toString(),
-          rx: (this.canvasMgr.shapeConfig?.rectCornerRadius || 0).toString(),
-        });
-      } else if (tool === 'ellipse') {
-        vertices = this.model.convertShapeToVertices('ellipse', {
-          cx: bounds.cx.toString(),
-          cy: bounds.cy.toString(),
-          rx: bounds.rx.toString(),
-          ry: bounds.ry.toString(),
-        });
-      } else if (tool === 'star') {
-        vertices = this.model.convertShapeToVertices('star', {
-          cx: bounds.cx.toString(),
-          cy: bounds.cy.toString(),
-          rx: bounds.rx.toString(),
-          ry: bounds.ry.toString(),
-          points: (this.canvasMgr.shapeConfig?.starPoints || 5).toString(),
-          innerRatio: (this.canvasMgr.shapeConfig?.starInnerRatio || 0.4).toString(),
-        });
-      }
-    }
-
-    const d = this.model.compilePathD(vertices, isClosed);
-    return {
-      id,
-      tagName: 'path',
-      attributes: {
-        id,
-        d,
-        fill: isClosed ? '#6366f1' : 'none',
-        stroke: '#ffffff',
-        'stroke-width': '2',
-        'data-node-types': vertices.map((v) => v.nodeType).join(','),
-      },
-      vertices,
-      isClosed,
-    };
-  }
-
-  private previewShape(
-    start: Point,
-    current: Point,
-    shiftKey: boolean = false,
-    ctrlKey: boolean = false,
-    altKey: boolean = false
-  ): void {
-    const tempId = 'temp_shape_preview';
-    this.model.elements = this.model.elements.filter((el) => el.id !== tempId);
-    const newEl = this.createShapeElement(
-      this.toolbar.activeTool,
-      start,
-      current,
-      tempId,
-      shiftKey,
-      ctrlKey,
-      altKey
-    );
-    newEl.attributes['fill-opacity'] = '0.5';
-    this.model.elements.push(newEl);
-    this.render();
-  }
-
-  private commitShape(
-    start: Point,
-    current: Point,
-    shiftKey: boolean = false,
-    ctrlKey: boolean = false,
-    altKey: boolean = false
-  ): void {
-    this.pushUndo();
-    const tempId = 'temp_shape_preview';
-    this.model.elements = this.model.elements.filter((el) => el.id !== tempId);
-    const id = `el_${Date.now().toString(36)}`;
-    const newEl = this.createShapeElement(
-      this.toolbar.activeTool,
-      start,
-      current,
-      id,
-      shiftKey,
-      ctrlKey,
-      altKey
-    );
-    this.model.elements.push(newEl);
-    this.selectionTool.select(id);
-    this.render();
-    this.syncToHost();
-  }
-
   // Commit pen path to vector model elements
   private finishPenPath(close: boolean = false): void {
     if (this.currentPenVertices.length >= 2) {
@@ -2385,55 +2133,6 @@ class AntiDrawApp {
     } else {
       this.currentPenVertices = [];
       this.penHoverPoint = null;
-      this.render();
-    }
-  }
-
-  // Commit polyline path to vector model elements
-  private finishPolylinePath(close: boolean = false): void {
-    // Deduplicate consecutive identical/micro-offset vertices
-    const cleanVerts: PathVertex[] = [];
-    for (let i = 0; i < this.currentPolylineVertices.length; i++) {
-      const v = this.currentPolylineVertices[i];
-      if (cleanVerts.length === 0) {
-        cleanVerts.push(v);
-      } else {
-        const prev = cleanVerts[cleanVerts.length - 1];
-        if (Math.hypot(v.x - prev.x, v.y - prev.y) > 0.5) {
-          cleanVerts.push(v);
-        }
-      }
-    }
-
-    if (cleanVerts.length >= 2) {
-      this.pushUndo();
-      const id = `el_poly_${Date.now().toString(36)}`;
-      const pathD = this.model.compilePathD(cleanVerts, close);
-      const newEl: VectorElement = {
-        id,
-        tagName: 'path',
-        attributes: {
-          id,
-          d: pathD,
-          fill: close ? '#4f46e5' : 'none',
-          stroke: '#ffffff',
-          'stroke-width': '2',
-          'data-node-types': cleanVerts.map(() => 'asymmetric').join(','),
-        },
-        vertices: JSON.parse(JSON.stringify(cleanVerts)),
-        isClosed: close,
-      };
-
-      this.model.elements.push(newEl);
-      this.selectionTool.select(id);
-      this.currentPolylineVertices = [];
-      this.polylineHoverPoint = null;
-      this.toolbar.setTool('select');
-      this.render();
-      this.syncToHost();
-    } else {
-      this.currentPolylineVertices = [];
-      this.polylineHoverPoint = null;
       this.render();
     }
   }
@@ -2902,7 +2601,7 @@ class AntiDrawApp {
       this.penNodeType,
       this.currentPenVertices.length,
       selectedGuide,
-      this.currentPolylineVertices.length,
+      this.polylineToolHandler.vertexCount,
       this.canvasMgr.gridAlignmentMode,
       this.canvasMgr.grids,
       this.canvasMgr.guides
@@ -3211,16 +2910,7 @@ class AntiDrawApp {
     }
 
     // Ghost Shape Tool Preview
-    if (this.ghostShapeElement) {
-      const d = this.ghostShapeElement.attributes.d;
-      const isClosed = this.ghostShapeElement.isClosed;
-      html += `<path d="${d}" fill="${isClosed ? 'rgba(99, 102, 241, 0.25)' : 'none'}" stroke="#818cf8" stroke-width="2" stroke-dasharray="5 3" vector-effect="non-scaling-stroke" />`;
-      if (this.ghostShapeElement.vertices) {
-        this.ghostShapeElement.vertices.forEach((gv) => {
-          html += `<circle cx="${gv.x}" cy="${gv.y}" r="${3.5 / z}" fill="#ffffff" stroke="#6366f1" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
-        });
-      }
-    }
+    html += this.shapeToolHandler.renderOverlay(z);
 
     /**
      * ARCHITECTURAL RATIONALE: Elastic Real-Time Curvature Feedback & Non-Scaling Overlays
@@ -3299,52 +2989,7 @@ class AntiDrawApp {
     }
 
     // 8. Polyline Tool In-Progress Path & Rubberband Overlay
-    if (this.currentPolylineVertices.length > 0) {
-      const polyD = this.model.compilePathD(this.currentPolylineVertices, false);
-      html += `<path d="${polyD}" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" />`;
-
-      const lastV = this.currentPolylineVertices[this.currentPolylineVertices.length - 1];
-      const firstV = this.currentPolylineVertices[0];
-
-      if (this.polylineHoverPoint) {
-        const isHoveringStart =
-          this.currentPolylineVertices.length >= 3 &&
-          Math.hypot(this.polylineHoverPoint.x - firstV.x, this.polylineHoverPoint.y - firstV.y) <= 14 / z;
-
-        const targetPt = isHoveringStart ? { x: firstV.x, y: firstV.y } : this.polylineHoverPoint;
-
-        // Rubberband line from last vertex to hover point
-        html += `<line x1="${lastV.x}" y1="${lastV.y}" x2="${targetPt.x}" y2="${targetPt.y}" stroke="${isHoveringStart ? '#10b981' : '#60a5fa'}" stroke-width="1.5" stroke-dasharray="4 3" vector-effect="non-scaling-stroke" />`;
-
-        if (isHoveringStart) {
-          html += `<circle cx="${firstV.x}" cy="${firstV.y}" r="${8 / z}" fill="none" stroke="#10b981" stroke-width="2" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
-        } else {
-          html += `
-            <g opacity="0.9">
-              <circle cx="${targetPt.x}" cy="${targetPt.y}" r="${4.5 / z}" fill="#38bdf8" fill-opacity="0.35" stroke="#38bdf8" stroke-width="1.5" vector-effect="non-scaling-stroke" />
-              <circle cx="${targetPt.x}" cy="${targetPt.y}" r="${1.5 / z}" fill="#ffffff" />
-            </g>
-          `;
-        }
-      }
-
-      this.currentPolylineVertices.forEach((v, idx) => {
-        const isStart = idx === 0;
-        if (isStart) {
-          html += `<circle cx="${v.x}" cy="${v.y}" r="${5 / z}" fill="#10b981" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
-        } else {
-          html += `<rect x="${v.x - 3.5 / z}" y="${v.y - 3.5 / z}" width="${7 / z}" height="${7 / z}" fill="#38bdf8" stroke="#ffffff" stroke-width="1" rx="${1 / z}" vector-effect="non-scaling-stroke" />`;
-        }
-      });
-    } else if (this.toolbar && this.toolbar.activeTool === 'polyline' && this.polylineHoverPoint) {
-      // First point preview under cursor before first click
-      html += `
-        <g opacity="0.9">
-          <circle cx="${this.polylineHoverPoint.x}" cy="${this.polylineHoverPoint.y}" r="5" fill="#10b981" fill-opacity="0.35" stroke="#10b981" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />
-          <circle cx="${this.polylineHoverPoint.x}" cy="${this.polylineHoverPoint.y}" r="1.5" fill="#ffffff" />
-        </g>
-      `;
-    }
+    html += this.polylineToolHandler.renderOverlay(z);
 
     this.overlaySvg.innerHTML = html;
   }
