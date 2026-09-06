@@ -192,6 +192,12 @@ export class SelectToolHandler implements IToolHandler {
           this.initialElementsMap.set(el.id, JSON.parse(JSON.stringify(el.vertices)));
         }
       });
+      // ARCHITECTURAL RATIONALE: Synchronize initialBox with the moved selection bounds.
+      // If initialBox is left stale from a previous transform, the ghost overlay draws an obsolete
+      // bounding box at a static position. Computing the exact group bounding box here guarantees
+      // that the ghost dashed rectangle moves coherently with the dragged elements.
+      const z = this.ctx.canvasMgr.zoom || 1;
+      this.initialBox = this.ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 6 / z);
       this.callbacks.onClearPanelMode?.();
       this.ctx.render();
       return true;
@@ -238,6 +244,9 @@ export class SelectToolHandler implements IToolHandler {
             this.initialElementsMap.set(el.id, JSON.parse(JSON.stringify(el.vertices)));
           }
         });
+        // ARCHITECTURAL RATIONALE: Recalculate initialBox for the newly clicked vector selection.
+        const z = this.ctx.canvasMgr.zoom || 1;
+        this.initialBox = this.ctx.selectionTool.getGroupSelectionBoundingBox(nowSelected, 6 / z);
       }
       this.callbacks.onClearPanelMode?.();
       this.ctx.render();
@@ -255,6 +264,7 @@ export class SelectToolHandler implements IToolHandler {
       this.nodeEditorTool.selectedVertexId = null;
       this.marqueeStartPt = pt;
       this.activeHandle = 'marquee';
+      this.initialBox = null;
       this.ctx.selectionTool.isDeselectMarquee = false;
       this.callbacks.onClearPanelMode?.();
       this.callbacks.onSelectionChanged?.();
@@ -547,6 +557,7 @@ export class SelectToolHandler implements IToolHandler {
 
     this.activeHandle = null;
     this.initialElementsMap.clear();
+    this.initialBox = null;
     this.ctx.applyCanvasSize?.();
     this.ctx.render();
     if (hasChangesToCommit) {
@@ -629,9 +640,10 @@ export class SelectToolHandler implements IToolHandler {
       handled = true;
     }
 
-    if (this.ghostDragOffset || this.ghostTransformMap.size > 0) {
+    if (this.ghostDragOffset || this.ghostTransformMap.size > 0 || this.initialBox) {
       this.ghostDragOffset = null;
       this.ghostTransformMap.clear();
+      this.initialBox = null;
       handled = true;
     }
 
