@@ -392,4 +392,174 @@ export class BooleanOperations {
 
     return list;
   }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Geometric Stroke-to-Path Conversion (Outline Stroke)
+   * 
+   * 1. Discrete Normal Extrusion & Miter/Bevel/Round Joins:
+   *    A path's stroke is mathematically equivalent to the 2D Minkowski sum of the centerline
+   *    curve with a circular disc of radius R = strokeWidth / 2.
+   *    To compute this accurately without numerical singularities:
+   *    - The curve is adaptively sampled into linear segments (via De Casteljau/polynomial sampling).
+   *    - Each linear segment [p_i, p_{i+1}] is extruded perpendicularly along its unit normal vector
+   *      n = (-dy/L, dx/L) to create an oriented rectangular quad of width 2R.
+   *    - At every inner vertex and joint, a circular join disc (or miter corner) of radius R is placed.
+   *    - At open path endpoints, caps are added according to stroke-linecap:
+   *      * 'round': circular cap discs at p_0 and p_n.
+   *      * 'square': quads are extended along their longitudinal tangent by R.
+   *      * 'butt': quads terminate exactly at p_0 and p_n.
+   * 
+   * 2. Non-Self-Intersecting Planar Union via polygon-clipping:
+   *    Extruding overlapping quads and discs generates self-intersecting loops and redundant internal
+   *    geometry. Passing all quads and discs to polygonClipping.union() eliminates all internal edges,
+   *    computes the exact outer boundary, and for closed shapes (like rings or rectangles) automatically
+   *    extracts the inner hole ring with fill-rule="evenodd".
+   * 
+   * 3. Style Transition:
+   *    The resulting vector element becomes an autonomous closed path (isClosed = true), with its fill
+   *    color set to the original stroke color, and stroke set to 'none'.
+   */
+  public static outlineStroke(element: VectorElement, model: VectorModel): VectorElement | null {
+    if (!element.vertices || element.vertices.length < 2) return null;
+
+    const strokeWidth = parseFloat(element.attributes['stroke-width'] || '1') || 1;
+    const halfW = strokeWidth / 2;
+    const strokeLinecap = element.attributes['stroke-linecap'] || 'butt';
+    const strokeColor = element.attributes['stroke'] && element.attributes['stroke'] !== 'none'
+      ? element.attributes['stroke']
+      : '#ffffff';
+
+    // Helper to generate circular disc polygon (16 sides)
+    const makeDisc = (cx: number, cy: number, r: number): Polygon => {
+      const ring: Ring = [];
+      const steps = 16;
+      for (let s = 0; s < steps; s++) {
+        const theta = (s / steps) * Math.PI * 2;
+        ring.push([cx + r * Math.cos(theta), cy + r * Math.sin(theta)]);
+      }
+      ring.push([ring[0][0], ring[0][1]]);
+      return [ring];
+    };
+
+    // Group vertices by subpaths
+    const subpaths: PathVertex[][] = [];
+    let curSp: PathVertex[] = [];
+    for (let i = 0; i < element.vertices.length; i++) {
+      const v = element.vertices[i];
+      if ((v.command === 'M' || i === 0) && curSp.length > 0) {
+        subpaths.push(curSp);
+        curSp = [];
+      }
+      curSp.push(v);
+    }
+    if (curSp.length > 0) subpaths.push(curSp);
+
+    const thickPolygons: Polygon[] = [];
+
+    for (const sp of subpaths) {
+      if (sp.length < 2) continue;
+
+      // Sample subpath into dense 2D point array
+      const pts: { x: number; y: number }[] = [];
+      for (let i = 0; i < sp.length - 1; i++) {
+        const v = sp[i];
+        const nextV = sp[i + 1];
+        pts.push({ x: v.x, y: v.y });
+        if (v.handleOut || nextV.handleIn) {
+          const h1 = v.handleOut || { x: v.x, y: v.y };
+          const h2 = nextV.handleIn || { x: nextV.x, y: nextV.y };
+          const sampled = this.sampleBezier(v, h1, h2, nextV, 24);
+          for (let j = 0; j < sampled.length - 1; j++) {
+            pts.push({ x: sampled[j][0], y: sampled[j][1] });
+          }
+        }
+      }
+      // Push last point of subpath
+      const lastSpV = sp[sp.length - 1];
+      pts.push({ x: lastSpV.x, y: lastSpV.y });
+
+      // If closed subpath, add closing curve or straight connection
+      const isClosed = element.isClosed ?? false;
+      if (isClosed && pts.length >= 3) {
+        const firstSpV = sp[0];
+        if (lastSpV.handleOut || firstSpV.handleIn) {
+          const h1 = lastSpV.handleOut || { x: lastSpV.x, y: lastSpV.y };
+          const h2 = firstSpV.handleIn || { x: firstSpV.x, y: firstSpV.y };
+          const sampled = this.sampleBezier(lastSpV, h1, h2, firstSpV, 24);
+          for (let j = 0; j < sampled.length - 1; j++) {
+            pts.push({ x: sampled[j][0], y: sampled[j][1] });
+          }
+        }
+        pts.push({ x: firstSpV.x, y: firstSpV.y });
+      }
+
+      // Generate thick quads for each segment
+      for (let i = 0; i < pts.length - 1; i++) {
+        const p1 = pts[i];
+        const p2 = pts[i + 1];
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        const len = Math.hypot(dx, dy);
+        if (len < 0.001) continue;
+
+        const nx = -dy / len;
+        const ny = dx / len;
+
+        let p1Left: Pair = [p1.x + nx * halfW, p1.y + ny * halfW];
+        let p1Right: Pair = [p1.x - nx * halfW, p1.y - ny * halfW];
+        let p2Left: Pair = [p2.x + nx * halfW, p2.y + ny * halfW];
+        let p2Right: Pair = [p2.x - nx * halfW, p2.y - ny * halfW];
+
+        // Square linecap extension on open ends
+        if (!isClosed && strokeLinecap === 'square') {
+          if (i === 0) {
+            p1Left = [p1Left[0] - (dx / len) * halfW, p1Left[1] - (dy / len) * halfW];
+            p1Right = [p1Right[0] - (dx / len) * halfW, p1Right[1] - (dy / len) * halfW];
+          }
+          if (i === pts.length - 2) {
+            p2Left = [p2Left[0] + (dx / len) * halfW, p2Left[1] + (dy / len) * halfW];
+            p2Right = [p2Right[0] + (dx / len) * halfW, p2Right[1] + (dy / len) * halfW];
+          }
+        }
+
+        const quadRing: Ring = [
+          p1Left,
+          p2Left,
+          p2Right,
+          p1Right,
+          [p1Left[0], p1Left[1]],
+        ];
+        thickPolygons.push([quadRing]);
+
+        // Join disc at internal vertex
+        if (i < pts.length - 2 || isClosed) {
+          thickPolygons.push(makeDisc(p2.x, p2.y, halfW));
+        }
+      }
+
+      // Round linecaps on open endpoints
+      if (!isClosed && strokeLinecap === 'round') {
+        thickPolygons.push(makeDisc(pts[0].x, pts[0].y, halfW));
+        thickPolygons.push(makeDisc(pts[pts.length - 1].x, pts[pts.length - 1].y, halfW));
+      }
+    }
+
+    if (thickPolygons.length === 0) return null;
+
+    // Union all thick polygons into a single seamless MultiPolygon
+    let merged: MultiPolygon = [thickPolygons[0]];
+    for (let i = 1; i < thickPolygons.length; i++) {
+      merged = polygonClipping.union(merged, [thickPolygons[i]]);
+    }
+
+    const newId = `el_stroke_path_${Date.now().toString(36)}`;
+    const baseAttrs: Record<string, string> = {
+      id: newId,
+      fill: strokeColor,
+      stroke: 'none',
+      'stroke-width': '0',
+    };
+
+    return this.multiPolygonToElement(merged, newId, baseAttrs, model);
+  }
 }

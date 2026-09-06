@@ -387,6 +387,7 @@ class AntiDrawApp {
           this.render();
         },
         onBoolean: (op) => this.handleBoolean(op),
+        onStrokeToPath: () => this.handleStrokeToPath(),
       }
     );
   }
@@ -1328,6 +1329,36 @@ class AntiDrawApp {
     });
     this.render();
     this.syncToHost();
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Stroke to Path (Outline Stroke) Invocation
+   * Why this exists:
+   * Replaces an open or closed stroked vector with an extruded planar polygon whose fill is the original stroke color.
+   *
+   * Edge Cases & Safety Handled:
+   * 1. Preserves Undo/Redo stack prior to mutating the element.
+   * 2. Swaps the element in-place in `model.elements` keeping layer ordering intact rather than appending to end.
+   * 3. Seamlessly updates `selectionTool` with the new element ID and re-renders the property panel with the new closed polygon.
+   * 4. Discarded alternative: leaving the stroke in place and creating a duplicate path. Discarded because standard graphic suites
+   *    (Corel Draw "Convert Outline to Object", Illustrator "Outline Stroke") replace the stroked vector directly, avoiding
+   *    accidental duplicate geometry and z-fighting.
+   */
+  private handleStrokeToPath(): void {
+    const selectedEl = this.model.elements.find((el) => this.selectionTool.isSelected(el.id));
+    if (!selectedEl) return;
+    this.pushUndo();
+    const outlined = BooleanOperations.outlineStroke(selectedEl, this.model);
+    if (outlined) {
+      const idx = this.model.elements.findIndex((el) => el.id === selectedEl.id);
+      if (idx >= 0) {
+        this.model.elements[idx] = outlined;
+        this.selectionTool.select(outlined.id);
+        this.propertyPanel.resetPanelMode();
+        this.render();
+        this.syncToHost();
+      }
+    }
   }
 
 

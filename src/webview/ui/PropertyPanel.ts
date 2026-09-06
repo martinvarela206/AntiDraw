@@ -25,6 +25,7 @@ export interface PropertyPanelCallbacks {
   onUpdateGrid?: (gridId: string, partial: Partial<GridConfig>) => void;
   onReorderGrid?: (gridId: string, direction: 'up' | 'down') => void;
   onSelectGuide?: (guideId: string) => void;
+  onStrokeToPath?: () => void;
   /**
    * Boolean Operations callback: Dispatches constructive geometry operations (union, subtract,
    * intersect, exclude, combine, fragment) directly to BooleanOperations engine.
@@ -1370,6 +1371,11 @@ export class PropertyPanel {
             <option value="bar-cap" ${markerEnd === 'bar-cap' ? 'selected' : ''}>Bar Cap</option>
           </select>
         </div>
+        <div class="prop-row" style="margin-top: 8px;">
+          <button class="prop-input" id="btn-stroke-to-path" style="cursor:pointer; background:var(--bg-active); text-align:center; font-weight:600; color:var(--text-main); padding:6px;" title="Convertir geométricamente el trazo en un contorno cerrado independiente con relleno (Outline Stroke)">
+            ⤹ Convertir Trazo a Vector
+          </button>
+        </div>
       </div>
 
       <div class="panel-section">
@@ -1534,6 +1540,10 @@ export class PropertyPanel {
         this.callbacks.onUpdateElement(el);
       });
     }
+
+    this.bindMouseDown('btn-stroke-to-path', () => {
+      if (this.callbacks.onStrokeToPath) this.callbacks.onStrokeToPath();
+    });
 
     this.bindMouseDown('btn-prop-bool-union-single', () => this.callbacks.onBoolean && this.callbacks.onBoolean('union'));
     this.bindMouseDown('btn-prop-bool-subtract-single', () => this.callbacks.onBoolean && this.callbacks.onBoolean('subtract'));
