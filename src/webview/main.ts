@@ -752,8 +752,8 @@ class AntiDrawApp {
       (e: WheelEvent) => {
         if (e.ctrlKey) {
           e.preventDefault();
-          const delta = e.deltaY < 0 ? 0.1 : -0.1;
-          this.zoomAtClientPoint(e.clientX, e.clientY, delta);
+          const factor = e.deltaY < 0 ? CanvasManager.ZOOM_FACTOR_IN : CanvasManager.ZOOM_FACTOR_OUT;
+          this.zoomAtClientPointByFactor(e.clientX, e.clientY, factor);
         } else if (e.altKey) {
           // Alt + Scroll -> Horizontal camera pan
           e.preventDefault();
@@ -827,9 +827,9 @@ class AntiDrawApp {
    * This formula eliminates viewport displacement and visual jumping, guaranteeing natural,
    * predictable zooming focused directly at the mouse cursor.
    */
-  public zoomAtClientPoint(clientX: number, clientY: number, delta: number): void {
+  public zoomAtClientPointByFactor(clientX: number, clientY: number, factor: number): void {
     const currentZoom = this.canvasMgr.zoom || 1.0;
-    const newZoom = Math.round(Math.max(0.1, Math.min(10.0, currentZoom + delta)) * 10) / 10;
+    const newZoom = this.canvasMgr.computeMultiplicativeZoom(factor);
     if (newZoom !== currentZoom) {
       const scrollRect = this.canvasScrollArea.getBoundingClientRect();
       const cursorViewportX = clientX - scrollRect.left;
@@ -843,9 +843,16 @@ class AntiDrawApp {
 
       this.canvasMgr.zoom = newZoom;
       this.applyCanvasSize();
+      this.applyCameraTransform();
+      this.syncRulerScroll();
       this.render();
       this.updateStatusZoom();
     }
+  }
+
+  public zoomAtClientPoint(clientX: number, clientY: number, delta: number): void {
+    const factor = delta > 0 ? CanvasManager.ZOOM_FACTOR_IN : CanvasManager.ZOOM_FACTOR_OUT;
+    this.zoomAtClientPointByFactor(clientX, clientY, factor);
   }
 
   public setZoom(zoom: number): void {

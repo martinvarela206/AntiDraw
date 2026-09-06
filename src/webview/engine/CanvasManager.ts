@@ -57,9 +57,29 @@ export class CanvasManager {
     step: 50,
   };
 
+  public static readonly ZOOM_FACTOR_IN: number = 1.10;
+  public static readonly ZOOM_FACTOR_OUT: number = 0.90;
+  public static readonly MIN_ZOOM: number = 0.05;
+  public static readonly MAX_ZOOM: number = 20.0;
+
   public zoom: number = 1.0;
   public panX: number = 0;
   public panY: number = 0;
+
+  /**
+   * ARCHITECTURAL RATIONALE: Multiplicative Proportional Zoom Progression
+   * Why multiplicative scaling (±10%) is implemented:
+   * 1. Weber-Fechner Psychophysical Model: Human perception of optical scale operates logarithmically.
+   *    Linear ±0.1 increments cause extreme disparity (sluggish at 500%, violently abrupt at 20%).
+   * 2. Perceptual Velocity Uniformity: Multiplying current zoom by 1.10 (zoom in) or 0.90 (zoom out)
+   *    preserves identical relative visual velocity across all scale tiers.
+   * 3. Bounds and Numerical Precision: Constrains zoom securely within [MIN_ZOOM, MAX_ZOOM] and rounds
+   *    to 3 decimals to avoid floating point precision artifacts.
+   */
+  public computeMultiplicativeZoom(factor: number): number {
+    const raw = (this.zoom || 1.0) * factor;
+    return Math.round(Math.max(CanvasManager.MIN_ZOOM, Math.min(CanvasManager.MAX_ZOOM, raw)) * 1000) / 1000;
+  }
 
   public isCanvasSelected: boolean = false;
   public selectedGuideId: string | null = null;
