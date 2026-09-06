@@ -128,6 +128,7 @@ export class CanvasManager {
   public snapToGrid: boolean = false;
   public snapToGuides: boolean = false;
   public snapToVertices: boolean = false;
+  public snapToViewBox: boolean = false;
   public snapThreshold: number = 5; // 5px proximity threshold
 
   // By default, no guide lines exist
@@ -169,10 +170,17 @@ export class CanvasManager {
   public selectedGuideId: string | null = null;
   public activeGuideTransformId: string | null = null;
 
-  // Snap point to active vertices, guide lines / guide intersections, or grid lines / grid intersections (3px proximity)
-  public snapPoint(pt: Point, otherVertices: Point[] = [], origin?: Point): Point {
+  // Snap point to active vertices, guide lines / guide intersections, viewBox frame / corners, or grid lines / grid intersections (3px proximity)
+  public snapPoint(
+    pt: Point,
+    otherVertices: Point[] = [],
+    origin?: Point,
+    viewBoxBounds?: { minX: number; minY: number; width: number; height: number }
+  ): Point {
     let snappedX = pt.x;
     let snappedY = pt.y;
+    let xSnapped = false;
+    let ySnapped = false;
     const threshold = this.snapThreshold / (this.zoom || 1);
 
     // 1. Snap to Vertices of other vector elements (highest priority)
@@ -233,7 +241,7 @@ export class CanvasManager {
 
       // 2b. Snap along single guide lines
       let minLineDist = threshold;
-      let bestLineSnap: Point | null = null;
+      let bestLineSnap: { x: number; y: number; orientation?: 'vertical' | 'horizontal' | 'angled'; angled?: boolean } | null = null;
 
       for (const g of this.guides) {
         if (g.visible === false) continue;
@@ -246,21 +254,128 @@ export class CanvasManager {
 
         if (Math.abs(dist) <= minLineDist) {
           minLineDist = Math.abs(dist);
+          const isAngled = Math.abs((g.angle || 0) % 90) !== 0;
           bestLineSnap = {
             x: pt.x - dist * nx,
             y: pt.y - dist * ny,
+            orientation: g.orientation,
+            angled: isAngled,
           };
         }
       }
 
       if (bestLineSnap) {
-        snappedX = bestLineSnap.x;
-        snappedY = bestLineSnap.y;
+        if (bestLineSnap.orientation === 'vertical' && !bestLineSnap.angled) {
+          snappedX = bestLineSnap.x;
+          xSnapped = true;
+        } else if (bestLineSnap.orientation === 'horizontal' && !bestLineSnap.angled) {
+          snappedY = bestLineSnap.y;
+          ySnapped = true;
+        } else {
+          snappedX = bestLineSnap.x;
+          snappedY = bestLineSnap.y;
+          xSnapped = true;
+          ySnapped = true;
+        }
       }
     }
 
-    // 3. Snap to Grid Lines & Grid Intersections (Origin-Aligned or Cell-Center)
-    if (this.snapToGrid && this.showGrid) {
+    /**
+     * ARCHITECTURAL RATIONALE: ViewBox (Artboard Frame) Adaptive Edge & Corner Snapping
+     * Why dedicated ViewBox magnetic snapping is required:
+     * 1. Physical Canvas Anchoring: Technical drawings, web mockups, and icon canvases depend on strict
+     *    alignment to the SVG document view boundaries (artboard limits).
+     * 2. Dual-Tier Priority Hierarchy (Vertices > Guides > ViewBox > Grids):
+     *    - 2D Keypoints (Corners, Midpoints, Optical Center) are checked first within the threshold.
+     *      If the cursor is near an artboard corner (e.g., top-left, bottom-right) or center, both
+     *      X and Y coordinates collapse to that exact point.
+     *    - 1D Boundary Edges (Left, Right, Top, Bottom, and Horizontal/Vertical Center axes) are checked
+     *      secondarily. If only one dimension is within threshold (e.g., close to the right edge of the artboard),
+     *      only that axis is snapped, allowing the orthogonal axis to remain free or snap to a grid line.
+     * 3. Numerical Stability & Zoom Scaling: Evaluated against threshold = snapThreshold / zoom, ensuring
+     *    consistent pixel-screen touch sensitivity regardless of canvas zoom factor.
+     */
+    if (this.snapToViewBox && viewBoxBounds) {
+      const left = viewBoxBounds.minX;
+      const right = viewBoxBounds.minX + viewBoxBounds.width;
+      const top = viewBoxBounds.minY;
+      const bottom = viewBoxBounds.minY + viewBoxBounds.height;
+      const centerX = viewBoxBounds.minX + viewBoxBounds.width / 2;
+      const centerY = viewBoxBounds.minY + viewBoxBounds.height / 2;
+
+      // 3a. Check 2D Keypoints: 4 Corners, 4 Edge Midpoints, and Artboard Center
+      const vbPoints: Point[] = [
+        { x: left, y: top },
+        { x: right, y: top },
+        { x: left, y: bottom },
+        { x: right, y: bottom },
+        { x: centerX, y: centerY },
+        { x: centerX, y: top },
+        { x: centerX, y: bottom },
+        { x: left, y: centerY },
+        { x: right, y: centerY },
+      ];
+
+      let bestVbPoint: Point | null = null;
+      let minPointDist = threshold;
+      for (const p of vbPoints) {
+        const d = Math.hypot(pt.x - p.x, pt.y - p.y);
+        if (d <= minPointDist) {
+          minPointDist = d;
+          bestVbPoint = p;
+        }
+      }
+
+      if (bestVbPoint) {
+        if (!xSnapped) {
+          snappedX = bestVbPoint.x;
+          xSnapped = true;
+        }
+        if (!ySnapped) {
+          snappedY = bestVbPoint.y;
+          ySnapped = true;
+        }
+      } else {
+        // 3b. Check 1D Edges: Left, Right, CenterX
+        if (!xSnapped) {
+          const xCandidates = [left, right, centerX];
+          let bestX: number | null = null;
+          let minXDist = threshold;
+          for (const candX of xCandidates) {
+            const dist = Math.abs(pt.x - candX);
+            if (dist <= minXDist) {
+              minXDist = dist;
+              bestX = candX;
+            }
+          }
+          if (bestX !== null) {
+            snappedX = bestX;
+            xSnapped = true;
+          }
+        }
+
+        // 3c. Check 1D Edges: Top, Bottom, CenterY
+        if (!ySnapped) {
+          const yCandidates = [top, bottom, centerY];
+          let bestY: number | null = null;
+          let minYDist = threshold;
+          for (const candY of yCandidates) {
+            const dist = Math.abs(pt.y - candY);
+            if (dist <= minYDist) {
+              minYDist = dist;
+              bestY = candY;
+            }
+          }
+          if (bestY !== null) {
+            snappedY = bestY;
+            ySnapped = true;
+          }
+        }
+      }
+    }
+
+    // 4. Snap to Grid Lines & Grid Intersections (Origin-Aligned or Cell-Center)
+    if (this.snapToGrid && this.showGrid && (!xSnapped || !ySnapped)) {
       for (const grid of this.grids) {
         if (!grid.visible) continue;
         const step = Math.max(1, grid.spacing || 20);
@@ -288,10 +403,10 @@ export class CanvasManager {
           const gx = ox + Math.round((pt.x - ox) / step) * step;
           const gy = oy + Math.round((pt.y - oy) / step) * step;
 
-          if (Math.abs(pt.x - gx) <= threshold) {
+          if (!xSnapped && Math.abs(pt.x - gx) <= threshold) {
             snappedX = gx;
           }
-          if (Math.abs(pt.y - gy) <= threshold) {
+          if (!ySnapped && Math.abs(pt.y - gy) <= threshold) {
             snappedY = gy;
           }
         } else if (grid.type === 'isometric') {
@@ -320,8 +435,8 @@ export class CanvasManager {
           const intDist = Math.hypot(pt.x - ix, pt.y - iy);
 
           if (intDist <= threshold) {
-            snappedX = ix;
-            snappedY = iy;
+            if (!xSnapped) snappedX = ix;
+            if (!ySnapped) snappedY = iy;
           } else {
             // 2. Individual Line Projections: vertical or 30-deg diagonals
             let bestDist = threshold;
@@ -361,8 +476,8 @@ export class CanvasManager {
             }
 
             if (bestSnap) {
-              snappedX = bestSnap.x;
-              snappedY = bestSnap.y;
+              if (!xSnapped) snappedX = bestSnap.x;
+              if (!ySnapped) snappedY = bestSnap.y;
             }
           }
         } else if (grid.type === 'axonometric') {
@@ -392,8 +507,8 @@ export class CanvasManager {
           const intDist = Math.hypot(pt.x - ix, pt.y - iy);
 
           if (intDist <= threshold) {
-            snappedX = ix;
-            snappedY = iy;
+            if (!xSnapped) snappedX = ix;
+            if (!ySnapped) snappedY = iy;
           } else {
             // 2. Line projections: vertical or 45-deg diagonals
             let bestDist = threshold;
@@ -434,8 +549,8 @@ export class CanvasManager {
             }
 
             if (bestSnap) {
-              snappedX = bestSnap.x;
-              snappedY = bestSnap.y;
+              if (!xSnapped) snappedX = bestSnap.x;
+              if (!ySnapped) snappedY = bestSnap.y;
             }
           }
         }

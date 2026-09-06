@@ -204,6 +204,7 @@ class AntiDrawApp {
           if (type === 'grid') this.canvasMgr.snapToGrid = !this.canvasMgr.snapToGrid;
           if (type === 'guide') this.canvasMgr.snapToGuides = !this.canvasMgr.snapToGuides;
           if (type === 'vertex') this.canvasMgr.snapToVertices = !this.canvasMgr.snapToVertices;
+          if (type === 'viewbox') this.canvasMgr.snapToViewBox = !this.canvasMgr.snapToViewBox;
           this.topBar.update();
           this.syncMetadataToHost();
         },
@@ -390,6 +391,7 @@ class AntiDrawApp {
           if (msg.metadata.snapToGrid !== undefined) this.canvasMgr.snapToGrid = msg.metadata.snapToGrid;
           if (msg.metadata.snapToGuides !== undefined) this.canvasMgr.snapToGuides = msg.metadata.snapToGuides;
           if (msg.metadata.snapToVertices !== undefined) this.canvasMgr.snapToVertices = msg.metadata.snapToVertices;
+          if (msg.metadata.snapToViewBox !== undefined) this.canvasMgr.snapToViewBox = msg.metadata.snapToViewBox;
           if (msg.metadata.shapeConfig) {
             this.canvasMgr.shapeConfig = { ...this.canvasMgr.shapeConfig, ...msg.metadata.shapeConfig };
           }
@@ -963,6 +965,7 @@ class AntiDrawApp {
         snapToGrid: this.canvasMgr.snapToGrid,
         snapToGuides: this.canvasMgr.snapToGuides,
         snapToVertices: this.canvasMgr.snapToVertices,
+        snapToViewBox: this.canvasMgr.snapToViewBox,
         shapeConfig: this.canvasMgr.shapeConfig,
       },
     });
@@ -1012,14 +1015,14 @@ class AntiDrawApp {
     }, 0);
   }
 
-  // Snap point accounting for dynamic ruler (0,0) origin offset
+  // Snap point accounting for dynamic ruler (0,0) origin offset and artboard viewBox bounds
   private snapPoint(pt: Point, otherVertices: Point[] = []): Point {
     const vb = this.model.getViewBoxBounds();
     const origin = {
       x: vb.minX + (this.canvasMgr.rulerConfig.originX || 0),
       y: vb.minY + (this.canvasMgr.rulerConfig.originY || 0),
     };
-    return this.canvasMgr.snapPoint(pt, otherVertices, origin);
+    return this.canvasMgr.snapPoint(pt, otherVertices, origin, vb);
   }
 
   private getCanvasPoint(e: PointerEvent | MouseEvent): Point {

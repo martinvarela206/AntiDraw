@@ -99,7 +99,16 @@ export const ToolIcons = {
   snapVertex: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
     <circle cx="12" cy="12" r="4" fill="none"/>
     <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
-    <path d="M12 4v4M12 16v4M4 12h4M16 12h4"/>
+    <path d="M12 2v6M12 16v6M2 12h6M16 12h6"/>
+  </svg>`,
+
+  snapViewBox: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8">
+    <rect x="4" y="4" width="16" height="16" stroke-dasharray="2 2" rx="1"/>
+    <circle cx="4" cy="4" r="1.5" fill="currentColor"/>
+    <circle cx="20" cy="4" r="1.5" fill="currentColor"/>
+    <circle cx="4" cy="20" r="1.5" fill="currentColor"/>
+    <circle cx="20" cy="20" r="1.5" fill="currentColor"/>
+    <path d="M12 9v6M9 12h6" stroke-width="1.5"/>
   </svg>`,
 
   // Boolean Ops
