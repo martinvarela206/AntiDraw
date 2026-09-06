@@ -1,4 +1,4 @@
-import { VectorModel, VectorElement, PathVertex, NodeType, DropShadowConfig, InnerShadowConfig } from '../engine/VectorModel.js';
+import { VectorModel, VectorElement, PathVertex, NodeType, DropShadowConfig, InnerShadowConfig, GradientConfig, GradientStop } from '../engine/VectorModel.js';
 import { SelectionTool, BoundingBox } from '../engine/SelectionTool.js';
 import { GuideLine, RulerConfig, ShapeToolConfig, GridAlignmentMode, GridConfig, GridType } from '../engine/CanvasManager.js';
 import { ToolIcons } from '../icons/ToolIcons.js';
@@ -1289,6 +1289,38 @@ export class PropertyPanel {
       } catch {}
     }
 
+    let grad: GradientConfig | null = null;
+    if (el.attributes['data-gradient']) {
+      try {
+        grad = JSON.parse(el.attributes['data-gradient']);
+      } catch {}
+    }
+
+    let fillType: 'solid' | 'linear' | 'radial' | 'none' = 'solid';
+    if (fill === 'none' && !grad) {
+      fillType = 'none';
+    } else if (grad && grad.type === 'radial') {
+      fillType = 'radial';
+    } else if (grad && grad.type === 'linear') {
+      fillType = 'linear';
+    } else if (fill.startsWith('url(#ad-grad-')) {
+      fillType = 'linear';
+    }
+
+    if (!grad) {
+      grad = {
+        type: fillType === 'radial' ? 'radial' : 'linear',
+        angle: 0,
+        stops: [
+          { id: 'stop_0', offset: 0, color: fill !== 'none' && !fill.startsWith('url') ? fill : '#4f46e5', opacity: 1 },
+          { id: 'stop_1', offset: 1, color: '#ec4899', opacity: 1 },
+        ],
+      };
+    }
+
+    const sortedStops = [...grad.stops].sort((a, b) => a.offset - b.offset);
+    const gradientCss = `linear-gradient(to right, ${sortedStops.map((s) => `${s.color} ${Math.round(s.offset * 100)}%`).join(', ')})`;
+
     this.container.innerHTML = `
       <div class="panel-section">
         <div class="panel-title">Transform</div>
@@ -1311,12 +1343,73 @@ export class PropertyPanel {
       </div>
 
       <div class="panel-section">
-        <div class="panel-title">Fill</div>
+        <div class="panel-title">Fill (Relleno)</div>
         <div class="prop-row">
-          <span class="prop-label">Color</span>
-          <div class="color-picker-row">
-            <input type="color" class="color-swatch" id="el-fill-color" value="${fill === 'none' ? '#4f46e5' : fill}" />
-            <input type="text" class="prop-input" id="el-fill-hex" value="${fill}" />
+          <span class="prop-label">Type</span>
+          <select class="prop-input" id="el-fill-type" style="cursor:pointer;">
+            <option value="solid" ${fillType === 'solid' ? 'selected' : ''}>Solid Color</option>
+            <option value="linear" ${fillType === 'linear' ? 'selected' : ''}>Linear Gradient</option>
+            <option value="radial" ${fillType === 'radial' ? 'selected' : ''}>Radial Gradient</option>
+            <option value="none" ${fillType === 'none' ? 'selected' : ''}>None</option>
+          </select>
+        </div>
+
+        <!-- Solid Fill Container -->
+        <div id="fill-solid-controls" style="${fillType === 'solid' ? '' : 'display: none;'}">
+          <div class="prop-row">
+            <span class="prop-label">Color</span>
+            <div class="color-picker-row">
+              <input type="color" class="color-swatch" id="el-fill-color" value="${fill === 'none' || fill.startsWith('url') ? '#4f46e5' : fill}" />
+              <input type="text" class="prop-input" id="el-fill-hex" value="${fill.startsWith('url') ? '#4f46e5' : fill}" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Gradient Controls Container -->
+        <div id="fill-gradient-controls" style="${fillType === 'linear' || fillType === 'radial' ? '' : 'display: none;'} margin-top: 6px;">
+          <!-- Gradient Preview Bar -->
+          <div style="margin-bottom: 8px;">
+            <div id="gradient-bar-preview" style="height: 18px; border-radius: 4px; border: 1px solid var(--border-subtle); background: ${gradientCss}; margin-bottom: 6px;"></div>
+            <div style="display: flex; gap: 4px; justify-content: space-between; align-items: center;">
+              <button class="prop-input" id="btn-add-gradient-stop" style="cursor: pointer; width: auto; padding: 3px 8px; font-size: 10px; font-weight: 600;" title="Añadir parada de color">+ Parada</button>
+              <button class="prop-input" id="btn-reverse-gradient" style="cursor: pointer; width: auto; padding: 3px 8px; font-size: 11px; font-weight: 600;" title="Invertir dirección del degradado">⇄ Invertir</button>
+              <button class="prop-input" id="btn-delete-gradient-stop" style="cursor: pointer; width: auto; padding: 3px 8px; font-size: 10px; color: #ef4444;" title="Eliminar parada activa" ${grad.stops.length <= 2 ? 'disabled' : ''}>🗑</button>
+            </div>
+          </div>
+
+          <!-- Angle Control (for Linear) -->
+          <div id="gradient-angle-row" class="prop-row" style="${fillType === 'linear' ? '' : 'display: none;'}">
+            <span class="prop-label">Angle (°)</span>
+            <input type="number" class="prop-input" id="gradient-angle" value="${grad.angle ?? 0}" min="0" max="360" step="15" />
+            <select class="prop-input" id="gradient-angle-preset" style="width: 70px; cursor: pointer;">
+              <option value="0" ${grad.angle === 0 ? 'selected' : ''}>0° →</option>
+              <option value="90" ${grad.angle === 90 ? 'selected' : ''}>90° ↓</option>
+              <option value="180" ${grad.angle === 180 ? 'selected' : ''}>180° ←</option>
+              <option value="270" ${grad.angle === 270 ? 'selected' : ''}>270° ↑</option>
+              <option value="45" ${grad.angle === 45 ? 'selected' : ''}>45° ↘</option>
+              <option value="135" ${grad.angle === 135 ? 'selected' : ''}>135° ↙</option>
+            </select>
+          </div>
+
+          <!-- Active Stop Selector & Inspector -->
+          <div class="prop-row">
+            <span class="prop-label">Stop</span>
+            <select class="prop-input" id="gradient-active-stop-select" style="cursor:pointer;">
+              ${grad.stops.map((s, idx) => `<option value="${idx}">Parada ${idx + 1} (${Math.round(s.offset * 100)}%)</option>`).join('')}
+            </select>
+          </div>
+          <div class="prop-row">
+            <span class="prop-label">Offset %</span>
+            <input type="number" class="prop-input" id="gradient-stop-offset" value="${Math.round((grad.stops[0]?.offset ?? 0) * 100)}" min="0" max="100" step="5" />
+            <span class="prop-label" style="width:40px; text-align:right;">Opac%</span>
+            <input type="number" class="prop-input" id="gradient-stop-opacity" value="${Math.round((grad.stops[0]?.opacity ?? 1) * 100)}" min="0" max="100" step="5" />
+          </div>
+          <div class="prop-row">
+            <span class="prop-label">Color</span>
+            <div class="color-picker-row">
+              <input type="color" class="color-swatch" id="gradient-stop-color" value="${grad.stops[0]?.color ?? '#4f46e5'}" />
+              <input type="text" class="prop-input" id="gradient-stop-color-hex" value="${grad.stops[0]?.color ?? '#4f46e5'}" />
+            </div>
           </div>
         </div>
       </div>
@@ -1518,18 +1611,213 @@ export class PropertyPanel {
       elH.addEventListener('change', applySize);
     }
 
+    let activeStopIdx = 0;
+
+    const syncActiveStopInputs = () => {
+      const s = grad!.stops[activeStopIdx] || grad!.stops[0];
+      if (!s) return;
+      const stopSelect = this.container.querySelector<HTMLSelectElement>('#gradient-active-stop-select');
+      const stopOffset = this.container.querySelector<HTMLInputElement>('#gradient-stop-offset');
+      const stopOpacity = this.container.querySelector<HTMLInputElement>('#gradient-stop-opacity');
+      const stopColor = this.container.querySelector<HTMLInputElement>('#gradient-stop-color');
+      const stopColorHex = this.container.querySelector<HTMLInputElement>('#gradient-stop-color-hex');
+      const delBtn = this.container.querySelector<HTMLButtonElement>('#btn-delete-gradient-stop');
+
+      if (stopSelect) stopSelect.value = activeStopIdx.toString();
+      if (stopOffset) stopOffset.value = Math.round(s.offset * 100).toString();
+      if (stopOpacity) stopOpacity.value = Math.round((s.opacity !== undefined ? s.opacity : 1) * 100).toString();
+      if (stopColor) stopColor.value = s.color || '#4f46e5';
+      if (stopColorHex) stopColorHex.value = s.color || '#4f46e5';
+      if (delBtn) delBtn.disabled = grad!.stops.length <= 2;
+    };
+
+    const updateGradientPreview = () => {
+      const sorted = [...grad!.stops].sort((a, b) => a.offset - b.offset);
+      const css = `linear-gradient(to right, ${sorted.map((s) => `${s.color} ${Math.round(s.offset * 100)}%`).join(', ')})`;
+      const bar = this.container.querySelector<HTMLElement>('#gradient-bar-preview');
+      if (bar) bar.style.background = css;
+
+      const stopSelect = this.container.querySelector<HTMLSelectElement>('#gradient-active-stop-select');
+      if (stopSelect) {
+        stopSelect.innerHTML = grad!.stops
+          .map((s, idx) => `<option value="${idx}" ${idx === activeStopIdx ? 'selected' : ''}>Parada ${idx + 1} (${Math.round(s.offset * 100)}%)</option>`)
+          .join('');
+      }
+    };
+
+    const applyFillChanges = () => {
+      if (fillType === 'none') {
+        el.attributes['fill'] = 'none';
+        delete el.attributes['data-gradient'];
+      } else if (fillType === 'solid') {
+        const solColor = this.container.querySelector<HTMLInputElement>('#el-fill-hex')?.value || '#4f46e5';
+        el.attributes['fill'] = solColor;
+        delete el.attributes['data-gradient'];
+      } else {
+        grad!.type = fillType;
+        el.attributes['data-gradient'] = JSON.stringify(grad);
+        el.attributes['fill'] = `url(#ad-grad-${el.id})`;
+        updateGradientPreview();
+      }
+      this.callbacks.onUpdateElement(el);
+    };
+
+    const fillTypeSelect = this.container.querySelector<HTMLSelectElement>('#el-fill-type');
+    const solidControls = this.container.querySelector<HTMLElement>('#fill-solid-controls');
+    const gradControls = this.container.querySelector<HTMLElement>('#fill-gradient-controls');
+    const angleRow = this.container.querySelector<HTMLElement>('#gradient-angle-row');
+
+    if (fillTypeSelect) {
+      fillTypeSelect.addEventListener('change', () => {
+        if (this.callbacks.onPushUndo) this.callbacks.onPushUndo();
+        fillType = fillTypeSelect.value as any;
+        if (solidControls) solidControls.style.display = fillType === 'solid' ? '' : 'none';
+        if (gradControls) gradControls.style.display = (fillType === 'linear' || fillType === 'radial') ? '' : 'none';
+        if (angleRow) angleRow.style.display = fillType === 'linear' ? '' : 'none';
+        applyFillChanges();
+      });
+    }
+
     if (elFillColor) {
       elFillColor.addEventListener('input', () => {
-        el.attributes['fill'] = elFillColor.value;
-        if (elFillHex) elFillHex.value = elFillColor.value;
-        this.callbacks.onUpdateElement(el);
+        if (fillType === 'solid') {
+          el.attributes['fill'] = elFillColor.value;
+          if (elFillHex) elFillHex.value = elFillColor.value;
+          this.callbacks.onUpdateElement(el);
+        }
+      });
+      elFillColor.addEventListener('change', () => {
+        if (this.callbacks.onPushUndo) this.callbacks.onPushUndo();
       });
     }
     if (elFillHex) {
       elFillHex.addEventListener('change', () => {
-        el.attributes['fill'] = elFillHex.value;
-        if (elFillColor) elFillColor.value = elFillHex.value;
-        this.callbacks.onUpdateElement(el);
+        if (fillType === 'solid') {
+          if (this.callbacks.onPushUndo) this.callbacks.onPushUndo();
+          el.attributes['fill'] = elFillHex.value;
+          if (elFillColor) elFillColor.value = elFillHex.value;
+          this.callbacks.onUpdateElement(el);
+        }
+      });
+    }
+
+    const stopSelect = this.container.querySelector<HTMLSelectElement>('#gradient-active-stop-select');
+    if (stopSelect) {
+      stopSelect.addEventListener('change', () => {
+        activeStopIdx = parseInt(stopSelect.value, 10) || 0;
+        syncActiveStopInputs();
+      });
+    }
+
+    const stopOffset = this.container.querySelector<HTMLInputElement>('#gradient-stop-offset');
+    if (stopOffset) {
+      stopOffset.addEventListener('change', () => {
+        if (this.callbacks.onPushUndo) this.callbacks.onPushUndo();
+        const pct = Math.max(0, Math.min(100, parseFloat(stopOffset.value) || 0));
+        if (grad!.stops[activeStopIdx]) {
+          grad!.stops[activeStopIdx].offset = pct / 100;
+          applyFillChanges();
+          syncActiveStopInputs();
+        }
+      });
+    }
+
+    const stopOpacity = this.container.querySelector<HTMLInputElement>('#gradient-stop-opacity');
+    if (stopOpacity) {
+      stopOpacity.addEventListener('change', () => {
+        if (this.callbacks.onPushUndo) this.callbacks.onPushUndo();
+        const pct = Math.max(0, Math.min(100, parseFloat(stopOpacity.value) || 0));
+        if (grad!.stops[activeStopIdx]) {
+          grad!.stops[activeStopIdx].opacity = pct / 100;
+          applyFillChanges();
+        }
+      });
+    }
+
+    const stopColor = this.container.querySelector<HTMLInputElement>('#gradient-stop-color');
+    const stopColorHex = this.container.querySelector<HTMLInputElement>('#gradient-stop-color-hex');
+    if (stopColor) {
+      stopColor.addEventListener('input', () => {
+        if (grad!.stops[activeStopIdx]) {
+          grad!.stops[activeStopIdx].color = stopColor.value;
+          if (stopColorHex) stopColorHex.value = stopColor.value;
+          applyFillChanges();
+        }
+      });
+      stopColor.addEventListener('change', () => {
+        if (this.callbacks.onPushUndo) this.callbacks.onPushUndo();
+      });
+    }
+    if (stopColorHex) {
+      stopColorHex.addEventListener('change', () => {
+        if (this.callbacks.onPushUndo) this.callbacks.onPushUndo();
+        if (grad!.stops[activeStopIdx]) {
+          grad!.stops[activeStopIdx].color = stopColorHex.value;
+          if (stopColor) stopColor.value = stopColorHex.value;
+          applyFillChanges();
+        }
+      });
+    }
+
+    const addStopBtn = this.container.querySelector<HTMLButtonElement>('#btn-add-gradient-stop');
+    if (addStopBtn) {
+      addStopBtn.addEventListener('click', () => {
+        if (this.callbacks.onPushUndo) this.callbacks.onPushUndo();
+        const curOffset = grad!.stops[activeStopIdx]?.offset ?? 0;
+        const newOffset = Math.round(((curOffset + 1) / 2) * 100) / 100;
+        grad!.stops.push({
+          id: `stop_${Date.now().toString(36)}`,
+          offset: Math.min(newOffset, 0.95),
+          color: '#f59e0b',
+          opacity: 1,
+        });
+        activeStopIdx = grad!.stops.length - 1;
+        applyFillChanges();
+        syncActiveStopInputs();
+      });
+    }
+
+    const delStopBtn = this.container.querySelector<HTMLButtonElement>('#btn-delete-gradient-stop');
+    if (delStopBtn) {
+      delStopBtn.addEventListener('click', () => {
+        if (grad!.stops.length <= 2) return;
+        if (this.callbacks.onPushUndo) this.callbacks.onPushUndo();
+        grad!.stops.splice(activeStopIdx, 1);
+        activeStopIdx = Math.max(0, activeStopIdx - 1);
+        applyFillChanges();
+        syncActiveStopInputs();
+      });
+    }
+
+    const revBtn = this.container.querySelector<HTMLButtonElement>('#btn-reverse-gradient');
+    if (revBtn) {
+      revBtn.addEventListener('click', () => {
+        if (this.callbacks.onPushUndo) this.callbacks.onPushUndo();
+        grad!.stops.forEach((s) => {
+          s.offset = Math.round((1 - s.offset) * 100) / 100;
+        });
+        grad!.stops.sort((a, b) => a.offset - b.offset);
+        applyFillChanges();
+        syncActiveStopInputs();
+      });
+    }
+
+    const gradAngle = this.container.querySelector<HTMLInputElement>('#gradient-angle');
+    const gradAnglePreset = this.container.querySelector<HTMLSelectElement>('#gradient-angle-preset');
+    if (gradAngle) {
+      gradAngle.addEventListener('change', () => {
+        if (this.callbacks.onPushUndo) this.callbacks.onPushUndo();
+        grad!.angle = parseFloat(gradAngle.value) || 0;
+        if (gradAnglePreset) gradAnglePreset.value = gradAngle.value;
+        applyFillChanges();
+      });
+    }
+    if (gradAnglePreset) {
+      gradAnglePreset.addEventListener('change', () => {
+        if (this.callbacks.onPushUndo) this.callbacks.onPushUndo();
+        grad!.angle = parseFloat(gradAnglePreset.value) || 0;
+        if (gradAngle) gradAngle.value = gradAnglePreset.value;
+        applyFillChanges();
       });
     }
     if (elStrokeColor) {

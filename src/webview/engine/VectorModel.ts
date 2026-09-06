@@ -54,6 +54,28 @@ export interface InnerShadowConfig {
   opacity: number;
 }
 
+export interface GradientStop {
+  id: string;
+  offset: number; // 0.0 to 1.0
+  color: string;
+  opacity: number; // 0.0 to 1.0
+}
+
+export interface GradientConfig {
+  type: 'linear' | 'radial';
+  x1?: number; // 0.0 to 1.0 for linear
+  y1?: number;
+  x2?: number;
+  y2?: number;
+  cx?: number; // 0.0 to 1.0 for radial
+  cy?: number;
+  r?: number;
+  fx?: number;
+  fy?: number;
+  angle?: number; // angle in degrees for linear (0 = left-to-right, 90 = top-to-bottom)
+  stops: GradientStop[];
+}
+
 /**
  * ARCHITECTURAL RATIONALE: Standard SVG Marker Catalog (<marker>)
  * 
@@ -182,6 +204,7 @@ export class VectorModel {
           if (m) m.remove();
         });
         clone.querySelectorAll('[id^="ad-filter-"]').forEach((f) => f.remove());
+        clone.querySelectorAll('[id^="ad-grad-"]').forEach((g) => g.remove());
         this.customDefs = clone.innerHTML.trim();
       } else {
         this.customDefs = '';
@@ -213,6 +236,42 @@ export class VectorModel {
                   const color = dropEl.getAttribute('flood-color') || '#000000';
                   const opacity = parseFloat(dropEl.getAttribute('flood-opacity') || '0.5') || 0.5;
                   attrs['data-drop-shadow'] = JSON.stringify({ enabled: true, dx, dy, blur, color, opacity });
+                }
+              }
+            }
+          }
+
+          // Import gradient metadata from external <linearGradient> or <radialGradient> if not already stored
+          if (!attrs['data-gradient'] && attrs['fill'] && defsEl) {
+            const match = attrs['fill'].match(/url\(#([^)]+)\)/);
+            if (match) {
+              const gradId = match[1];
+              const gradEl = defsEl.querySelector(`#${gradId}`);
+              if (gradEl) {
+                const gradTag = gradEl.tagName.toLowerCase();
+                if (gradTag === 'lineargradient' || gradTag === 'radialgradient') {
+                  const isLinear = gradTag === 'lineargradient';
+                  const stopEls = Array.from(gradEl.querySelectorAll('stop'));
+                  const stops: GradientStop[] = stopEls.map((s, sIdx) => {
+                    const offStr = s.getAttribute('offset') || '0';
+                    const offVal = offStr.includes('%') ? parseFloat(offStr) / 100 : parseFloat(offStr);
+                    const color = s.getAttribute('stop-color') || '#000000';
+                    const opStr = s.getAttribute('stop-opacity');
+                    const op = opStr ? parseFloat(opStr) : 1;
+                    return {
+                      id: `stop_${sIdx}`,
+                      offset: isNaN(offVal) ? 0 : offVal,
+                      color,
+                      opacity: isNaN(op) ? 1 : op,
+                    };
+                  });
+                  if (stops.length >= 2) {
+                    const gradConfig: GradientConfig = {
+                      type: isLinear ? 'linear' : 'radial',
+                      stops,
+                    };
+                    attrs['data-gradient'] = JSON.stringify(gradConfig);
+                  }
                 }
               }
             }
@@ -317,6 +376,75 @@ export class VectorModel {
     return out;
   }
 
+  /**
+   * ARCHITECTURAL RATIONALE: Hardware-Accelerated SVG Gradient Compilation
+   * Why this exists:
+   * Compiles dynamic <linearGradient> and <radialGradient> definitions into <defs>,
+   * referencing them via `fill="url(#ad-grad-${id})"`.
+   *
+   * Technical Justification & Coordinate Systems:
+   * 1. Uses `gradientUnits="objectBoundingBox"` so gradients automatically scale, stretch,
+   *    and adapt proportionally when vector objects are transformed or resized.
+   * 2. For linear gradients, angle is converted into normalized coordinates:
+   *    theta = (angle * Math.PI) / 180;
+   *    x1 = 0.5 - 0.5 * Math.cos(theta); y1 = 0.5 - 0.5 * Math.sin(theta);
+   *    x2 = 0.5 + 0.5 * Math.cos(theta); y2 = 0.5 + 0.5 * Math.sin(theta);
+   *    This aligns with standard CSS linear-gradient where 0° points left-to-right and 90° points top-to-bottom.
+   * 3. For radial gradients, default cx=0.5, cy=0.5, r=0.5 produces a centered circular/elliptical glow conforming to the bounding box.
+   */
+  public compileElementGradients(): string {
+    let out = '';
+    this.elements.forEach((el) => {
+      const gradStr = el.attributes['data-gradient'];
+      if (!gradStr) return;
+      let grad: GradientConfig | null = null;
+      try {
+        grad = JSON.parse(gradStr);
+      } catch {}
+      if (!grad || !grad.stops || grad.stops.length === 0) return;
+
+      const gradId = `ad-grad-${el.id}`;
+      if (grad.type === 'linear') {
+        let x1 = grad.x1 ?? 0;
+        let y1 = grad.y1 ?? 0;
+        let x2 = grad.x2 ?? 1;
+        let y2 = grad.y2 ?? 0;
+
+        if (grad.angle !== undefined) {
+          const rad = (grad.angle * Math.PI) / 180;
+          x1 = Math.round((0.5 - 0.5 * Math.cos(rad)) * 1000) / 1000;
+          y1 = Math.round((0.5 - 0.5 * Math.sin(rad)) * 1000) / 1000;
+          x2 = Math.round((0.5 + 0.5 * Math.cos(rad)) * 1000) / 1000;
+          y2 = Math.round((0.5 + 0.5 * Math.sin(rad)) * 1000) / 1000;
+        }
+
+        out += `    <linearGradient id="${gradId}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" gradientUnits="objectBoundingBox">\n`;
+      } else {
+        const cx = grad.cx ?? 0.5;
+        const cy = grad.cy ?? 0.5;
+        const r = grad.r ?? 0.5;
+        const fx = grad.fx ?? cx;
+        const fy = grad.fy ?? cy;
+        out += `    <radialGradient id="${gradId}" cx="${cx}" cy="${cy}" r="${r}" fx="${fx}" fy="${fy}" gradientUnits="objectBoundingBox">\n`;
+      }
+
+      // Sort stops by offset ascending
+      const sortedStops = [...grad.stops].sort((a, b) => a.offset - b.offset);
+      sortedStops.forEach((stop) => {
+        const offPct = Math.round(stop.offset * 100);
+        const op = stop.opacity !== undefined ? stop.opacity : 1;
+        out += `      <stop offset="${offPct}%" stop-color="${stop.color}" stop-opacity="${op}" />\n`;
+      });
+
+      if (grad.type === 'linear') {
+        out += `    </linearGradient>\n`;
+      } else {
+        out += `    </radialGradient>\n`;
+      }
+    });
+    return out;
+  }
+
   public toSvgString(): string {
     const { width, height, viewBox, backgroundColor } = this.canvas;
     let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${viewBox}" style="background-color: ${backgroundColor};">\n`;
@@ -326,14 +454,18 @@ export class VectorModel {
       (el) => !!(el.attributes['marker-start'] || el.attributes['marker-mid'] || el.attributes['marker-end'])
     );
     const filterDefs = this.compileElementFilters();
+    const gradientDefs = this.compileElementGradients();
 
-    if (hasMarkers || filterDefs.length > 0 || (this.customDefs && this.customDefs.length > 0)) {
+    if (hasMarkers || filterDefs.length > 0 || gradientDefs.length > 0 || (this.customDefs && this.customDefs.length > 0)) {
       svg += `  <defs id="antidraw-defs">\n`;
       if (hasMarkers) {
         svg += STANDARD_MARKERS_INNER_XML;
       }
       if (filterDefs.length > 0) {
         svg += filterDefs;
+      }
+      if (gradientDefs.length > 0) {
+        svg += gradientDefs;
       }
       if (this.customDefs && this.customDefs.length > 0) {
         svg += `    ${this.customDefs}\n`;

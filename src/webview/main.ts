@@ -1473,6 +1473,10 @@ class AntiDrawApp {
           el.attributes['filter'] = `url(#ad-filter-shadow-${el.id})`;
         }
 
+        if (el.attributes['fill'] && el.attributes['fill'].includes('ad-grad-')) {
+          el.attributes['fill'] = `url(#ad-grad-${el.id})`;
+        }
+
         return el;
       });
 

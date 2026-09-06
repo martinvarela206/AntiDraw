@@ -698,6 +698,47 @@ export class SelectToolHandler implements IToolHandler {
         html += `<circle cx="${groupBox.cx}" cy="${groupBox.y - rotOffset}" r="${rotR}" fill="#38bdf8" stroke="#ffffff" stroke-width="1" vector-effect="non-scaling-stroke" />`;
       }
 
+      // 3.1. On-Canvas Interactive Gradient Vector Overlay
+      if (selectedEls.length === 1 && selectedEls[0].attributes['data-gradient']) {
+        const el = selectedEls[0];
+        try {
+          const grad = JSON.parse(el.attributes['data-gradient']);
+          const box = this.ctx.selectionTool.getBoundingBox(el);
+          if (box && grad) {
+            if (grad.type === 'linear') {
+              let x1 = grad.x1 ?? 0;
+              let y1 = grad.y1 ?? 0;
+              let x2 = grad.x2 ?? 1;
+              let y2 = grad.y2 ?? 0;
+              if (grad.angle !== undefined) {
+                const rad = (grad.angle * Math.PI) / 180;
+                x1 = 0.5 - 0.5 * Math.cos(rad);
+                y1 = 0.5 - 0.5 * Math.sin(rad);
+                x2 = 0.5 + 0.5 * Math.cos(rad);
+                y2 = 0.5 + 0.5 * Math.sin(rad);
+              }
+              const p1x = box.x + x1 * box.width;
+              const p1y = box.y + y1 * box.height;
+              const p2x = box.x + x2 * box.width;
+              const p2y = box.y + y2 * box.height;
+              const hSize = 6 / z;
+              html += `<line x1="${p1x}" y1="${p1y}" x2="${p2x}" y2="${p2y}" stroke="#ec4899" stroke-width="1.5" stroke-dasharray="3 2" vector-effect="non-scaling-stroke" />`;
+              html += `<rect x="${p1x - hSize / 2}" y="${p1y - hSize / 2}" width="${hSize}" height="${hSize}" fill="#ec4899" stroke="#ffffff" stroke-width="1" vector-effect="non-scaling-stroke" />`;
+              html += `<circle cx="${p2x}" cy="${p2y}" r="${hSize / 2}" fill="#3b82f6" stroke="#ffffff" stroke-width="1" vector-effect="non-scaling-stroke" />`;
+            } else if (grad.type === 'radial') {
+              const cx = box.x + (grad.cx ?? 0.5) * box.width;
+              const cy = box.y + (grad.cy ?? 0.5) * box.height;
+              const rx = (grad.r ?? 0.5) * box.width;
+              const ry = (grad.r ?? 0.5) * box.height;
+              const hSize = 6 / z;
+              html += `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="none" stroke="#ec4899" stroke-width="1.2" stroke-dasharray="3 2" vector-effect="non-scaling-stroke" />`;
+              html += `<circle cx="${cx}" cy="${cy}" r="${hSize / 2}" fill="#ec4899" stroke="#ffffff" stroke-width="1" vector-effect="non-scaling-stroke" />`;
+              html += `<circle cx="${cx + rx}" cy="${cy}" r="${hSize / 2}" fill="#3b82f6" stroke="#ffffff" stroke-width="1" vector-effect="non-scaling-stroke" />`;
+            }
+          }
+        } catch {}
+      }
+
       if (selectedEls.length > 1) {
         selectedEls.forEach((el) => {
           const elBox = this.ctx.selectionTool.getSelectionBoundingBox(el, 6 / z);
