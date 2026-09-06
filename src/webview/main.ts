@@ -1851,19 +1851,42 @@ class AntiDrawApp {
           const dragDist = Math.hypot(curDx, curDy);
           if (dragDist > 3) {
             curV.handleOut = { x: snappedPt.x, y: snappedPt.y };
-            const angle = Math.atan2(curDy, curDx) + Math.PI;
-            const dist = curV.nodeType === 'symmetric'
-              ? dragDist
-              : (curV.handleIn ? Math.hypot(curV.handleIn.x - curV.x, curV.handleIn.y - curV.y) : dragDist);
-            curV.handleIn = {
-              x: curV.x + Math.cos(angle) * dist,
-              y: curV.y + Math.sin(angle) * dist,
-            };
+
+            /**
+             * ARCHITECTURAL RATIONALE: Instant Cusp / Tangent Decoupling via Alt Key
+             * Why decoupling handles dynamically with Alt is implemented:
+             * 1. Standard Bézier Drawing Workflow (CorelDraw / Illustrator / Figma):
+             *    When dragging out a curve node, handles are normally collinear (180° opposed). Holding
+             *    the Alt modifier breaks this collinear constraint instantaneously during active pointer movement.
+             * 2. Edge Cases and Preservation of Incoming Segment:
+             *    If handleIn was already established by a prior drag or segment creation, modifying handleOut
+             *    while Alt is pressed preserves handleIn exactly as it was, preventing the incoming curve
+             *    segment from warping or glitching.
+             * 3. Discarded Alternate Approaches:
+             *    Requiring a second tool switch or post-drag Alt click was rejected because it breaks the continuous
+             *    drawing flow of vector artists. Decoupling on active drag allows single-stroke cusp creation.
+             * 4. State Consistency:
+             *    The vertex nodeType is explicitly converted to 'asymmetric' so subsequent edits respect independent
+             *    tangents without snapping back to symmetric or smooth constraints.
+             */
+            if (e.altKey) {
+              curV.nodeType = 'asymmetric';
+            } else {
+              const angle = Math.atan2(curDy, curDx) + Math.PI;
+              const dist = curV.nodeType === 'symmetric'
+                ? dragDist
+                : (curV.handleIn ? Math.hypot(curV.handleIn.x - curV.x, curV.handleIn.y - curV.y) : dragDist);
+              curV.handleIn = {
+                x: curV.x + Math.cos(angle) * dist,
+                y: curV.y + Math.sin(angle) * dist,
+              };
+              if (this.penNodeType !== 'sharp') {
+                curV.nodeType = this.penNodeType;
+              }
+            }
+
             if (curV.command === 'L') {
               curV.command = 'C';
-            }
-            if (this.penNodeType !== 'sharp') {
-              curV.nodeType = this.penNodeType;
             }
           }
         }

@@ -435,7 +435,7 @@ export class PropertyPanel {
   private renderPenProperties(): void {
     this.container.innerHTML = `
       <div class="panel-section">
-        <div class="panel-title">Pen Path Tool</div>
+        <div class="panel-title">Bézier Curve Tool (P)</div>
         <div class="prop-row">
           <span class="prop-label">Path Nodes</span>
           <span style="font-weight:600; color:var(--text-main);">${this.penVertexCount} vertices</span>
@@ -479,7 +479,7 @@ export class PropertyPanel {
         <div class="panel-title">Shortcuts</div>
         <div style="font-size:11px; color:var(--text-muted); line-height:1.5;">
           • <b>Click</b>: Add node<br/>
-          • <b>Drag</b>: Pull Bézier handles<br/>
+          • <b>Drag</b>: Pull Bézier handles (Hold <b>Alt</b> to break handle)<br/>
           • <b>Shift + Click node</b>: Delete node<br/>
           • <b>Ctrl + Drag node</b>: Move node<br/>
           • <b>Enter / DblClick</b>: Finish path<br/>
