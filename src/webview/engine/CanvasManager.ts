@@ -273,6 +273,17 @@ export class CanvasManager {
           oy += step / 2;
         }
 
+        /**
+         * ARCHITECTURAL RATIONALE: Adaptive Non-Orthogonal Projection Snapping
+         * Why geometric normal projection is required for isometric and axonometric grids:
+         * 1. Multi-Axis Vector Tracing: In 30°/60° isometric and 45° axonometric spaces, lines and vertices
+         *    do not adhere to orthogonal Cartesian X/Y increments. Standard rounding distorts diagonal lines.
+         * 2. Intersection Prioritization: Snapping detects triple-axis crossing vertices (diamond edges and centers)
+         *    first, collapsing cursor coordinates to exact nodes within the proximity threshold.
+         * 3. Normal Vector Projection: For points near a diagonal or vertical segment between crossings,
+         *    projects the point onto the nearest continuous line vector using unit normal displacement,
+         *    maintaining seamless alignment during pen/polyline and node manipulation.
+         */
         if (grid.type === 'orthogonal') {
           const gx = ox + Math.round((pt.x - ox) / step) * step;
           const gy = oy + Math.round((pt.y - oy) / step) * step;
@@ -282,6 +293,150 @@ export class CanvasManager {
           }
           if (Math.abs(pt.y - gy) <= threshold) {
             snappedY = gy;
+          }
+        } else if (grid.type === 'isometric') {
+          // Cell dimensions match SVG pattern exactly:
+          const S = Math.max(5, grid.spacing || 20);
+          const tileH = S;
+          const tileW = Math.round(S * Math.sqrt(3) * 1000) / 1000;
+          const halfW = tileW / 2;
+          const halfH = tileH / 2;
+
+          let gOx = ox;
+          let gOy = oy;
+          if (grid.alignmentMode === 'cell-center') {
+            gOx += halfW;
+            gOy += halfH;
+          }
+
+          const dx = pt.x - gOx;
+          const dy = pt.y - gOy;
+
+          // 1. Triple-axis intersection snapping (highest priority)
+          const nearK = Math.round(dx / halfW);
+          const nearM = Math.round(dy / halfH);
+          const ix = gOx + nearK * halfW;
+          const iy = gOy + nearM * halfH;
+          const intDist = Math.hypot(pt.x - ix, pt.y - iy);
+
+          if (intDist <= threshold) {
+            snappedX = ix;
+            snappedY = iy;
+          } else {
+            // 2. Individual Line Projections: vertical or 30-deg diagonals
+            let bestDist = threshold;
+            let bestSnap: Point | null = null;
+
+            // Vertical line snap
+            const vx = gOx + nearK * halfW;
+            const vDist = Math.abs(pt.x - vx);
+            if (vDist <= bestDist) {
+              bestDist = vDist;
+              bestSnap = { x: vx, y: pt.y };
+            }
+
+            // Diagonal +30 deg family: n1 = (-1/2, sqrt(3)/2)
+            const stepD = (S * Math.sqrt(3)) / 4;
+            const d1 = (Math.sqrt(3) * dy - dx) / 2;
+            const snapD1 = Math.round(d1 / stepD) * stepD;
+            const err1 = d1 - snapD1;
+            if (Math.abs(err1) < bestDist) {
+              bestDist = Math.abs(err1);
+              bestSnap = {
+                x: pt.x - err1 * (-0.5),
+                y: pt.y - err1 * (Math.sqrt(3) / 2),
+              };
+            }
+
+            // Diagonal -30 deg family: n2 = (1/2, sqrt(3)/2)
+            const d2 = (Math.sqrt(3) * dy + dx) / 2;
+            const snapD2 = Math.round(d2 / stepD) * stepD;
+            const err2 = d2 - snapD2;
+            if (Math.abs(err2) < bestDist) {
+              bestDist = Math.abs(err2);
+              bestSnap = {
+                x: pt.x - err2 * 0.5,
+                y: pt.y - err2 * (Math.sqrt(3) / 2),
+              };
+            }
+
+            if (bestSnap) {
+              snappedX = bestSnap.x;
+              snappedY = bestSnap.y;
+            }
+          }
+        } else if (grid.type === 'axonometric') {
+          // 45-degree axonometric projection
+          const S = Math.max(5, grid.spacing || 20);
+          let gOx = ox;
+          let gOy = oy;
+          if (grid.alignmentMode === 'cell-center') {
+            gOx += S / 2;
+            gOy += S / 2;
+          }
+
+          const dx = pt.x - gOx;
+          const dy = pt.y - gOy;
+
+          // 1. Check crossing intersections at grid vertices or diamond centers
+          const nearK = Math.round(dx / (S / 2));
+          const nearM = Math.round(dy / (S / 2));
+          const parity = (Math.abs(nearK) + Math.abs(nearM)) % 2;
+          let ix = gOx + nearK * (S / 2);
+          let iy = gOy + nearM * (S / 2);
+          if (parity !== 0) {
+            const altM = Math.abs(dy - (nearM + 1) * (S / 2)) < Math.abs(dy - (nearM - 1) * (S / 2)) ? nearM + 1 : nearM - 1;
+            ix = gOx + nearK * (S / 2);
+            iy = gOy + altM * (S / 2);
+          }
+          const intDist = Math.hypot(pt.x - ix, pt.y - iy);
+
+          if (intDist <= threshold) {
+            snappedX = ix;
+            snappedY = iy;
+          } else {
+            // 2. Line projections: vertical or 45-deg diagonals
+            let bestDist = threshold;
+            let bestSnap: Point | null = null;
+
+            // Vertical line
+            const vx = gOx + Math.round(dx / S) * S;
+            const vDist = Math.abs(pt.x - vx);
+            if (vDist <= bestDist) {
+              bestDist = vDist;
+              bestSnap = { x: vx, y: pt.y };
+            }
+
+            // Diagonal +45 deg: normal = (-1/sqrt(2), 1/sqrt(2))
+            const invSqrt2 = 1 / Math.SQRT2;
+            const d1 = (dy - dx) * invSqrt2;
+            const step45 = S * invSqrt2;
+            const snapD1 = Math.round(d1 / step45) * step45;
+            const err1 = d1 - snapD1;
+            if (Math.abs(err1) < bestDist) {
+              bestDist = Math.abs(err1);
+              bestSnap = {
+                x: pt.x - err1 * (-invSqrt2),
+                y: pt.y - err1 * invSqrt2,
+              };
+            }
+
+            // Diagonal -45 deg: normal = (1/sqrt(2), 1/sqrt(2))
+            const d2 = (dy + dx) * invSqrt2;
+            const snapD2 = Math.round(d2 / step45) * step45;
+            const err2 = d2 - snapD2;
+            if (Math.abs(err2) < bestDist) {
+              bestDist = Math.abs(err2);
+              bestSnap = {
+                x: pt.x - err2 * invSqrt2,
+                y: pt.y - err2 * invSqrt2,
+              };
+            }
+
+            if (bestSnap) {
+              snappedX = bestSnap.x;
+              snappedY = bestSnap.y;
+            }
           }
         }
       }
