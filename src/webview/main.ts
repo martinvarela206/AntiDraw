@@ -3,21 +3,18 @@ import { SelectionTool, HandleType } from './engine/SelectionTool.js';
 import { NodeEditorTool } from './engine/NodeEditorTool.js';
 import { CanvasManager, GuideLine, RulerConfig } from './engine/CanvasManager.js';
 import { BooleanOperations } from './engine/BooleanOperations.js';
+import { ViewportController } from './engine/ViewportController.js';
+import { VsCodeBridge } from './bridge/VsCodeBridge.js';
 import { Toolbar, ToolType } from './ui/Toolbar.js';
 import { TopBar } from './ui/TopBar.js';
 import { PropertyPanel } from './ui/PropertyPanel.js';
 import { RulerView } from './ui/RulerView.js';
 import './styles/main.css';
 
-declare function acquireVsCodeApi(): {
-  postMessage(message: any): void;
-  setState(state: any): void;
-  getState(): any;
-};
-
-const vscode = acquireVsCodeApi();
-
 class AntiDrawApp {
+  private vscodeBridge: VsCodeBridge = VsCodeBridge.getInstance();
+  private viewportCtrl!: ViewportController;
+
   private model: VectorModel = new VectorModel();
   private selectionTool: SelectionTool = new SelectionTool();
   private nodeEditorTool: NodeEditorTool = new NodeEditorTool();
@@ -66,12 +63,10 @@ class AntiDrawApp {
   private guideInitialState: GuideLine | null = null;
   private activeRotateArrowIdx: 1 | 2 = 1;
 
-  // Camera 2D viewport & middle mouse panning state
-  private isMiddlePanning: boolean = false;
-  private panStartClient: { x: number; y: number } = { x: 0, y: 0 };
-  private cameraOffset: Point = { x: 0, y: 0 };
-  private panStartOffset: Point = { x: 0, y: 0 };
   private hasInitialCentered: boolean = false;
+  private get isMiddlePanning(): boolean {
+    return this.viewportCtrl?.isMiddlePanning ?? false;
+  }
 
   public penNodeType: NodeType = 'asymmetric';
   private currentPenVertices: PathVertex[] = [];
@@ -88,9 +83,9 @@ class AntiDrawApp {
   private ghostTransformMap: Map<string, PathVertex[]> = new Map();
   private ghostNodeVertices: PathVertex[] | null = null;
   private ghostShapeElement: VectorElement | null = null;
+
+
   private isShiftPressed: boolean = false;
-  // Flag: avoid re-parsing model when a change was sent from this webview itself
-  private isUpdatingFromWebview: boolean = false;
 
   // Clipboard buffer
   private clipboardElements: VectorElement[] = [];
@@ -103,8 +98,22 @@ class AntiDrawApp {
 
   constructor() {
     this.initLayout();
+    this.initViewport();
     this.initEvents();
     this.notifyReady();
+  }
+
+  private initViewport(): void {
+    this.viewportCtrl = new ViewportController({
+      canvasScrollArea: this.canvasScrollArea,
+      canvasWrapper: this.canvasWrapper,
+      getSvgCanvas: () => this.svgCanvas,
+      getRulerView: () => this.rulerView,
+      canvasMgr: this.canvasMgr,
+      model: this.model,
+      onRender: () => this.render(),
+      onApplyCanvasSize: () => this.applyCanvasSize(),
+    });
   }
 
   private initLayout(): void {
@@ -360,56 +369,46 @@ class AntiDrawApp {
   }
 
   private syncRulerScroll(): void {
-    const wrapRect = this.canvasWrapper.getBoundingClientRect();
-    const scrollRect = this.canvasScrollArea.getBoundingClientRect();
-    const offsetX = wrapRect.left - scrollRect.left;
-    const offsetY = wrapRect.top - scrollRect.top;
-    this.rulerView.renderRulers(offsetX, offsetY);
+    if (this.viewportCtrl) {
+      this.viewportCtrl.syncRulerScroll();
+    }
   }
 
   private initEvents(): void {
-    // Webview messaging from VS Code Host
-    window.addEventListener('message', (event) => {
-      const msg = event.data;
-      if (msg.type === 'loadSvg') {
-        if (this.isUpdatingFromWebview) {
-          this.isUpdatingFromWebview = false;
-          return;
+    // Webview messaging from VS Code Host via VsCodeBridge
+    this.vscodeBridge.onLoadSvg((payload) => {
+      // Load sidecar metadata if available
+      if (payload.metadata) {
+        this.canvasMgr.guides = Array.isArray(payload.metadata.guides) ? payload.metadata.guides : [];
+        if (payload.metadata.ruler) {
+          this.canvasMgr.rulerConfig = { ...this.canvasMgr.rulerConfig, ...payload.metadata.ruler };
         }
+        if (payload.metadata.showRulers !== undefined) this.canvasMgr.showRulers = payload.metadata.showRulers;
+        if (Array.isArray(payload.metadata.grids)) this.canvasMgr.grids = payload.metadata.grids;
+        if (payload.metadata.showGrid !== undefined) this.canvasMgr.showGrid = payload.metadata.showGrid;
+        if (payload.metadata.showGuides !== undefined) this.canvasMgr.showGuides = payload.metadata.showGuides;
+        if (payload.metadata.gridSpacing !== undefined) this.canvasMgr.gridSpacing = payload.metadata.gridSpacing;
+        if (payload.metadata.snapToGrid !== undefined) this.canvasMgr.snapToGrid = payload.metadata.snapToGrid;
+        if (payload.metadata.snapToGuides !== undefined) this.canvasMgr.snapToGuides = payload.metadata.snapToGuides;
+        if (payload.metadata.snapToVertices !== undefined) this.canvasMgr.snapToVertices = payload.metadata.snapToVertices;
+        if (payload.metadata.snapToViewBox !== undefined) this.canvasMgr.snapToViewBox = payload.metadata.snapToViewBox;
+        if (payload.metadata.shapeConfig) {
+          this.canvasMgr.shapeConfig = { ...this.canvasMgr.shapeConfig, ...payload.metadata.shapeConfig };
+        }
+        this.canvasContainer.classList.toggle('no-rulers', !this.canvasMgr.showRulers);
+        this.topBar.update();
+      } else {
+        this.canvasMgr.guides = [];
+      }
 
-        // Load sidecar metadata if available
-        if (msg.metadata) {
-          this.canvasMgr.guides = Array.isArray(msg.metadata.guides) ? msg.metadata.guides : [];
-          if (msg.metadata.ruler) {
-            this.canvasMgr.rulerConfig = { ...this.canvasMgr.rulerConfig, ...msg.metadata.ruler };
-          }
-          if (msg.metadata.showRulers !== undefined) this.canvasMgr.showRulers = msg.metadata.showRulers;
-          if (Array.isArray(msg.metadata.grids)) this.canvasMgr.grids = msg.metadata.grids;
-          if (msg.metadata.showGrid !== undefined) this.canvasMgr.showGrid = msg.metadata.showGrid;
-          if (msg.metadata.showGuides !== undefined) this.canvasMgr.showGuides = msg.metadata.showGuides;
-          if (msg.metadata.gridSpacing !== undefined) this.canvasMgr.gridSpacing = msg.metadata.gridSpacing;
-          if (msg.metadata.snapToGrid !== undefined) this.canvasMgr.snapToGrid = msg.metadata.snapToGrid;
-          if (msg.metadata.snapToGuides !== undefined) this.canvasMgr.snapToGuides = msg.metadata.snapToGuides;
-          if (msg.metadata.snapToVertices !== undefined) this.canvasMgr.snapToVertices = msg.metadata.snapToVertices;
-          if (msg.metadata.snapToViewBox !== undefined) this.canvasMgr.snapToViewBox = msg.metadata.snapToViewBox;
-          if (msg.metadata.shapeConfig) {
-            this.canvasMgr.shapeConfig = { ...this.canvasMgr.shapeConfig, ...msg.metadata.shapeConfig };
-          }
-          this.canvasContainer.classList.toggle('no-rulers', !this.canvasMgr.showRulers);
-          this.topBar.update();
-        } else {
-          this.canvasMgr.guides = [];
-        }
-
-        this.model.loadSvgString(msg.text);
-        this.applyCanvasSize();
-        this.render();
-        if (!this.hasInitialCentered) {
-          this.hasInitialCentered = true;
-          setTimeout(() => {
-            this.recenterViewBox();
-          }, 40);
-        }
+      this.model.loadSvgString(payload.text);
+      this.applyCanvasSize();
+      this.render();
+      if (!this.hasInitialCentered) {
+        this.hasInitialCentered = true;
+        setTimeout(() => {
+          this.recenterViewBox();
+        }, 40);
       }
     });
 
@@ -734,209 +733,39 @@ class AntiDrawApp {
       this.onDoubleClick(e);
     });
 
-    // Middle mouse button panning (camera 2D pan)
-    const startMiddlePan = (e: PointerEvent) => {
-      if (e.button === 1) {
-        e.preventDefault();
-        this.isMiddlePanning = true;
-        this.panStartClient = { x: e.clientX, y: e.clientY };
-        this.panStartOffset = { x: this.cameraOffset.x, y: this.cameraOffset.y };
-        this.canvasScrollArea.style.cursor = 'grabbing';
-        this.canvasWrapper.style.cursor = 'grabbing';
-        try {
-          this.canvasScrollArea.setPointerCapture(e.pointerId);
-        } catch (_) {}
-      }
-    };
-    this.canvasScrollArea.addEventListener('pointerdown', startMiddlePan);
-    this.canvasWrapper.addEventListener('pointerdown', startMiddlePan);
-
-    const onMiddlePanMove = (e: PointerEvent) => {
-      if (this.isMiddlePanning) {
-        e.preventDefault();
-        const dx = e.clientX - this.panStartClient.x;
-        const dy = e.clientY - this.panStartClient.y;
-        this.cameraOffset.x = Math.round(this.panStartOffset.x + dx);
-        this.cameraOffset.y = Math.round(this.panStartOffset.y + dy);
-        this.applyCameraTransform();
-        this.syncRulerScroll();
-      }
-    };
-    this.canvasScrollArea.addEventListener('pointermove', onMiddlePanMove);
-    window.addEventListener('pointermove', onMiddlePanMove);
-
-    const stopMiddlePan = (e: PointerEvent) => {
-      if (this.isMiddlePanning) {
-        this.isMiddlePanning = false;
-        this.canvasScrollArea.style.cursor = '';
-        this.canvasWrapper.style.cursor = '';
-        try {
-          this.canvasScrollArea.releasePointerCapture(e.pointerId);
-        } catch (_) {}
-      }
-    };
-
-    this.canvasScrollArea.addEventListener('pointerup', stopMiddlePan);
-    this.canvasScrollArea.addEventListener('pointercancel', stopMiddlePan);
-    window.addEventListener('pointerup', stopMiddlePan);
-
-    // Prevent default browser auto-scroll icon on middle click
-    this.canvasScrollArea.addEventListener('auxclick', (e: MouseEvent) => {
-      if (e.button === 1) e.preventDefault();
-    });
-
-    // Mouse Wheel: Ctrl + Wheel for Zoom In / Zoom Out (centered on cursor), Alt + Wheel for Horizontal Pan, Wheel for Vertical Pan
-    this.canvasScrollArea.addEventListener(
-      'wheel',
-      (e: WheelEvent) => {
-        if (e.ctrlKey) {
-          e.preventDefault();
-          const factor = e.deltaY < 0 ? CanvasManager.ZOOM_FACTOR_IN : CanvasManager.ZOOM_FACTOR_OUT;
-          this.zoomAtClientPointByFactor(e.clientX, e.clientY, factor);
-        } else if (e.altKey) {
-          // Alt + Scroll -> Horizontal camera pan
-          e.preventDefault();
-          const delta = e.deltaY || e.deltaX;
-          this.cameraOffset.x -= delta;
-          this.applyCameraTransform();
-          this.syncRulerScroll();
-        } else if (!e.shiftKey) {
-          // Regular Wheel -> Vertical camera pan
-          e.preventDefault();
-          this.cameraOffset.y -= e.deltaY;
-          this.applyCameraTransform();
-          this.syncRulerScroll();
-        }
-      },
-      { passive: false }
-    );
-
-    // Status bar zoom indicator: click to reset to 100%
-    const zoomResetBtn = document.getElementById('status-zoom');
-    if (zoomResetBtn) {
-      zoomResetBtn.addEventListener('click', () => {
-        this.setZoom(1.0);
-      });
-    }
-
-    // Status bar recenter viewBox button
-    const recenterBtn = document.getElementById('btn-recenter-viewbox');
-    if (recenterBtn) {
-      recenterBtn.addEventListener('click', () => {
-        this.recenterViewBox();
-      });
-    }
-
-    // Window resize handler to update rulers
-    window.addEventListener('resize', () => {
-      this.rulerView.updateSize(this.model.canvas.width, this.model.canvas.height);
-      this.syncRulerScroll();
-    });
   }
 
   public recenterViewBox(): void {
-    const areaW = this.canvasScrollArea.clientWidth;
-    const areaH = this.canvasScrollArea.clientHeight;
-    if (areaW <= 0 || areaH <= 0) return;
-
-    const zoom = this.canvasMgr.zoom || 1.0;
-    const vb = this.model.getViewBoxBounds();
-    const workBounds = this.model.getWorkingCanvasBounds(80);
-
-    const vbCenterX = (vb.minX + vb.width / 2 - workBounds.minX) * zoom;
-    const vbCenterY = (vb.minY + vb.height / 2 - workBounds.minY) * zoom;
-
-    this.cameraOffset.x = Math.round(areaW / 2 - vbCenterX);
-    this.cameraOffset.y = Math.round(areaH / 2 - vbCenterY);
-
-    this.applyCameraTransform();
-    this.syncRulerScroll();
+    this.viewportCtrl.recenterViewBox();
   }
 
-  /**
-   * ARCHITECTURAL RATIONALE: Cursor-Invariant Zoom Geometry
-   * Mathematical Derivation:
-   * 1. Screen-to-World: A point on the screen (cursorViewportX) maps to world space via:
-   *    worldX = (cursorViewportX - cameraOffset.x) / currentZoom
-   * 2. Invariance Requirement: When zoom scales to newZoom, the same worldX coordinate MUST
-   *    remain exactly beneath cursorViewportX on screen:
-   *    cursorViewportX = worldX * newZoom + newCameraOffset.x
-   * 3. Solving for new camera offset:
-   *    newCameraOffset.x = cursorViewportX - worldX * newZoom
-   * This formula eliminates viewport displacement and visual jumping, guaranteeing natural,
-   * predictable zooming focused directly at the mouse cursor.
-   */
   public zoomAtClientPointByFactor(clientX: number, clientY: number, factor: number): void {
-    const currentZoom = this.canvasMgr.zoom || 1.0;
-    const newZoom = this.canvasMgr.computeMultiplicativeZoom(factor);
-    if (newZoom !== currentZoom) {
-      const scrollRect = this.canvasScrollArea.getBoundingClientRect();
-      const cursorViewportX = clientX - scrollRect.left;
-      const cursorViewportY = clientY - scrollRect.top;
-
-      const worldX = (cursorViewportX - this.cameraOffset.x) / currentZoom;
-      const worldY = (cursorViewportY - this.cameraOffset.y) / currentZoom;
-
-      this.cameraOffset.x = Math.round(cursorViewportX - worldX * newZoom);
-      this.cameraOffset.y = Math.round(cursorViewportY - worldY * newZoom);
-
-      this.canvasMgr.zoom = newZoom;
-      this.applyCanvasSize();
-      this.applyCameraTransform();
-      this.syncRulerScroll();
-      this.render();
-      this.updateStatusZoom();
-    }
+    this.viewportCtrl.zoomAtClientPointByFactor(clientX, clientY, factor);
   }
 
   public zoomAtClientPoint(clientX: number, clientY: number, delta: number): void {
-    const factor = delta > 0 ? CanvasManager.ZOOM_FACTOR_IN : CanvasManager.ZOOM_FACTOR_OUT;
-    this.zoomAtClientPointByFactor(clientX, clientY, factor);
+    this.viewportCtrl.zoomAtClientPoint(clientX, clientY, delta);
   }
 
   public setZoom(zoom: number): void {
-    const oldZoom = this.canvasMgr.zoom || 1.0;
-    const newZoom = Math.round(Math.max(0.1, Math.min(10.0, zoom)) * 10) / 10;
-    if (newZoom !== oldZoom) {
-      const areaW = this.canvasScrollArea.clientWidth;
-      const areaH = this.canvasScrollArea.clientHeight;
-      const centerViewportX = areaW / 2;
-      const centerViewportY = areaH / 2;
-
-      const worldX = (centerViewportX - this.cameraOffset.x) / oldZoom;
-      const worldY = (centerViewportY - this.cameraOffset.y) / oldZoom;
-
-      this.cameraOffset.x = Math.round(centerViewportX - worldX * newZoom);
-      this.cameraOffset.y = Math.round(centerViewportY - worldY * newZoom);
-
-      this.canvasMgr.zoom = newZoom;
-      this.applyCanvasSize();
-      this.render();
-      this.updateStatusZoom();
-    }
+    this.viewportCtrl.setZoom(zoom);
   }
 
   private applyCameraTransform(): void {
-    if (this.canvasWrapper) {
-      this.canvasWrapper.style.transform = `translate(${this.cameraOffset.x}px, ${this.cameraOffset.y}px)`;
-    }
+    this.viewportCtrl.applyCameraTransform();
   }
 
   private updateStatusZoom(): void {
-    const zoomEl = document.getElementById('status-zoom');
-    if (zoomEl) {
-      zoomEl.innerText = `${Math.round(this.canvasMgr.zoom * 100)}%`;
-    }
+    this.viewportCtrl.updateStatusZoom();
   }
 
   private notifyReady(): void {
-    vscode.postMessage({ type: 'ready' });
+    this.vscodeBridge.notifyReady();
   }
 
   private syncToHost(): void {
-    this.isUpdatingFromWebview = true;
     const svgText = this.model.toSvgString();
-    vscode.postMessage({ type: 'updateDocument', text: svgText });
+    this.vscodeBridge.updateDocument(svgText);
     this.syncMetadataToHost();
   }
 
@@ -952,22 +781,19 @@ class AntiDrawApp {
    *    all workspace customizations survive session restarts without polluting the vector graphic.
    */
   private syncMetadataToHost(): void {
-    vscode.postMessage({
-      type: 'updateMetadata',
-      metadata: {
-        grids: this.canvasMgr.grids,
-        guides: this.canvasMgr.guides,
-        ruler: this.canvasMgr.rulerConfig,
-        showRulers: this.canvasMgr.showRulers,
-        showGrid: this.canvasMgr.showGrid,
-        showGuides: this.canvasMgr.showGuides,
-        gridSpacing: this.canvasMgr.gridSpacing,
-        snapToGrid: this.canvasMgr.snapToGrid,
-        snapToGuides: this.canvasMgr.snapToGuides,
-        snapToVertices: this.canvasMgr.snapToVertices,
-        snapToViewBox: this.canvasMgr.snapToViewBox,
-        shapeConfig: this.canvasMgr.shapeConfig,
-      },
+    this.vscodeBridge.updateMetadata({
+      grids: this.canvasMgr.grids,
+      guides: this.canvasMgr.guides,
+      ruler: this.canvasMgr.rulerConfig,
+      showRulers: this.canvasMgr.showRulers,
+      showGrid: this.canvasMgr.showGrid,
+      showGuides: this.canvasMgr.showGuides,
+      gridSpacing: this.canvasMgr.gridSpacing,
+      snapToGrid: this.canvasMgr.snapToGrid,
+      snapToGuides: this.canvasMgr.snapToGuides,
+      snapToVertices: this.canvasMgr.snapToVertices,
+      snapToViewBox: this.canvasMgr.snapToViewBox,
+      shapeConfig: this.canvasMgr.shapeConfig,
     });
   }
 
@@ -985,7 +811,7 @@ class AntiDrawApp {
       left: 0;
       width: ${displayW}px;
       height: ${displayH}px;
-      transform: translate(${this.cameraOffset.x}px, ${this.cameraOffset.y}px);
+      transform: translate(${this.viewportCtrl.cameraOffset.x}px, ${this.viewportCtrl.cameraOffset.y}px);
       transform-origin: 0 0;
       background-color: #12131c;
       box-shadow: 0 12px 40px rgba(0,0,0,0.6);
@@ -1030,28 +856,7 @@ class AntiDrawApp {
   }
 
   private getCanvasPointFromClient(clientX: number, clientY: number): Point {
-    try {
-      const pt = this.svgCanvas.createSVGPoint();
-      pt.x = clientX;
-      pt.y = clientY;
-      const ctm = this.svgCanvas.getScreenCTM();
-      if (ctm) {
-        const transformed = pt.matrixTransform(ctm.inverse());
-        return { x: transformed.x, y: transformed.y };
-      }
-    } catch (_err) {}
-
-    // Fallback: read directly from active SVG viewBox baseVal
-    const rect = this.svgCanvas.getBoundingClientRect();
-    const vb = this.svgCanvas.viewBox.baseVal;
-    const vbX = vb ? vb.x : 0;
-    const vbY = vb ? vb.y : 0;
-    const vbW = vb && vb.width ? vb.width : rect.width;
-    const vbH = vb && vb.height ? vb.height : rect.height;
-    return {
-      x: vbX + (clientX - rect.left) * (vbW / (rect.width || 1)),
-      y: vbY + (clientY - rect.top) * (vbH / (rect.height || 1)),
-    };
+    return this.viewportCtrl.getCanvasPointFromClient(clientX, clientY);
   }
 
   private handleToolChange(tool: ToolType): void {
