@@ -191,7 +191,7 @@ export class PropertyPanel {
     } else if (selectedEls.length > 1) {
       this.currentPanelMode = 'multi';
       this.renderMultiElementProperties(selectedEls);
-    } else if (['rect', 'ellipse', 'star', 'line'].includes(this.activeTool)) {
+    } else if (['rect', 'ellipse', 'star'].includes(this.activeTool)) {
       this.currentPanelMode = 'shape';
       this.renderShapeToolProperties();
     } else {
@@ -768,8 +768,7 @@ export class PropertyPanel {
   private renderShapeToolProperties(): void {
     const toolName =
       this.activeTool === 'rect' ? 'Rectangle' :
-      this.activeTool === 'ellipse' ? 'Ellipse / Circle' :
-      this.activeTool === 'star' ? 'Star' : 'Line';
+      this.activeTool === 'ellipse' ? 'Ellipse / Circle' : 'Star';
 
     this.container.innerHTML = `
       <div class="panel-section">

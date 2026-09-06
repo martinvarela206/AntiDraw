@@ -23,9 +23,14 @@ import { Point, VectorElement, PathVertex } from '../engine/VectorModel.js';
  *      doubling dimensions and computing center `(cx, cy)` rather than corner-to-corner.
  *    - `ctrlKey`: Enforces an exact 1:1 square or circular aspect ratio (`targetW = targetH = max(rawW, rawH)`).
  *    - `altKey`: Constrains geometry to predefined user aspect ratios from `CanvasManager.shapeConfig`.
+ *
+ * ARCHITECTURAL NOTE ON LINE TOOL DEPRECATION:
+ * The legacy standalone 'line' tool has been deprecated and removed. Line creation is consolidated
+ * into PolylineToolHandler ('polyline'), which natively provides 2+ vertex straight-line construction,
+ * rubberband ghost previews, snapping to grids/guides/viewbox, and marker terminations without redundant code.
  */
 export class ShapeToolHandler implements IToolHandler {
-  public readonly toolTypes: ToolType[] = ['rect', 'ellipse', 'line', 'star'];
+  public readonly toolTypes: ToolType[] = ['rect', 'ellipse', 'star'];
   private ctx: ToolContext;
 
   public shapeStartPt: Point | null = null;
@@ -208,65 +213,37 @@ export class ShapeToolHandler implements IToolHandler {
     ctrlKey: boolean = false,
     altKey: boolean = false
   ): VectorElement {
-    const isLine = tool === 'line';
-    const isClosed = !isLine;
+    // All primitives managed by ShapeToolHandler ('rect', 'ellipse', 'star') are closed geometric paths.
+    // Open straight paths are handled exclusively by PolylineToolHandler, eliminating branching and redundant code.
+    const isClosed = true;
     let vertices: PathVertex[] = [];
 
-    if (isLine) {
-      let pStart = start;
-      let pEnd = current;
-      if (shiftKey) {
-        const dx = current.x - start.x;
-        const dy = current.y - start.y;
-        pStart = { x: start.x - dx, y: start.y - dy };
-        pEnd = { x: start.x + dx, y: start.y + dy };
-      }
-      if (ctrlKey) {
-        const dx = pEnd.x - pStart.x;
-        const dy = pEnd.y - pStart.y;
-        const len = Math.hypot(dx, dy);
-        let angle = Math.atan2(dy, dx);
-        const snap = Math.PI / 4;
-        angle = Math.round(angle / snap) * snap;
-        pEnd = {
-          x: pStart.x + len * Math.cos(angle),
-          y: pStart.y + len * Math.sin(angle),
-        };
-      }
-      vertices = this.ctx.model.convertShapeToVertices('line', {
-        x1: pStart.x.toString(),
-        y1: pStart.y.toString(),
-        x2: pEnd.x.toString(),
-        y2: pEnd.y.toString(),
-      });
-    } else {
-      const bounds = this.calculateShapeBounds(start, current, shiftKey, ctrlKey, altKey);
+    const bounds = this.calculateShapeBounds(start, current, shiftKey, ctrlKey, altKey);
 
-      if (tool === 'rect') {
-        vertices = this.ctx.model.convertShapeToVertices('rect', {
-          x: bounds.x.toString(),
-          y: bounds.y.toString(),
-          width: bounds.w.toString(),
-          height: bounds.h.toString(),
-          rx: (this.ctx.canvasMgr.shapeConfig?.rectCornerRadius || 0).toString(),
-        });
-      } else if (tool === 'ellipse') {
-        vertices = this.ctx.model.convertShapeToVertices('ellipse', {
-          cx: bounds.cx.toString(),
-          cy: bounds.cy.toString(),
-          rx: bounds.rx.toString(),
-          ry: bounds.ry.toString(),
-        });
-      } else if (tool === 'star') {
-        vertices = this.ctx.model.convertShapeToVertices('star', {
-          cx: bounds.cx.toString(),
-          cy: bounds.cy.toString(),
-          rx: bounds.rx.toString(),
-          ry: bounds.ry.toString(),
-          points: (this.ctx.canvasMgr.shapeConfig?.starPoints || 5).toString(),
-          innerRatio: (this.ctx.canvasMgr.shapeConfig?.starInnerRatio || 0.4).toString(),
-        });
-      }
+    if (tool === 'rect') {
+      vertices = this.ctx.model.convertShapeToVertices('rect', {
+        x: bounds.x.toString(),
+        y: bounds.y.toString(),
+        width: bounds.w.toString(),
+        height: bounds.h.toString(),
+        rx: (this.ctx.canvasMgr.shapeConfig?.rectCornerRadius || 0).toString(),
+      });
+    } else if (tool === 'ellipse') {
+      vertices = this.ctx.model.convertShapeToVertices('ellipse', {
+        cx: bounds.cx.toString(),
+        cy: bounds.cy.toString(),
+        rx: bounds.rx.toString(),
+        ry: bounds.ry.toString(),
+      });
+    } else if (tool === 'star') {
+      vertices = this.ctx.model.convertShapeToVertices('star', {
+        cx: bounds.cx.toString(),
+        cy: bounds.cy.toString(),
+        rx: bounds.rx.toString(),
+        ry: bounds.ry.toString(),
+        points: (this.ctx.canvasMgr.shapeConfig?.starPoints || 5).toString(),
+        innerRatio: (this.ctx.canvasMgr.shapeConfig?.starInnerRatio || 0.4).toString(),
+      });
     }
 
     const d = this.ctx.model.compilePathD(vertices, isClosed);

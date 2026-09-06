@@ -7,7 +7,6 @@ export type ToolType =
   | 'pen'
   | 'rect'
   | 'ellipse'
-  | 'line'
   | 'star'
   | 'addVertex'
   | 'canvas'
@@ -43,7 +42,6 @@ export class Toolbar {
       { id: 'pen', title: 'Bézier Curve Tool (P)', icon: ToolIcons.pen },
       { id: 'rect', title: 'Rectangle Tool (R)', icon: ToolIcons.rect },
       { id: 'ellipse', title: 'Ellipse/Circle Tool (E)', icon: ToolIcons.ellipse },
-      { id: 'line', title: 'Line Tool (L)', icon: ToolIcons.line },
       { id: 'star', title: 'Star/Polygon Tool (S)', icon: ToolIcons.star },
       { id: 'addVertex', title: 'Add Vertex Tool (+)', icon: ToolIcons.addVertex },
       { id: 'canvas', title: 'Canvas Tool (C)', icon: ToolIcons.canvas },

@@ -28,21 +28,32 @@ This file contains rules specific to the AntiDraw project. Rules are written in 
 
 ---
 
+## Architectural Componentization & Proactive Refactoring
+
+5. **Strict Componentization & Refactoring Prioritization**:
+   - Every feature, UI panel, tool handler, and engine subsystem must remain strictly modular and componentized.
+   - If any component, class, or handler grows too large, acquires excessive complexity, or violates single-responsibility principles, a dedicated refactoring task MUST immediately be added and prioritized at the top of `Docs/TODO.md`.
+
+---
+
 ## Multi-Item Prompt Decomposition & Atomic Loop Execution
 
-5. **Mandatory Decomposition of Multi-Item Prompts**:
-   - Whenever the user prompt contains multiple tasks, bullet points, fixes, additions, or removals (2 or more distinct items):
+6. **Dynamic Task Ingestion into `Docs/TODO.md`**:
+   - Whenever a user prompt mentions, enumerates, or identifies problems, bugs, corrections, missing functionality, or new features, these items MUST immediately be cataloged and added to `Docs/TODO.md` before execution.
+
+7. **Mandatory Decomposition of Multi-Item Prompts**:
+   - Whenever the prompt or active TODO list contains multiple tasks, bullet points, fixes, additions, or removals (2 or more distinct items):
      - **NEVER** bundle, combine, or resolve multiple items together in a single step, file edit block, version bump, or commit.
-     - You MUST immediately decompose the prompt into an ordered list of individual, discrete items.
+     - You MUST immediately decompose the work into an ordered list of individual, discrete items.
      - Evaluate and classify each item individually before executing it:
        - If the feature already exists partially, or has defects/modifications: classify as `fix`.
        - If the capability is completely new and did not exist before: classify as `feat`.
 
-6. **Strict Sequential Atomic Execution Loop**:
+8. **Strict Sequential Atomic Execution Loop**:
    - Execute items sequentially, one by one, completing the entire cycle for each item before touching the next:
      1. **Implement Code**: Make code changes strictly for the single active item.
      2. **Update Documentation**:
-        - **Clean `Docs/TODO.md`**: Completely DELETE/REMOVE the corresponding solved or completed item from `Docs/TODO.md` (both from the roadmap and the gap analysis table). NEVER leave items marked with checkboxes (`[x]`); `Docs/TODO.md` must remain strictly clean and contain only active, pending tasks.
+        - **Clean `Docs/TODO.md`**: Completely DELETE/REMOVE the corresponding solved or completed item from `Docs/TODO.md` (both from the roadmap and the gap analysis table). NEVER leave items marked with checkboxes (`[x]`); `Docs/TODO.md` must remain strictly clean, with the ultimate objective of achieving a zero-item (empty) TODO.
         - **Update Catalog**: Update `Docs/Descripción de las herramientas.md` with relevant functional details for this item.
      3. **Version Bump**: Increment `package.json` (`patch` for `fix`, `minor` for `feat`).
      4. **Build & Package**: Run `pnpm run package` to compile and create the `.vsix` artifact for that specific version.
@@ -56,7 +67,7 @@ This file contains rules specific to the AntiDraw project. Rules are written in 
 
 ## Code Hygiene & Architectural Rationale
 
-7. **Mandatory In-Code Rationale & Technical Solution Comments**:
+9. **Mandatory In-Code Rationale & Technical Solution Comments**:
    - Whenever a specific technical solution, algorithm, non-obvious workaround, or architectural choice is implemented in code, comprehensive comments MUST be placed directly in the code explaining the exact rationale:
      - **Why it was built this way and not another** (the underlying technical justification).
      - **Which edge cases, race conditions, focus/blur quirks, or numerical stability issues it solves**.

@@ -877,7 +877,7 @@ class AntiDrawApp {
     if (tool !== 'polyline') {
       this.polylineToolHandler.deactivate();
     }
-    if (!['rect', 'ellipse', 'line', 'star'].includes(tool)) {
+    if (!['rect', 'ellipse', 'star'].includes(tool)) {
       this.shapeToolHandler.cancel();
     }
     if (tool !== 'pen') {
@@ -980,7 +980,7 @@ class AntiDrawApp {
       if (this.nodeToolHandler.onPointerDown(e, pt)) {
         return;
       }
-    } else if (['rect', 'ellipse', 'line', 'star'].includes(activeTool)) {
+    } else if (['rect', 'ellipse', 'star'].includes(activeTool)) {
       if (this.shapeToolHandler.onPointerDown(e, pt)) {
         this.activeHandle = 'shape';
         return;
