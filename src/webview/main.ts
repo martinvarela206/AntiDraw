@@ -388,6 +388,7 @@ class AntiDrawApp {
         },
         onBoolean: (op) => this.handleBoolean(op),
         onStrokeToPath: () => this.handleStrokeToPath(),
+        onPushUndo: () => this.pushUndo(),
       }
     );
   }
@@ -1467,6 +1468,10 @@ class AntiDrawApp {
         if (el.attributes.y) el.attributes.y = (parseFloat(el.attributes.y) + offset).toString();
         if (el.attributes.cx) el.attributes.cx = (parseFloat(el.attributes.cx) + offset).toString();
         if (el.attributes.cy) el.attributes.cy = (parseFloat(el.attributes.cy) + offset).toString();
+
+        if (el.attributes['filter'] && el.attributes['filter'].includes('ad-filter-shadow-')) {
+          el.attributes['filter'] = `url(#ad-filter-shadow-${el.id})`;
+        }
 
         return el;
       });

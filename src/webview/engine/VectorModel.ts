@@ -36,6 +36,24 @@ export interface CanvasSettings {
   backgroundColor: string;
 }
 
+export interface DropShadowConfig {
+  enabled: boolean;
+  dx: number;
+  dy: number;
+  blur: number;
+  color: string;
+  opacity: number;
+}
+
+export interface InnerShadowConfig {
+  enabled: boolean;
+  dx: number;
+  dy: number;
+  blur: number;
+  color: string;
+  opacity: number;
+}
+
 /**
  * ARCHITECTURAL RATIONALE: Standard SVG Marker Catalog (<marker>)
  * 
@@ -163,6 +181,7 @@ export class VectorModel {
           const m = clone.querySelector(`#${id}`);
           if (m) m.remove();
         });
+        clone.querySelectorAll('[id^="ad-filter-"]').forEach((f) => f.remove());
         this.customDefs = clone.innerHTML.trim();
       } else {
         this.customDefs = '';
@@ -177,6 +196,26 @@ export class VectorModel {
           for (let i = 0; i < child.attributes.length; i++) {
             const attr = child.attributes[i];
             attrs[attr.name] = attr.value;
+          }
+
+          // Import drop-shadow metadata from external <feDropShadow> filter if not already stored
+          if (!attrs['data-drop-shadow'] && attrs['filter'] && defsEl) {
+            const match = attrs['filter'].match(/url\(#([^)]+)\)/);
+            if (match) {
+              const filterId = match[1];
+              const filterEl = defsEl.querySelector(`#${filterId}`);
+              if (filterEl) {
+                const dropEl = filterEl.querySelector('feDropShadow');
+                if (dropEl) {
+                  const dx = parseFloat(dropEl.getAttribute('dx') || '4') || 4;
+                  const dy = parseFloat(dropEl.getAttribute('dy') || '4') || 4;
+                  const blur = parseFloat(dropEl.getAttribute('stdDeviation') || '4') || 4;
+                  const color = dropEl.getAttribute('flood-color') || '#000000';
+                  const opacity = parseFloat(dropEl.getAttribute('flood-opacity') || '0.5') || 0.5;
+                  attrs['data-drop-shadow'] = JSON.stringify({ enabled: true, dx, dy, blur, color, opacity });
+                }
+              }
+            }
           }
 
           if (!attrs.id) {
@@ -215,6 +254,69 @@ export class VectorModel {
     }
   }
 
+  /**
+   * ARCHITECTURAL RATIONALE: Dynamic SVG Filter Compilation
+   * Why this exists:
+   * Generates hardware-accelerated SVG <filter> definitions for Drop Shadow and Inner Shadow
+   * directly within <defs>, binding them to elements via `filter="url(#ad-filter-shadow-${id})"`.
+   *
+   * Technical Justification & Edge Cases:
+   * 1. feDropShadow is used for drop shadow as it is natively supported by modern SVG2 renderers
+   *    and runs on the GPU.
+   * 2. Inner Shadow is constructed using a composite inversion pipeline (SourceAlpha out offset -> blur -> flood -> in SourceAlpha).
+   *    Alternative considered: Inset box-shadow CSS. Discarded because CSS box-shadow does not conform to
+   *    arbitrary vector path outlines (Bézier curves, polygons, stars) and is ignored in standalone SVG files.
+   * 3. Both shadows can coexist simultaneously on a single element through chained feComposite over operations.
+   */
+  public compileElementFilters(): string {
+    let out = '';
+    this.elements.forEach((el) => {
+      const dsStr = el.attributes['data-drop-shadow'];
+      const isStr = el.attributes['data-inner-shadow'];
+      let ds: DropShadowConfig | null = null;
+      let is: InnerShadowConfig | null = null;
+      try {
+        if (dsStr) ds = JSON.parse(dsStr);
+      } catch {}
+      try {
+        if (isStr) is = JSON.parse(isStr);
+      } catch {}
+
+      const hasDs = !!(ds && ds.enabled);
+      const hasIs = !!(is && is.enabled);
+
+      if (!hasDs && !hasIs) return;
+
+      const filterId = `ad-filter-shadow-${el.id}`;
+      // Generous filter region prevents clipping blurred shadow margins
+      out += `    <filter id="${filterId}" x="-50%" y="-50%" width="200%" height="200%">\n`;
+
+      if (hasDs && !hasIs) {
+        out += `      <feDropShadow dx="${ds!.dx}" dy="${ds!.dy}" stdDeviation="${ds!.blur}" flood-color="${ds!.color}" flood-opacity="${ds!.opacity}" />\n`;
+      } else if (!hasDs && hasIs) {
+        out += `      <feOffset dx="${is!.dx}" dy="${is!.dy}" in="SourceAlpha" result="offset-alpha" />\n`;
+        out += `      <feComposite operator="out" in="SourceAlpha" in2="offset-alpha" result="inverse-alpha" />\n`;
+        out += `      <feGaussianBlur in="inverse-alpha" stdDeviation="${is!.blur}" result="blurred-shadow" />\n`;
+        out += `      <feFlood flood-color="${is!.color}" flood-opacity="${is!.opacity}" result="shadow-color" />\n`;
+        out += `      <feComposite operator="in" in="shadow-color" in2="blurred-shadow" result="colored-shadow" />\n`;
+        out += `      <feComposite operator="in" in="colored-shadow" in2="SourceAlpha" result="clipped-inner-shadow" />\n`;
+        out += `      <feComposite operator="over" in="clipped-inner-shadow" in2="SourceGraphic" />\n`;
+      } else if (hasDs && hasIs) {
+        out += `      <feDropShadow dx="${ds!.dx}" dy="${ds!.dy}" stdDeviation="${ds!.blur}" flood-color="${ds!.color}" flood-opacity="${ds!.opacity}" result="drop-shadow-graphic" />\n`;
+        out += `      <feOffset dx="${is!.dx}" dy="${is!.dy}" in="SourceAlpha" result="offset-alpha" />\n`;
+        out += `      <feComposite operator="out" in="SourceAlpha" in2="offset-alpha" result="inverse-alpha" />\n`;
+        out += `      <feGaussianBlur in="inverse-alpha" stdDeviation="${is!.blur}" result="blurred-shadow" />\n`;
+        out += `      <feFlood flood-color="${is!.color}" flood-opacity="${is!.opacity}" result="shadow-color" />\n`;
+        out += `      <feComposite operator="in" in="shadow-color" in2="blurred-shadow" result="colored-shadow" />\n`;
+        out += `      <feComposite operator="in" in="colored-shadow" in2="SourceAlpha" result="clipped-inner-shadow" />\n`;
+        out += `      <feComposite operator="over" in="clipped-inner-shadow" in2="drop-shadow-graphic" />\n`;
+      }
+
+      out += `    </filter>\n`;
+    });
+    return out;
+  }
+
   public toSvgString(): string {
     const { width, height, viewBox, backgroundColor } = this.canvas;
     let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${viewBox}" style="background-color: ${backgroundColor};">\n`;
@@ -223,11 +325,15 @@ export class VectorModel {
     const hasMarkers = this.elements.some(
       (el) => !!(el.attributes['marker-start'] || el.attributes['marker-mid'] || el.attributes['marker-end'])
     );
+    const filterDefs = this.compileElementFilters();
 
-    if (hasMarkers || (this.customDefs && this.customDefs.length > 0)) {
-      svg += `  <defs id="antidraw-marker-defs">\n`;
+    if (hasMarkers || filterDefs.length > 0 || (this.customDefs && this.customDefs.length > 0)) {
+      svg += `  <defs id="antidraw-defs">\n`;
       if (hasMarkers) {
         svg += STANDARD_MARKERS_INNER_XML;
+      }
+      if (filterDefs.length > 0) {
+        svg += filterDefs;
       }
       if (this.customDefs && this.customDefs.length > 0) {
         svg += `    ${this.customDefs}\n`;
