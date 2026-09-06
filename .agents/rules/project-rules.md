@@ -42,8 +42,8 @@ This file contains rules specific to the AntiDraw project. Rules are written in 
    - Execute items sequentially, one by one, completing the entire cycle for each item before touching the next:
      1. **Implement Code**: Make code changes strictly for the single active item.
      2. **Update Documentation**:
-        - Remove or mark complete the corresponding item in `Docs/TODO.md`.
-        - Update `Docs/Descripción de las herramientas.md` with relevant functional details for this item.
+        - **Clean `Docs/TODO.md`**: Completely DELETE/REMOVE the corresponding solved or completed item from `Docs/TODO.md` (both from the roadmap and the gap analysis table). NEVER leave items marked with checkboxes (`[x]`); `Docs/TODO.md` must remain strictly clean and contain only active, pending tasks.
+        - **Update Catalog**: Update `Docs/Descripción de las herramientas.md` with relevant functional details for this item.
      3. **Version Bump**: Increment `package.json` (`patch` for `fix`, `minor` for `feat`).
      4. **Build & Package**: Run `pnpm run package` to compile and create the `.vsix` artifact for that specific version.
      5. **Atomic Commit**: Stage files and commit with simple conventional format:
