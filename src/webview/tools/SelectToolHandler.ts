@@ -102,11 +102,10 @@ export class SelectToolHandler implements IToolHandler {
           return true;
         }
 
-        // Check click anywhere on the active transforming guide line away from the pivot
+        // Check click anywhere on the active transforming guide line away from the pivot & arrows: drag to move
         const hitActive = this.ctx.canvasMgr.hitTestGuide(pt, this.ctx.model.canvas.width, this.ctx.model.canvas.height, 8);
         if (hitActive && hitActive.id === activeG.id) {
-          this.activeHandle = 'guide-rotate';
-          this.activeRotateArrowIdx = 1;
+          this.activeHandle = 'guide-move';
           this.guideInitialState = { ...activeG };
           this.ctx.render();
           return true;
@@ -115,12 +114,11 @@ export class SelectToolHandler implements IToolHandler {
     }
 
     // 2. Check if clicking on any Guide Line to select it and activate rotation controls immediately
-    // ARCHITECTURAL RATIONALE: Instant Guide Transformation on Single Click
-    // In earlier versions, guide rotation controls (pivot and curved arrows) required an explicit
-    // double-click gesture. This caused friction and broke expected workflow where clicking, holding,
-    // and dragging a guide line directly performs angular rotation, while dragging the central pivot
-    // translates its center of rotation. Activating `activeGuideTransformId` and assigning
-    // `activeHandle = 'guide-rotate'` on first click ensures instant feedback and interactive rotation.
+    // ARCHITECTURAL RATIONALE: Differentiated Guide Transformation & Translation
+    // Clicking on the central pivot node translates the pivot ('guide-pivot').
+    // Clicking on the outer curved arrows activates rotational angle steering ('guide-rotate').
+    // Clicking anywhere on the remaining body of the guide line executes parallel translation ('guide-move').
+    // This resolves the ambiguity where attempting to translate a guideline inadvertently spun it off-axis.
     const hitGuide = this.ctx.canvasMgr.hitTestGuide(pt, this.ctx.model.canvas.width, this.ctx.model.canvas.height, 8);
     if (hitGuide) {
       this.ctx.selectionTool.deselectAll();
@@ -132,13 +130,18 @@ export class SelectToolHandler implements IToolHandler {
       const geom = this.ctx.canvasMgr.getGuideGeometry(hitGuide, this.ctx.model.canvas.width, this.ctx.model.canvas.height);
       if (Math.hypot(pt.x - geom.pivot.x, pt.y - geom.pivot.y) <= 14) {
         this.activeHandle = 'guide-pivot';
-      } else {
+      } else if (
+        Math.hypot(pt.x - geom.arrow1.x, pt.y - geom.arrow1.y) <= 16 ||
+        Math.hypot(pt.x - geom.arrow2.x, pt.y - geom.arrow2.y) <= 16
+      ) {
         this.activeHandle = 'guide-rotate';
         if (Math.hypot(pt.x - geom.arrow2.x, pt.y - geom.arrow2.y) <= 16) {
           this.activeRotateArrowIdx = 2;
         } else {
           this.activeRotateArrowIdx = 1;
         }
+      } else {
+        this.activeHandle = 'guide-move';
       }
 
       this.ctx.render();
@@ -346,7 +349,8 @@ export class SelectToolHandler implements IToolHandler {
           }
           const hitActive = this.ctx.canvasMgr.hitTestGuide(pt, this.ctx.model.canvas.width, this.ctx.model.canvas.height, 6);
           if (hitActive && hitActive.id === activeG.id) {
-            this.callbacks.setCursor?.('grab');
+            const cur = activeG.orientation === 'vertical' ? 'ew-resize' : activeG.orientation === 'horizontal' ? 'ns-resize' : 'crosshair';
+            this.callbacks.setCursor?.(cur);
             return true;
           }
         }
@@ -429,8 +433,9 @@ export class SelectToolHandler implements IToolHandler {
       const currentAngle = Math.atan2(pt.y - this.rotationPivot.y, pt.x - this.rotationPivot.x);
       let deltaAngle = currentAngle - this.initialRotationAngle;
 
-      // Snapping to 15-degree increments when Shift is held
-      if (e.shiftKey) {
+      // Snapping to 15-degree increments when Shift is held OR snapAngular is enabled
+      const shouldSnapAngular = this.ctx.canvasMgr.snapAngular || e.shiftKey;
+      if (shouldSnapAngular) {
         const step = (15 * Math.PI) / 180;
         deltaAngle = Math.round(deltaAngle / step) * step;
       }
@@ -448,29 +453,59 @@ export class SelectToolHandler implements IToolHandler {
       return true;
     }
 
+    /**
+     * ARCHITECTURAL RATIONALE: Magnetic Guideline Translation Snapping
+     *
+     * Why guidelines must query the unified snapping engine (snapPoint) with exclusion:
+     * 1. Multi-Target Snap: Horizontal & vertical guidelines respond seamlessly to grid lines,
+     *    viewBox frame edges/corners/center, other guidelines & intersections, and vector vertices.
+     * 2. Self-Snapping Prevention: Passing `g.id` as `excludeGuideId` prevents the guideline from
+     *    snapping to its own pre-drag position or creating artificial self-intersections.
+     * 3. Synchronized Pivot: When a guideline is translated, its pivot point translates solidarily
+     *    with the line so subsequent rotations stay anchored to the user's intended relative position.
+     */
     if (this.activeHandle === 'guide-move' && this.ctx.canvasMgr.selectedGuideId && this.guideInitialState) {
       const g = this.ctx.canvasMgr.getGuide(this.ctx.canvasMgr.selectedGuideId);
       if (g) {
+        const otherVertices = this.ctx.getOtherVertices();
         if (g.orientation === 'horizontal') {
-          g.position = Math.round(this.guideInitialState.position + dy);
+          const rawTarget: Point = { x: pt.x, y: this.guideInitialState.position + dy };
+          const snapped = this.ctx.snapPoint(rawTarget, otherVertices, g.id);
+          g.position = Math.round(snapped.y);
           g.pivotY = g.position;
         } else if (g.orientation === 'vertical') {
-          g.position = Math.round(this.guideInitialState.position + dx);
+          const rawTarget: Point = { x: this.guideInitialState.position + dx, y: pt.y };
+          const snapped = this.ctx.snapPoint(rawTarget, otherVertices, g.id);
+          g.position = Math.round(snapped.x);
           g.pivotX = g.position;
         } else {
-          g.pivotX = Math.round((this.guideInitialState.pivotX || 0) + dx);
-          g.pivotY = Math.round((this.guideInitialState.pivotY || 0) + dy);
+          const rawTarget: Point = {
+            x: (this.guideInitialState.pivotX || 0) + dx,
+            y: (this.guideInitialState.pivotY || 0) + dy,
+          };
+          const snapped = this.ctx.snapPoint(rawTarget, otherVertices, g.id);
+          g.pivotX = Math.round(snapped.x);
+          g.pivotY = Math.round(snapped.y);
         }
       }
       this.ctx.render();
       return true;
     }
 
+    /**
+     * ARCHITECTURAL RATIONALE: Magnetic Guide Pivot Snapping
+     *
+     * Dragging the pivot node of a guideline allows positioning the center of rotation at precise
+     * geometric coordinates (such as vector vertices, grid intersections, or artboard boundaries).
+     * Passing `g.id` prevents self-intersection locking.
+     */
     if (this.activeHandle === 'guide-pivot' && this.ctx.canvasMgr.selectedGuideId) {
       const g = this.ctx.canvasMgr.getGuide(this.ctx.canvasMgr.selectedGuideId);
       if (g) {
-        g.pivotX = Math.round(pt.x);
-        g.pivotY = Math.round(pt.y);
+        const otherVertices = this.ctx.getOtherVertices();
+        const snapped = this.ctx.snapPoint(pt, otherVertices, g.id);
+        g.pivotX = Math.round(snapped.x);
+        g.pivotY = Math.round(snapped.y);
         if (g.orientation === 'horizontal') g.position = g.pivotY;
         if (g.orientation === 'vertical') g.position = g.pivotX;
       }
@@ -478,6 +513,13 @@ export class SelectToolHandler implements IToolHandler {
       return true;
     }
 
+    /**
+     * ARCHITECTURAL RATIONALE: 15-Degree Angular Snapping on Guidelines
+     *
+     * Guidelines can be spun around their pivot point. When `snapAngular` is enabled in TopBar
+     * or when the user holds `Shift`, rotation snaps to exact multiples of 15° (0°, 15°, 30°, 45°, 60°...).
+     * Otherwise, soft threshold snapping (3°) snaps to primary cardinal/diagonal angles (0, 45, 90...).
+     */
     if (this.activeHandle === 'guide-rotate' && this.ctx.canvasMgr.selectedGuideId) {
       this.callbacks.setCursor?.('grabbing');
       const g = this.ctx.canvasMgr.getGuide(this.ctx.canvasMgr.selectedGuideId);
@@ -488,12 +530,19 @@ export class SelectToolHandler implements IToolHandler {
         let deg = Math.round((angleRad * 180) / Math.PI);
         if (deg < 0) deg += 360;
 
-        // Snap angle to 0, 45, 90, 135, 180, 225, 270, 315 if within 3 degrees
-        const snapAngles = [0, 45, 90, 135, 180, 225, 270, 315, 360];
-        for (const sa of snapAngles) {
-          if (Math.abs(deg - sa) <= 3) {
-            deg = sa % 360;
-            break;
+        const shouldSnapAngular = this.ctx.canvasMgr.snapAngular || e.shiftKey;
+        if (shouldSnapAngular) {
+          // Strict 15-degree magnetic snapping
+          deg = Math.round(deg / 15) * 15;
+          deg = deg % 360;
+        } else {
+          // Soft snapping within 3 degrees for primary orthogonal / diagonal angles
+          const snapAngles = [0, 45, 90, 135, 180, 225, 270, 315, 360];
+          for (const sa of snapAngles) {
+            if (Math.abs(deg - sa) <= 3) {
+              deg = sa % 360;
+              break;
+            }
           }
         }
 

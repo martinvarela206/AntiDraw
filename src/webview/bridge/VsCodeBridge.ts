@@ -33,6 +33,7 @@ export interface CompanionMetadata {
   snapToGuides?: boolean;
   snapToVertices?: boolean;
   snapToViewBox?: boolean;
+  snapAngular?: boolean;
   shapeConfig?: any;
   [key: string]: any;
 }

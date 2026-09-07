@@ -106,6 +106,15 @@ export const ToolIcons = {
     <path d="M12 9v6M9 12h6" stroke-width="1.5"/>
   </svg>`,
 
+  snapAngular: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+    <line x1="4" y1="20" x2="20" y2="20"/>
+    <line x1="4" y1="20" x2="18" y2="6"/>
+    <path d="M11 20a7 7 0 0 0-4-6.2" stroke-width="1.5"/>
+    <circle cx="18" cy="6" r="1.5" fill="currentColor"/>
+    <circle cx="4" cy="20" r="1.5" fill="currentColor"/>
+    <path d="M14 13l2-2" stroke-width="1.5" stroke-dasharray="1 1"/>
+  </svg>`,
+
   // Boolean Ops
   union: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
     <rect x="4" y="4" width="11" height="11" rx="1"/>

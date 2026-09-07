@@ -129,6 +129,7 @@ export class CanvasManager {
   public snapToGuides: boolean = false;
   public snapToVertices: boolean = false;
   public snapToViewBox: boolean = false;
+  public snapAngular: boolean = false;
   public snapThreshold: number = 5; // 5px proximity threshold
 
   // By default, no guide lines exist
@@ -170,12 +171,30 @@ export class CanvasManager {
   public selectedGuideId: string | null = null;
   public activeGuideTransformId: string | null = null;
 
-  // Snap point to active vertices, guide lines / guide intersections, viewBox frame / corners, or grid lines / grid intersections (3px proximity)
+  /**
+   * ARCHITECTURAL RATIONALE: Unified Magnetic Snapping Engine (snapPoint)
+   *
+   * 1. Multi-Target Snap Hierarchy:
+   *    Vertices > Guide Lines & Intersections > ViewBox Frame & Keypoints > Parametric Grids.
+   *
+   * 2. 1D Coordinate Snapping for Infinite Guides & Axial Alignment:
+   *    Horizontal guidelines span Y exclusively, and vertical guidelines span X exclusively.
+   *    If only 2D distance (Math.hypot) were evaluated, dragging a horizontal guide across the canvas
+   *    would only snap if the cursor happened to be within threshold pixels of a vertex in BOTH X and Y.
+   *    By adding secondary 1D coordinate checks, guidelines and aligned elements snap magnetically
+   *    to any vertex matching their orthogonal coordinate across the entire canvas span.
+   *
+   * 3. Self-Snapping Glitch Prevention via excludeGuideId:
+   *    When translating or adjusting the pivot of an existing guide line, testing against `this.guides`
+   *    without exclusion causes the guide to snap to its own stale pre-drag coordinate or register
+   *    degenerate self-intersections. Passing `excludeGuideId` skips the active guide cleanly.
+   */
   public snapPoint(
     pt: Point,
     otherVertices: Point[] = [],
     origin?: Point,
-    viewBoxBounds?: { minX: number; minY: number; width: number; height: number }
+    viewBoxBounds?: { minX: number; minY: number; width: number; height: number },
+    excludeGuideId?: string
   ): Point {
     let snappedX = pt.x;
     let snappedY = pt.y;
@@ -195,7 +214,42 @@ export class CanvasManager {
         }
       }
       if (bestVertex) {
-        return { x: bestVertex.x, y: bestVertex.y };
+        snappedX = bestVertex.x;
+        snappedY = bestVertex.y;
+        xSnapped = true;
+        ySnapped = true;
+      } else {
+        // 1b. Check 1D coordinate alignment to vertices if not snapped to a 2D keypoint
+        if (!xSnapped) {
+          let minXDist = threshold;
+          let bestX: number | null = null;
+          for (const v of otherVertices) {
+            const dx = Math.abs(pt.x - v.x);
+            if (dx <= minXDist) {
+              minXDist = dx;
+              bestX = v.x;
+            }
+          }
+          if (bestX !== null) {
+            snappedX = bestX;
+            xSnapped = true;
+          }
+        }
+        if (!ySnapped) {
+          let minYDist = threshold;
+          let bestY: number | null = null;
+          for (const v of otherVertices) {
+            const dy = Math.abs(pt.y - v.y);
+            if (dy <= minYDist) {
+              minYDist = dy;
+              bestY = v.y;
+            }
+          }
+          if (bestY !== null) {
+            snappedY = bestY;
+            ySnapped = true;
+          }
+        }
       }
     }
 
@@ -207,10 +261,10 @@ export class CanvasManager {
 
       for (let i = 0; i < this.guides.length; i++) {
         const g1 = this.guides[i];
-        if (g1.visible === false) continue;
+        if (g1.visible === false || g1.id === excludeGuideId) continue;
         for (let j = i + 1; j < this.guides.length; j++) {
           const g2 = this.guides[j];
-          if (g2.visible === false) continue;
+          if (g2.visible === false || g2.id === excludeGuideId) continue;
           const rad1 = ((g1.angle || 0) * Math.PI) / 180;
           const rad2 = ((g2.angle || 0) * Math.PI) / 180;
           const n1x = -Math.sin(rad1), n1y = Math.cos(rad1);
@@ -236,46 +290,55 @@ export class CanvasManager {
       }
 
       if (bestIntersection) {
-        return { x: bestIntersection.x, y: bestIntersection.y };
+        snappedX = bestIntersection.x;
+        snappedY = bestIntersection.y;
+        xSnapped = true;
+        ySnapped = true;
       }
 
       // 2b. Snap along single guide lines
-      let minLineDist = threshold;
-      let bestLineSnap: { x: number; y: number; orientation?: 'vertical' | 'horizontal' | 'angled'; angled?: boolean } | null = null;
+      if (!xSnapped || !ySnapped) {
+        let minLineDist = threshold;
+        let bestLineSnap: { x: number; y: number; orientation?: 'vertical' | 'horizontal' | 'angled'; angled?: boolean } | null = null;
 
-      for (const g of this.guides) {
-        if (g.visible === false) continue;
-        const rad = ((g.angle || 0) * Math.PI) / 180;
-        const nx = -Math.sin(rad);
-        const ny = Math.cos(rad);
-        const px = g.pivotX ?? (g.orientation === 'vertical' ? g.position : 0);
-        const py = g.pivotY ?? (g.orientation === 'horizontal' ? g.position : 0);
-        const dist = nx * (pt.x - px) + ny * (pt.y - py);
+        for (const g of this.guides) {
+          if (g.visible === false || g.id === excludeGuideId) continue;
+          const rad = ((g.angle || 0) * Math.PI) / 180;
+          const nx = -Math.sin(rad);
+          const ny = Math.cos(rad);
+          const px = g.pivotX ?? (g.orientation === 'vertical' ? g.position : 0);
+          const py = g.pivotY ?? (g.orientation === 'horizontal' ? g.position : 0);
+          const dist = nx * (pt.x - px) + ny * (pt.y - py);
 
-        if (Math.abs(dist) <= minLineDist) {
-          minLineDist = Math.abs(dist);
-          const isAngled = Math.abs((g.angle || 0) % 90) !== 0;
-          bestLineSnap = {
-            x: pt.x - dist * nx,
-            y: pt.y - dist * ny,
-            orientation: g.orientation,
-            angled: isAngled,
-          };
+          if (Math.abs(dist) <= minLineDist) {
+            minLineDist = Math.abs(dist);
+            const isAngled = Math.abs((g.angle || 0) % 90) !== 0;
+            bestLineSnap = {
+              x: pt.x - dist * nx,
+              y: pt.y - dist * ny,
+              orientation: g.orientation,
+              angled: isAngled,
+            };
+          }
         }
-      }
 
-      if (bestLineSnap) {
-        if (bestLineSnap.orientation === 'vertical' && !bestLineSnap.angled) {
-          snappedX = bestLineSnap.x;
-          xSnapped = true;
-        } else if (bestLineSnap.orientation === 'horizontal' && !bestLineSnap.angled) {
-          snappedY = bestLineSnap.y;
-          ySnapped = true;
-        } else {
-          snappedX = bestLineSnap.x;
-          snappedY = bestLineSnap.y;
-          xSnapped = true;
-          ySnapped = true;
+        if (bestLineSnap) {
+          if (bestLineSnap.orientation === 'vertical' && !bestLineSnap.angled) {
+            if (!xSnapped) {
+              snappedX = bestLineSnap.x;
+              xSnapped = true;
+            }
+          } else if (bestLineSnap.orientation === 'horizontal' && !bestLineSnap.angled) {
+            if (!ySnapped) {
+              snappedY = bestLineSnap.y;
+              ySnapped = true;
+            }
+          } else {
+            if (!xSnapped) snappedX = bestLineSnap.x;
+            if (!ySnapped) snappedY = bestLineSnap.y;
+            xSnapped = true;
+            ySnapped = true;
+          }
         }
       }
     }

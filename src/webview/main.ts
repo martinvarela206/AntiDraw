@@ -86,7 +86,7 @@ class AntiDrawApp {
       syncToHost: () => this.syncToHost(),
       render: () => this.render(),
       renderOverlay: () => this.renderOverlay(),
-      snapPoint: (pt, others) => this.snapPoint(pt, others),
+      snapPoint: (pt, others, excludeGuideId) => this.snapPoint(pt, others, excludeGuideId),
       getOtherVertices: () => this.getOtherVertices(),
       setTool: (t) => this.toolbar.setTool(t),
       getActiveTool: () => this.toolbar.activeTool,
@@ -237,6 +237,7 @@ class AntiDrawApp {
           if (type === 'guide') this.canvasMgr.snapToGuides = !this.canvasMgr.snapToGuides;
           if (type === 'vertex') this.canvasMgr.snapToVertices = !this.canvasMgr.snapToVertices;
           if (type === 'viewbox') this.canvasMgr.snapToViewBox = !this.canvasMgr.snapToViewBox;
+          if (type === 'angular') this.canvasMgr.snapAngular = !this.canvasMgr.snapAngular;
           this.topBar.update();
           this.syncMetadataToHost();
         },
@@ -418,6 +419,7 @@ class AntiDrawApp {
         if (payload.metadata.snapToGuides !== undefined) this.canvasMgr.snapToGuides = payload.metadata.snapToGuides;
         if (payload.metadata.snapToVertices !== undefined) this.canvasMgr.snapToVertices = payload.metadata.snapToVertices;
         if (payload.metadata.snapToViewBox !== undefined) this.canvasMgr.snapToViewBox = payload.metadata.snapToViewBox;
+        if (payload.metadata.snapAngular !== undefined) this.canvasMgr.snapAngular = payload.metadata.snapAngular;
         if (payload.metadata.shapeConfig) {
           this.canvasMgr.shapeConfig = { ...this.canvasMgr.shapeConfig, ...payload.metadata.shapeConfig };
         }
@@ -802,6 +804,7 @@ class AntiDrawApp {
       snapToGuides: this.canvasMgr.snapToGuides,
       snapToVertices: this.canvasMgr.snapToVertices,
       snapToViewBox: this.canvasMgr.snapToViewBox,
+      snapAngular: this.canvasMgr.snapAngular,
       shapeConfig: this.canvasMgr.shapeConfig,
     });
   }
@@ -851,13 +854,13 @@ class AntiDrawApp {
   }
 
   // Snap point accounting for dynamic ruler (0,0) origin offset and artboard viewBox bounds
-  private snapPoint(pt: Point, otherVertices: Point[] = []): Point {
+  private snapPoint(pt: Point, otherVertices: Point[] = [], excludeGuideId?: string): Point {
     const vb = this.model.getViewBoxBounds();
     const origin = {
       x: vb.minX + (this.canvasMgr.rulerConfig.originX || 0),
       y: vb.minY + (this.canvasMgr.rulerConfig.originY || 0),
     };
-    return this.canvasMgr.snapPoint(pt, otherVertices, origin, vb);
+    return this.canvasMgr.snapPoint(pt, otherVertices, origin, vb, excludeGuideId);
   }
 
   private getCanvasPoint(e: PointerEvent | MouseEvent): Point {
@@ -1057,7 +1060,8 @@ class AntiDrawApp {
 
     // Handle Guide creation preview from ruler drag
     if (this.activeHandle === 'guide-create') {
-      this.dragGuideCurrentPt = pt;
+      const allVerts = this.getOtherVertices();
+      this.dragGuideCurrentPt = this.snapPoint(pt, allVerts);
       this.renderOverlay();
       return;
     }
@@ -1127,11 +1131,13 @@ class AntiDrawApp {
     if (this.activeHandle === 'guide-create') {
       this.isDragging = false;
       const isHoriz = this.dragGuideOrientation === 'horizontal';
-      const pos = Math.round(isHoriz ? pt.y : pt.x);
+      const allVerts = this.getOtherVertices();
+      const snappedPt = this.snapPoint(pt, allVerts);
+      const pos = Math.round(isHoriz ? snappedPt.y : snappedPt.x);
 
       const isInside = isHoriz
-        ? pt.y >= 0 && pt.y <= this.model.canvas.height
-        : pt.x >= 0 && pt.x <= this.model.canvas.width;
+        ? pos >= 0 && pos <= this.model.canvas.height
+        : pos >= 0 && pos <= this.model.canvas.width;
 
       if (isInside) {
         const newG = this.canvasMgr.addGuide(
