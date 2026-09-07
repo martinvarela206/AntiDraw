@@ -1,5 +1,5 @@
 import polygonClipping, { MultiPolygon, Polygon, Ring, Pair } from 'polygon-clipping';
-import { VectorElement, PathVertex, VectorModel } from './VectorModel.js';
+import { VectorElement, PathVertex, VectorModel, Point } from './VectorModel.js';
 
 export interface TrimResult {
   trimmed: VectorElement;
@@ -937,6 +937,166 @@ export class BooleanOperations {
   }
 
   /**
+   * Helper to parse marker identifier from an attribute value like 'url(#ad-marker-arrow-filled-start)'
+   */
+  private static parseMarkerType(attrVal?: string): string {
+    if (!attrVal) return 'none';
+    const m = attrVal.match(/#ad-marker-([^'")\s]+)/);
+    if (!m) return 'none';
+    return m[1];
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: High-Fidelity SVG Marker Planar Geometry Extraction
+   *
+   * Why this solution is engineered this way:
+   * 1. Direct SVG Marker Coordinate Mapping:
+   *    In SVG standard (<marker markerUnits="strokeWidth">), markers are defined within a canonical
+   *    viewBox (e.g. 0 0 10 10) with an anchor reference point (refX, refY).
+   *    By mapping marker points (X, Y) through the 2D affine transformation:
+   *      x' = anchor.x + ((X - refX) * sx * cos - (Y - refY) * sy * sin)
+   *      y' = anchor.y + ((X - refX) * sx * sin + (Y - refY) * sy * cos)
+   *    the converted polygon precisely matches the onscreen position, scale, and orientation
+   *    rendered natively by the browser.
+   * 2. Planar Boolean Welded Unity:
+   *    Alternate approaches (such as creating separate child shapes in a group <g>) fail because
+   *    they leave overlapping geometries that do not behave as a single solid path for subsequent
+   *    booleans, fills, or node edits. Adding marker polygons directly to thickPolygons before
+   *    polygonClipping.union() ensures a single, continuous, non-self-intersecting closed vector.
+   * 3. Tangent Stability & Degeneracy Immunity:
+   *    If incoming/outgoing tangent vectors collapse to zero length (< 0.0001), fallback tangents
+   *    are computed from adjacent vertex chords or outgoing tangents, preventing NaN singularities.
+   */
+  private static createMarkerPolygons(
+    markerId: string,
+    anchor: Point,
+    tangent: Point,
+    strokeWidth: number
+  ): Polygon[] {
+    if (!markerId || markerId === 'none') return [];
+
+    const len = Math.hypot(tangent.x, tangent.y);
+    if (len < 0.0001) return [];
+    const cos = tangent.x / len;
+    const sin = tangent.y / len;
+
+    const transform = (X: number, Y: number, refX: number, refY: number, mw: number, mh: number): Pair => {
+      const sx = (mw / 10) * strokeWidth;
+      const sy = (mh / 10) * strokeWidth;
+      const dx = (X - refX) * sx;
+      const dy = (Y - refY) * sy;
+      return [
+        anchor.x + dx * cos - dy * sin,
+        anchor.y + dx * sin + dy * cos,
+      ];
+    };
+
+    const polys: Polygon[] = [];
+
+    if (markerId.startsWith('arrow-filled')) {
+      let pts: [number, number][];
+      let refX = 5;
+      let refY = 5;
+      const mw = 6;
+      const mh = 6;
+      if (markerId.includes('start')) {
+        refX = 1;
+        refY = 5;
+        pts = [[10, 1.5], [1, 5], [10, 8.5]];
+      } else if (markerId.includes('end')) {
+        refX = 9;
+        refY = 5;
+        pts = [[0, 1.5], [9, 5], [0, 8.5]];
+      } else {
+        // mid
+        refX = 5;
+        refY = 5;
+        pts = [[1, 1.5], [9, 5], [1, 8.5]];
+      }
+      const ring: Ring = pts.map(([x, y]) => transform(x, y, refX, refY, mw, mh));
+      ring.push([ring[0][0], ring[0][1]]);
+      polys.push([ring]);
+    } else if (markerId.startsWith('circle-dot')) {
+      const r = 3.5 * 0.5 * strokeWidth;
+      const steps = 16;
+      const ring: Ring = [];
+      for (let s = 0; s < steps; s++) {
+        const theta = (s / steps) * Math.PI * 2;
+        ring.push([anchor.x + r * Math.cos(theta), anchor.y + r * Math.sin(theta)]);
+      }
+      ring.push([ring[0][0], ring[0][1]]);
+      polys.push([ring]);
+    } else if (markerId.startsWith('square-block')) {
+      const refX = 5;
+      const refY = 5;
+      const mw = 5;
+      const mh = 5;
+      const corners: [number, number][] = [[2, 2], [8, 2], [8, 8], [2, 8]];
+      const ring: Ring = corners.map(([x, y]) => transform(x, y, refX, refY, mw, mh));
+      ring.push([ring[0][0], ring[0][1]]);
+      polys.push([ring]);
+    } else if (markerId.startsWith('bar-cap')) {
+      const isStart = markerId.includes('start');
+      const refX = isStart ? 2 : 8;
+      const refY = 5;
+      const mw = 5;
+      const mh = 6;
+      const corners: [number, number][] = [
+        [refX - 1, 1],
+        [refX + 1, 1],
+        [refX + 1, 9],
+        [refX - 1, 9],
+      ];
+      const ring: Ring = corners.map(([x, y]) => transform(x, y, refX, refY, mw, mh));
+      ring.push([ring[0][0], ring[0][1]]);
+      polys.push([ring]);
+    } else if (markerId.startsWith('arrow-open')) {
+      const isStart = markerId.includes('start');
+      const refX = isStart ? 1 : 9;
+      const refY = 5;
+      const mw = 6;
+      const mh = 6;
+      const vPts: [number, number][] = isStart
+        ? [[9, 1.5], [1, 5], [9, 8.5]]
+        : [[1, 1.5], [9, 5], [1, 8.5]];
+
+      const p0 = transform(vPts[0][0], vPts[0][1], refX, refY, mw, mh);
+      const p1 = transform(vPts[1][0], vPts[1][1], refX, refY, mw, mh);
+      const p2 = transform(vPts[2][0], vPts[2][1], refX, refY, mw, mh);
+      const legThickness = 1.8 * 0.6 * strokeWidth;
+      const halfLeg = legThickness / 2;
+
+      const extrudeLeg = (a: Pair, b: Pair): Polygon => {
+        const ldx = b[0] - a[0];
+        const ldy = b[1] - a[1];
+        const llen = Math.hypot(ldx, ldy) || 1;
+        const lnx = (-ldy / llen) * halfLeg;
+        const lny = (ldx / llen) * halfLeg;
+        return [[
+          [a[0] + lnx, a[1] + lny],
+          [b[0] + lnx, b[1] + lny],
+          [b[0] - lnx, b[1] - lny],
+          [a[0] - lnx, a[1] - lny],
+          [a[0] + lnx, a[1] + lny],
+        ]];
+      };
+
+      polys.push(extrudeLeg(p0, p1));
+      polys.push(extrudeLeg(p1, p2));
+      const discSteps = 12;
+      const tipRing: Ring = [];
+      for (let s = 0; s < discSteps; s++) {
+        const th = (s / discSteps) * Math.PI * 2;
+        tipRing.push([p1[0] + halfLeg * Math.cos(th), p1[1] + halfLeg * Math.sin(th)]);
+      }
+      tipRing.push([tipRing[0][0], tipRing[0][1]]);
+      polys.push([tipRing]);
+    }
+
+    return polys;
+  }
+
+  /**
    * ARCHITECTURAL RATIONALE: Geometric Stroke-to-Path Conversion (Outline Stroke)
    * 
    * 1. Discrete Normal Extrusion & Miter/Bevel/Round Joins:
@@ -952,15 +1112,20 @@ export class BooleanOperations {
    *      * 'square': quads are extended along their longitudinal tangent by R.
    *      * 'butt': quads terminate exactly at p_0 and p_n.
    * 
-   * 2. Non-Self-Intersecting Planar Union via polygon-clipping:
-   *    Extruding overlapping quads and discs generates self-intersecting loops and redundant internal
-   *    geometry. Passing all quads and discs to polygonClipping.union() eliminates all internal edges,
+   * 2. Geometric Integration of SVG Markers (marker-start, marker-mid, marker-end):
+   *    If markers are assigned, their geometric shapes (arrows, dots, squares, bar-caps) are scaled
+   *    by strokeWidth, oriented along path tangent vectors, and injected as planar polygons.
+   *    polygonClipping.union merges the stroke and all markers into a single unified polygon.
+   * 
+   * 3. Non-Self-Intersecting Planar Union via polygon-clipping:
+   *    Extruding overlapping quads, discs, and markers generates internal geometry. Passing all
+   *    quads, discs, and marker polygons to polygonClipping.union() eliminates all internal edges,
    *    computes the exact outer boundary, and for closed shapes (like rings or rectangles) automatically
    *    extracts the inner hole ring with fill-rule="evenodd".
    * 
-   * 3. Style Transition:
+   * 4. Style Transition:
    *    The resulting vector element becomes an autonomous closed path (isClosed = true), with its fill
-   *    color set to the original stroke color, and stroke set to 'none'.
+   *    color set to the original stroke color, and stroke set to 'none'. All marker attributes are cleared.
    */
   public static outlineStroke(element: VectorElement, model: VectorModel): VectorElement | null {
     if (!element.vertices || element.vertices.length < 2) return null;
@@ -971,6 +1136,10 @@ export class BooleanOperations {
     const strokeColor = element.attributes['stroke'] && element.attributes['stroke'] !== 'none'
       ? element.attributes['stroke']
       : '#ffffff';
+
+    const markerStartType = this.parseMarkerType(element.attributes['marker-start']);
+    const markerMidType = this.parseMarkerType(element.attributes['marker-mid']);
+    const markerEndType = this.parseMarkerType(element.attributes['marker-end']);
 
     // Helper to generate circular disc polygon (16 sides)
     const makeDisc = (cx: number, cy: number, r: number): Polygon => {
@@ -1084,6 +1253,68 @@ export class BooleanOperations {
       if (!isClosed && strokeLinecap === 'round') {
         thickPolygons.push(makeDisc(pts[0].x, pts[0].y, halfW));
         thickPolygons.push(makeDisc(pts[pts.length - 1].x, pts[pts.length - 1].y, halfW));
+      }
+
+      // Append marker geometry into thickPolygons
+      // 1. marker-start on first vertex of subpath
+      if (markerStartType !== 'none' && sp.length >= 2) {
+        let v0Tan = { x: sp[1].x - sp[0].x, y: sp[1].y - sp[0].y };
+        if (sp[0].handleOut) {
+          const hx = sp[0].handleOut.x - sp[0].x;
+          const hy = sp[0].handleOut.y - sp[0].y;
+          if (Math.hypot(hx, hy) > 0.001) v0Tan = { x: hx, y: hy };
+        }
+        const mPolys = this.createMarkerPolygons(markerStartType, sp[0], v0Tan, strokeWidth);
+        thickPolygons.push(...mPolys);
+      }
+
+      // 2. marker-mid on intermediate vertices of subpath
+      if (markerMidType !== 'none' && sp.length >= 3) {
+        for (let i = 1; i < sp.length - 1; i++) {
+          const curr = sp[i];
+          const prev = sp[i - 1];
+          const next = sp[i + 1];
+
+          let inTan = { x: curr.x - prev.x, y: curr.y - prev.y };
+          if (curr.handleIn) {
+            const hx = curr.x - curr.handleIn.x;
+            const hy = curr.y - curr.handleIn.y;
+            if (Math.hypot(hx, hy) > 0.001) inTan = { x: hx, y: hy };
+          }
+          const inLen = Math.hypot(inTan.x, inTan.y) || 1;
+          const uIn = { x: inTan.x / inLen, y: inTan.y / inLen };
+
+          let outTan = { x: next.x - curr.x, y: next.y - curr.y };
+          if (curr.handleOut) {
+            const hx = curr.handleOut.x - curr.x;
+            const hy = curr.handleOut.y - curr.y;
+            if (Math.hypot(hx, hy) > 0.001) outTan = { x: hx, y: hy };
+          }
+          const outLen = Math.hypot(outTan.x, outTan.y) || 1;
+          const uOut = { x: outTan.x / outLen, y: outTan.y / outLen };
+
+          let midTan = { x: uIn.x + uOut.x, y: uIn.y + uOut.y };
+          if (Math.hypot(midTan.x, midTan.y) < 0.001) midTan = uOut;
+
+          const mPolys = this.createMarkerPolygons(markerMidType, curr, midTan, strokeWidth);
+          thickPolygons.push(...mPolys);
+        }
+      }
+
+      // 3. marker-end on last vertex of subpath
+      if (markerEndType !== 'none' && sp.length >= 2) {
+        const lastIdx = sp.length - 1;
+        const lastV = sp[lastIdx];
+        const prevV = sp[lastIdx - 1];
+
+        let vnTan = { x: lastV.x - prevV.x, y: lastV.y - prevV.y };
+        if (lastV.handleIn) {
+          const hx = lastV.x - lastV.handleIn.x;
+          const hy = lastV.y - lastV.handleIn.y;
+          if (Math.hypot(hx, hy) > 0.001) vnTan = { x: hx, y: hy };
+        }
+        const mPolys = this.createMarkerPolygons(markerEndType, lastV, vnTan, strokeWidth);
+        thickPolygons.push(...mPolys);
       }
     }
 
