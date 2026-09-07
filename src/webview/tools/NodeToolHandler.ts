@@ -544,13 +544,24 @@ export class NodeToolHandler implements IToolHandler {
     const selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
     if (selectedEl && selectedEl.vertices && this.nodeEditorTool.selectedVertexId) {
       this.ctx.pushUndo();
-      selectedEl.vertices = this.nodeEditorTool.splitNode(
+      const isClosed = this.isElementClosed(selectedEl);
+      const splitResult = this.nodeEditorTool.splitNode(
         selectedEl.vertices,
-        this.nodeEditorTool.selectedVertexId
+        this.nodeEditorTool.selectedVertexId,
+        isClosed
       );
+      selectedEl.vertices = splitResult.vertices;
+      if (splitResult.newVertexId) {
+        this.nodeEditorTool.selectedVertexId = splitResult.newVertexId;
+      }
       selectedEl.isClosed = false;
       selectedEl.attributes.d = this.ctx.model.compilePathD(selectedEl.vertices, false);
       selectedEl.attributes['data-node-types'] = selectedEl.vertices.map((v) => v.nodeType).join(',');
+
+      const newSelectedV = selectedEl.vertices.find((v) => v.id === this.nodeEditorTool.selectedVertexId);
+      if (newSelectedV && this.callbacks.onNodeSelected) {
+        this.callbacks.onNodeSelected(newSelectedV, selectedEl);
+      }
       this.ctx.render();
       this.ctx.syncToHost();
     }

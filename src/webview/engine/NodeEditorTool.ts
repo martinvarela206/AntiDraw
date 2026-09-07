@@ -43,8 +43,13 @@ export class NodeEditorTool {
     for (const v of vertices) {
       const dAnchor = Math.hypot(pt.x - v.x, pt.y - v.y);
       if (dAnchor <= radius) {
-        if (!bestHit || dAnchor < bestHit.dist) {
+        if (!bestHit || dAnchor < bestHit.dist - 0.001) {
           bestHit = { vertex: v, type: 'vertex', dist: dAnchor };
+        } else if (bestHit && Math.abs(dAnchor - bestHit.dist) <= 0.001) {
+          // If coincident nodes share the exact same location, prioritize the currently selected vertex
+          if (v.id === selectedVertexId) {
+            bestHit = { vertex: v, type: 'vertex', dist: dAnchor };
+          }
         }
       }
     }
@@ -289,6 +294,13 @@ export class NodeEditorTool {
 
           const isOtherEndpoint = (i === 0 || i === el.vertices.length - 1);
           if (isOtherEndpoint) {
+            // If otherV was originally coincident with targetV before dragging started,
+            // do not block the user from separating them
+            const initialSeparation = Math.hypot(targetV.x - otherV.x, targetV.y - otherV.y);
+            if (initialSeparation < 0.001) {
+              continue;
+            }
+
             const dist = Math.hypot(newPos.x - otherV.x, newPos.y - otherV.y);
             if (dist <= this.fusionThreshold) {
               finalPos = { x: otherV.x, y: otherV.y };
@@ -475,24 +487,120 @@ export class NodeEditorTool {
     });
   }
 
-  // Split selected vertex into two independent free endpoints
-  public splitNode(vertices: PathVertex[], vertexId: string): PathVertex[] {
+  /**
+   * ARCHITECTURAL RATIONALE: Exact-Position Vector Node Splitting
+   *
+   * Why this solution is engineered this way:
+   * 1. Identical Spatial Coincidence:
+   *    Splitting a vertex must never distort the geometry or translate vertices with arbitrary offsets (+10px).
+   *    Both the terminating vertex and the originating vertex share the EXACT coordinates (target.x, target.y).
+   * 2. Canonical Bézier Tangent Separation:
+   *    A path vertex acts as a junction between incoming and outgoing segments:
+   *    - The incoming endpoint retains `handleIn` (and clears `handleOut` since no path departs from it).
+   *    - The outgoing endpoint retains `handleOut` (and clears `handleIn` since it begins a new contour/subpath).
+   * 3. Closed Loop Unwrapping:
+   *    When splitting a vertex in a closed path (isClosed === true), the loop unrolls into an open path:
+   *    - The path begins at (target.x, target.y) with command 'M' and outgoing tangent handleOut.
+   *    - It traverses through the remaining vertices in cyclical order.
+   *    - It terminates back at (target.x, target.y) with incoming tangent handleIn.
+   *    All intermediate segments, curvatures, and node types remain perfectly intact.
+   * 4. Open Path Subpath Division:
+   *    When splitting an interior vertex in an open path (isClosed === false), the path breaks into two subpaths:
+   *    - Subpath 1 ends at (target.x, target.y) retaining handleIn.
+   *    - Subpath 2 begins at (target.x, target.y) with command 'M', retaining handleOut.
+   */
+  public splitNode(
+    vertices: PathVertex[],
+    vertexId: string,
+    isClosed: boolean = false
+  ): { vertices: PathVertex[]; newVertexId?: string } {
     const idx = vertices.findIndex((v) => v.id === vertexId);
-    if (idx === -1) return vertices;
+    if (idx === -1 || vertices.length < 2) return { vertices, newVertexId: undefined };
 
     const target = vertices[idx];
-    const newV: PathVertex = {
+
+    // Case 1: Closed Path Unwrapping
+    if (isClosed) {
+      const n = vertices.length;
+      // Start vertex begins open contour at target position
+      const startV: PathVertex = {
+        ...target,
+        id: target.id,
+        x: target.x,
+        y: target.y,
+        command: 'M',
+        handleIn: undefined,
+        handleOut: target.handleOut ? { ...target.handleOut } : undefined,
+        nodeType: target.nodeType,
+      };
+
+      // Previous vertex in original cycle
+      const prevIdx = (idx - 1 + n) % n;
+      const prevV = vertices[prevIdx];
+
+      // End vertex terminates open contour at target position
+      const newEndId = `v_split_${Date.now().toString(36)}`;
+      const endV: PathVertex = {
+        ...target,
+        id: newEndId,
+        x: target.x,
+        y: target.y,
+        command: target.handleIn || prevV.handleOut ? 'C' : 'L',
+        handleIn: target.handleIn ? { ...target.handleIn } : undefined,
+        handleOut: undefined,
+        nodeType: target.nodeType,
+      };
+
+      // Reassemble cyclical vertices: startV -> subsequent vertices -> previous vertices -> endV
+      const reordered: PathVertex[] = [startV];
+      for (let i = 1; i < n; i++) {
+        const curr = { ...vertices[(idx + i) % n] };
+        // If the original index 0 had command 'M', it now sits mid-sequence and continues from predecessor
+        if (curr.command === 'M') {
+          const predecessor = reordered[reordered.length - 1];
+          curr.command = predecessor.handleOut || curr.handleIn ? 'C' : 'L';
+        }
+        reordered.push(curr);
+      }
+      reordered.push(endV);
+
+      return { vertices: reordered, newVertexId: newEndId };
+    }
+
+    // Case 2: Open Path Endpoint Check
+    if (idx === 0 || idx === vertices.length - 1) {
+      // Cannot split an existing open endpoint
+      return { vertices, newVertexId: target.id };
+    }
+
+    // Case 3: Open Path Interior Vertex Division (breaks into two continuous subpaths)
+    const endV1: PathVertex = {
       ...target,
-      id: `v_split_${Date.now().toString(36)}`,
-      x: target.x + 10,
-      y: target.y + 10,
-      handleIn: target.handleIn ? { x: target.handleIn.x + 10, y: target.handleIn.y + 10 } : undefined,
-      handleOut: target.handleOut ? { x: target.handleOut.x + 10, y: target.handleOut.y + 10 } : undefined,
+      x: target.x,
+      y: target.y,
+      handleIn: target.handleIn ? { ...target.handleIn } : undefined,
+      handleOut: undefined,
     };
 
-    const result = [...vertices];
-    result.splice(idx + 1, 0, newV);
-    return result;
+    const newStartId = `v_split_${Date.now().toString(36)}`;
+    const startV2: PathVertex = {
+      ...target,
+      id: newStartId,
+      x: target.x,
+      y: target.y,
+      command: 'M',
+      handleIn: undefined,
+      handleOut: target.handleOut ? { ...target.handleOut } : undefined,
+    };
+
+    const result = [
+      ...vertices.slice(0, idx),
+      endV1,
+      startV2,
+      ...vertices.slice(idx + 1),
+    ];
+
+    return { vertices: result, newVertexId: newStartId };
   }
 
   /**
