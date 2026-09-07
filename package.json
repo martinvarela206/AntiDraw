@@ -2,7 +2,7 @@
     "name": "antidraw",
     "displayName": "AntiDraw - SVG Vector Editor",
     "description": "Integrated vector graphics editor for SVG files inspired by CorelDraw and Figma.",
-    "version": "0.32.4",
+    "version": "0.32.5",
     "publisher": "antigravity",
     "packageManager": "pnpm@11.20.0",
     "engines": {

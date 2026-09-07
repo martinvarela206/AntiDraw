@@ -54,6 +54,42 @@ export const VIEWBOX_PRESETS: ViewBoxPreset[] = [
   { id: '1440p', name: '1440p', width: 2560, height: 1440 },
 ];
 
+/**
+ * ARCHITECTURAL RATIONALE: Bi-directional Conversion Between SVG Miter Limit and Degrees
+ *
+ * 1. Why Degrees Instead of Dimensionless Ratio:
+ *    In SVG, stroke-miterlimit is a dimensionless ratio m = 1 / sin(theta / 2), where theta is the interior
+ *    angle between segments. For human designers, setting "miterlimit: 4" or "miterlimit: 10" is completely
+ *    opaque and requires mental trigonometry. By exposing the limit directly in degrees (e.g. 29°),
+ *    the designer immediately understands: "any corner sharper than 29° will be clipped to bevel;
+ *    corners wider than 29° will remain sharp".
+ *
+ * 2. Exact Formula:
+ *    - Given miterlimit m: theta_deg = 2 * asin(1 / m) * (180 / PI).
+ *      Default m=4 -> ~28.96° -> 29°.
+ *    - Given angle in degrees theta_deg: m = 1 / sin((theta_deg * PI) / 360).
+ *      theta=15° -> m=7.66. theta=6° -> m=19.1.
+ *
+ * 3. Numerical Stability & Clamping:
+ *    - Clamped to [1°, 170°] to avoid division by zero or infinite miter lengths at 0°.
+ */
+export function miterLimitToDegrees(limit: number): number {
+  const m = Math.max(1, limit);
+  const sinHalf = 1 / m;
+  const halfAngleRad = Math.asin(Math.min(1, Math.max(0, sinHalf)));
+  const angleDeg = (halfAngleRad * 2 * 180) / Math.PI;
+  return Math.round(angleDeg);
+}
+
+export function degreesToMiterLimit(degrees: number): number {
+  const deg = Math.max(1, Math.min(170, degrees));
+  const halfAngleRad = (deg * Math.PI) / 360;
+  const sinHalf = Math.sin(halfAngleRad);
+  if (sinHalf <= 0.0001) return 100;
+  const limit = 1 / sinHalf;
+  return Math.round(limit * 100) / 100;
+}
+
 export class PropertyPanel {
   private container: HTMLElement;
   private model: VectorModel;
@@ -957,15 +993,17 @@ export class PropertyPanel {
         </div>
         <div class="prop-row">
           <span class="prop-label">Join</span>
-          <select class="prop-input" id="batch-stroke-join" style="cursor:pointer;">
-            <option value="miter">Miter</option>
-            <option value="round">Round</option>
-            <option value="bevel">Bevel</option>
-          </select>
-        </div>
-        <div class="prop-row" id="row-batch-stroke-miterlimit">
-          <span class="prop-label">Miter Limit</span>
-          <input type="number" class="prop-input" id="batch-stroke-miterlimit" value="4" min="1" max="100" step="1" title="Límite de inglete (stroke-miterlimit): valores altos evitan el truncado a bisel en esquinas agudas" />
+          <div style="display:flex; gap:4px; flex:1; align-items:center;">
+            <select class="prop-input" id="batch-stroke-join" style="cursor:pointer; flex:1;">
+              <option value="miter">Miter</option>
+              <option value="round">Round</option>
+              <option value="bevel">Bevel</option>
+            </select>
+            <div id="container-batch-stroke-miterlimit" style="display:flex; align-items:center; gap:2px; width:65px;" title="Ángulo mínimo de inglete en grados (°): esquinas más agudas que este valor se cortan a bisel">
+              <input type="number" class="prop-input" id="batch-stroke-miter-angle" value="29" min="1" max="170" step="1" style="width:45px; padding:2px 4px; text-align:right;" />
+              <span style="font-size:11px; color:var(--text-muted); font-weight:600;">°</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1034,21 +1072,23 @@ export class PropertyPanel {
     if (bStrokeJoin) {
       bStrokeJoin.addEventListener('change', () => {
         elements.forEach((el) => { el.attributes['stroke-linejoin'] = bStrokeJoin.value; });
-        const rowMiter = this.container.querySelector<HTMLElement>('#row-batch-stroke-miterlimit');
-        if (rowMiter) rowMiter.style.display = bStrokeJoin.value === 'miter' ? '' : 'none';
+        const containerMiter = this.container.querySelector<HTMLElement>('#container-batch-stroke-miterlimit');
+        if (containerMiter) containerMiter.style.display = bStrokeJoin.value === 'miter' ? 'flex' : 'none';
         this.callbacks.onUpdateElement(elements[0]);
       });
     }
-    if (bStrokeMiterlimit) {
-      const applyBatchMiter = () => {
-        const val = Math.max(1, parseFloat(bStrokeMiterlimit.value) || 4);
-        elements.forEach((el) => { el.attributes['stroke-miterlimit'] = val.toString(); });
+    const bStrokeMiterAngle = this.container.querySelector<HTMLInputElement>('#batch-stroke-miter-angle');
+    if (bStrokeMiterAngle) {
+      const applyBatchMiterAngle = () => {
+        const deg = Math.max(1, Math.min(170, parseFloat(bStrokeMiterAngle.value) || 29));
+        const limit = degreesToMiterLimit(deg);
+        elements.forEach((el) => { el.attributes['stroke-miterlimit'] = limit.toString(); });
         this.callbacks.onUpdateElement(elements[0]);
       };
-      bStrokeMiterlimit.addEventListener('input', applyBatchMiter);
-      bStrokeMiterlimit.addEventListener('change', () => {
+      bStrokeMiterAngle.addEventListener('input', applyBatchMiterAngle);
+      bStrokeMiterAngle.addEventListener('change', () => {
         if (this.callbacks.onPushUndo) this.callbacks.onPushUndo();
-        applyBatchMiter();
+        applyBatchMiterAngle();
       });
     }
 
@@ -1330,7 +1370,8 @@ export class PropertyPanel {
     const strokeDash = el.attributes['stroke-dasharray'] || '';
     const strokeLinecap = el.attributes['stroke-linecap'] || 'butt';
     const strokeLinejoin = el.attributes['stroke-linejoin'] || 'miter';
-    const strokeMiterlimit = el.attributes['stroke-miterlimit'] || '4';
+    const strokeMiterlimit = parseFloat(el.attributes['stroke-miterlimit'] || '4') || 4;
+    const miterAngleDeg = miterLimitToDegrees(strokeMiterlimit);
 
     const parseMarkerId = (val?: string): string => {
       if (!val || val === 'none') return 'none';
@@ -1525,15 +1566,17 @@ export class PropertyPanel {
         </div>
         <div class="prop-row">
           <span class="prop-label">Join</span>
-          <select class="prop-input" id="el-stroke-join" style="cursor:pointer;">
-            <option value="miter" ${strokeLinejoin === 'miter' ? 'selected' : ''}>Miter</option>
-            <option value="round" ${strokeLinejoin === 'round' ? 'selected' : ''}>Round</option>
-            <option value="bevel" ${strokeLinejoin === 'bevel' ? 'selected' : ''}>Bevel</option>
-          </select>
-        </div>
-        <div class="prop-row" id="row-stroke-miterlimit" style="${strokeLinejoin === 'miter' ? '' : 'display: none;'}">
-          <span class="prop-label">Miter Limit</span>
-          <input type="number" class="prop-input" id="el-stroke-miterlimit" value="${strokeMiterlimit}" min="1" max="100" step="1" title="Límite de inglete (stroke-miterlimit): valores más altos permiten esquinas afiladas en ángulos muy agudos sin truncar a bisel" />
+          <div style="display:flex; gap:4px; flex:1; align-items:center;">
+            <select class="prop-input" id="el-stroke-join" style="cursor:pointer; flex:1;">
+              <option value="miter" ${strokeLinejoin === 'miter' ? 'selected' : ''}>Miter</option>
+              <option value="round" ${strokeLinejoin === 'round' ? 'selected' : ''}>Round</option>
+              <option value="bevel" ${strokeLinejoin === 'bevel' ? 'selected' : ''}>Bevel</option>
+            </select>
+            <div id="container-stroke-miterlimit" style="${strokeLinejoin === 'miter' ? 'display:flex;' : 'display:none;'} align-items:center; gap:2px; width:65px;" title="Ángulo mínimo de inglete en grados (°): esquinas más agudas que este valor se cortan a bisel. Valores menores permiten puntas más afiladas.">
+              <input type="number" class="prop-input" id="el-stroke-miter-angle" value="${miterAngleDeg}" min="1" max="170" step="1" style="width:45px; padding:2px 4px; text-align:right;" />
+              <span style="font-size:11px; color:var(--text-muted); font-weight:600;">°</span>
+            </div>
+          </div>
         </div>
         <div class="prop-row">
           <span class="prop-label">Start Mkr</span>
@@ -1969,40 +2012,38 @@ export class PropertyPanel {
     if (elStrokeJoin) {
       elStrokeJoin.addEventListener('change', () => {
         el.attributes['stroke-linejoin'] = elStrokeJoin.value;
-        const miterRow = this.container.querySelector<HTMLElement>('#row-stroke-miterlimit');
-        if (miterRow) {
-          miterRow.style.display = elStrokeJoin.value === 'miter' ? '' : 'none';
+        const miterContainer = this.container.querySelector<HTMLElement>('#container-stroke-miterlimit');
+        if (miterContainer) {
+          miterContainer.style.display = elStrokeJoin.value === 'miter' ? 'flex' : 'none';
         }
         this.callbacks.onUpdateElement(el);
       });
     }
 
     /**
-     * ARCHITECTURAL RATIONALE: Interactive stroke-miterlimit Configuration
+     * ARCHITECTURAL RATIONALE: Interactive Miter Limit Angle (° Degree) Input
      *
-     * Why this exists:
-     * According to W3C SVG specifications, stroke-linejoin="miter" is automatically truncated to a flat bevel
-     * whenever the ratio of the miter length to the stroke width exceeds stroke-miterlimit (default 4).
-     * For acute angles sharper than ~29° (such as star spikes, chevron tips, or sharp polylines),
-     * this creates an unexpected bevel cut.
-     *
-     * Technical Justification & In-Place Synchronization:
-     * - Exposing stroke-miterlimit in the inspector allows users to set higher limits (e.g. 10, 20, 50),
-     *   allowing razor-sharp acute points.
-     * - The input is dynamically shown only when stroke-linejoin is "miter", keeping UI uncluttered.
-     * - We update on 'input' for instant visual feedback on canvas, and push undo snapshot on 'change'.
+     * Why degrees instead of dimensionless ratio:
+     * According to W3C SVG specifications, stroke-miterlimit is a mathematical ratio m = 1 / sin(theta / 2).
+     * Asking the user to enter abstract numbers (like 4, 10, 14.1) is completely non-intuitive.
+     * Expressing this control in angular degrees (°):
+     * - Allows immediate visual mental modeling: a corner with angle theta < miterAngleDeg is beveled;
+     *   corners with theta >= miterAngleDeg retain sharp miter points.
+     * - Positioned immediately adjacent to the 'Join' select input for zero visual search cost.
+     * - Live-syncs to SVG stroke-miterlimit attribute bidirectionally without loss of precision.
      */
-    const elStrokeMiterlimit = this.container.querySelector<HTMLInputElement>('#el-stroke-miterlimit');
-    if (elStrokeMiterlimit) {
-      const applyMiterLimit = () => {
-        const val = Math.max(1, parseFloat(elStrokeMiterlimit.value) || 4);
-        el.attributes['stroke-miterlimit'] = val.toString();
+    const elStrokeMiterAngle = this.container.querySelector<HTMLInputElement>('#el-stroke-miter-angle');
+    if (elStrokeMiterAngle) {
+      const applyMiterAngle = () => {
+        const deg = Math.max(1, Math.min(170, parseFloat(elStrokeMiterAngle.value) || 29));
+        const limit = degreesToMiterLimit(deg);
+        el.attributes['stroke-miterlimit'] = limit.toString();
         this.callbacks.onUpdateElement(el);
       };
-      elStrokeMiterlimit.addEventListener('input', applyMiterLimit);
-      elStrokeMiterlimit.addEventListener('change', () => {
+      elStrokeMiterAngle.addEventListener('input', applyMiterAngle);
+      elStrokeMiterAngle.addEventListener('change', () => {
         if (this.callbacks.onPushUndo) this.callbacks.onPushUndo();
-        applyMiterLimit();
+        applyMiterAngle();
       });
     }
 
