@@ -1428,11 +1428,18 @@ export class PropertyPanel {
       grad = {
         type: fillType === 'radial' ? 'radial' : 'linear',
         angle: 0,
+        cx: 0.5,
+        cy: 0.5,
+        r: 0.5,
         stops: [
           { id: 'stop_0', offset: 0, color: fill !== 'none' && !fill.startsWith('url') ? fill : '#4f46e5', opacity: 1 },
           { id: 'stop_1', offset: 1, color: '#ec4899', opacity: 1 },
         ],
       };
+    } else if (grad.type === 'radial') {
+      if (grad.cx === undefined) grad.cx = 0.5;
+      if (grad.cy === undefined) grad.cy = 0.5;
+      if (grad.r === undefined) grad.r = 0.5;
     }
 
     const sortedStops = [...grad.stops].sort((a, b) => a.offset - b.offset);
@@ -1513,7 +1520,31 @@ export class PropertyPanel {
               <option value="270" ${grad.angle === 270 ? 'selected' : ''}>270° ↑</option>
               <option value="45" ${grad.angle === 45 ? 'selected' : ''}>45° ↘</option>
               <option value="135" ${grad.angle === 135 ? 'selected' : ''}>135° ↙</option>
-            </select>
+          </div>
+
+          <!-- Radial Gradient Geometric Controls (for Radial) -->
+          <div id="fill-radial-controls" style="${fillType === 'radial' ? '' : 'display: none;'}">
+            <div class="prop-row">
+              <span class="prop-label">Centro</span>
+              <span class="prop-label" style="width: 14px; text-align: right; font-size: 10px;">X%</span>
+              <input type="number" class="prop-input" id="radial-cx" value="${Math.round((grad.cx ?? 0.5) * 100)}" min="-100" max="200" step="5" title="Posición X del centro del gradiente (%)" />
+              <span class="prop-label" style="width: 14px; text-align: right; font-size: 10px;">Y%</span>
+              <input type="number" class="prop-input" id="radial-cy" value="${Math.round((grad.cy ?? 0.5) * 100)}" min="-100" max="200" step="5" title="Posición Y del centro del gradiente (%)" />
+              <button class="prop-input" id="btn-reset-radial-center" style="width: auto; padding: 2px 6px; cursor: pointer;" title="Centrar al 50%, 50%">⟲</button>
+            </div>
+            <div class="prop-row">
+              <span class="prop-label">Radio %</span>
+              <input type="number" class="prop-input" id="radial-r" value="${Math.round((grad.r ?? 0.5) * 100)}" min="1" max="500" step="5" title="Radio de dispersión del gradiente radial (%)" />
+              <button class="prop-input" id="btn-reset-radial-radius" style="width: auto; padding: 2px 6px; cursor: pointer;" title="Restablecer radio al 50%">50%</button>
+            </div>
+            <div class="prop-row">
+              <span class="prop-label">Foco</span>
+              <span class="prop-label" style="width: 14px; text-align: right; font-size: 10px;">X%</span>
+              <input type="number" class="prop-input" id="radial-fx" value="${Math.round((grad.fx ?? grad.cx ?? 0.5) * 100)}" min="-100" max="200" step="5" title="Foco X del gradiente radial (%)" />
+              <span class="prop-label" style="width: 14px; text-align: right; font-size: 10px;">Y%</span>
+              <input type="number" class="prop-input" id="radial-fy" value="${Math.round((grad.fy ?? grad.cy ?? 0.5) * 100)}" min="-100" max="200" step="5" title="Foco Y del gradiente radial (%)" />
+              <button class="prop-input" id="btn-sync-radial-focus" style="width: auto; padding: 2px 6px; cursor: pointer;" title="Igualar foco al centro">⟲</button>
+            </div>
           </div>
 
           <!-- Active Stop Selector & Inspector -->
@@ -1823,6 +1854,7 @@ export class PropertyPanel {
     const solidControls = this.container.querySelector<HTMLElement>('#fill-solid-controls');
     const gradControls = this.container.querySelector<HTMLElement>('#fill-gradient-controls');
     const angleRow = this.container.querySelector<HTMLElement>('#gradient-angle-row');
+    const radialControls = this.container.querySelector<HTMLElement>('#fill-radial-controls');
 
     if (fillTypeSelect) {
       fillTypeSelect.addEventListener('change', () => {
@@ -1831,6 +1863,12 @@ export class PropertyPanel {
         if (solidControls) solidControls.style.display = fillType === 'solid' ? '' : 'none';
         if (gradControls) gradControls.style.display = (fillType === 'linear' || fillType === 'radial') ? '' : 'none';
         if (angleRow) angleRow.style.display = fillType === 'linear' ? '' : 'none';
+        if (radialControls) radialControls.style.display = fillType === 'radial' ? '' : 'none';
+        if (fillType === 'radial') {
+          grad!.cx = grad!.cx ?? 0.5;
+          grad!.cy = grad!.cy ?? 0.5;
+          grad!.r = grad!.r ?? 0.5;
+        }
         applyFillChanges();
       });
     }
@@ -1977,6 +2015,84 @@ export class PropertyPanel {
         applyFillChanges();
       });
     }
+
+    // Radial Gradient Numeric Controls Event Listeners
+    const radialCx = this.container.querySelector<HTMLInputElement>('#radial-cx');
+    const radialCy = this.container.querySelector<HTMLInputElement>('#radial-cy');
+    const btnResetRadialCenter = this.container.querySelector<HTMLButtonElement>('#btn-reset-radial-center');
+
+    const updateRadialCenter = () => {
+      if (this.callbacks.onPushUndo) this.callbacks.onPushUndo();
+      const cxPct = parseFloat(radialCx?.value || '50') || 50;
+      const cyPct = parseFloat(radialCy?.value || '50') || 50;
+      const newCx = Math.round((cxPct / 100) * 1000) / 1000;
+      const newCy = Math.round((cyPct / 100) * 1000) / 1000;
+      if (grad!.fx === undefined || grad!.fx === grad!.cx) {
+        grad!.fx = newCx;
+        grad!.fy = newCy;
+        if (radialFx) radialFx.value = Math.round(newCx * 100).toString();
+        if (radialFy) radialFy.value = Math.round(newCy * 100).toString();
+      }
+      grad!.cx = newCx;
+      grad!.cy = newCy;
+      applyFillChanges();
+    };
+
+    if (radialCx) radialCx.addEventListener('change', updateRadialCenter);
+    if (radialCy) radialCy.addEventListener('change', updateRadialCenter);
+    if (btnResetRadialCenter) {
+      btnResetRadialCenter.addEventListener('click', () => {
+        if (radialCx) radialCx.value = '50';
+        if (radialCy) radialCy.value = '50';
+        updateRadialCenter();
+      });
+    }
+
+    const radialR = this.container.querySelector<HTMLInputElement>('#radial-r');
+    const btnResetRadialRadius = this.container.querySelector<HTMLButtonElement>('#btn-reset-radial-radius');
+    if (radialR) {
+      radialR.addEventListener('change', () => {
+        if (this.callbacks.onPushUndo) this.callbacks.onPushUndo();
+        const rPct = Math.max(1, parseFloat(radialR.value || '50') || 50);
+        grad!.r = Math.round((rPct / 100) * 1000) / 1000;
+        applyFillChanges();
+      });
+    }
+    if (btnResetRadialRadius) {
+      btnResetRadialRadius.addEventListener('click', () => {
+        if (this.callbacks.onPushUndo) this.callbacks.onPushUndo();
+        if (radialR) radialR.value = '50';
+        grad!.r = 0.5;
+        applyFillChanges();
+      });
+    }
+
+    const radialFx = this.container.querySelector<HTMLInputElement>('#radial-fx');
+    const radialFy = this.container.querySelector<HTMLInputElement>('#radial-fy');
+    const btnSyncRadialFocus = this.container.querySelector<HTMLButtonElement>('#btn-sync-radial-focus');
+
+    const updateRadialFocus = () => {
+      if (this.callbacks.onPushUndo) this.callbacks.onPushUndo();
+      const fxPct = parseFloat(radialFx?.value || '50') || 50;
+      const fyPct = parseFloat(radialFy?.value || '50') || 50;
+      grad!.fx = Math.round((fxPct / 100) * 1000) / 1000;
+      grad!.fy = Math.round((fyPct / 100) * 1000) / 1000;
+      applyFillChanges();
+    };
+
+    if (radialFx) radialFx.addEventListener('change', updateRadialFocus);
+    if (radialFy) radialFy.addEventListener('change', updateRadialFocus);
+    if (btnSyncRadialFocus) {
+      btnSyncRadialFocus.addEventListener('click', () => {
+        if (this.callbacks.onPushUndo) this.callbacks.onPushUndo();
+        grad!.fx = grad!.cx ?? 0.5;
+        grad!.fy = grad!.cy ?? 0.5;
+        if (radialFx) radialFx.value = Math.round((grad!.fx) * 100).toString();
+        if (radialFy) radialFy.value = Math.round((grad!.fy) * 100).toString();
+        applyFillChanges();
+      });
+    }
+
     if (elStrokeColor) {
       elStrokeColor.addEventListener('input', () => {
         el.attributes['stroke'] = elStrokeColor.value;

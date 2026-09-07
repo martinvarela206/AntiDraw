@@ -270,6 +270,17 @@ export class VectorModel {
                       type: isLinear ? 'linear' : 'radial',
                       stops,
                     };
+                    if (!isLinear) {
+                      const parsePctOrNum = (val: string | null, defVal: number): number => {
+                        if (!val) return defVal;
+                        return val.includes('%') ? parseFloat(val) / 100 : parseFloat(val);
+                      };
+                      gradConfig.cx = parsePctOrNum(gradEl.getAttribute('cx'), 0.5);
+                      gradConfig.cy = parsePctOrNum(gradEl.getAttribute('cy'), 0.5);
+                      gradConfig.r = parsePctOrNum(gradEl.getAttribute('r'), 0.5);
+                      if (gradEl.hasAttribute('fx')) gradConfig.fx = parsePctOrNum(gradEl.getAttribute('fx'), gradConfig.cx);
+                      if (gradEl.hasAttribute('fy')) gradConfig.fy = parsePctOrNum(gradEl.getAttribute('fy'), gradConfig.cy);
+                    }
                     attrs['data-gradient'] = JSON.stringify(gradConfig);
                   }
                 }
