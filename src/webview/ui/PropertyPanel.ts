@@ -955,6 +955,18 @@ export class PropertyPanel {
           <span class="prop-label">Width</span>
           <input type="number" class="prop-input" id="batch-stroke-width" value="1" min="0" step="0.5" />
         </div>
+        <div class="prop-row">
+          <span class="prop-label">Join</span>
+          <select class="prop-input" id="batch-stroke-join" style="cursor:pointer;">
+            <option value="miter">Miter</option>
+            <option value="round">Round</option>
+            <option value="bevel">Bevel</option>
+          </select>
+        </div>
+        <div class="prop-row" id="row-batch-stroke-miterlimit">
+          <span class="prop-label">Miter Limit</span>
+          <input type="number" class="prop-input" id="batch-stroke-miterlimit" value="4" min="1" max="100" step="1" title="Límite de inglete (stroke-miterlimit): valores altos evitan el truncado a bisel en esquinas agudas" />
+        </div>
       </div>
 
       <div class="panel-section">
@@ -975,6 +987,8 @@ export class PropertyPanel {
     const bStrokeColor = this.container.querySelector<HTMLInputElement>('#batch-stroke-color');
     const bStrokeHex = this.container.querySelector<HTMLInputElement>('#batch-stroke-hex');
     const bStrokeWidth = this.container.querySelector<HTMLInputElement>('#batch-stroke-width');
+    const bStrokeJoin = this.container.querySelector<HTMLSelectElement>('#batch-stroke-join');
+    const bStrokeMiterlimit = this.container.querySelector<HTMLInputElement>('#batch-stroke-miterlimit');
 
     this.bindMouseDown('btn-prop-bool-union', () => this.callbacks.onBoolean && this.callbacks.onBoolean('union'));
     this.bindMouseDown('btn-prop-bool-subtract', () => this.callbacks.onBoolean && this.callbacks.onBoolean('subtract'));
@@ -1015,6 +1029,26 @@ export class PropertyPanel {
       bStrokeWidth.addEventListener('input', () => {
         elements.forEach((el) => { el.attributes['stroke-width'] = bStrokeWidth.value; });
         this.callbacks.onUpdateElement(elements[0]);
+      });
+    }
+    if (bStrokeJoin) {
+      bStrokeJoin.addEventListener('change', () => {
+        elements.forEach((el) => { el.attributes['stroke-linejoin'] = bStrokeJoin.value; });
+        const rowMiter = this.container.querySelector<HTMLElement>('#row-batch-stroke-miterlimit');
+        if (rowMiter) rowMiter.style.display = bStrokeJoin.value === 'miter' ? '' : 'none';
+        this.callbacks.onUpdateElement(elements[0]);
+      });
+    }
+    if (bStrokeMiterlimit) {
+      const applyBatchMiter = () => {
+        const val = Math.max(1, parseFloat(bStrokeMiterlimit.value) || 4);
+        elements.forEach((el) => { el.attributes['stroke-miterlimit'] = val.toString(); });
+        this.callbacks.onUpdateElement(elements[0]);
+      };
+      bStrokeMiterlimit.addEventListener('input', applyBatchMiter);
+      bStrokeMiterlimit.addEventListener('change', () => {
+        if (this.callbacks.onPushUndo) this.callbacks.onPushUndo();
+        applyBatchMiter();
       });
     }
 
@@ -1296,6 +1330,7 @@ export class PropertyPanel {
     const strokeDash = el.attributes['stroke-dasharray'] || '';
     const strokeLinecap = el.attributes['stroke-linecap'] || 'butt';
     const strokeLinejoin = el.attributes['stroke-linejoin'] || 'miter';
+    const strokeMiterlimit = el.attributes['stroke-miterlimit'] || '4';
 
     const parseMarkerId = (val?: string): string => {
       if (!val || val === 'none') return 'none';
@@ -1495,6 +1530,10 @@ export class PropertyPanel {
             <option value="round" ${strokeLinejoin === 'round' ? 'selected' : ''}>Round</option>
             <option value="bevel" ${strokeLinejoin === 'bevel' ? 'selected' : ''}>Bevel</option>
           </select>
+        </div>
+        <div class="prop-row" id="row-stroke-miterlimit" style="${strokeLinejoin === 'miter' ? '' : 'display: none;'}">
+          <span class="prop-label">Miter Limit</span>
+          <input type="number" class="prop-input" id="el-stroke-miterlimit" value="${strokeMiterlimit}" min="1" max="100" step="1" title="Límite de inglete (stroke-miterlimit): valores más altos permiten esquinas afiladas en ángulos muy agudos sin truncar a bisel" />
         </div>
         <div class="prop-row">
           <span class="prop-label">Start Mkr</span>
@@ -1930,7 +1969,40 @@ export class PropertyPanel {
     if (elStrokeJoin) {
       elStrokeJoin.addEventListener('change', () => {
         el.attributes['stroke-linejoin'] = elStrokeJoin.value;
+        const miterRow = this.container.querySelector<HTMLElement>('#row-stroke-miterlimit');
+        if (miterRow) {
+          miterRow.style.display = elStrokeJoin.value === 'miter' ? '' : 'none';
+        }
         this.callbacks.onUpdateElement(el);
+      });
+    }
+
+    /**
+     * ARCHITECTURAL RATIONALE: Interactive stroke-miterlimit Configuration
+     *
+     * Why this exists:
+     * According to W3C SVG specifications, stroke-linejoin="miter" is automatically truncated to a flat bevel
+     * whenever the ratio of the miter length to the stroke width exceeds stroke-miterlimit (default 4).
+     * For acute angles sharper than ~29° (such as star spikes, chevron tips, or sharp polylines),
+     * this creates an unexpected bevel cut.
+     *
+     * Technical Justification & In-Place Synchronization:
+     * - Exposing stroke-miterlimit in the inspector allows users to set higher limits (e.g. 10, 20, 50),
+     *   allowing razor-sharp acute points.
+     * - The input is dynamically shown only when stroke-linejoin is "miter", keeping UI uncluttered.
+     * - We update on 'input' for instant visual feedback on canvas, and push undo snapshot on 'change'.
+     */
+    const elStrokeMiterlimit = this.container.querySelector<HTMLInputElement>('#el-stroke-miterlimit');
+    if (elStrokeMiterlimit) {
+      const applyMiterLimit = () => {
+        const val = Math.max(1, parseFloat(elStrokeMiterlimit.value) || 4);
+        el.attributes['stroke-miterlimit'] = val.toString();
+        this.callbacks.onUpdateElement(el);
+      };
+      elStrokeMiterlimit.addEventListener('input', applyMiterLimit);
+      elStrokeMiterlimit.addEventListener('change', () => {
+        if (this.callbacks.onPushUndo) this.callbacks.onPushUndo();
+        applyMiterLimit();
       });
     }
 

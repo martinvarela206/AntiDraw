@@ -1133,6 +1133,8 @@ export class BooleanOperations {
     const strokeWidth = parseFloat(element.attributes['stroke-width'] || '1') || 1;
     const halfW = strokeWidth / 2;
     const strokeLinecap = element.attributes['stroke-linecap'] || 'butt';
+    const strokeLinejoin = element.attributes['stroke-linejoin'] || 'miter';
+    const strokeMiterlimit = parseFloat(element.attributes['stroke-miterlimit'] || '4') || 4;
     const strokeColor = element.attributes['stroke'] && element.attributes['stroke'] !== 'none'
       ? element.attributes['stroke']
       : '#ffffff';
@@ -1171,24 +1173,32 @@ export class BooleanOperations {
     for (const sp of subpaths) {
       if (sp.length < 2) continue;
 
-      // Sample subpath into dense 2D point array
+      // Sample subpath into dense 2D point array, avoiding zero-length consecutive duplicates
       const pts: { x: number; y: number }[] = [];
+      const addPt = (pt: { x: number; y: number }) => {
+        if (pts.length > 0) {
+          const last = pts[pts.length - 1];
+          if (Math.hypot(pt.x - last.x, pt.y - last.y) < 1e-4) return;
+        }
+        pts.push({ x: pt.x, y: pt.y });
+      };
+
       for (let i = 0; i < sp.length - 1; i++) {
         const v = sp[i];
         const nextV = sp[i + 1];
-        pts.push({ x: v.x, y: v.y });
+        addPt(v);
         if (v.handleOut || nextV.handleIn) {
           const h1 = v.handleOut || { x: v.x, y: v.y };
           const h2 = nextV.handleIn || { x: nextV.x, y: nextV.y };
           const sampled = this.sampleBezier(v, h1, h2, nextV, 24);
           for (let j = 0; j < sampled.length - 1; j++) {
-            pts.push({ x: sampled[j][0], y: sampled[j][1] });
+            addPt({ x: sampled[j][0], y: sampled[j][1] });
           }
         }
       }
       // Push last point of subpath
       const lastSpV = sp[sp.length - 1];
-      pts.push({ x: lastSpV.x, y: lastSpV.y });
+      addPt(lastSpV);
 
       // If closed subpath, add closing curve or straight connection
       const isClosed = element.isClosed ?? false;
@@ -1199,10 +1209,13 @@ export class BooleanOperations {
           const h2 = firstSpV.handleIn || { x: firstSpV.x, y: firstSpV.y };
           const sampled = this.sampleBezier(lastSpV, h1, h2, firstSpV, 24);
           for (let j = 0; j < sampled.length - 1; j++) {
-            pts.push({ x: sampled[j][0], y: sampled[j][1] });
+            addPt({ x: sampled[j][0], y: sampled[j][1] });
           }
         }
-        pts.push({ x: firstSpV.x, y: firstSpV.y });
+        // Ensure closed path ends on exact starting point
+        if (Math.hypot(pts[pts.length - 1].x - firstSpV.x, pts[pts.length - 1].y - firstSpV.y) > 1e-4) {
+          pts.push({ x: firstSpV.x, y: firstSpV.y });
+        }
       }
 
       // Generate thick quads for each segment
@@ -1243,9 +1256,16 @@ export class BooleanOperations {
         ];
         thickPolygons.push([quadRing]);
 
-        // Join disc at internal vertex
-        if (i < pts.length - 2 || isClosed) {
-          thickPolygons.push(makeDisc(p2.x, p2.y, halfW));
+        // Join corner at internal vertex or closing vertex using exact join mode
+        if (i < pts.length - 2) {
+          const p3 = pts[i + 2];
+          const joinPolys = this.createJoinPolygon(p1, p2, p3, strokeLinejoin, strokeMiterlimit, halfW);
+          thickPolygons.push(...joinPolys);
+        } else if (isClosed && pts.length >= 3) {
+          // Closing vertex: connects incoming segment (pts[N-2]->pts[N-1]) to outgoing segment (pts[0]->pts[1])
+          const pNext = pts[1];
+          const joinPolys = this.createJoinPolygon(p1, p2, pNext, strokeLinejoin, strokeMiterlimit, halfW);
+          thickPolygons.push(...joinPolys);
         }
       }
 
@@ -1335,5 +1355,130 @@ export class BooleanOperations {
     };
 
     return this.multiPolygonToElement(merged, newId, baseAttrs, model);
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Geometric Stroke Join Extrusion (Miter, Bevel, Round)
+   *
+   * 1. Why this exists:
+   *    In SVG, stroke-linejoin determines how two connected stroke segments meet:
+   *    - 'miter': The outer edges of the stroke are extended until they meet at a sharp point.
+   *      However, in acute corners (angles < 30°), the miter length can become extraordinarily long.
+   *      W3C SVG specification imposes the `stroke-miterlimit` ratio rule:
+   *      miterRatio = miterLength / strokeWidth = 1 / sin(theta / 2).
+   *      If miterRatio <= strokeMiterlimit, a sharp miter corner is rendered.
+   *      If miterRatio > strokeMiterlimit, the join is converted/clipped to a flat bevel.
+   *    - 'bevel': The outer corner is truncated with a flat triangle connecting the outer stroke edges.
+   *    - 'round': A circular disc of radius strokeWidth/2 rounds off the outer corner.
+   *
+   * 2. Why naive disc placement was discarded:
+   *    Previously, outlineStroke placed a circular disc (makeDisc) at every vertex regardless of
+   *    strokeLinejoin. This caused all miter and bevel corners to be forcibly rounded, completely
+   *    preventing sharp acute points from appearing in converted vectors.
+   *
+   * 3. Geometric Miter Intersection Algorithm & Numerical Stability:
+   *    Given segment 1 (pPrev -> pCurr) and segment 2 (pCurr -> pNext):
+   *    - Unit vectors u1 and u2, normals n1 = (-u1y, u1x) and n2 = (-u2y, u2x).
+   *    - 2D Cross product cross = u1x * u2y - u1y * u2x determines turn direction:
+   *      * cross > 0: Left turn (outer side is -n).
+   *      * cross < 0: Right turn (outer side is +n).
+   *      * |cross| < 1e-4: Collinear segments (no wedge needed).
+   *    - Outer edge lines intersect at M = pOut1 + t * u1, where:
+   *      t = ((pOut2 - pOut1) x u2) / cross.
+   *    - miterRatio is evaluated against strokeMiterlimit before emitting the kite polygon:
+   *      [pCurr, pOut1, M, pOut2, pCurr].
+   *    - If miterRatio exceeds strokeMiterlimit, it falls back to the bevel triangle [pCurr, pOut1, pOut2, pCurr].
+   */
+  private static createJoinPolygon(
+    pPrev: { x: number; y: number },
+    pCurr: { x: number; y: number },
+    pNext: { x: number; y: number },
+    strokeLinejoin: string,
+    strokeMiterlimit: number,
+    halfW: number
+  ): Polygon[] {
+    const dx1 = pCurr.x - pPrev.x;
+    const dy1 = pCurr.y - pPrev.y;
+    const len1 = Math.hypot(dx1, dy1);
+    if (len1 < 0.001) return [];
+
+    const dx2 = pNext.x - pCurr.x;
+    const dy2 = pNext.y - pCurr.y;
+    const len2 = Math.hypot(dx2, dy2);
+    if (len2 < 0.001) return [];
+
+    const u1x = dx1 / len1;
+    const u1y = dy1 / len1;
+    const u2x = dx2 / len2;
+    const u2y = dy2 / len2;
+
+    const cross = u1x * u2y - u1y * u2x;
+    const dot = u1x * u2x + u1y * u2y;
+
+    // Collinear segments in same direction (straight line)
+    if (Math.abs(cross) < 1e-4 && dot > 0) {
+      return [];
+    }
+
+    // 1. Round Join: Circular disc of radius halfW
+    if (strokeLinejoin === 'round') {
+      const ring: Ring = [];
+      const steps = 16;
+      for (let s = 0; s < steps; s++) {
+        const theta = (s / steps) * Math.PI * 2;
+        ring.push([pCurr.x + halfW * Math.cos(theta), pCurr.y + halfW * Math.sin(theta)]);
+      }
+      ring.push([ring[0][0], ring[0][1]]);
+      return [[ring]];
+    }
+
+    // Normal vectors pointing to the left of the path (+n)
+    const n1x = -u1y;
+    const n1y = u1x;
+    const n2x = -u2y;
+    const n2y = u2x;
+
+    let pOut1: Pair;
+    let pOut2: Pair;
+
+    if (cross > 0) {
+      // Path turns LEFT: outer corner is on the RIGHT side (-n)
+      pOut1 = [pCurr.x - n1x * halfW, pCurr.y - n1y * halfW];
+      pOut2 = [pCurr.x - n2x * halfW, pCurr.y - n2y * halfW];
+    } else {
+      // Path turns RIGHT: outer corner is on the LEFT side (+n)
+      pOut1 = [pCurr.x + n1x * halfW, pCurr.y + n1y * halfW];
+      pOut2 = [pCurr.x + n2x * halfW, pCurr.y + n2y * halfW];
+    }
+
+    // 2. Miter Join: Outer edge line intersection if within miter limit
+    if (strokeLinejoin === 'miter' && Math.abs(cross) >= 1e-4) {
+      const t = ((pOut2[0] - pOut1[0]) * u2y - (pOut2[1] - pOut1[1]) * u2x) / cross;
+      const mx = pOut1[0] + t * u1x;
+      const my = pOut1[1] + t * u1y;
+
+      const miterDist = Math.hypot(mx - pCurr.x, my - pCurr.y);
+      const miterRatio = miterDist / halfW;
+
+      if (miterRatio <= strokeMiterlimit && !isNaN(mx) && !isNaN(my) && isFinite(mx) && isFinite(my)) {
+        const miterRing: Ring = [
+          [pCurr.x, pCurr.y],
+          pOut1,
+          [mx, my],
+          pOut2,
+          [pCurr.x, pCurr.y],
+        ];
+        return [[miterRing]];
+      }
+    }
+
+    // 3. Bevel Join (also fallback when miterLimit is exceeded)
+    const bevelRing: Ring = [
+      [pCurr.x, pCurr.y],
+      pOut1,
+      pOut2,
+      [pCurr.x, pCurr.y],
+    ];
+    return [[bevelRing]];
   }
 }
