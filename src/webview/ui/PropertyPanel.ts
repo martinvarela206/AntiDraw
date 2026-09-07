@@ -27,6 +27,7 @@ export interface PropertyPanelCallbacks {
   onSelectGuide?: (guideId: string) => void;
   onStrokeToPath?: () => void;
   onPushUndo?: () => void;
+  onRenderOverlay?: () => void;
   /**
    * Boolean Operations callback: Dispatches constructive geometry operations (union, subtract,
    * intersect, exclude, combine, fragment) directly to BooleanOperations engine.
@@ -903,6 +904,9 @@ export class PropertyPanel {
 
   // Render properties when multiple elements are selected
   private renderMultiElementProperties(elements: VectorElement[]): void {
+    const groupBox = this.selectionTool.getGroupSelectionBoundingBox(elements);
+    const multiPivot = groupBox ? this.selectionTool.getPivot(groupBox) : { x: 0, y: 0 };
+
     this.container.innerHTML = `
       <div class="panel-section">
         <div class="panel-title">Multiple Selection</div>
@@ -913,6 +917,17 @@ export class PropertyPanel {
         <div class="prop-row">
           <span class="prop-label">Total Nodes</span>
           <span style="font-weight:600; color:var(--text-main);">${elements.reduce((acc, curr) => acc + (curr.vertices ? curr.vertices.length : 0), 0)} nodes</span>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <div class="panel-title">Transform (Group)</div>
+        <div class="prop-row">
+          <span class="prop-label">Pivot</span>
+          <input type="number" class="prop-input" id="multi-pivot-x" value="${Math.round(multiPivot.x)}" title="Coordenada X del pivote de rotación grupal" />
+          <span class="prop-label" style="width:20px; text-align:right;">Y</span>
+          <input type="number" class="prop-input" id="multi-pivot-y" value="${Math.round(multiPivot.y)}" title="Coordenada Y del pivote de rotación grupal" />
+          <button class="prop-input" id="btn-multi-reset-pivot" style="width:auto; padding:2px 8px; cursor:pointer;" title="Restablecer pivote al centro de la selección">⟲</button>
         </div>
       </div>
 
@@ -1000,6 +1015,32 @@ export class PropertyPanel {
       bStrokeWidth.addEventListener('input', () => {
         elements.forEach((el) => { el.attributes['stroke-width'] = bStrokeWidth.value; });
         this.callbacks.onUpdateElement(elements[0]);
+      });
+    }
+
+    const multiPivotX = this.container.querySelector<HTMLInputElement>('#multi-pivot-x');
+    const multiPivotY = this.container.querySelector<HTMLInputElement>('#multi-pivot-y');
+    const btnMultiResetPivot = this.container.querySelector<HTMLButtonElement>('#btn-multi-reset-pivot');
+
+    if (multiPivotX && multiPivotY && groupBox) {
+      const applyMultiPivot = () => {
+        const px = parseFloat(multiPivotX.value);
+        const py = parseFloat(multiPivotY.value);
+        if (!isNaN(px) && !isNaN(py)) {
+          this.selectionTool.customPivot = { x: px, y: py };
+          this.callbacks.onRenderOverlay?.();
+        }
+      };
+      multiPivotX.addEventListener('input', applyMultiPivot);
+      multiPivotY.addEventListener('input', applyMultiPivot);
+    }
+
+    if (btnMultiResetPivot && groupBox) {
+      btnMultiResetPivot.addEventListener('click', () => {
+        this.selectionTool.resetPivot();
+        if (multiPivotX) multiPivotX.value = String(Math.round(groupBox.cx));
+        if (multiPivotY) multiPivotY.value = String(Math.round(groupBox.cy));
+        this.callbacks.onRenderOverlay?.();
       });
     }
   }
@@ -1320,6 +1361,7 @@ export class PropertyPanel {
 
     const sortedStops = [...grad.stops].sort((a, b) => a.offset - b.offset);
     const gradientCss = `linear-gradient(to right, ${sortedStops.map((s) => `${s.color} ${Math.round(s.offset * 100)}%`).join(', ')})`;
+    const pivot = box ? this.selectionTool.getPivot(box) : { x: 0, y: 0 };
 
     this.container.innerHTML = `
       <div class="panel-section">
@@ -1335,6 +1377,13 @@ export class PropertyPanel {
           <input type="number" class="prop-input" id="el-w" value="${w}" />
           <span class="prop-label" style="width:20px; text-align:right;">H</span>
           <input type="number" class="prop-input" id="el-h" value="${h}" />
+        </div>
+        <div class="prop-row">
+          <span class="prop-label">Pivot</span>
+          <input type="number" class="prop-input" id="el-pivot-x" value="${Math.round(pivot.x)}" title="Coordenada X del pivote de rotación" />
+          <span class="prop-label" style="width:20px; text-align:right;">Y</span>
+          <input type="number" class="prop-input" id="el-pivot-y" value="${Math.round(pivot.y)}" title="Coordenada Y del pivote de rotación" />
+          <button class="prop-input" id="btn-reset-pivot" style="width:auto; padding:2px 8px; cursor:pointer;" title="Restablecer pivote al centro del elemento">⟲</button>
         </div>
         <div class="prop-row">
           <span class="prop-label">Nodes</span>
@@ -1609,6 +1658,32 @@ export class PropertyPanel {
       };
       elW.addEventListener('change', applySize);
       elH.addEventListener('change', applySize);
+    }
+
+    const elPivotX = this.container.querySelector<HTMLInputElement>('#el-pivot-x');
+    const elPivotY = this.container.querySelector<HTMLInputElement>('#el-pivot-y');
+    const btnResetPivot = this.container.querySelector<HTMLButtonElement>('#btn-reset-pivot');
+
+    if (elPivotX && elPivotY && box) {
+      const applyPivot = () => {
+        const px = parseFloat(elPivotX.value);
+        const py = parseFloat(elPivotY.value);
+        if (!isNaN(px) && !isNaN(py)) {
+          this.selectionTool.customPivot = { x: px, y: py };
+          this.callbacks.onRenderOverlay?.();
+        }
+      };
+      elPivotX.addEventListener('input', applyPivot);
+      elPivotY.addEventListener('input', applyPivot);
+    }
+
+    if (btnResetPivot && box) {
+      btnResetPivot.addEventListener('click', () => {
+        this.selectionTool.resetPivot();
+        if (elPivotX) elPivotX.value = String(Math.round(box.cx));
+        if (elPivotY) elPivotY.value = String(Math.round(box.cy));
+        this.callbacks.onRenderOverlay?.();
+      });
     }
 
     let activeStopIdx = 0;

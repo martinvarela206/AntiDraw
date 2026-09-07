@@ -299,6 +299,7 @@ class AntiDrawApp {
       this.model,
       this.selectionTool,
       {
+        onRenderOverlay: () => this.renderOverlay(),
         onUpdateElement: (_el) => {
           this.render();
           this.syncToHost();

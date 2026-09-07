@@ -30,6 +30,17 @@ export class SelectionTool {
   public marqueeRect: { x: number; y: number; width: number; height: number } | null = null;
   public isDeselectMarquee: boolean = false;
 
+  /**
+   * ARCHITECTURAL RATIONALE: Arbitrary Rotation Pivot (`customPivot`)
+   * By default, vector rotation occurs around the center of the selection bounding box `(box.cx, box.cy)`.
+   * Storing an explicit `customPivot: Point | null` allows users to drag the pivot anywhere in 2D space
+   * (snapping to guides, grid, and other geometry vertices) to perform exterior or asymmetrical angular rotations.
+   * Storing `null` indicates that the dynamic bounding box center should be used automatically.
+   * Selection mutations automatically clear `customPivot` to prevent stale pivot coordinates from inadvertently
+   * affecting subsequent, unrelated element selections.
+   */
+  public customPivot: Point | null = null;
+
   // Backward compatibility getter & setter
   public get selectedElementId(): string | null {
     return this.selectedElementIds.values().next().value || null;
@@ -40,6 +51,7 @@ export class SelectionTool {
     if (id) {
       this.selectedElementIds.add(id);
     }
+    this.customPivot = null;
   }
 
   public isSelected(id: string): boolean {
@@ -47,11 +59,15 @@ export class SelectionTool {
   }
 
   public select(id: string): void {
+    if (this.selectedElementIds.size !== 1 || !this.selectedElementIds.has(id)) {
+      this.customPivot = null;
+    }
     this.selectedElementIds.clear();
     this.selectedElementIds.add(id);
   }
 
   public toggleSelect(id: string): void {
+    this.customPivot = null;
     if (this.selectedElementIds.has(id)) {
       this.selectedElementIds.delete(id);
     } else {
@@ -60,11 +76,26 @@ export class SelectionTool {
   }
 
   public deselect(id: string): void {
+    this.customPivot = null;
     this.selectedElementIds.delete(id);
   }
 
   public deselectAll(): void {
+    this.customPivot = null;
     this.selectedElementIds.clear();
+  }
+
+  public getPivot(box: BoundingBox): Point {
+    return this.customPivot ? { ...this.customPivot } : { x: box.cx, y: box.cy };
+  }
+
+  public resetPivot(): void {
+    this.customPivot = null;
+  }
+
+  public hitTestPivot(box: BoundingBox, pt: Point, radius: number = 8): boolean {
+    const pivot = this.getPivot(box);
+    return Math.hypot(pt.x - pivot.x, pt.y - pivot.y) <= radius;
   }
 
   // Calculate bounding box for a single element
@@ -402,6 +433,54 @@ export class SelectionTool {
           x: newTightX + (v.handleOut.x - initialTightX) * scaleX,
           y: newTightY + (v.handleOut.y - initialTightY) * scaleY,
         };
+      }
+      return next;
+    });
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Rigorous Affine 2D Rotation Around Arbitrary Pivot
+   * Rotates every vertex coordinate and its associated Bézier control handles (`handleIn`, `handleOut`)
+   * by `angleRad` around the specified arbitrary pivot point `(pivot.x, pivot.y)`.
+   *
+   * Mathematical Rationale:
+   * x' = pivot.x + (x - pivot.x) * cos(theta) - (y - pivot.y) * sin(theta)
+   * y' = pivot.y + (x - pivot.x) * sin(theta) + (y - pivot.y) * cos(theta)
+   *
+   * Why control handles must be rotated identically:
+   * Bézier handles are absolute coordinates in SVG space. If only the anchor point is rotated,
+   * or if handles are rotated relative to the anchor instead of the global pivot, the curve tangents
+   * and curvature deform disastrously. Rotating all handle positions around the same global pivot
+   * preserves exact curve fidelity and shape integrity across any angle.
+   */
+  public rotateVerticesAroundPivot(
+    initialVertices: PathVertex[],
+    pivot: Point,
+    angleRad: number
+  ): PathVertex[] {
+    const cos = Math.cos(angleRad);
+    const sin = Math.sin(angleRad);
+
+    const rotatePoint = (p: Point): Point => {
+      const dx = p.x - pivot.x;
+      const dy = p.y - pivot.y;
+      return {
+        x: pivot.x + dx * cos - dy * sin,
+        y: pivot.y + dx * sin + dy * cos,
+      };
+    };
+
+    return initialVertices.map((v) => {
+      const next: PathVertex = {
+        ...v,
+        ...rotatePoint(v),
+      };
+
+      if (v.handleIn) {
+        next.handleIn = rotatePoint(v.handleIn);
+      }
+      if (v.handleOut) {
+        next.handleOut = rotatePoint(v.handleOut);
       }
       return next;
     });
