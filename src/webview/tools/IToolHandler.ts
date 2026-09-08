@@ -12,7 +12,7 @@ export interface ToolContext {
   render(): void;
   renderOverlay(): void;
   snapPoint(pt: Point, otherVertices?: Point[], excludeGuideId?: string): Point;
-  getOtherVertices(): Point[];
+  getOtherVertices(excludeIds?: string[]): Point[];
   setTool(tool: ToolType): void;
   getActiveTool(): ToolType;
   applyCanvasSize?(): void;

@@ -87,7 +87,7 @@ class AntiDrawApp {
       render: () => this.render(),
       renderOverlay: () => this.renderOverlay(),
       snapPoint: (pt, others, excludeGuideId) => this.snapPoint(pt, others, excludeGuideId),
-      getOtherVertices: () => this.getOtherVertices(),
+      getOtherVertices: (excludeIds) => this.getOtherVertices(excludeIds),
       setTool: (t) => this.toolbar.setTool(t),
       getActiveTool: () => this.toolbar.activeTool,
       applyCanvasSize: () => this.applyCanvasSize(),

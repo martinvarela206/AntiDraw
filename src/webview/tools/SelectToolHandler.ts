@@ -77,6 +77,7 @@ export class SelectToolHandler implements IToolHandler {
   private initialRotationAngle: number = 0;
   private initialPivot: Point | null = null;
   private lastDeltaAngle: number = 0;
+  private currentRotationSnappedPt: Point | null = null;
 
   private initialElementsMap: Map<string, PathVertex[]> = new Map();
   private initialBox: any = null;
@@ -613,11 +614,39 @@ export class SelectToolHandler implements IToolHandler {
 
     if (this.activeHandle === 'rotate' && this.rotationPivot && this.initialElementsMap.size > 0) {
       this.callbacks.setCursor?.('grabbing');
-      const currentAngle = Math.atan2(pt.y - this.rotationPivot.y, pt.x - this.rotationPivot.x);
+
+      /**
+       * ARCHITECTURAL RATIONALE: Magnetic Cursor Snapping during Vector Rotation (FIX-08)
+       *
+       * 1. Pre-Trigonometric Snapping Evaluation:
+       *    Instead of computing the rotation angle from raw pointer screen coordinates, `pt` is first
+       *    evaluated against the unified snapping engine `this.ctx.snapPoint()`. Snapping queries all
+       *    active reference geometries: grid intersections, guide lines, vertices of other vectors
+       *    (excluding the elements currently transforming to prevent self-referential locking), and
+       *    artboard/ViewBox boundaries.
+       *
+       * 2. Precedence over 15-Degree Increments:
+       *    When a magnetic target is acquired (`isMagneticallySnapped`), the rotation angle points
+       *    strictly towards the snapped feature without being overridden by default 15° quantization,
+       *    unless the user explicitly forces 15° steps by holding `Shift`.
+       *
+       * 3. Alternative Approaches Discarded:
+       *    - Snapping the computed angle post-facto (e.g. searching for angles of nearby vertices):
+       *      Discarded because computing angular distance across all canvas vertices is O(N) in polar
+       *      space and ignores orthogonal grid lines, guidelines, and ViewBox edges. Leveraging `snapPoint`
+       *      directly operates in unified Cartesian space with full multi-constraint resolution.
+       */
+      const otherVertices = this.ctx.getOtherVertices(Array.from(this.ctx.selectionTool.selectedElementIds));
+      const snapped = this.ctx.snapPoint(pt, otherVertices);
+      const isMagneticallySnapped = Math.hypot(snapped.x - pt.x, snapped.y - pt.y) > 0.001;
+
+      this.currentRotationSnappedPt = isMagneticallySnapped ? snapped : null;
+
+      const currentAngle = Math.atan2(snapped.y - this.rotationPivot.y, snapped.x - this.rotationPivot.x);
       let deltaAngle = currentAngle - this.initialRotationAngle;
 
-      // Snapping to 15-degree increments when Shift is held OR snapAngular is enabled
-      const shouldSnapAngular = this.ctx.canvasMgr.snapAngular || e.shiftKey;
+      // Snapping to 15-degree increments when Shift is held OR (snapAngular is enabled AND not magnetically snapped)
+      const shouldSnapAngular = e.shiftKey || (this.ctx.canvasMgr.snapAngular && !isMagneticallySnapped);
       if (shouldSnapAngular) {
         const step = (15 * Math.PI) / 180;
         deltaAngle = Math.round(deltaAngle / step) * step;
@@ -698,11 +727,18 @@ export class SelectToolHandler implements IToolHandler {
     }
 
     /**
-     * ARCHITECTURAL RATIONALE: 15-Degree Angular Snapping on Guidelines
+     * ARCHITECTURAL RATIONALE: Magnetic Cursor Snapping during Guideline Rotation (FIX-08)
      *
-     * Guidelines can be spun around their pivot point. When `snapAngular` is enabled in TopBar
-     * or when the user holds `Shift`, rotation snaps to exact multiples of 15° (0°, 15°, 30°, 45°, 60°...).
-     * Otherwise, soft threshold snapping (3°) snaps to primary cardinal/diagonal angles (0, 45, 90...).
+     * 1. Unified Reference Target Snapping:
+     *    When spinning a guideline via its polar curved arrows, the pointer position `pt` is snapped
+     *    against the grid, other guidelines (excluding `g.id` to avoid self-snapping), vector vertices,
+     *    and ViewBox edges. The polar angle `Math.atan2(snapped.y - py, snapped.x - px)` directs the
+     *    guideline directly through the magnetically snapped reference coordinate.
+     *
+     * 2. Soft-Snap Suppression during Magnetic Lock:
+     *    Soft 3° snapping towards 0°, 45°, 90°, etc. is bypassed when `isMagneticallySnapped` is true,
+     *    guaranteeing that guidelines targeting arbitrary vertices (e.g. at 33.7°) do not get deflected
+     *    erroneously to 45°.
      */
     if (this.activeHandle === 'guide-rotate' && this.ctx.canvasMgr.selectedGuideId) {
       this.callbacks.setCursor?.('grabbing');
@@ -710,17 +746,24 @@ export class SelectToolHandler implements IToolHandler {
       if (g) {
         const px = g.pivotX ?? (g.orientation === 'vertical' ? g.position : this.ctx.model.canvas.width / 2);
         const py = g.pivotY ?? (g.orientation === 'horizontal' ? g.position : this.ctx.model.canvas.height / 2);
-        const angleRad = Math.atan2(pt.y - py, pt.x - px);
+
+        const otherVertices = this.ctx.getOtherVertices();
+        const snapped = this.ctx.snapPoint(pt, otherVertices, g.id);
+        const isMagneticallySnapped = Math.hypot(snapped.x - pt.x, snapped.y - pt.y) > 0.001;
+
+        this.currentRotationSnappedPt = isMagneticallySnapped ? snapped : null;
+
+        const angleRad = Math.atan2(snapped.y - py, snapped.x - px);
         let deg = Math.round((angleRad * 180) / Math.PI);
         if (deg < 0) deg += 360;
 
-        const shouldSnapAngular = this.ctx.canvasMgr.snapAngular || e.shiftKey;
+        const shouldSnapAngular = e.shiftKey || (this.ctx.canvasMgr.snapAngular && !isMagneticallySnapped);
         if (shouldSnapAngular) {
           // Strict 15-degree magnetic snapping
           deg = Math.round(deg / 15) * 15;
           deg = deg % 360;
-        } else {
-          // Soft snapping within 3 degrees for primary orthogonal / diagonal angles
+        } else if (!isMagneticallySnapped) {
+          // Soft snapping within 3 degrees for primary orthogonal / diagonal angles only when not magnetically snapped
           const snapAngles = [0, 45, 90, 135, 180, 225, 270, 315, 360];
           for (const sa of snapAngles) {
             if (Math.abs(deg - sa) <= 3) {
@@ -821,6 +864,7 @@ export class SelectToolHandler implements IToolHandler {
     if (this.activeHandle === 'guide-pivot' || this.activeHandle === 'guide-rotate') {
       this.activeHandle = null;
       this.guideInitialState = null;
+      this.currentRotationSnappedPt = null;
       this.callbacks.syncMetadataToHost?.();
       this.ctx.render();
       return true;
@@ -948,6 +992,7 @@ export class SelectToolHandler implements IToolHandler {
 
     this.activeHandle = null;
     this.rotationPivot = null;
+    this.currentRotationSnappedPt = null;
     this.initialElementsMap.clear();
     this.initialBox = null;
     this.ctx.applyCanvasSize?.();
@@ -1010,6 +1055,7 @@ export class SelectToolHandler implements IToolHandler {
         }
       }
       this.guideInitialState = null;
+      this.currentRotationSnappedPt = null;
       handled = true;
     }
 
@@ -1017,6 +1063,7 @@ export class SelectToolHandler implements IToolHandler {
       this.ghostDragOffset = null;
       this.ghostTransformMap.clear();
       this.initialBox = null;
+      this.currentRotationSnappedPt = null;
       handled = true;
     }
 
@@ -1138,9 +1185,12 @@ export class SelectToolHandler implements IToolHandler {
           </g>
         `;
 
-        // If currently rotating, draw a visual guide ray from the pivot to the rotation handle
+        // If currently rotating, draw a visual guide ray from the pivot to the rotation handle and snapped point
         if (this.activeHandle === 'rotate' && this.rotationPivot) {
           html += `<line x1="${pivot.x}" y1="${pivot.y}" x2="${groupBox.cx}" y2="${groupBox.y - rotOffset}" stroke="#0ea5e9" stroke-width="1" stroke-dasharray="3 2" opacity="0.8" vector-effect="non-scaling-stroke" />`;
+          if (this.currentRotationSnappedPt) {
+            html += `<line x1="${pivot.x}" y1="${pivot.y}" x2="${this.currentRotationSnappedPt.x}" y2="${this.currentRotationSnappedPt.y}" stroke="#f59e0b" stroke-width="1.2" stroke-dasharray="3 2" opacity="0.9" vector-effect="non-scaling-stroke" />`;
+          }
         }
       }
 
@@ -1256,6 +1306,31 @@ export class SelectToolHandler implements IToolHandler {
           });
         }
       });
+    }
+
+    // 6. Magnetic Snap Target Indicator during Vector or Guideline Rotation (FIX-08)
+    if (this.currentRotationSnappedPt) {
+      const sp = this.currentRotationSnappedPt;
+      const sR = 6 / z;
+      const sCross = 9 / z;
+      html += `
+        <g class="rotation-snap-indicator" pointer-events="none">
+          <circle cx="${sp.x}" cy="${sp.y}" r="${sR}" fill="none" stroke="#f59e0b" stroke-width="1.5" vector-effect="non-scaling-stroke" />
+          <line x1="${sp.x - sCross}" y1="${sp.y}" x2="${sp.x + sCross}" y2="${sp.y}" stroke="#f59e0b" stroke-width="1" vector-effect="non-scaling-stroke" />
+          <line x1="${sp.x}" y1="${sp.y - sCross}" x2="${sp.x}" y2="${sp.y + sCross}" stroke="#f59e0b" stroke-width="1" vector-effect="non-scaling-stroke" />
+          <circle cx="${sp.x}" cy="${sp.y}" r="${1.8 / z}" fill="#f59e0b" />
+        </g>
+      `;
+
+      // If rotating a guideline, also draw ray from guideline pivot to snapped point
+      if (this.activeHandle === 'guide-rotate' && this.ctx.canvasMgr.selectedGuideId) {
+        const g = this.ctx.canvasMgr.getGuide(this.ctx.canvasMgr.selectedGuideId);
+        if (g) {
+          const px = g.pivotX ?? (g.orientation === 'vertical' ? g.position : this.ctx.model.canvas.width / 2);
+          const py = g.pivotY ?? (g.orientation === 'horizontal' ? g.position : this.ctx.model.canvas.height / 2);
+          html += `<line x1="${px}" y1="${py}" x2="${sp.x}" y2="${sp.y}" stroke="#f59e0b" stroke-width="1.2" stroke-dasharray="3 2" opacity="0.9" vector-effect="non-scaling-stroke" />`;
+        }
+      }
     }
 
     return html;
