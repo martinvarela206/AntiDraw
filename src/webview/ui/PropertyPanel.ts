@@ -1444,6 +1444,9 @@ export class PropertyPanel {
 
     const sortedStops = [...grad.stops].sort((a, b) => a.offset - b.offset);
     const gradientCss = `linear-gradient(to right, ${sortedStops.map((s) => `${s.color} ${Math.round(s.offset * 100)}%`).join(', ')})`;
+    if (el.attributes['data-pivot'] && !this.selectionTool.customPivot) {
+      this.selectionTool.restorePivotForElement(el);
+    }
     const pivot = box ? this.selectionTool.getPivot(box) : { x: 0, y: 0 };
 
     this.container.innerHTML = `
@@ -1748,6 +1751,7 @@ export class PropertyPanel {
           handleIn: v.handleIn ? { x: v.handleIn.x + dx, y: v.handleIn.y + dy } : undefined,
           handleOut: v.handleOut ? { x: v.handleOut.x + dx, y: v.handleOut.y + dy } : undefined,
         }));
+        this.selectionTool.updatePivotOnTranslate(dx, dy, [el]);
         this.callbacks.onUpdateElement(el);
       };
       elX.addEventListener('change', applyPos);
@@ -1767,6 +1771,7 @@ export class PropertyPanel {
           handleIn: v.handleIn ? { x: box.x + (v.handleIn.x - box.x) * sx, y: box.y + (v.handleIn.y - box.y) * sy } : undefined,
           handleOut: v.handleOut ? { x: box.x + (v.handleOut.x - box.x) * sx, y: box.y + (v.handleOut.y - box.y) * sy } : undefined,
         }));
+        this.selectionTool.updatePivotOnScale(box, { ...box, width: targetW, height: targetH }, [el]);
         this.callbacks.onUpdateElement(el);
       };
       elW.addEventListener('change', applySize);
@@ -1782,7 +1787,8 @@ export class PropertyPanel {
         const px = parseFloat(elPivotX.value);
         const py = parseFloat(elPivotY.value);
         if (!isNaN(px) && !isNaN(py)) {
-          this.selectionTool.customPivot = { x: px, y: py };
+          this.selectionTool.setCustomPivotForElement(el, { x: px, y: py });
+          this.callbacks.onUpdateElement(el);
           this.callbacks.onRenderOverlay?.();
         }
       };
@@ -1792,9 +1798,10 @@ export class PropertyPanel {
 
     if (btnResetPivot && box) {
       btnResetPivot.addEventListener('click', () => {
-        this.selectionTool.resetPivot();
+        this.selectionTool.resetPivot(el);
         if (elPivotX) elPivotX.value = String(Math.round(box.cx));
         if (elPivotY) elPivotY.value = String(Math.round(box.cy));
+        this.callbacks.onUpdateElement(el);
         this.callbacks.onRenderOverlay?.();
       });
     }

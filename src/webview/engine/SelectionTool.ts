@@ -31,13 +31,29 @@ export class SelectionTool {
   public isDeselectMarquee: boolean = false;
 
   /**
-   * ARCHITECTURAL RATIONALE: Arbitrary Rotation Pivot (`customPivot`)
-   * By default, vector rotation occurs around the center of the selection bounding box `(box.cx, box.cy)`.
-   * Storing an explicit `customPivot: Point | null` allows users to drag the pivot anywhere in 2D space
-   * (snapping to guides, grid, and other geometry vertices) to perform exterior or asymmetrical angular rotations.
-   * Storing `null` indicates that the dynamic bounding box center should be used automatically.
-   * Selection mutations automatically clear `customPivot` to prevent stale pivot coordinates from inadvertently
-   * affecting subsequent, unrelated element selections.
+   * ARCHITECTURAL RATIONALE: Vector-Relative Rotation Pivot Lifecyle & Persistence
+   *
+   * 1. Technical Justification for Vector-Relative Persistence:
+   *    Historically, `customPivot` was stored only as a transient in-memory coordinate `Point | null`.
+   *    When elements were rotated, translated, scaled, or deselected, `customPivot` either remained
+   *    frozen in static canvas coordinates or was wiped out to `null`. This broke the mental model of
+   *    anchoring a rotation pivot to an element's feature (such as a corner or articulated joint).
+   *
+   * 2. Why Synchronized Affine Transformations:
+   *    When an element transforms (translation by dx/dy, affine rotation by theta around an arbitrary center,
+   *    or bounding-box scaling by sx/sy), any attached custom pivot must undergo the IDENTICAL affine
+   *    mapping. This guarantees numerical stability and rotational invariance across repeated, successive
+   *    transforms without drift or manual re-anchoring.
+   *
+   * 3. Discarded Alternate Approaches:
+   *    - Naive AABB-relative percentage storage (relX, relY as 0..1 fractions of width/height):
+   *      Discarded because axis-aligned bounding boxes (AABBs) recalculate dynamically upon rotation,
+   *      causing a bounding box to expand and alter its aspect ratio when rotated, which catastrophically
+   *      deforms and shifts normalized relative percentages.
+   *    - Centroid-relative offsets in global space:
+   *      Storing world coordinates directly on `element.attributes['data-pivot']` and mapping them
+   *      solidarily during rotation, translation, and scaling ensures absolute geometric accuracy,
+   *      exact SVG serialization, and seamless undo/redo snapshotting.
    */
   public customPivot: Point | null = null;
 
@@ -58,12 +74,15 @@ export class SelectionTool {
     return this.selectedElementIds.has(id);
   }
 
-  public select(id: string): void {
+  public select(id: string, element?: VectorElement): void {
     if (this.selectedElementIds.size !== 1 || !this.selectedElementIds.has(id)) {
       this.customPivot = null;
     }
     this.selectedElementIds.clear();
     this.selectedElementIds.add(id);
+    if (element) {
+      this.restorePivotForElement(element);
+    }
   }
 
   public toggleSelect(id: string): void {
@@ -89,8 +108,94 @@ export class SelectionTool {
     return this.customPivot ? { ...this.customPivot } : { x: box.cx, y: box.cy };
   }
 
-  public resetPivot(): void {
+  /**
+   * Sets custom pivot and persists coordinates on element attributes when single element is selected.
+   */
+  public setCustomPivotForElement(element: VectorElement | undefined, pt: Point): void {
+    this.customPivot = { x: pt.x, y: pt.y };
+    if (element) {
+      element.attributes['data-pivot'] = JSON.stringify({
+        x: Math.round(pt.x * 100) / 100,
+        y: Math.round(pt.y * 100) / 100,
+      });
+    }
+  }
+
+  /**
+   * Restores custom pivot from element `data-pivot` attribute if present.
+   */
+  public restorePivotForElement(element: VectorElement): void {
+    if (element.attributes && element.attributes['data-pivot']) {
+      try {
+        const parsed = JSON.parse(element.attributes['data-pivot']);
+        if (typeof parsed.x === 'number' && typeof parsed.y === 'number') {
+          this.customPivot = { x: parsed.x, y: parsed.y };
+        }
+      } catch {}
+    }
+  }
+
+  /**
+   * Resets custom pivot to null and cleans attribute from element if provided.
+   */
+  public resetPivot(element?: VectorElement): void {
     this.customPivot = null;
+    if (element && element.attributes && element.attributes['data-pivot']) {
+      delete element.attributes['data-pivot'];
+    }
+  }
+
+  /**
+   * Translates custom pivot solidarily with vector displacement.
+   */
+  public updatePivotOnTranslate(dx: number, dy: number, elements?: VectorElement[]): void {
+    if (!this.customPivot) return;
+    this.customPivot = {
+      x: this.customPivot.x + dx,
+      y: this.customPivot.y + dy,
+    };
+    if (elements && elements.length === 1) {
+      this.setCustomPivotForElement(elements[0], this.customPivot);
+    }
+  }
+
+  /**
+   * Rotates custom pivot solidarily with angular rotation around specified pivot center.
+   * If rotation was performed around customPivot itself, coordinates remain numerically invariant.
+   */
+  public updatePivotOnRotate(pivotCenter: Point, angleRad: number, elements?: VectorElement[]): void {
+    if (!this.customPivot) return;
+    const cos = Math.cos(angleRad);
+    const sin = Math.sin(angleRad);
+    const dx = this.customPivot.x - pivotCenter.x;
+    const dy = this.customPivot.y - pivotCenter.y;
+    this.customPivot = {
+      x: pivotCenter.x + dx * cos - dy * sin,
+      y: pivotCenter.y + dx * sin + dy * cos,
+    };
+    if (elements && elements.length === 1) {
+      this.setCustomPivotForElement(elements[0], this.customPivot);
+    }
+  }
+
+  /**
+   * Scales custom pivot solidarily with bounding box resize transformation.
+   */
+  public updatePivotOnScale(initialBox: BoundingBox, newBox: BoundingBox, elements?: VectorElement[]): void {
+    if (!this.customPivot) return;
+    const initialW = Math.max(initialBox.width, 1);
+    const initialH = Math.max(initialBox.height, 1);
+    const scaleX = newBox.width / initialW;
+    const scaleY = newBox.height / initialH;
+    const relX = this.customPivot.x - initialBox.x;
+    const relY = this.customPivot.y - initialBox.y;
+    this.customPivot = {
+      x: newBox.x + relX * scaleX,
+      y: newBox.y + relY * scaleY,
+    };
+    if (elements && elements.length === 1) {
+      this.setCustomPivotForElement(elements[0], this.customPivot);
+    }
   }
 
   public hitTestPivot(box: BoundingBox, pt: Point, radius: number = 8): boolean {

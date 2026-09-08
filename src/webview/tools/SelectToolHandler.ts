@@ -75,6 +75,8 @@ export class SelectToolHandler implements IToolHandler {
    */
   private rotationPivot: Point | null = null;
   private initialRotationAngle: number = 0;
+  private initialPivot: Point | null = null;
+  private lastDeltaAngle: number = 0;
 
   private initialElementsMap: Map<string, PathVertex[]> = new Map();
   private initialBox: any = null;
@@ -227,6 +229,7 @@ export class SelectToolHandler implements IToolHandler {
         this.activeHandle = 'selection-pivot';
         this.isDragging = true;
         this.dragStartPt = pt;
+        this.initialPivot = this.ctx.selectionTool.customPivot ? { ...this.ctx.selectionTool.customPivot } : null;
         this.callbacks.setCursor?.('move');
         this.ctx.renderOverlay();
         return true;
@@ -350,6 +353,7 @@ export class SelectToolHandler implements IToolHandler {
           if (handle === 'rotate') {
             this.rotationPivot = this.ctx.selectionTool.getPivot(groupBox);
             this.initialRotationAngle = Math.atan2(pt.y - this.rotationPivot.y, pt.x - this.rotationPivot.x);
+            this.lastDeltaAngle = 0;
             this.callbacks.setCursor?.('grabbing');
           }
 
@@ -363,7 +367,7 @@ export class SelectToolHandler implements IToolHandler {
     const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, this.ctx.canvasMgr.zoom);
     if (hit) {
       if (!this.ctx.selectionTool.isSelected(hit.element.id)) {
-        this.ctx.selectionTool.select(hit.element.id);
+        this.ctx.selectionTool.select(hit.element.id, hit.element);
         this.callbacks.onSelectionChanged?.();
       }
 
@@ -535,6 +539,9 @@ export class SelectToolHandler implements IToolHandler {
       }
       const snapped = this.ctx.snapPoint(pt, otherVertices);
       this.ctx.selectionTool.customPivot = snapped;
+      if (selectedEls.length === 1) {
+        this.ctx.selectionTool.setCustomPivotForElement(selectedEls[0], snapped);
+      }
       this.ctx.renderOverlay();
       return true;
     }
@@ -615,6 +622,7 @@ export class SelectToolHandler implements IToolHandler {
         const step = (15 * Math.PI) / 180;
         deltaAngle = Math.round(deltaAngle / step) * step;
       }
+      this.lastDeltaAngle = deltaAngle;
 
       this.ghostTransformMap.clear();
       this.initialElementsMap.forEach((origVerts, id) => {
@@ -820,7 +828,13 @@ export class SelectToolHandler implements IToolHandler {
 
     // 3. Finishing Selection Pivot Move
     if (this.activeHandle === 'selection-pivot') {
+      const selectedEls = this.ctx.model.elements.filter((el) => this.ctx.selectionTool.isSelected(el.id));
+      if (selectedEls.length === 1 && this.ctx.selectionTool.customPivot) {
+        this.ctx.selectionTool.setCustomPivotForElement(selectedEls[0], this.ctx.selectionTool.customPivot);
+        this.ctx.syncToHost();
+      }
       this.activeHandle = null;
+      this.initialPivot = null;
       this.callbacks.onSelectionChanged?.();
       this.ctx.renderOverlay();
       return true;
@@ -859,6 +873,7 @@ export class SelectToolHandler implements IToolHandler {
     if (this.activeHandle === 'move' && this.ghostDragOffset) {
       if (this.ghostDragOffset.x !== 0 || this.ghostDragOffset.y !== 0) {
         this.ctx.pushUndo();
+        const selectedEls = this.ctx.model.elements.filter((el) => this.ctx.selectionTool.isSelected(el.id));
         this.initialElementsMap.forEach((origVerts, id) => {
           const el = this.ctx.model.elements.find((e) => e.id === id);
           if (el) {
@@ -877,6 +892,8 @@ export class SelectToolHandler implements IToolHandler {
             el.attributes.d = this.ctx.model.compilePathD(el.vertices, isClosed);
           }
         });
+        // Translate custom pivot solidarily with moved vectors
+        this.ctx.selectionTool.updatePivotOnTranslate(this.ghostDragOffset.x, this.ghostDragOffset.y, selectedEls);
         hasChangesToCommit = true;
       }
       this.ghostDragOffset = null;
@@ -885,6 +902,7 @@ export class SelectToolHandler implements IToolHandler {
     // Commit Transform Ghost (Scale, Rotate)
     if (this.activeHandle && this.activeHandle !== 'move' && this.ghostTransformMap.size > 0) {
       this.ctx.pushUndo();
+      const selectedEls = this.ctx.model.elements.filter((el) => this.ctx.selectionTool.isSelected(el.id));
       this.ghostTransformMap.forEach((transformedVerts, id) => {
         const el = this.ctx.model.elements.find((e) => e.id === id);
         if (el) {
@@ -893,6 +911,16 @@ export class SelectToolHandler implements IToolHandler {
           el.attributes.d = this.ctx.model.compilePathD(el.vertices, isClosed);
         }
       });
+      // Synchronize custom pivot solidarily with rotation or scaling
+      if (this.activeHandle === 'rotate' && this.rotationPivot) {
+        this.ctx.selectionTool.updatePivotOnRotate(this.rotationPivot, this.lastDeltaAngle, selectedEls);
+      } else if (this.initialBox) {
+        const z = this.ctx.canvasMgr.zoom || 1;
+        const newBox = this.ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 6 / z);
+        if (newBox) {
+          this.ctx.selectionTool.updatePivotOnScale(this.initialBox, newBox, selectedEls);
+        }
+      }
       this.ghostTransformMap.clear();
       hasChangesToCommit = true;
     }
@@ -938,8 +966,9 @@ export class SelectToolHandler implements IToolHandler {
       const z = this.ctx.canvasMgr.zoom || 1;
       const groupBox = this.ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 6 / z);
       if (groupBox && this.ctx.selectionTool.hitTestPivot(groupBox, pt, 10 / z)) {
-        this.ctx.selectionTool.resetPivot();
+        this.ctx.selectionTool.resetPivot(selectedEls.length === 1 ? selectedEls[0] : undefined);
         this.callbacks.onSelectionChanged?.();
+        this.ctx.syncToHost();
         this.ctx.renderOverlay();
         return true;
       }
@@ -988,6 +1017,13 @@ export class SelectToolHandler implements IToolHandler {
       this.ghostDragOffset = null;
       this.ghostTransformMap.clear();
       this.initialBox = null;
+      handled = true;
+    }
+
+    if (this.activeHandle === 'selection-pivot') {
+      this.ctx.selectionTool.customPivot = this.initialPivot;
+      this.initialPivot = null;
+      this.activeHandle = null;
       handled = true;
     }
 
@@ -1076,7 +1112,13 @@ export class SelectToolHandler implements IToolHandler {
         html += `<circle cx="${groupBox.cx}" cy="${groupBox.y - rotOffset}" r="${rotR}" fill="#38bdf8" stroke="#ffffff" stroke-width="1" vector-effect="non-scaling-stroke" />`;
 
         // 3.0. Arbitrary Rotation Pivot Marker
-        const pivot = this.ctx.selectionTool.getPivot(groupBox);
+        if (selectedEls.length === 1 && !this.ctx.selectionTool.customPivot && selectedEls[0].attributes['data-pivot']) {
+          this.ctx.selectionTool.restorePivotForElement(selectedEls[0]);
+        }
+        let pivot = this.ctx.selectionTool.getPivot(groupBox);
+        if (this.activeHandle === 'move' && this.ghostDragOffset) {
+          pivot = { x: pivot.x + this.ghostDragOffset.x, y: pivot.y + this.ghostDragOffset.y };
+        }
         const isCustomPivot = this.ctx.selectionTool.customPivot !== null;
 
         // If displaced from bounding box center, draw a dashed lever line connecting center to custom pivot
