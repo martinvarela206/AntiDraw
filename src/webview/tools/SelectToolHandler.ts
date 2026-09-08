@@ -686,19 +686,37 @@ export class SelectToolHandler implements IToolHandler {
           const snapped = this.ctx.snapPoint(rawTarget, otherVertices, g.id);
           g.position = Math.round(snapped.y);
           g.pivotY = g.position;
+          this.currentRotationSnappedPt = Math.abs(snapped.y - rawTarget.y) > 0.001 ? snapped : null;
         } else if (g.orientation === 'vertical') {
           const rawTarget: Point = { x: this.guideInitialState.position + dx, y: pt.y };
           const snapped = this.ctx.snapPoint(rawTarget, otherVertices, g.id);
           g.position = Math.round(snapped.x);
           g.pivotX = g.position;
+          this.currentRotationSnappedPt = Math.abs(snapped.x - rawTarget.x) > 0.001 ? snapped : null;
         } else {
-          const rawTarget: Point = {
-            x: (this.guideInitialState.pivotX || 0) + dx,
-            y: (this.guideInitialState.pivotY || 0) + dy,
+          /**
+           * ARCHITECTURAL RATIONALE: Magnetic Parallel Translation Snapping for Oblique Guidelines (FIX-09)
+           * The translation is projected strictly perpendicular to the guide angle n = (-sin θ, cos θ).
+           * Both local cursor proximity and full-line keypoint sweeping are evaluated via
+           * CanvasManager.snapAngledGuideTranslation, updating pivotX and pivotY coordinately.
+           */
+          const vb = this.ctx.model.getViewBoxBounds();
+          const origin = {
+            x: vb.minX + (this.ctx.canvasMgr.rulerConfig.originX || 0),
+            y: vb.minY + (this.ctx.canvasMgr.rulerConfig.originY || 0),
           };
-          const snapped = this.ctx.snapPoint(rawTarget, otherVertices, g.id);
-          g.pivotX = Math.round(snapped.x);
-          g.pivotY = Math.round(snapped.y);
+          const res = this.ctx.canvasMgr.snapAngledGuideTranslation(
+            g,
+            this.guideInitialState,
+            this.dragStartPt,
+            pt,
+            otherVertices,
+            origin,
+            vb
+          );
+          g.pivotX = res.pivotX;
+          g.pivotY = res.pivotY;
+          this.currentRotationSnappedPt = res.snappedPt;
         }
       }
       this.ctx.render();
@@ -856,6 +874,7 @@ export class SelectToolHandler implements IToolHandler {
       }
       this.activeHandle = null;
       this.guideInitialState = null;
+      this.currentRotationSnappedPt = null;
       this.ctx.render();
       return true;
     }

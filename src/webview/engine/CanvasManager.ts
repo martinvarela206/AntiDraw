@@ -624,6 +624,175 @@ export class CanvasManager {
   }
 
   /**
+   * ARCHITECTURAL RATIONALE: Magnetic Parallel Translation Snapping for Angled Guidelines (FIX-09)
+   *
+   * 1. Perpendicular Normal Projection:
+   *    Unlike 1D orthogonal guidelines (which independently bind to X or Y), an oblique guideline
+   *    with angle θ has a single degree of translational freedom along its normal vector
+   *    n = (-sin θ, cos θ). Free dragging produces arbitrary (dx, dy) mouse displacements.
+   *    To preserve pure parallel translation without lateral drift, mouse movement is first
+   *    projected onto the line normal: Δ_perp = n · (currentPt - dragStartPt).
+   *
+   * 2. Dual-Scope Magnetic Snapping:
+   *    a) Cursor-Locality Snapping: The grab point on the guideline G_raw = G_0 + Δ_perp * n
+   *       is evaluated via `snapPoint()`. If the cursor/grab point snaps to a 2D vertex,
+   *       guideline intersection, grid point, or ViewBox anchor, the displacement required to
+   *       pass through that snapped coordinate is computed along n.
+   *    b) Whole-Line Sweep Snapping: If the cursor did not directly capture a local feature,
+   *       all visible canvas keypoints (other vector vertices, other guideline intersections,
+   *       and ViewBox frame points) are tested against the line's infinite ray. If any keypoint
+   *       lies within perpendicular proximity (|dist_perp| <= threshold), the guideline snaps
+   *       perpendicularly to pass through that keypoint.
+   *
+   * 3. Synchronized Pivot Transformation:
+   *    The guide's pivot point (pivotX, pivotY) is updated strictly along the normal vector n
+   *    (newPivot = initialPivot + final_perp * n). This guarantees that the pivot never shifts
+   *    longitudinally along the line, keeping rotation handles and polar controls stable across
+   *    successive translations.
+   *
+   * 4. Discarded Alternate Approaches:
+   *    - Unconstrained 2D Snap (snapping raw pivot coordinates in Cartesian space):
+   *      Discarded because arbitrary (dx, dy) jumps alter the angle or slide the line tangentially
+   *      rather than executing parallel translation.
+   */
+  public snapAngledGuideTranslation(
+    guide: GuideLine,
+    initialGuide: GuideLine,
+    dragStartPt: Point,
+    currentPt: Point,
+    otherVertices: Point[] = [],
+    origin?: Point,
+    viewBoxBounds?: { minX: number; minY: number; width: number; height: number }
+  ): { pivotX: number; pivotY: number; snappedPt: Point | null } {
+    const rad = ((guide.angle || 0) * Math.PI) / 180;
+    const nx = -Math.sin(rad);
+    const ny = Math.cos(rad);
+    const ux = Math.cos(rad);
+    const uy = Math.sin(rad);
+
+    const px0 = initialGuide.pivotX ?? (initialGuide.orientation === 'vertical' ? initialGuide.position : 0);
+    const py0 = initialGuide.pivotY ?? (initialGuide.orientation === 'horizontal' ? initialGuide.position : 0);
+
+    // Initial grab point projected onto the initial guide line
+    const dx0 = dragStartPt.x - px0;
+    const dy0 = dragStartPt.y - py0;
+    const tangentDist0 = dx0 * ux + dy0 * uy;
+    const g0x = px0 + tangentDist0 * ux;
+    const g0y = py0 + tangentDist0 * uy;
+
+    // Pointer delta and perpendicular component of translation
+    const dx = currentPt.x - dragStartPt.x;
+    const dy = currentPt.y - dragStartPt.y;
+    const rawDeltaPerp = dx * nx + dy * ny;
+
+    // Tentative grip point on the translated guide line
+    const gRawX = g0x + rawDeltaPerp * nx;
+    const gRawY = g0y + rawDeltaPerp * ny;
+
+    const threshold = this.snapThreshold / (this.zoom || 1);
+
+    // 1. Check local cursor snap via unified snapPoint
+    const snappedCursor = this.snapPoint({ x: gRawX, y: gRawY }, otherVertices, origin, viewBoxBounds, guide.id);
+    const hasCursorSnap = Math.hypot(snappedCursor.x - gRawX, snappedCursor.y - gRawY) > 0.001;
+
+    let finalDeltaPerp = rawDeltaPerp;
+    let snappedPointResult: Point | null = null;
+
+    if (hasCursorSnap) {
+      finalDeltaPerp = (snappedCursor.x - px0) * nx + (snappedCursor.y - py0) * ny;
+      snappedPointResult = snappedCursor;
+    } else {
+      // 2. Check full-line perpendicular proximity to all active keypoints (vertices, other guides, viewBox)
+      let minPerpDist = threshold;
+      let bestKeypoint: Point | null = null;
+
+      const candidates: Point[] = [];
+
+      // Vector vertices
+      if (this.snapToVertices && otherVertices.length > 0) {
+        for (const v of otherVertices) {
+          candidates.push(v);
+        }
+      }
+
+      // Other guide intersections and guide pivots
+      if (this.snapToGuides && this.showGuides && this.guides.length > 0) {
+        for (let i = 0; i < this.guides.length; i++) {
+          const g1 = this.guides[i];
+          if (g1.visible === false || g1.id === guide.id) continue;
+          const g1px = g1.pivotX ?? (g1.orientation === 'vertical' ? g1.position : 0);
+          const g1py = g1.pivotY ?? (g1.orientation === 'horizontal' ? g1.position : 0);
+          candidates.push({ x: g1px, y: g1py });
+
+          for (let j = i + 1; j < this.guides.length; j++) {
+            const g2 = this.guides[j];
+            if (g2.visible === false || g2.id === guide.id) continue;
+            const r1 = ((g1.angle || 0) * Math.PI) / 180;
+            const r2 = ((g2.angle || 0) * Math.PI) / 180;
+            const n1x = -Math.sin(r1), n1y = Math.cos(r1);
+            const n2x = -Math.sin(r2), n2y = Math.cos(r2);
+            const g2px = g2.pivotX ?? (g2.orientation === 'vertical' ? g2.position : 0);
+            const g2py = g2.pivotY ?? (g2.orientation === 'horizontal' ? g2.position : 0);
+            const d1 = n1x * g1px + n1y * g1py;
+            const d2 = n2x * g2px + n2y * g2py;
+            const det = n1x * n2y - n1y * n2x;
+            if (Math.abs(det) > 1e-4) {
+              candidates.push({
+                x: (d1 * n2y - d2 * n1y) / det,
+                y: (n1x * d2 - n2x * d1) / det,
+              });
+            }
+          }
+        }
+      }
+
+      // ViewBox frame corners, midpoints, and center
+      if (this.snapToViewBox && viewBoxBounds) {
+        const vb = viewBoxBounds;
+        candidates.push(
+          { x: vb.minX, y: vb.minY },
+          { x: vb.minX + vb.width, y: vb.minY },
+          { x: vb.minX, y: vb.minY + vb.height },
+          { x: vb.minX + vb.width, y: vb.minY + vb.height },
+          { x: vb.minX + vb.width / 2, y: vb.minY + vb.height / 2 },
+          { x: vb.minX + vb.width / 2, y: vb.minY },
+          { x: vb.minX + vb.width / 2, y: vb.minY + vb.height },
+          { x: vb.minX, y: vb.minY + vb.height / 2 },
+          { x: vb.minX + vb.width, y: vb.minY + vb.height / 2 }
+        );
+      }
+
+      // Origin point
+      if (origin) {
+        candidates.push(origin);
+      }
+
+      for (const k of candidates) {
+        const kPerp = (k.x - px0) * nx + (k.y - py0) * ny;
+        const dist = Math.abs(kPerp - rawDeltaPerp);
+        if (dist <= minPerpDist) {
+          minPerpDist = dist;
+          bestKeypoint = k;
+          finalDeltaPerp = kPerp;
+        }
+      }
+
+      if (bestKeypoint) {
+        snappedPointResult = bestKeypoint;
+      }
+    }
+
+    const newPivotX = px0 + finalDeltaPerp * nx;
+    const newPivotY = py0 + finalDeltaPerp * ny;
+
+    return {
+      pivotX: Math.round(newPivotX * 100) / 100,
+      pivotY: Math.round(newPivotY * 100) / 100,
+      snappedPt: snappedPointResult,
+    };
+  }
+
+  /**
    * Parametric Grid Management
    * Allows creating, deleting, and modifying multi-type grids (orthogonal, isometric, axonometric).
    */
