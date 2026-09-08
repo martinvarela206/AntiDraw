@@ -358,6 +358,17 @@ export class VectorModel {
       if (!hasDs && !hasIs) return;
 
       const filterId = `ad-filter-shadow-${el.id}`;
+
+      /**
+       * ARCHITECTURAL RATIONALE: Self-Healing Filter URL Binding
+       * If the element's id was modified (e.g. during Boolean operations, cloning, or
+       * deserialization), its filter attribute might point to an obsolete ID.
+       * Re-syncing ensures the filter reference matches the compiled <filter> definition in <defs>.
+       */
+      if (el.attributes['filter'] && el.attributes['filter'].includes('ad-filter-shadow-')) {
+        el.attributes['filter'] = `url(#${filterId})`;
+      }
+
       // Generous filter region prevents clipping blurred shadow margins
       out += `    <filter id="${filterId}" x="-50%" y="-50%" width="200%" height="200%">\n`;
 
@@ -415,6 +426,22 @@ export class VectorModel {
       if (!grad || !grad.stops || grad.stops.length === 0) return;
 
       const gradId = `ad-grad-${el.id}`;
+
+      /**
+       * ARCHITECTURAL RATIONALE: Self-Healing Dynamic Gradient URL Binding
+       * Why this exists:
+       * When vector elements undergo Boolean operations (Trim, Union, Intersect, Exclude),
+       * cloning, or ID mutations, their attributes may carry stale gradient URL references
+       * (e.g. fill="url(#ad-grad-old_id)") while the gradient definition in <defs> is
+       * compiled under the element's active ID (id="ad-grad-new_id").
+       * This self-healing binding synchronizes el.attributes['fill'] = `url(#ad-grad-${el.id})`
+       * directly during compilation, ensuring SVG renderers always locate the active gradient
+       * and preventing trimmed or modified vectors from visually losing their fill.
+       */
+      if (el.attributes['fill'] && el.attributes['fill'].includes('ad-grad-')) {
+        el.attributes['fill'] = `url(#${gradId})`;
+      }
+
       if (grad.type === 'linear') {
         let x1 = grad.x1 ?? 0;
         let y1 = grad.y1 ?? 0;

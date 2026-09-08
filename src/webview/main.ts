@@ -1269,6 +1269,7 @@ class AntiDrawApp {
         this.model.elements = this.model.elements.filter((e) => !removeIds.has(e.id));
         this.model.elements.push(result);
         this.selectionTool.select(result.id);
+        this.propertyPanel.resetPanelMode();
         this.render();
         this.syncToHost();
       }
@@ -1281,6 +1282,7 @@ class AntiDrawApp {
           this.model.elements[targetIdx] = trimRes.trimmed;
         }
         this.selectionTool.select(trimRes.trimmed.id);
+        this.propertyPanel.resetPanelMode();
         this.render();
         this.syncToHost();
       }
@@ -1291,6 +1293,7 @@ class AntiDrawApp {
         this.model.elements = this.model.elements.filter((e) => !removeIds.has(e.id));
         this.model.elements.push(result);
         this.selectionTool.select(result.id);
+        this.propertyPanel.resetPanelMode();
         this.render();
         this.syncToHost();
       }
@@ -1301,6 +1304,7 @@ class AntiDrawApp {
         this.model.elements = this.model.elements.filter((e) => !removeIds.has(e.id));
         this.model.elements.push(result);
         this.selectionTool.select(result.id);
+        this.propertyPanel.resetPanelMode();
         this.render();
         this.syncToHost();
       }
@@ -1310,6 +1314,7 @@ class AntiDrawApp {
       if (result) {
         this.model.elements.push(result);
         this.selectionTool.select(result.id);
+        this.propertyPanel.resetPanelMode();
         this.render();
         this.syncToHost();
       }
@@ -1322,6 +1327,7 @@ class AntiDrawApp {
         frags.forEach((f) => this.model.elements.push(f));
         this.selectionTool.deselectAll();
         frags.forEach((f) => this.selectionTool.selectedElementIds.add(f.id));
+        this.propertyPanel.resetPanelMode();
         this.render();
         this.syncToHost();
       }

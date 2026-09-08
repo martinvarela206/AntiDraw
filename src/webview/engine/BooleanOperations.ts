@@ -145,16 +145,34 @@ export class BooleanOperations {
     if (vertices.length === 0) return null;
 
     const d = model.compilePathD(vertices, true);
+    const attrs: Record<string, string> = {
+      ...baseAttrs,
+      id,
+      d,
+      'fill-rule': 'evenodd',
+      'data-node-types': vertices.map((v) => v.nodeType).join(','),
+    };
+
+    /**
+     * ARCHITECTURAL RATIONALE: Gradient & Filter Reference Re-Targeting
+     * Why this exists:
+     * When Boolean operations produce new vector elements (with new IDs), copying
+     * baseAttrs blindly leaves `fill="url(#ad-grad-${oldId})"` pointing to a defunct
+     * defs ID that will no longer exist once the old element is replaced or removed.
+     * Re-targeting to the new element `id` ensures that hardware-accelerated gradients
+     * (both linear and radial) and drop/inner shadow filters remain bound and renderable.
+     */
+    if (attrs['fill'] && attrs['fill'].includes('ad-grad-')) {
+      attrs['fill'] = `url(#ad-grad-${id})`;
+    }
+    if (attrs['filter'] && attrs['filter'].includes('ad-filter-shadow-')) {
+      attrs['filter'] = `url(#ad-filter-shadow-${id})`;
+    }
+
     return {
       id,
       tagName: 'path',
-      attributes: {
-        ...baseAttrs,
-        id,
-        d,
-        'fill-rule': 'evenodd',
-        'data-node-types': vertices.map((v) => v.nodeType).join(','),
-      },
+      attributes: attrs,
       vertices,
       isClosed: true,
     };
@@ -527,25 +545,44 @@ export class BooleanOperations {
         }));
         const combinedVertices = [...targetEl.vertices, ...holeVerts];
         const d = model.compilePathD(combinedVertices, true);
+        const attrs: Record<string, string> = {
+          ...targetEl.attributes,
+          id,
+          d,
+          'fill-rule': 'evenodd',
+          'data-node-types': combinedVertices.map((v) => v.nodeType).join(','),
+        };
+        if (attrs['fill'] && attrs['fill'].includes('ad-grad-')) {
+          attrs['fill'] = `url(#ad-grad-${id})`;
+        }
+        if (attrs['filter'] && attrs['filter'].includes('ad-filter-shadow-')) {
+          attrs['filter'] = `url(#ad-filter-shadow-${id})`;
+        }
         return {
           id,
           tagName: 'path',
-          attributes: {
-            ...targetEl.attributes,
-            id,
-            d,
-            'fill-rule': 'evenodd',
-            'data-node-types': combinedVertices.map((v) => v.nodeType).join(','),
-          },
+          attributes: attrs,
           vertices: combinedVertices,
           isClosed: true,
         };
       }
 
       // Disjoint: cutter is completely outside target -> target unchanged
+      const disjointId = `trimmed_${Date.now().toString(36)}`;
+      const disjointAttrs: Record<string, string> = {
+        ...targetEl.attributes,
+        id: disjointId,
+      };
+      if (disjointAttrs['fill'] && disjointAttrs['fill'].includes('ad-grad-')) {
+        disjointAttrs['fill'] = `url(#ad-grad-${disjointId})`;
+      }
+      if (disjointAttrs['filter'] && disjointAttrs['filter'].includes('ad-filter-shadow-')) {
+        disjointAttrs['filter'] = `url(#ad-filter-shadow-${disjointId})`;
+      }
       return {
         ...targetEl,
-        id: `trimmed_${Date.now().toString(36)}`,
+        id: disjointId,
+        attributes: disjointAttrs,
       };
     }
 
@@ -689,17 +726,33 @@ export class BooleanOperations {
 
     const id = `trimmed_${Date.now().toString(36)}`;
     const d = model.compilePathD(finalVertices, true);
+    const attrs: Record<string, string> = {
+      ...targetEl.attributes,
+      id,
+      d,
+      'fill-rule': 'evenodd',
+      'data-node-types': finalVertices.map((v) => v.nodeType).join(','),
+    };
+
+    /**
+     * ARCHITECTURAL RATIONALE: Preserving Gradient Fill and Filter Links After Bezier Trim
+     * When Bezier trimming subtracts intersecting curves, targetEl.attributes carries
+     * 'data-gradient' and fill="url(#ad-grad-${targetEl.id})".
+     * Because VectorModel compiles gradients dynamically using the element's active id,
+     * failure to re-bind fill="url(#ad-grad-${id})" causes the SVG renderer to look for
+     * a non-existent gradient ID, rendering the newly trimmed vector as transparent.
+     */
+    if (attrs['fill'] && attrs['fill'].includes('ad-grad-')) {
+      attrs['fill'] = `url(#ad-grad-${id})`;
+    }
+    if (attrs['filter'] && attrs['filter'].includes('ad-filter-shadow-')) {
+      attrs['filter'] = `url(#ad-filter-shadow-${id})`;
+    }
 
     return {
       id,
       tagName: 'path',
-      attributes: {
-        ...targetEl.attributes,
-        id,
-        d,
-        'fill-rule': 'evenodd',
-        'data-node-types': finalVertices.map((v) => v.nodeType).join(','),
-      },
+      attributes: attrs,
       vertices: finalVertices,
       isClosed: true,
     };
