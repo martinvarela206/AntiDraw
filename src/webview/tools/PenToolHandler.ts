@@ -47,21 +47,30 @@ export class PenToolHandler implements IToolHandler {
     if (activeTool !== 'pen') return false;
     if (e.button !== 0) return false;
 
-    const snappedPt = this.ctx.snapPoint(pt);
+    const z = this.ctx.canvasMgr.zoom || 1;
+    const closeRadius = 14 / z;
+
+    // ARCHITECTURAL RATIONALE: Screen-Normalized Proximity and Snapping Consistency
+    // 1. Evaluating snapping with `currentPenVertices` ensures the cursor magnetically locks
+    //    to the initial node if the user clicks close to it.
+    // 2. Testing both `snappedPt` and raw `pt` against `closeRadius = 14 / z` ensures that
+    //    even if external grid/guide snapping pulled `snappedPt` slightly away, a physical click
+    //    directly targeting the initial node reliably triggers path closure instead of inserting
+    //    an unwanted duplicate vertex directly on top of the origin.
+    const otherVertices = this.ctx.getOtherVertices();
+    this.currentPenVertices.forEach((v) => otherVertices.push({ x: v.x, y: v.y }));
+    const snappedPt = this.ctx.snapPoint(pt, otherVertices);
 
     // Check if clicking start node to close path
-    let hitVertexIdx = -1;
-    for (let i = 0; i < this.currentPenVertices.length; i++) {
-      const v = this.currentPenVertices[i];
-      if (Math.hypot(snappedPt.x - v.x, snappedPt.y - v.y) <= 12) {
-        hitVertexIdx = i;
-        break;
-      }
-    }
+    if (this.currentPenVertices.length >= 2) {
+      const firstV = this.currentPenVertices[0];
+      const distSnapped = Math.hypot(snappedPt.x - firstV.x, snappedPt.y - firstV.y);
+      const distRaw = Math.hypot(pt.x - firstV.x, pt.y - firstV.y);
 
-    if (hitVertexIdx === 0 && this.currentPenVertices.length >= 2) {
-      this.finishPenPath(true);
-      return true;
+      if (distSnapped <= closeRadius || distRaw <= closeRadius) {
+        this.finishPenPath(true);
+        return true;
+      }
     }
 
     const isStart = this.currentPenVertices.length === 0;
@@ -169,11 +178,30 @@ export class PenToolHandler implements IToolHandler {
     this.penMovingVertexIdx = null;
   }
 
+  /**
+   * ARCHITECTURAL RATIONALE: Coincident Vertex Deduplication and Topological Fusion
+   *
+   * 1. Eliminating Micro-Offset Duplicates:
+   *    Consecutive micro-clicks (e.g. double-click gestures or mouse debounce jitter) frequently
+   *    append multiple nodes at identical or near-identical coordinates.
+   * 2. Single Unified Closing Node:
+   *    When closing the path (`close === true`), if the final vertex was placed over the starting
+   *    anchor point (`v0`), `unifyClosingVertices` fuses the closing vertex into `v0`, transferring
+   *    incoming tangent handles and discarding the duplicate endpoint. The SVG 'Z' command then
+   *    cleanly seals the contour to `v0` without producing double-stacked nodes.
+   */
   public finishPenPath(close: boolean = false): void {
-    if (this.currentPenVertices.length >= 2) {
+    const z = this.ctx.canvasMgr.zoom || 1;
+    const cleanVerts = this.ctx.model.unifyClosingVertices(
+      this.currentPenVertices,
+      close,
+      14 / z
+    );
+
+    if (cleanVerts.length >= 2) {
       this.ctx.pushUndo();
       const id = `el_pen_${Date.now().toString(36)}`;
-      const pathD = this.ctx.model.compilePathD(this.currentPenVertices, close);
+      const pathD = this.ctx.model.compilePathD(cleanVerts, close);
       const newEl: VectorElement = {
         id,
         tagName: 'path',
@@ -183,9 +211,9 @@ export class PenToolHandler implements IToolHandler {
           fill: close ? '#4f46e5' : 'none',
           stroke: '#ffffff',
           'stroke-width': '2',
-          'data-node-types': this.currentPenVertices.map((v) => v.nodeType).join(','),
+          'data-node-types': cleanVerts.map((v) => v.nodeType).join(','),
         },
-        vertices: JSON.parse(JSON.stringify(this.currentPenVertices)),
+        vertices: cleanVerts,
         isClosed: close,
       };
 
@@ -216,8 +244,8 @@ export class PenToolHandler implements IToolHandler {
 
       if (this.penHoverPoint) {
         const isHoveringStart =
-          this.currentPenVertices.length >= 3 &&
-          Math.hypot(this.penHoverPoint.x - firstV.x, this.penHoverPoint.y - firstV.y) <= 12;
+          this.currentPenVertices.length >= 2 &&
+          Math.hypot(this.penHoverPoint.x - firstV.x, this.penHoverPoint.y - firstV.y) <= 14 / z;
 
         const targetPt = isHoveringStart ? { x: firstV.x, y: firstV.y } : this.penHoverPoint;
 

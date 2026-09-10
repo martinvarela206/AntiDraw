@@ -45,15 +45,23 @@ export class PolylineToolHandler implements IToolHandler {
     if (e.button !== 0) return false;
 
     const z = this.ctx.canvasMgr.zoom || 1;
+    const closeRadius = 14 / z;
     const otherVertices = this.ctx.getOtherVertices();
     this.currentPolylineVertices.forEach((v) => otherVertices.push({ x: v.x, y: v.y }));
     const snappedPt = this.ctx.snapPoint(pt, otherVertices);
 
-    // If we have at least 3 vertices and click on the first vertex, close the polygon
-    if (this.currentPolylineVertices.length >= 3) {
+    // If clicking on the first vertex, close the polygon
+    // ARCHITECTURAL RATIONALE: Resilient Proximity Snapping & Preventing Premature Duplicate Stacking
+    // 1. Minimum 2 vertices required to form a closed polygon/contour. Checking `>= 2` instead of `>= 3`
+    //    prevents the 3rd click (e.g. closing a triangle) from failing the close condition and
+    //    silently appending an unintended duplicate vertex on top of `firstV`.
+    // 2. Both `snappedPt` and raw `pt` are tested within `closeRadius` to ensure snapping to an adjacent
+    //    grid line or guide never prevents the user from committing the path closure.
+    if (this.currentPolylineVertices.length >= 2) {
       const firstV = this.currentPolylineVertices[0];
-      const distToStart = Math.hypot(snappedPt.x - firstV.x, snappedPt.y - firstV.y);
-      if (distToStart <= 14 / z) {
+      const distSnapped = Math.hypot(snappedPt.x - firstV.x, snappedPt.y - firstV.y);
+      const distRaw = Math.hypot(pt.x - firstV.x, pt.y - firstV.y);
+      if (distSnapped <= closeRadius || distRaw <= closeRadius) {
         this.finishPolylinePath(true);
         return true;
       }
@@ -62,8 +70,9 @@ export class PolylineToolHandler implements IToolHandler {
     // If clicking on the last vertex, finalize the open path
     if (this.currentPolylineVertices.length >= 2) {
       const lastV = this.currentPolylineVertices[this.currentPolylineVertices.length - 1];
-      const distToLast = Math.hypot(snappedPt.x - lastV.x, snappedPt.y - lastV.y);
-      if (distToLast <= 6 / z) {
+      const distSnapped = Math.hypot(snappedPt.x - lastV.x, snappedPt.y - lastV.y);
+      const distRaw = Math.hypot(pt.x - lastV.x, pt.y - lastV.y);
+      if (distSnapped <= 6 / z || distRaw <= 6 / z) {
         this.finishPolylinePath(false);
         return true;
       }
@@ -125,23 +134,24 @@ export class PolylineToolHandler implements IToolHandler {
   }
 
   /**
-   * Commit the polyline path to vector model elements.
-   * Cleans consecutive micro-offset duplicates before compilation.
+   * ARCHITECTURAL RATIONALE: Coincident Vertex Deduplication & Terminal Unification
+   *
+   * 1. Eliminating Micro-Offset Duplicates:
+   *    Consecutive clicks occurring in close succession (double-click gestures or mouse debounce jitter)
+   *    frequently emit adjacent vertices with Euclidean distance <= 0.5px.
+   * 2. Single Unified Closing Node:
+   *    When closing the path (`close === true`), if the final vertex was placed over the starting
+   *    anchor point (`v0`), `unifyClosingVertices` fuses the closing vertex into `v0`, transferring
+   *    incoming tangent handles and discarding the duplicate endpoint. The SVG 'Z' command then
+   *    cleanly seals the contour to `v0` without producing double-stacked nodes.
    */
   public finishPolylinePath(close: boolean = false): void {
-    // Deduplicate consecutive identical/micro-offset vertices
-    const cleanVerts: PathVertex[] = [];
-    for (let i = 0; i < this.currentPolylineVertices.length; i++) {
-      const v = this.currentPolylineVertices[i];
-      if (cleanVerts.length === 0) {
-        cleanVerts.push(v);
-      } else {
-        const prev = cleanVerts[cleanVerts.length - 1];
-        if (Math.hypot(v.x - prev.x, v.y - prev.y) > 0.5) {
-          cleanVerts.push(v);
-        }
-      }
-    }
+    const z = this.ctx.canvasMgr.zoom || 1;
+    const cleanVerts = this.ctx.model.unifyClosingVertices(
+      this.currentPolylineVertices,
+      close,
+      14 / z
+    );
 
     if (cleanVerts.length >= 2) {
       this.ctx.pushUndo();
@@ -158,7 +168,7 @@ export class PolylineToolHandler implements IToolHandler {
           'stroke-width': '2',
           'data-node-types': cleanVerts.map(() => 'asymmetric').join(','),
         },
-        vertices: JSON.parse(JSON.stringify(cleanVerts)),
+        vertices: cleanVerts,
         isClosed: close,
       };
 
@@ -189,7 +199,7 @@ export class PolylineToolHandler implements IToolHandler {
 
       if (this.polylineHoverPoint) {
         const isHoveringStart =
-          this.currentPolylineVertices.length >= 3 &&
+          this.currentPolylineVertices.length >= 2 &&
           Math.hypot(this.polylineHoverPoint.x - firstV.x, this.polylineHoverPoint.y - firstV.y) <= 14 / z;
 
         const targetPt = isHoveringStart ? { x: firstV.x, y: firstV.y } : this.polylineHoverPoint;

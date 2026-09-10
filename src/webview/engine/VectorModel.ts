@@ -734,7 +734,28 @@ export class VectorModel {
           command: 'C',
         });
       } else if (cmdUpper === 'Z') {
-        // Closing command
+        // ARCHITECTURAL RATIONALE: Parsing Terminal Coincident Nodes in 'Z' Subpaths
+        // When standard SVG generators emit an explicit final coordinate identical to the subpath origin
+        // prior to 'Z' (e.g. `M 0 0 L 100 0 L 0 0 Z`), naive parsers store both endpoints, creating two
+        // stacked coincident nodes at the closure point. If the last parsed vertex coincides with the origin
+        // of the active subpath, we fuse any incoming handle into the origin and eliminate the redundant vertex.
+        if (vertices.length >= 2) {
+          let subpathStartIdx = 0;
+          for (let k = vertices.length - 1; k >= 0; k--) {
+            if (vertices[k].command === 'M') {
+              subpathStartIdx = k;
+              break;
+            }
+          }
+          const startV = vertices[subpathStartIdx];
+          const lastV = vertices[vertices.length - 1];
+          if (lastV !== startV && Math.hypot(lastV.x - startV.x, lastV.y - startV.y) <= 0.5) {
+            if (lastV.handleIn && !startV.handleIn) {
+              startV.handleIn = { ...lastV.handleIn };
+            }
+            vertices.pop();
+          }
+        }
       } else {
         i++;
       }
@@ -752,6 +773,69 @@ export class VectorModel {
     }
 
     return vertices;
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Topological Closing & Coincident Endpoint Unification
+   *
+   * Why this solution is engineered this way:
+   * 1. Redundant Terminal Vertex Elimination:
+   *    In SVG path geometry, the 'Z' command instructs the rendering engine to connect the pen back
+   *    to the initial 'M' anchor point. If an authoring tool commits a terminal vertex whose coordinates
+   *    coincide with the starting point, storing both vertices generates a redundant zero-length segment.
+   *    This results in duplicate coincident nodes in the Node Editor, double control handles, and invalid
+   *    self-intersections during boolean clipping.
+   *
+   * 2. Curvature Continuity & Tangent Inheritance (Handle Transfer):
+   *    When eliminating the redundant closing vertex, its incoming Bézier handle (`handleIn`) must be
+   *    safely transferred to the initial anchor point (`v0.handleIn`) if `v0` does not possess one.
+   *    This preserves the exact mathematical curvature of the closing segment without altering topology.
+   *
+   * 3. Micro-Offset Deduplication:
+   *    Consecutive clicks occurring within <= 0.5px (e.g. from rapid double-clicks) are automatically
+   *    deduplicated to prevent zero-length sub-segments while preserving intentional macro shapes.
+   *
+   * Discarded Alternate Approaches:
+   * - Leaving vertices uncleaned and only adjusting `compilePathD`: Discarded because the Node Editor,
+   *   subdivision algorithms, and boolean engines operate directly on `el.vertices`. Having redundant
+   *   vertices in memory causes UI desynchronization and double-selection glitches.
+   */
+  public unifyClosingVertices(vertices: PathVertex[], isClosed?: boolean, closingTol: number = 0.5): PathVertex[] {
+    if (!vertices || vertices.length === 0) return [];
+
+    // Step 1: Deduplicate consecutive identical/micro-offset vertices
+    const cleanVerts: PathVertex[] = [];
+    for (let i = 0; i < vertices.length; i++) {
+      const v = vertices[i];
+      if (cleanVerts.length === 0) {
+        cleanVerts.push({ ...v });
+      } else {
+        const prev = cleanVerts[cleanVerts.length - 1];
+        if (Math.hypot(v.x - prev.x, v.y - prev.y) > 0.5) {
+          cleanVerts.push({ ...v });
+        }
+      }
+    }
+
+    // Step 2: If closed, detect and fuse redundant terminal vertex into initial vertex
+    if (isClosed && cleanVerts.length >= 2) {
+      const firstV = cleanVerts[0];
+      const lastV = cleanVerts[cleanVerts.length - 1];
+      const dist = Math.hypot(lastV.x - firstV.x, lastV.y - firstV.y);
+
+      if (dist <= closingTol) {
+        // Inherit incoming tangent handle if the initial vertex lacks it
+        if (lastV.handleIn && !firstV.handleIn) {
+          firstV.handleIn = { ...lastV.handleIn };
+        }
+        if (lastV.handleOut && !firstV.handleOut) {
+          firstV.handleOut = { ...lastV.handleOut };
+        }
+        cleanVerts.pop();
+      }
+    }
+
+    return cleanVerts;
   }
 
   // Convert vertices back into SVG 'd' string with proper per-subpath closing and Bézier curves
@@ -778,11 +862,29 @@ export class VectorModel {
 
     for (const sp of subpaths) {
       if (sp.length === 0) continue;
-      let spD = `M ${formatNum(sp[0].x)} ${formatNum(sp[0].y)}`;
 
-      for (let i = 1; i < sp.length; i++) {
-        const v = sp[i];
-        const prev = sp[i - 1];
+      // ARCHITECTURAL RATIONALE: Coincident Closing Subpath Trimming
+      // If the caller supplied a closed subpath where the final vertex is already coincident
+      // with the starting vertex, we trim the terminal duplicate so that the closing 'Z' command
+      // closes directly from the true preceding anchor, avoiding a zero-length line/curve.
+      let effSp = sp;
+      let closingHandleIn: Point | undefined;
+      let closingHandleOut: Point | undefined;
+      if (isClosed && sp.length >= 2) {
+        const first = sp[0];
+        const last = sp[sp.length - 1];
+        if (Math.hypot(last.x - first.x, last.y - first.y) <= 0.5) {
+          closingHandleIn = last.handleIn;
+          closingHandleOut = last.handleOut;
+          effSp = sp.slice(0, sp.length - 1);
+        }
+      }
+
+      let spD = `M ${formatNum(effSp[0].x)} ${formatNum(effSp[0].y)}`;
+
+      for (let i = 1; i < effSp.length; i++) {
+        const v = effSp[i];
+        const prev = effSp[i - 1];
         if (prev.handleOut || v.handleIn) {
           const h1 = prev.handleOut || { x: prev.x, y: prev.y };
           const h2 = v.handleIn || { x: v.x, y: v.y };
@@ -792,13 +894,15 @@ export class VectorModel {
         }
       }
 
-      if (isClosed && sp.length > 1) {
-        const first = sp[0];
-        const last = sp[sp.length - 1];
-        if (last.handleOut || first.handleIn) {
-          const h1 = last.handleOut || { x: last.x, y: last.y };
-          const h2 = first.handleIn || { x: first.x, y: first.y };
-          spD += ` C ${formatNum(h1.x)} ${formatNum(h1.y)} ${formatNum(h2.x)} ${formatNum(h2.y)} ${formatNum(first.x)} ${formatNum(first.y)} Z`;
+      if (isClosed && effSp.length > 1) {
+        const first = effSp[0];
+        const last = effSp[effSp.length - 1];
+        const h1 = last.handleOut || (closingHandleOut ? closingHandleOut : undefined);
+        const h2 = first.handleIn || (closingHandleIn ? closingHandleIn : undefined);
+        if (h1 || h2) {
+          const h1Pt = h1 || { x: last.x, y: last.y };
+          const h2Pt = h2 || { x: first.x, y: first.y };
+          spD += ` C ${formatNum(h1Pt.x)} ${formatNum(h1Pt.y)} ${formatNum(h2Pt.x)} ${formatNum(h2Pt.y)} ${formatNum(first.x)} ${formatNum(first.y)} Z`;
         } else {
           spD += ' Z';
         }

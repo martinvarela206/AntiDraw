@@ -238,18 +238,33 @@ export class NodeEditorTool {
   }
 
   /**
-   * ARCHITECTURAL RATIONALE: Topological Contour Auto-Closure ('Z')
+   * ARCHITECTURAL RATIONALE: Topological Contour Auto-Closure ('Z') and Coincident Node Fusion
    * Why this solution is engineered this way:
    * 1. Vector Graph Closure: An open path in SVG does not fill predictably across different renderers
    *    unless explicitly terminated with the 'Z' (closepath) operator.
-   * 2. Preserves Node Identities: Instead of mutating vertex indices or discarding vertices,
-   *    marking the contour as closed connects the last vertex back to the initial 'M' anchor point
-   *    while retaining all handle tangents and individual node ids for subsequent editing.
+   * 2. Preserves Node Identities and Prevents Terminal Stacking:
+   *    If the last vertex is already coincident with the initial anchor point (within fusionThreshold),
+   *    retaining both before applying 'Z' causes duplicate coincident nodes to be stacked at the origin.
+   *    In such cases, any incoming handle from the terminal node is transferred to the origin node,
+   *    and the redundant terminal vertex is cleanly removed before closing.
    * 3. Idempotent: If the path is already closed or has fewer than 2 vertices, this operation is a safe no-op.
    */
   public closePath(vertices: PathVertex[]): { updatedVertices: PathVertex[]; isClosed: boolean } {
     if (!vertices || vertices.length < 2) return { updatedVertices: vertices, isClosed: false };
     const updated = vertices.map((v) => ({ ...v }));
+    const firstV = updated[0];
+    const lastV = updated[updated.length - 1];
+
+    if (Math.hypot(lastV.x - firstV.x, lastV.y - firstV.y) <= this.fusionThreshold) {
+      if (lastV.handleIn && !firstV.handleIn) {
+        firstV.handleIn = { ...lastV.handleIn };
+      }
+      if (lastV.handleOut && !firstV.handleOut) {
+        firstV.handleOut = { ...lastV.handleOut };
+      }
+      updated.pop();
+    }
+
     return { updatedVertices: updated, isClosed: true };
   }
 

@@ -368,7 +368,26 @@ export class NodeToolHandler implements IToolHandler {
 
       if (selectedEl && this.ghostNodeVertices) {
         this.ctx.pushUndo();
-        const isClosed = this.isElementClosed(selectedEl);
+        let isClosed = this.isElementClosed(selectedEl);
+
+        // ARCHITECTURAL RATIONALE: Endpoint Drag Auto-Closure & Coincident Fusion
+        // If an artist drags an open vector's free endpoint onto its opposite terminal endpoint,
+        // rather than leaving two stacked vertices on an open contour, we trigger auto-closure:
+        // the terminal vertex is fused into the origin node and the contour is marked isClosed=true.
+        if (!isClosed && this.ghostNodeVertices.length >= 2) {
+          const firstV = this.ghostNodeVertices[0];
+          const lastV = this.ghostNodeVertices[this.ghostNodeVertices.length - 1];
+          if (Math.hypot(lastV.x - firstV.x, lastV.y - firstV.y) <= this.nodeEditorTool.fusionThreshold) {
+            const closeRes = this.nodeEditorTool.closePath(this.ghostNodeVertices);
+            this.ghostNodeVertices = closeRes.updatedVertices;
+            selectedEl.isClosed = true;
+            isClosed = true;
+            if (!selectedEl.attributes.fill || selectedEl.attributes.fill === 'none') {
+              selectedEl.attributes.fill = '#6366f1';
+            }
+          }
+        }
+
         selectedEl.vertices = this.ghostNodeVertices;
         selectedEl.attributes.d = this.ctx.model.compilePathD(selectedEl.vertices, isClosed);
         selectedEl.attributes['data-node-types'] = selectedEl.vertices.map((v) => v.nodeType).join(',');
