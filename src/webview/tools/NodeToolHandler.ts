@@ -22,10 +22,10 @@ export interface NodeToolCallbacks {
  *    point via De Casteljau subdivision (`insertVertexOnPath`), inserting a new vertex while
  *    preserving the original contour curve with sub-pixel tolerance.
  *
- * 3. Proximity Auto-Fusion for Open Contours:
- *    On release (`onPointerUp`), open paths undergo proximity testing between endpoints (`autoFuseVertices`).
- *    If an endpoint is dragged within `fusionThreshold` (8px) of another endpoint, they fuse into
- *    a single continuous vertex, closing the path and maintaining continuous Bézier flow.
+ * 3. Explicit Endpoint Auto-Fusion with Ctrl (FIX-03):
+ *    Endpoints of open paths only fuse and close when the user explicitly holds the `Ctrl` key
+ *    while dragging/releasing near another free endpoint (`isCtrlPressed`). Without Ctrl, nodes
+ *    remain strictly independent and can be positioned or crossed freely without accidental welding.
  *
  * 4. Ephemeral Ghost Manipulation:
  *    All active vertex and handle drags operate entirely on `ghostNodeVertices` and render to the
@@ -284,6 +284,7 @@ export class NodeToolHandler implements IToolHandler {
 
       const isClosed = this.isElementClosed(selectedEl);
       const isShift = e.shiftKey;
+      const isCtrl = e.ctrlKey || e.metaKey;
 
       if (this.activeHandle === 'vertex' && this.nodeEditorTool.selectedVertexId) {
         const otherVertices: Point[] = [];
@@ -302,7 +303,7 @@ export class NodeToolHandler implements IToolHandler {
           this.initialVertices,
           this.nodeEditorTool.selectedVertexId,
           snappedPt,
-          isShift,
+          isCtrl,
           this.ctx.model.elements
         );
         this.ghostNodeVertices = result.updatedVertices;
@@ -361,7 +362,7 @@ export class NodeToolHandler implements IToolHandler {
     return false;
   }
 
-  public onPointerUp(_e: PointerEvent, _pt: Point): boolean {
+  public onPointerUp(e: PointerEvent, _pt: Point): boolean {
     if (this.isDragging) {
       this.isDragging = false;
       const selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
@@ -369,12 +370,13 @@ export class NodeToolHandler implements IToolHandler {
       if (selectedEl && this.ghostNodeVertices) {
         this.ctx.pushUndo();
         let isClosed = this.isElementClosed(selectedEl);
+        const isCtrl = e.ctrlKey || e.metaKey;
 
-        // ARCHITECTURAL RATIONALE: Endpoint Drag Auto-Closure & Coincident Fusion
+        // ARCHITECTURAL RATIONALE: Endpoint Drag Auto-Closure & Coincident Fusion (FIX-03)
         // If an artist drags an open vector's free endpoint onto its opposite terminal endpoint,
-        // rather than leaving two stacked vertices on an open contour, we trigger auto-closure:
-        // the terminal vertex is fused into the origin node and the contour is marked isClosed=true.
-        if (!isClosed && this.ghostNodeVertices.length >= 2) {
+        // auto-closure and node welding occurs ONLY when the user explicitly holds the Ctrl key.
+        // If Ctrl is NOT pressed, nodes may freely cross or coincide without accidental path closure.
+        if (isCtrl && !isClosed && this.ghostNodeVertices.length >= 2) {
           const firstV = this.ghostNodeVertices[0];
           const lastV = this.ghostNodeVertices[this.ghostNodeVertices.length - 1];
           if (Math.hypot(lastV.x - firstV.x, lastV.y - firstV.y) <= this.nodeEditorTool.fusionThreshold) {

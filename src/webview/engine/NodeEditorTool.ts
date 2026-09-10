@@ -269,21 +269,23 @@ export class NodeEditorTool {
   }
 
   /**
-   * ARCHITECTURAL RATIONALE: Topological Endpoint Auto-Fusion
+   * ARCHITECTURAL RATIONALE: Topological Endpoint Auto-Fusion (FIX-03)
    * Why this solution is engineered this way:
    * 1. Scope Restriction (isFreeEndpoint): Auto-fusion is strictly limited to the first (index 0)
    *    or last (index n-1) vertex of an open path. Merging an interior vertex would create an invalid
    *    non-manifold branch in standard SVG path geometry (SVG paths cannot represent 3-way branch points).
    * 2. Proximity Snapping (fusionThreshold = 8px): Provides tactile magnetic snapping when closing
    *    a contour or joining two separate path endpoints together.
-   * 3. Override Modifier (isShiftPressed): Holding Shift deliberately bypasses fusion, enabling users
-   *    to place endpoints intimately close to other vertices without accidental joining.
+   * 3. Explicit Intent via Ctrl Modifier (isCtrlPressed):
+   *    Auto-fusion and topological welding MUST occur exclusively when the user explicitly holds the Ctrl key.
+   *    Without Ctrl, endpoints can be placed, aligned, or crossed freely at any distance (even 0px)
+   *    without accidental topological welding or path closure.
    */
   public moveVertex(
     vertices: PathVertex[],
     vertexId: string,
     newPos: Point,
-    isShiftPressed: boolean = false,
+    isCtrlPressed: boolean = false,
     allElements: VectorElement[] = []
   ): { updatedVertices: PathVertex[]; fused: boolean } {
     const vIndex = vertices.findIndex((v) => v.id === vertexId);
@@ -299,7 +301,7 @@ export class NodeEditorTool {
     // Check Auto-Fusion for free endpoints (first or last vertex of open path)
     const isFreeEndpoint = (vIndex === 0 || vIndex === vertices.length - 1) && targetV.command !== 'Z';
 
-    if (isFreeEndpoint && !isShiftPressed) {
+    if (isFreeEndpoint && isCtrlPressed) {
       // Search for nearby free endpoints in current or other paths
       for (const el of allElements) {
         if (!el.vertices) continue;
