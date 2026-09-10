@@ -574,6 +574,18 @@ export class NodeToolHandler implements IToolHandler {
         this.nodeEditorTool.selectedVertexId = splitResult.newVertexId;
       }
       selectedEl.isClosed = false;
+
+      /**
+       * HISTORICAL ARCHITECTURE (FIX-13):
+       * Fill Reset on Node Split.
+       * When a path node is split, the contour unrolls or breaks into an open path.
+       * In accordance with professional vector standards, open paths must have their fill
+       * immediately reset to 'none' and gradient metadata purged so that no simulated
+       * straight-line chord closure is rendered by SVG engines.
+       */
+      selectedEl.attributes.fill = 'none';
+      delete selectedEl.attributes['data-gradient'];
+
       selectedEl.attributes.d = this.ctx.model.compilePathD(selectedEl.vertices, false);
       selectedEl.attributes['data-node-types'] = selectedEl.vertices.map((v) => v.nodeType).join(',');
 

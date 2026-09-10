@@ -315,6 +315,26 @@ export class VectorModel {
             elem.attributes.d = this.compilePathD(elem.vertices, elem.isClosed);
           }
 
+          /**
+           * HISTORICAL ARCHITECTURE (FIX-13):
+           * Open Vector Fill Restriction & Simulated Fill Elimination.
+           *
+           * Underlying Technical Justification:
+           * The SVG specification dictates that when an open path (missing 'Z' command) has a fill
+           * other than 'none', the browser automatically simulates a closure by connecting the
+           * terminal vertex back to the origin vertex with an invisible straight line.
+           * In professional vector illustration (CorelDraw, Illustrator, Figma), open strokes
+           * must never have artificial fills unless explicitly closed.
+           *
+           * Technical Solution:
+           * When importing or unrolling an open element, `fill` is strictly forced to 'none'
+           * and any associated `data-gradient` attributes are deleted to prevent corrupt defs.
+           */
+          if (!elem.isClosed) {
+            elem.attributes.fill = 'none';
+            delete elem.attributes['data-gradient'];
+          }
+
           this.elements.push(elem);
         }
       });
@@ -517,6 +537,18 @@ export class VectorModel {
         // Persist nodeType for each vertex so re-parsing restores it reliably
         el.attributes['data-node-types'] = el.vertices.map((v) => v.nodeType).join(',');
       }
+
+      /**
+       * HISTORICAL ARCHITECTURE (FIX-13):
+       * Open Vector Fill Suppression in SVG Serialization.
+       * If an element is open (!isElementClosed), its fill attribute is strictly set to 'none'
+       * and any gradient definitions are unlinked to eliminate false straight-line polygon fills.
+       */
+      if (!this.isElementClosed(el)) {
+        el.attributes.fill = 'none';
+        delete el.attributes['data-gradient'];
+      }
+
       svg += `  <${el.tagName}`;
       for (const [key, val] of Object.entries(el.attributes)) {
         svg += ` ${key}="${escapeXml(val)}"`;
@@ -915,12 +947,24 @@ export class VectorModel {
   }
 
   /**
-   * Determine whether an element is topologically closed ('Z' subpath, explicit flag, or closed SVG shape).
+   * HISTORICAL ARCHITECTURE (FIX-13): Rigorous Topological Closure Evaluation
+   *
+   * Problem & SVG Edge Case:
+   * When an SVG element lacks closure ('Z' command), browsers automatically simulate a closed polygon
+   * whenever `fill` is defined. This produces bizarre artifacts (e.g. diagonal filling chords
+   * cutting across unclosed Bézier branches or split nodes).
+   *
+   * Technical Solution:
+   * Determine topological closure across all SVG primitives:
+   * - <path>: explicitly checks presence of 'Z' or 'z' command in compiled path data or `el.isClosed`.
+   * - <line>, <polyline>: open by nature unless explicitly flagged.
+   * - <rect>, <circle>, <ellipse>, <star>, <polygon>: inherently closed polygons.
    */
   public isElementClosed(el: VectorElement): boolean {
     if (el.isClosed !== undefined) return el.isClosed;
     if (el.tagName && ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(el.tagName)) return true;
-    if (el.attributes?.d && /z/i.test(el.attributes.d)) return true;
+    if (el.tagName && ['line', 'polyline'].includes(el.tagName)) return false;
+    if (el.attributes?.d && /[zZ]/.test(el.attributes.d)) return true;
     return false;
   }
 

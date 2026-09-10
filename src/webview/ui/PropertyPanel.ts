@@ -943,6 +943,8 @@ export class PropertyPanel {
     const groupBox = this.selectionTool.getGroupSelectionBoundingBox(elements);
     const multiPivot = groupBox ? this.selectionTool.getPivot(groupBox) : { x: 0, y: 0 };
 
+    const hasClosedElements = elements.some((el) => this.model.isElementClosed(el));
+
     this.container.innerHTML = `
       <div class="panel-section">
         <div class="panel-title">Multiple Selection</div>
@@ -968,12 +970,15 @@ export class PropertyPanel {
       </div>
 
       <div class="panel-section">
-        <div class="panel-title">Batch Fill</div>
+        <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
+          <span>Batch Fill</span>
+          ${!hasClosedElements ? '<span style="font-size:10px; color:#94a3b8; font-weight:normal; text-transform:none;">(Solo elementos cerrados)</span>' : ''}
+        </div>
         <div class="prop-row">
           <span class="prop-label">Color</span>
           <div class="color-picker-row">
-            <input type="color" class="color-swatch" id="batch-fill-color" value="#4f46e5" />
-            <input type="text" class="prop-input" id="batch-fill-hex" value="#4f46e5" />
+            <input type="color" class="color-swatch" id="batch-fill-color" value="#4f46e5" ${!hasClosedElements ? 'disabled' : ''} />
+            <input type="text" class="prop-input" id="batch-fill-hex" value="#4f46e5" ${!hasClosedElements ? 'disabled style="opacity:0.6; cursor:not-allowed;" title="Ningún elemento seleccionado es un trazado cerrado"' : ''} />
           </div>
         </div>
       </div>
@@ -1037,14 +1042,26 @@ export class PropertyPanel {
 
     if (bFillColor) {
       bFillColor.addEventListener('input', () => {
-        elements.forEach((el) => { el.attributes['fill'] = bFillColor.value; });
+        elements.forEach((el) => {
+          if (this.model.isElementClosed(el)) {
+            el.attributes['fill'] = bFillColor.value;
+          } else {
+            el.attributes['fill'] = 'none';
+          }
+        });
         if (bFillHex) bFillHex.value = bFillColor.value;
         this.callbacks.onUpdateElement(elements[0]);
       });
     }
     if (bFillHex) {
       bFillHex.addEventListener('change', () => {
-        elements.forEach((el) => { el.attributes['fill'] = bFillHex.value; });
+        elements.forEach((el) => {
+          if (this.model.isElementClosed(el)) {
+            el.attributes['fill'] = bFillHex.value;
+          } else {
+            el.attributes['fill'] = 'none';
+          }
+        });
         if (bFillColor) bFillColor.value = bFillHex.value;
         this.callbacks.onUpdateElement(elements[0]);
       });
@@ -1364,7 +1381,12 @@ export class PropertyPanel {
 
   // Render Single Element Properties
   private renderElementProperties(el: VectorElement): void {
-    const fill = el.attributes['fill'] || 'none';
+    const isClosed = this.model.isElementClosed(el);
+    let fill = isClosed ? (el.attributes['fill'] || 'none') : 'none';
+    if (!isClosed) {
+      el.attributes['fill'] = 'none';
+      delete el.attributes['data-gradient'];
+    }
     const stroke = el.attributes['stroke'] || '#ffffff';
     const strokeWidth = el.attributes['stroke-width'] || '1';
     const strokeDash = el.attributes['stroke-dasharray'] || '';
@@ -1373,19 +1395,9 @@ export class PropertyPanel {
     const strokeMiterlimit = parseFloat(el.attributes['stroke-miterlimit'] || '4') || 4;
     const miterAngleDeg = miterLimitToDegrees(strokeMiterlimit);
 
-    const parseMarkerId = (val?: string): string => {
-      if (!val || val === 'none') return 'none';
-      if (val.includes('arrow-open')) return 'arrow-open';
-      if (val.includes('arrow-filled')) return 'arrow-filled';
-      if (val.includes('circle-dot')) return 'circle-dot';
-      if (val.includes('square-block')) return 'square-block';
-      if (val.includes('bar-cap')) return 'bar-cap';
-      return 'none';
-    };
-
-    const markerStart = parseMarkerId(el.attributes['marker-start']);
-    const markerMid = parseMarkerId(el.attributes['marker-mid']);
-    const markerEnd = parseMarkerId(el.attributes['marker-end']);
+    const markerStart = el.attributes['marker-start'] || '';
+    const markerMid = el.attributes['marker-mid'] || '';
+    const markerEnd = el.attributes['marker-end'] || '';
 
     const box = this.selectionTool.getBoundingBox(el);
     const x = box ? Math.round(box.x) : 0;
@@ -1393,8 +1405,8 @@ export class PropertyPanel {
     const w = box ? Math.round(box.width) : 0;
     const h = box ? Math.round(box.height) : 0;
 
-    let ds: DropShadowConfig = { enabled: false, dx: 4, dy: 4, blur: 6, color: '#000000', opacity: 0.5 };
-    let is: InnerShadowConfig = { enabled: false, dx: 3, dy: 3, blur: 4, color: '#000000', opacity: 0.5 };
+    let ds: DropShadowConfig = { enabled: false, dx: 4, dy: 4, blur: 4, color: '#000000', opacity: 0.5 };
+    let is: InnerShadowConfig = { enabled: false, dx: 2, dy: 2, blur: 3, color: '#000000', opacity: 0.6 };
     if (el.attributes['data-drop-shadow']) {
       try {
         ds = { ...ds, ...JSON.parse(el.attributes['data-drop-shadow']) };
@@ -1407,14 +1419,16 @@ export class PropertyPanel {
     }
 
     let grad: GradientConfig | null = null;
-    if (el.attributes['data-gradient']) {
+    if (isClosed && el.attributes['data-gradient']) {
       try {
         grad = JSON.parse(el.attributes['data-gradient']);
       } catch {}
     }
 
     let fillType: 'solid' | 'linear' | 'radial' | 'none' = 'solid';
-    if (fill === 'none' && !grad) {
+    if (!isClosed) {
+      fillType = 'none';
+    } else if (fill === 'none' && !grad) {
       fillType = 'none';
     } else if (grad && grad.type === 'radial') {
       fillType = 'radial';
@@ -1473,12 +1487,29 @@ export class PropertyPanel {
         </div>
         <div class="prop-row">
           <span class="prop-label">Nodes</span>
-          <span style="font-weight:600; color:var(--text-main); font-size:12px;">${el.vertices ? el.vertices.length : 0} nodes (${el.isClosed ? 'closed' : 'open'})</span>
+          <span style="font-weight:600; color:var(--text-main); font-size:12px;">${el.vertices ? el.vertices.length : 0} nodes (${isClosed ? 'closed' : 'open'})</span>
         </div>
       </div>
 
       <div class="panel-section">
-        <div class="panel-title">Fill (Relleno)</div>
+        <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
+          <span>Fill (Relleno)</span>
+          ${!isClosed ? '<span style="font-size:10px; color:#94a3b8; font-weight:normal; text-transform:none;">Trazado abierto</span>' : ''}
+        </div>
+        ${!isClosed ? `
+        <div class="prop-row">
+          <span class="prop-label">Type</span>
+          <select class="prop-input" id="el-fill-type" disabled style="cursor:not-allowed; opacity:0.6;" title="Los vectores abiertos no admiten relleno. Cierra el trazado formalmente para habilitar el relleno.">
+            <option value="none" selected>None (Trazado abierto)</option>
+          </select>
+        </div>
+        <div style="font-size:11px; color:#94a3b8; margin-top:4px; line-height:1.4;">
+          Los vectores abiertos tienen el relleno bloqueado a <code>none</code> para evitar cierres simulados.
+        </div>
+        <div style="margin-top:6px;">
+          <button class="prop-input" id="btn-prop-close-path" style="width:100%; cursor:pointer; background:#3b82f6; color:#fff; text-align:center; font-weight:600; padding:4px 8px; font-size:11px;" title="Cerrar trazado formalmente uniendo extremos libres con Z">Cerrar Trazado (Z)</button>
+        </div>
+        ` : `
         <div class="prop-row">
           <span class="prop-label">Type</span>
           <select class="prop-input" id="el-fill-type" style="cursor:pointer;">
@@ -1523,6 +1554,7 @@ export class PropertyPanel {
               <option value="270" ${grad.angle === 270 ? 'selected' : ''}>270° ↑</option>
               <option value="45" ${grad.angle === 45 ? 'selected' : ''}>45° ↘</option>
               <option value="135" ${grad.angle === 135 ? 'selected' : ''}>135° ↙</option>
+            </select>
           </div>
 
           <!-- Radial Gradient Geometric Controls (for Radial) -->
@@ -1571,6 +1603,7 @@ export class PropertyPanel {
             </div>
           </div>
         </div>
+        `}
       </div>
 
       <div class="panel-section">
@@ -1841,6 +1874,12 @@ export class PropertyPanel {
     };
 
     const applyFillChanges = () => {
+      if (!isClosed) {
+        el.attributes['fill'] = 'none';
+        delete el.attributes['data-gradient'];
+        this.callbacks.onUpdateElement(el);
+        return;
+      }
       if (fillType === 'none') {
         el.attributes['fill'] = 'none';
         delete el.attributes['data-gradient'];
@@ -1857,13 +1896,22 @@ export class PropertyPanel {
       this.callbacks.onUpdateElement(el);
     };
 
+    const btnPropClosePath = this.container.querySelector<HTMLButtonElement>('#btn-prop-close-path');
+    if (btnPropClosePath) {
+      this.bindMouseDown('btn-prop-close-path', () => {
+        if (this.callbacks.onClosePath) {
+          this.callbacks.onClosePath();
+        }
+      });
+    }
+
     const fillTypeSelect = this.container.querySelector<HTMLSelectElement>('#el-fill-type');
     const solidControls = this.container.querySelector<HTMLElement>('#fill-solid-controls');
     const gradControls = this.container.querySelector<HTMLElement>('#fill-gradient-controls');
     const angleRow = this.container.querySelector<HTMLElement>('#gradient-angle-row');
     const radialControls = this.container.querySelector<HTMLElement>('#fill-radial-controls');
 
-    if (fillTypeSelect) {
+    if (fillTypeSelect && isClosed) {
       fillTypeSelect.addEventListener('change', () => {
         if (this.callbacks.onPushUndo) this.callbacks.onPushUndo();
         fillType = fillTypeSelect.value as any;
@@ -1880,7 +1928,7 @@ export class PropertyPanel {
       });
     }
 
-    if (elFillColor) {
+    if (elFillColor && isClosed) {
       elFillColor.addEventListener('input', () => {
         if (fillType === 'solid') {
           el.attributes['fill'] = elFillColor.value;
@@ -1892,7 +1940,7 @@ export class PropertyPanel {
         if (this.callbacks.onPushUndo) this.callbacks.onPushUndo();
       });
     }
-    if (elFillHex) {
+    if (elFillHex && isClosed) {
       elFillHex.addEventListener('change', () => {
         if (fillType === 'solid') {
           if (this.callbacks.onPushUndo) this.callbacks.onPushUndo();
