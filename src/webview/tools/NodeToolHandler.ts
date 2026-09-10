@@ -543,12 +543,19 @@ export class NodeToolHandler implements IToolHandler {
     const selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
     if (selectedEl && selectedEl.vertices && this.nodeEditorTool.selectedVertexId) {
       this.ctx.pushUndo();
+      const isClosed = this.isElementClosed(selectedEl);
+      /**
+       * HISTORICAL ARCHITECTURE (FIX-14):
+       * Closed Path Tangential Wrapping.
+       * Passing `isClosed` allows `setNodeType` to cyclically resolve P_prev and P_next across
+       * index 0 and index N-1, ensuring exact secant tangency for closed loops (rectangles, polygons, closed Béziers).
+       */
       selectedEl.vertices = this.nodeEditorTool.setNodeType(
         selectedEl.vertices,
         this.nodeEditorTool.selectedVertexId,
-        type
+        type,
+        isClosed
       );
-      const isClosed = this.isElementClosed(selectedEl);
       selectedEl.attributes.d = this.ctx.model.compilePathD(selectedEl.vertices, isClosed);
       selectedEl.attributes['data-node-types'] = selectedEl.vertices.map((v) => v.nodeType).join(',');
 

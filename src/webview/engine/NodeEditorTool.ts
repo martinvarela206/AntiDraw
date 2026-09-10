@@ -366,15 +366,113 @@ export class NodeEditorTool {
    * 4. 'symmetric' (Mirrored Tangents):
    *    Enforces both 180° opposite angle and identical Euclidean distance (distOut = distIn) ensuring
    *    balanced curvature on both incoming and outgoing curve segments.
+   * 5. HISTORICAL ARCHITECTURE (FIX-14) - Tangential Secant Alignment:
+   *    Previous Implementation:
+   *    When switching a node without handles (`sharp`) to 'asymmetric', 'smooth', or 'symmetric', handles
+   *    were inserted with a fixed horizontal X offset: `{ x: v.x - 20, y: v.y }` and `{ x: v.x + 20, y: v.y }`.
+   *    On vertical, diagonal, or curved paths, this introduced artificial kinks, self-intersecting loops,
+   *    and visual defects because the handles were completely oblivious to the path's direction of travel.
+   *
+   *    Solution:
+   *    The generated handles are aligned tangentially to the trajectory of the path at the target vertex:
+   *    1. Secant Tangent:
+   *       Derived from the adjacent predecessor (P_prev) and successor (P_next) anchors in the containing subpath:
+   *       t = P_next - P_prev, normalized to unit tangent tHat = t / ||t||.
+   *    2. Boundary & Topology Awareness:
+   *       - Closed contours (isClosed=true) wrap cyclically: P_prev = subpath[(k-1+M)%M], P_next = subpath[(k+1)%M].
+   *       - Open contours (isClosed=false) use one-sided forward tangent at start (P_next - v) and backward tangent
+   *         at end (v - P_prev).
+   *       - Degenerate / coincident vertices fall back to forward/backward differences, or unit (1,0) if single-point.
+   *    3. Proportional Lengths (distIn, distOut):
+   *       If handles already existed, their custom Euclidean lengths are preserved. If newly created, lengths are
+   *       proportional to adjacent chords (~chordLength / 3 clamped between 10px and 80px), preventing overshoot.
+   *
+   *    Discarded Alternatives:
+   *    - Using average angle of existing handles: Fails when converting from 'sharp' where no handles exist.
+   *    - Fixed 20px magnitude: Creates massive overshoot on tiny segments and invisible handles on large vectors.
    */
-  public setNodeType(vertices: PathVertex[], vertexId: string, nodeType: NodeType): PathVertex[] {
-    return vertices.map((v) => {
-      if (v.id !== vertexId) return v;
+  public setNodeType(
+    vertices: PathVertex[],
+    vertexId: string,
+    nodeType: NodeType,
+    isClosed: boolean = false
+  ): PathVertex[] {
+    const targetIdx = vertices.findIndex((v) => v.id === vertexId);
+    if (targetIdx === -1) return vertices;
+
+    const targetV = vertices[targetIdx];
+
+    // Identify the contiguous subpath containing the target vertex (delimited by 'M' commands)
+    let spStart = targetIdx;
+    while (spStart > 0 && vertices[spStart].command !== 'M') {
+      spStart--;
+    }
+    let spEnd = targetIdx;
+    while (spEnd < vertices.length - 1 && vertices[spEnd + 1].command !== 'M') {
+      spEnd++;
+    }
+    const subpath = vertices.slice(spStart, spEnd + 1);
+    const k = targetIdx - spStart;
+    const M = subpath.length;
+
+    // Resolve adjacent anchor points for tangential secant derivative
+    let pPrev: Point | undefined;
+    let pNext: Point | undefined;
+
+    if (isClosed && M >= 2) {
+      pPrev = subpath[(k - 1 + M) % M];
+      pNext = subpath[(k + 1) % M];
+    } else {
+      if (k > 0) pPrev = subpath[k - 1];
+      if (k < M - 1) pNext = subpath[k + 1];
+    }
+
+    // Calculate tangent vector t
+    let tx = 0;
+    let ty = 0;
+    if (pPrev && pNext) {
+      tx = pNext.x - pPrev.x;
+      ty = pNext.y - pPrev.y;
+      if (Math.hypot(tx, ty) < 1e-6) {
+        tx = pNext.x - targetV.x;
+        ty = pNext.y - targetV.y;
+        if (Math.hypot(tx, ty) < 1e-6) {
+          tx = targetV.x - pPrev.x;
+          ty = targetV.y - pPrev.y;
+        }
+      }
+    } else if (pNext) {
+      tx = pNext.x - targetV.x;
+      ty = pNext.y - targetV.y;
+    } else if (pPrev) {
+      tx = targetV.x - pPrev.x;
+      ty = targetV.y - pPrev.y;
+    }
+
+    const tLen = Math.hypot(tx, ty);
+    const tHat: Point = tLen >= 1e-6 ? { x: tx / tLen, y: ty / tLen } : { x: 1, y: 0 };
+
+    // Calculate handle distances based on adjacent segment chords and existing handle lengths
+    const distPrev = pPrev ? Math.hypot(targetV.x - pPrev.x, targetV.y - pPrev.y) : 0;
+    const distNext = pNext ? Math.hypot(pNext.x - targetV.x, pNext.y - targetV.y) : 0;
+
+    const existingDistIn = targetV.handleIn
+      ? Math.hypot(targetV.handleIn.x - targetV.x, targetV.handleIn.y - targetV.y)
+      : 0;
+    const existingDistOut = targetV.handleOut
+      ? Math.hypot(targetV.handleOut.x - targetV.x, targetV.handleOut.y - targetV.y)
+      : 0;
+
+    const defaultDistIn = distPrev > 0 ? Math.max(10, Math.min(distPrev / 3, 80)) : 20;
+    const defaultDistOut = distNext > 0 ? Math.max(10, Math.min(distNext / 3, 80)) : 20;
+
+    return vertices.map((v, idx) => {
+      if (idx !== targetIdx) return v;
 
       const updated = { ...v, nodeType };
 
       if (nodeType === 'sharp') {
-        // Remove handles completely and reset Bézier curvature
+        // Remove handles completely and reset Bézier curvature to pure linear
         updated.handleIn = undefined;
         updated.handleOut = undefined;
         if (updated.command !== 'M') {
@@ -384,10 +482,10 @@ export class NodeEditorTool {
       }
 
       if (nodeType === 'asymmetric') {
-        // If it had no handles, create default independent handles
+        // If it had no handles, create default independent handles aligned tangentially
         if (!updated.handleIn && !updated.handleOut) {
-          updated.handleIn = { x: v.x - 20, y: v.y };
-          updated.handleOut = { x: v.x + 20, y: v.y };
+          updated.handleIn = { x: v.x - tHat.x * defaultDistIn, y: v.y - tHat.y * defaultDistIn };
+          updated.handleOut = { x: v.x + tHat.x * defaultDistOut, y: v.y + tHat.y * defaultDistOut };
           if (updated.command !== 'M') {
             updated.command = 'C';
           }
@@ -396,40 +494,22 @@ export class NodeEditorTool {
       }
 
       if (nodeType === 'smooth' || nodeType === 'symmetric') {
-        // Ensure both handles exist before enforcing collinearity
-        if (!updated.handleIn && !updated.handleOut) {
-          // No handles at all — create default collinear handles (20px each direction)
-          updated.handleIn  = { x: v.x - 20, y: v.y };
-          updated.handleOut = { x: v.x + 20, y: v.y };
-          if (updated.command !== 'M') {
-            updated.command = 'C';
-          }
-        } else if (!updated.handleIn && updated.handleOut) {
-          // Mirror handleOut to create handleIn
-          const dx = updated.handleOut.x - v.x;
-          const dy = updated.handleOut.y - v.y;
-          updated.handleIn = { x: v.x - dx, y: v.y - dy };
-          if (updated.command !== 'M') {
-            updated.command = 'C';
-          }
-        } else if (updated.handleIn && !updated.handleOut) {
-          // Mirror handleIn to create handleOut
-          const dx = updated.handleIn.x - v.x;
-          const dy = updated.handleIn.y - v.y;
-          updated.handleOut = { x: v.x - dx, y: v.y - dy };
+        // Enforce collinear tangential alignment along the path's natural flow
+        let distIn = existingDistIn > 0 ? existingDistIn : defaultDistIn;
+        let distOut = existingDistOut > 0 ? existingDistOut : defaultDistOut;
+
+        if (nodeType === 'symmetric') {
+          // Identical Euclidean distance on both sides for balanced curvature
+          const avgDist = (distIn + distOut) / 2;
+          distIn = avgDist;
+          distOut = avgDist;
         }
 
-        // Enforce collinearity now that both handles exist
-        const dx = updated.handleIn!.x - v.x;
-        const dy = updated.handleIn!.y - v.y;
-        const angle = Math.atan2(dy, dx) + Math.PI;
-        const distOut = nodeType === 'symmetric'
-          ? Math.hypot(dx, dy)
-          : Math.hypot(updated.handleOut!.x - v.x, updated.handleOut!.y - v.y);
-        updated.handleOut = {
-          x: v.x + Math.cos(angle) * distOut,
-          y: v.y + Math.sin(angle) * distOut,
-        };
+        updated.handleIn = { x: v.x - tHat.x * distIn, y: v.y - tHat.y * distIn };
+        updated.handleOut = { x: v.x + tHat.x * distOut, y: v.y + tHat.y * distOut };
+        if (updated.command !== 'M') {
+          updated.command = 'C';
+        }
         return updated;
       }
 

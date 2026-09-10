@@ -57,9 +57,9 @@ This file contains rules specific to the AntiDraw project. Rules are written in 
         - **Update Catalog**: Update `Docs/Descripción de las herramientas.md` with relevant functional details for this item.
      3. **Version Bump**: Increment `package.json` (`patch` for `fix`, `minor` for `feat`).
      4. **Build & Package**: Run `pnpm run package` to compile and create the `.vsix` artifact for that specific version.
-     5. **Atomic Commit**: Stage files and commit with simple conventional format:
-        - `fix: <element or problem fixed>`
-        - `feat: <new element or functionality added>`
+     5. **Atomic Commit**: Stage files and commit with simple conventional format in Spanish:
+        - `fix: <elemento o problema corregido en español>`
+        - `feat: <nuevo elemento o funcionalidad añadida en español>`
      6. **Advance to Next Item**: Only after the commit has been successfully created, proceed to the next item in the prompt list and repeat steps 1 to 5.
    - In the final response, provide a distinct verification checklist grouped by each atomic commit for user testing.
 
