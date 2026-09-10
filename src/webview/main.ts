@@ -107,10 +107,12 @@ class AntiDrawApp {
         this.propertyPanel.update(null, 'select');
       },
       onGuideSelected: (guide) => {
+        this.rulerView.setCornerActive(false);
         this.propertyPanel.showGuideSettings(guide);
         this.syncMetadataToHost();
       },
       onClearPanelMode: () => {
+        this.rulerView.setCornerActive(false);
         this.propertyPanel.resetPanelMode();
       },
       setCursor: (cursor) => {
@@ -267,6 +269,13 @@ class AntiDrawApp {
       this.model,
       {
         onCornerClick: () => {
+          if (this.propertyPanel.currentPanelMode === 'ruler') {
+            this.rulerView.setCornerActive(false);
+            this.propertyPanel.resetPanelMode();
+            this.toolbar.setTool('select');
+            this.render();
+            return;
+          }
           this.toolbar.deselectAll();
           this.rulerView.setCornerActive(true);
           this.selectionTool.deselectAll();
@@ -1686,6 +1695,11 @@ class AntiDrawApp {
     const selectedGuide = this.canvasMgr.selectedGuideId
       ? this.canvasMgr.getGuide(this.canvasMgr.selectedGuideId) || null
       : null;
+
+    const hasSelectedElements = this.selectionTool.selectedElementIds.size > 0;
+    if (hasSelectedElements || selectedGuide || this.propertyPanel.currentPanelMode !== 'ruler') {
+      this.rulerView.setCornerActive(false);
+    }
 
     this.propertyPanel.update(
       selectedV,

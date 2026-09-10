@@ -150,13 +150,24 @@ export class PropertyPanel {
     if (grids.length > 0 || this.grids.length === 0) this.grids = grids;
     if (guides.length > 0 || this.guides.length === 0) this.guides = guides;
 
-    if (selectedGuide) {
-      this.currentPanelMode = 'guide';
-    } else if (activeTool && activeTool !== '' && activeTool !== 'ruler') {
+    const hasSelectedElements = this.model.elements.some((e) =>
+      this.selectionTool.isSelected(e.id)
+    );
+
+    // Strict Modal Dismissal:
+    // If elements or guides are selected, dismiss ruler mode immediately so vector properties
+    // are never blocked or hidden by stale ruler state.
+    if (hasSelectedElements) {
       if (this.currentPanelMode === 'ruler') {
         this.currentPanelMode = null;
+        this.activeRulerConfig = null;
       }
+      this.activeGuide = null;
+    } else if (selectedGuide) {
+      this.currentPanelMode = 'guide';
+      this.activeRulerConfig = null;
     }
+
     this.renderPanel();
   }
 
@@ -188,55 +199,87 @@ export class PropertyPanel {
     this.renderGuideProperties(guide);
   }
 
+  /**
+   * Technical Rationale (FIX-20):
+   * Strict Modal Hierarchy for Property Inspector:
+   *
+   * 1. Vector Selection (Highest Priority):
+   *    Whenever one or more vector elements are selected in the model, their properties MUST ALWAYS
+   *    be presented (Transform, Fill, Stroke, Effects, Shape-specific parameters if ellipse/rect, etc.).
+   *    Under no circumstance should tool creation modes or ruler settings override active vector selection.
+   *
+   * 2. Guide Line Selection:
+   *    When a guideline is selected (and no vectors are selected), guideline properties are displayed.
+   *
+   * 3. Ruler Corner Mode:
+   *    When the user explicitly clicks the ruler corner (`#ruler-corner`), ruler origin, scale,
+   *    grids and guide manager are displayed.
+   *
+   * 4. In-Progress Path Creation:
+   *    When actively drawing vertices in polyline or pen mode, action buttons (finish / close) are exposed.
+   *
+   * 5. Base / Default State (No vectors selected):
+   *    When no vectors are selected (and neither a guide nor the ruler corner is active), the panel
+   *    consistently presents the Canvas & ViewBox properties (presets, W/H, minX/minY, bg color, grid-ruler alignment).
+   */
   private renderPanel(): void {
-    if (this.activeTool === 'polyline') {
-      this.currentPanelMode = 'polyline';
-      this.renderPolylineProperties();
+    const selectedEls = this.model.elements.filter(
+      (e) => this.selectionTool.isSelected(e.id)
+    );
+
+    // 1. HIGHEST PRIORITY: Active Vector Element Selection
+    if (selectedEls.length > 0) {
+      this.activeGuide = null;
+      this.activeRulerConfig = null;
+
+      if (this.activeVertex && selectedEls.length === 1 && this.activeTool === 'node') {
+        if (this.currentPanelMode === 'node') {
+          // Panel already shows node properties — update in place without destroying DOM
+          this.updateNodePropertiesInPlace(this.activeVertex);
+        } else {
+          this.renderNodeProperties(selectedEls[0], this.activeVertex);
+          this.currentPanelMode = 'node';
+        }
+      } else if (selectedEls.length === 1) {
+        this.currentPanelMode = 'element';
+        this.renderElementProperties(selectedEls[0]);
+      } else {
+        this.currentPanelMode = 'multi';
+        this.renderMultiElementProperties(selectedEls);
+      }
       return;
     }
 
-    if (this.activeTool === 'pen') {
-      this.currentPanelMode = 'pen';
-      this.renderPenProperties();
+    // 2. Guide Line Selection
+    if (this.activeGuide) {
+      this.currentPanelMode = 'guide';
+      this.activeRulerConfig = null;
+      this.renderGuideProperties(this.activeGuide);
       return;
     }
 
+    // 3. Ruler Corner Active
     if (this.currentPanelMode === 'ruler' && this.activeRulerConfig) {
       this.renderRulerProperties(this.activeRulerConfig);
       return;
     }
 
-    if (this.activeGuide) {
-      this.currentPanelMode = 'guide';
-      this.renderGuideProperties(this.activeGuide);
+    // 4. In-Progress Interactive Path Creation
+    if (this.activeTool === 'polyline' && this.polylineVertexCount > 0) {
+      this.currentPanelMode = 'polyline';
+      this.renderPolylineProperties();
       return;
     }
 
-    const selectedEls = this.model.elements.filter(
-      (e) => this.selectionTool.isSelected(e.id)
-    );
-
-    if (this.activeVertex && selectedEls.length === 1) {
-      if (this.currentPanelMode === 'node') {
-        // Panel already shows node properties — update in place without destroying DOM
-        this.updateNodePropertiesInPlace(this.activeVertex);
-      } else {
-        this.renderNodeProperties(selectedEls[0], this.activeVertex);
-        this.currentPanelMode = 'node';
-      }
-    } else if (selectedEls.length === 1) {
-      this.currentPanelMode = 'element';
-      this.renderElementProperties(selectedEls[0]);
-    } else if (selectedEls.length > 1) {
-      this.currentPanelMode = 'multi';
-      this.renderMultiElementProperties(selectedEls);
-    } else if (['rect', 'ellipse', 'star'].includes(this.activeTool)) {
-      this.currentPanelMode = 'shape';
-      this.renderShapeToolProperties();
-    } else {
-      this.currentPanelMode = 'canvas';
-      this.renderCanvasProperties();
+    if (this.activeTool === 'pen' && this.penVertexCount > 0) {
+      this.currentPanelMode = 'pen';
+      this.renderPenProperties();
+      return;
     }
+
+    // 5. Default Base State: Canvas & ViewBox Properties
+    this.currentPanelMode = 'canvas';
+    this.renderCanvasProperties();
   }
 
   // Render Ruler Configuration Properties
