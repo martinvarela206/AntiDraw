@@ -211,6 +211,11 @@ export class VectorModel {
       }
 
       // Parse child vector elements
+      // HISTORICAL ARCHITECTURE (FIX-19):
+      // Strict ID Deduplication and Collision Prevention.
+      // If external SVGs or previous saves contain duplicate or missing IDs, assign a fresh unique ID
+      // so no two vector elements ever share the same identifier in memory or DOM lookups.
+      const usedIds = new Set<string>();
       const children = Array.from(svgEl.children);
       children.forEach((child, idx) => {
         const tag = child.tagName.toLowerCase();
@@ -288,12 +293,15 @@ export class VectorModel {
             }
           }
 
-          if (!attrs.id) {
-            attrs.id = `el_${idx}_${Date.now().toString(36)}`;
+          let elementId = attrs.id;
+          if (!elementId || usedIds.has(elementId)) {
+            elementId = `el_${idx}_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
+            attrs.id = elementId;
           }
+          usedIds.add(elementId);
 
           const elem: VectorElement = {
-            id: attrs.id,
+            id: elementId,
             tagName: tag,
             attributes: attrs,
           };
@@ -532,6 +540,9 @@ export class VectorModel {
     }
 
     this.elements.forEach((el) => {
+      // HISTORICAL ARCHITECTURE (FIX-19): Guarantee attributes.id strictly reflects model el.id upon serialization
+      el.attributes.id = el.id;
+
       if (el.vertices && el.vertices.length > 0) {
         el.attributes.d = this.compilePathD(el.vertices, el.isClosed);
         // Persist nodeType for each vertex so re-parsing restores it reliably

@@ -1547,7 +1547,20 @@ class AntiDrawApp {
       this.pushUndo();
       const pastedElements: VectorElement[] = this.clipboardElements.map((srcEl) => {
         const el: VectorElement = JSON.parse(JSON.stringify(srcEl));
+        /**
+         * HISTORICAL ARCHITECTURE (FIX-19):
+         * Strict Synchronization of el.attributes.id with el.id on Clipboard Paste.
+         * Why this was built:
+         * Previously, pasting a cloned element reassigned `el.id` in memory but left `el.attributes.id`
+         * untouched with the original element's ID. When serialized to SVG (`toSvgString`), attributes.id
+         * was written, causing both the original and pasted elements to share identical ID attributes
+         * in the SVG XML. Upon closing and reopening the file, DOMParser loaded both paths with the same ID,
+         * resulting in phantom multi-selection coupling, inability to move or select elements independently,
+         * and corruption of object tracking. Synchronizing `el.attributes.id = el.id` guarantees absolute
+         * identifier independence across paste, serialization, and disk reload cycles.
+         */
         el.id = `el_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
+        el.attributes.id = el.id;
 
         if (el.vertices && el.vertices.length > 0) {
           el.vertices.forEach((v) => {
