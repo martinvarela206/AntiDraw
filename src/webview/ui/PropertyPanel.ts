@@ -114,7 +114,7 @@ export class PropertyPanel {
   private callbacks: PropertyPanelCallbacks;
 
   // Track which panel section is currently rendered to avoid full re-builds
-  private currentPanelMode: 'canvas' | 'element' | 'node' | 'pen' | 'polyline' | 'multi' | 'ruler' | 'guide' | 'shape' | null = null;
+  public currentPanelMode: 'canvas' | 'element' | 'node' | 'pen' | 'polyline' | 'multi' | 'ruler' | 'guide' | 'shape' | null = null;
 
   constructor(
     container: HTMLElement,
@@ -1667,7 +1667,14 @@ export class PropertyPanel {
             severe horizontal clipping of values like "-100" or "100" (inputs previously reduced to ~20px text area).
             To resolve this without breaking layout hierarchy:
             1. Shorten the primary row label to 46px ("Centro", "Radio", "Foco").
-            2. Encapsulate X/Y percentage inputs into `.prop-coord-group` and `.prop-coord-box` badge containers.
+            /*
+             * Technical Rationale (FIX-01 / FIX-16):
+             * In template literals (backtick-delimited strings), unescaped backticks within embedded HTML comments
+             * cause premature termination of the template string, evaluating the comment text as JS expressions and
+             * throwing runtime ReferenceErrors (e.g. ReferenceError: coord is not defined).
+             * Single quotes are strictly used here instead of markdown-style backticks.
+             */
+            2. Encapsulate X/Y percentage inputs into '.prop-coord-group' and '.prop-coord-box' badge containers.
             3. Separate sublabels ('X', 'Y', '%') as non-selectable affixes while giving the input 100% of the
                box's inner flex width, ensuring 3-4 digit percentage values remain completely visible without truncation.
             4. Retain 26x26px square action buttons with centered glyphs for quick resetting and synchronization.
