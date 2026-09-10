@@ -1026,6 +1026,17 @@ export class BooleanOperations {
    *    - Bar Cap ('bar-cap'): In SVG `<line stroke-linecap="round" stroke-width="2" />`, the perpendicular bar terminates with
    *      semicircular round caps at (refX, 1) and (refX, 9). Semicircular discs are now placed at both ends to yield a faithful capsule.
    *    - Circle Dot ('circle-dot'): Discretized with 32 polygon vertices for silky circular contour without visible polygonal facets.
+   * 5. HISTORICAL ARCHITECTURE (FIX-15B) - Uniform Scaling & Capsule Calibration (preserveAspectRatio):
+   *    Previous Implementation:
+   *    Markers scaled anisotropic axes independently: `sx = (mw / 10) * strokeWidth` and `sy = (mh / 10) * strokeWidth`.
+   *    For `bar-cap` ($mw = 5, mh = 6$), this caused $sy = 0.6 \times W$ and $r_{cap} = 0.6 \times W$, while $sx = 0.5 \times W$.
+   *    This violated the W3C SVG specification default `preserveAspectRatio="xMidYMid meet"` on `<marker>`, which dictates
+   *    uniform isotropic scaling based on the limiting axis: `scale = min(mw/10, mh/10) * strokeWidth = 0.5 * strokeWidth`.
+   *    The 20% over-extension in height and mismatched $r_{cap}$ produced visible protruding crescent bulbs past the native stroke.
+   *
+   *    Solution:
+   *    `transform` enforces uniform scaling `scale = min(mw/10, mh/10) * strokeWidth`, and `rCap = 1.0 * scale = 0.5 * strokeWidth`.
+   *    The semicircular round caps align with the bar edges with zero error, forming an exact capsule matching native SVG.
    */
   private static createMarkerPolygons(
     markerId: string,
@@ -1041,10 +1052,11 @@ export class BooleanOperations {
     const sin = tangent.y / len;
 
     const transform = (X: number, Y: number, refX: number, refY: number, mw: number, mh: number): Pair => {
-      const sx = (mw / 10) * strokeWidth;
-      const sy = (mh / 10) * strokeWidth;
-      const dx = (X - refX) * sx;
-      const dy = (Y - refY) * sy;
+      // W3C SVG Specification: <marker> preserveAspectRatio defaults to 'xMidYMid meet'.
+      // Enforces uniform scale S = min(mw, mh) / 10 * strokeWidth, preventing aspect ratio distortion.
+      const scale = Math.min(mw / 10, mh / 10) * strokeWidth;
+      const dx = (X - refX) * scale;
+      const dy = (Y - refY) * scale;
       return [
         anchor.x + dx * cos - dy * sin,
         anchor.y + dx * sin + dy * cos,
@@ -1117,11 +1129,14 @@ export class BooleanOperations {
       polys.push([ring]);
 
       // stroke-linecap="round" on line ends: semicircular round caps centered at (refX, 1) and (refX, 9)
-      const rCap = 1.0 * (mh / 10) * strokeWidth;
+      // The line stroke-width is 2.0 in viewBox units (radius = 1.0).
+      // Under uniform scale (Math.min(mw/10, mh/10) * strokeWidth), rCap matches the half-width of the bar exactly.
+      const scale = Math.min(mw / 10, mh / 10) * strokeWidth;
+      const rCap = 1.0 * scale;
       const pTop = transform(refX, 1, refX, refY, mw, mh);
       const pBot = transform(refX, 9, refX, refY, mw, mh);
-      polys.push(makeCircle(pTop[0], pTop[1], rCap, 16));
-      polys.push(makeCircle(pBot[0], pBot[1], rCap, 16));
+      polys.push(makeCircle(pTop[0], pTop[1], rCap, 20));
+      polys.push(makeCircle(pBot[0], pBot[1], rCap, 20));
     } else if (markerId.includes('arrow-open')) {
       const isStart = markerId.includes('start');
       const refX = isStart ? 1 : 9;
