@@ -340,6 +340,68 @@ body {
   border-color: var(--accent-color);
 }
 
+/* Numeric inputs: eliminate spinners that crowd compact UI controls */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* COMPACT COORDINATE AND NUMERIC PAIR BOXES (e.g. Radial Gradient Focus and Center)
+ * Technical Rationale:
+ * Squeezing multiple 70px labels, dual inputs, and action buttons in a 260px right panel
+ * leaves <35px per input, severely clipping numeric characters (-100, 100).
+ * By grouping sublabels (X, Y, %) directly inside structured, flexible badge boxes,
+ * inputs gain maximum horizontal width (~75px container, ~50px input area) without digit clipping.
+ */
+.prop-coord-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.prop-coord-box {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  background-color: var(--bg-dark);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  transition: border-color 0.12s ease;
+}
+
+.prop-coord-box:focus-within {
+  border-color: var(--accent-color);
+}
+
+.prop-coord-sublabel {
+  font-size: 10px;
+  color: var(--text-muted);
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.prop-coord-input {
+  all: unset;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  font-size: 11px;
+  color: var(--text-main);
+  text-align: right;
+  padding: 0 2px;
+}
+
 button.prop-input.active {
   background-color: var(--accent-color);
   color: #ffffff;

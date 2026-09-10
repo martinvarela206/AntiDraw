@@ -1568,27 +1568,59 @@ export class PropertyPanel {
           </div>
 
           <!-- Radial Gradient Geometric Controls (for Radial) -->
+          <!--
+            Technical Rationale (FIX-16):
+            In the 260px inspector panel, squeezing a 70px label, multiple standalone percentage indicators,
+            two separate number inputs with default browser padding/spinners, and an action button causes
+            severe horizontal clipping of values like "-100" or "100" (inputs previously reduced to ~20px text area).
+            To resolve this without breaking layout hierarchy:
+            1. Shorten the primary row label to 46px ("Centro", "Radio", "Foco").
+            2. Encapsulate X/Y percentage inputs into `.prop-coord-group` and `.prop-coord-box` badge containers.
+            3. Separate sublabels ('X', 'Y', '%') as non-selectable affixes while giving the input 100% of the
+               box's inner flex width, ensuring 3-4 digit percentage values remain completely visible without truncation.
+            4. Retain 26x26px square action buttons with centered glyphs for quick resetting and synchronization.
+          -->
           <div id="fill-radial-controls" style="${fillType === 'radial' ? '' : 'display: none;'}">
-            <div class="prop-row">
-              <span class="prop-label">Centro</span>
-              <span class="prop-label" style="width: 14px; text-align: right; font-size: 10px;">X%</span>
-              <input type="number" class="prop-input" id="radial-cx" value="${Math.round((grad.cx ?? 0.5) * 100)}" min="-100" max="200" step="5" title="Posición X del centro del gradiente (%)" />
-              <span class="prop-label" style="width: 14px; text-align: right; font-size: 10px;">Y%</span>
-              <input type="number" class="prop-input" id="radial-cy" value="${Math.round((grad.cy ?? 0.5) * 100)}" min="-100" max="200" step="5" title="Posición Y del centro del gradiente (%)" />
-              <button class="prop-input" id="btn-reset-radial-center" style="width: auto; padding: 2px 6px; cursor: pointer;" title="Centrar al 50%, 50%">⟲</button>
+            <div class="prop-row" style="gap: 6px;">
+              <span class="prop-label" style="width: 46px;" title="Posición del centro del gradiente radial">Centro</span>
+              <div class="prop-coord-group">
+                <div class="prop-coord-box" title="Posición X del centro del gradiente (%)">
+                  <span class="prop-coord-sublabel">X</span>
+                  <input type="number" class="prop-coord-input" id="radial-cx" value="${Math.round((grad.cx ?? 0.5) * 100)}" min="-100" max="200" step="5" />
+                  <span class="prop-coord-sublabel">%</span>
+                </div>
+                <div class="prop-coord-box" title="Posición Y del centro del gradiente (%)">
+                  <span class="prop-coord-sublabel">Y</span>
+                  <input type="number" class="prop-coord-input" id="radial-cy" value="${Math.round((grad.cy ?? 0.5) * 100)}" min="-100" max="200" step="5" />
+                  <span class="prop-coord-sublabel">%</span>
+                </div>
+              </div>
+              <button class="prop-input" id="btn-reset-radial-center" style="width: 26px; height: 26px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;" title="Centrar al 50%, 50%">⟲</button>
             </div>
-            <div class="prop-row">
-              <span class="prop-label">Radio %</span>
-              <input type="number" class="prop-input" id="radial-r" value="${Math.round((grad.r ?? 0.5) * 100)}" min="1" max="500" step="5" title="Radio de dispersión del gradiente radial (%)" />
-              <button class="prop-input" id="btn-reset-radial-radius" style="width: auto; padding: 2px 6px; cursor: pointer;" title="Restablecer radio al 50%">50%</button>
+            <div class="prop-row" style="gap: 6px;">
+              <span class="prop-label" style="width: 46px;" title="Radio de dispersión del gradiente radial">Radio</span>
+              <div class="prop-coord-box" style="flex: 1;" title="Radio de dispersión del gradiente radial (%)">
+                <span class="prop-coord-sublabel">R</span>
+                <input type="number" class="prop-coord-input" id="radial-r" value="${Math.round((grad.r ?? 0.5) * 100)}" min="1" max="500" step="5" />
+                <span class="prop-coord-sublabel">%</span>
+              </div>
+              <button class="prop-input" id="btn-reset-radial-radius" style="width: auto; padding: 2px 8px; height: 26px; cursor: pointer; flex-shrink: 0;" title="Restablecer radio al 50%">50%</button>
             </div>
-            <div class="prop-row">
-              <span class="prop-label">Foco</span>
-              <span class="prop-label" style="width: 14px; text-align: right; font-size: 10px;">X%</span>
-              <input type="number" class="prop-input" id="radial-fx" value="${Math.round((grad.fx ?? grad.cx ?? 0.5) * 100)}" min="-100" max="200" step="5" title="Foco X del gradiente radial (%)" />
-              <span class="prop-label" style="width: 14px; text-align: right; font-size: 10px;">Y%</span>
-              <input type="number" class="prop-input" id="radial-fy" value="${Math.round((grad.fy ?? grad.cy ?? 0.5) * 100)}" min="-100" max="200" step="5" title="Foco Y del gradiente radial (%)" />
-              <button class="prop-input" id="btn-sync-radial-focus" style="width: auto; padding: 2px 6px; cursor: pointer;" title="Igualar foco al centro">⟲</button>
+            <div class="prop-row" style="gap: 6px;">
+              <span class="prop-label" style="width: 46px;" title="Foco de iluminación del gradiente radial">Foco</span>
+              <div class="prop-coord-group">
+                <div class="prop-coord-box" title="Foco X del gradiente radial (%)">
+                  <span class="prop-coord-sublabel">X</span>
+                  <input type="number" class="prop-coord-input" id="radial-fx" value="${Math.round((grad.fx ?? grad.cx ?? 0.5) * 100)}" min="-100" max="200" step="5" />
+                  <span class="prop-coord-sublabel">%</span>
+                </div>
+                <div class="prop-coord-box" title="Foco Y del gradiente radial (%)">
+                  <span class="prop-coord-sublabel">Y</span>
+                  <input type="number" class="prop-coord-input" id="radial-fy" value="${Math.round((grad.fy ?? grad.cy ?? 0.5) * 100)}" min="-100" max="200" step="5" />
+                  <span class="prop-coord-sublabel">%</span>
+                </div>
+              </div>
+              <button class="prop-input" id="btn-sync-radial-focus" style="width: 26px; height: 26px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;" title="Igualar foco al centro">⟲</button>
             </div>
           </div>
 
