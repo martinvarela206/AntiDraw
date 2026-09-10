@@ -247,17 +247,36 @@ export class ShapeToolHandler implements IToolHandler {
     }
 
     const d = this.ctx.model.compilePathD(vertices, isClosed);
+    const attributes: Record<string, string> = {
+      id,
+      d,
+      fill: isClosed ? '#6366f1' : 'none',
+      stroke: '#ffffff',
+      'stroke-width': '2',
+      'data-node-types': vertices.map((v) => v.nodeType).join(','),
+      'data-shape': tool,
+    };
+
+    /**
+     * Technical Rationale (FIX-19):
+     * Persisting explicit geometric shape metadata on created elements allows
+     * PropertyPanel to recognize and expose dedicated geometric controls
+     * (e.g. Center X/Y, Radius X/Y, aspect ratio constraints) when selected,
+     * maintaining high fidelity while retaining standard path representation.
+     */
+    if (tool === 'ellipse') {
+      attributes['cx'] = bounds.cx.toString();
+      attributes['cy'] = bounds.cy.toString();
+      attributes['rx'] = bounds.rx.toString();
+      attributes['ry'] = bounds.ry.toString();
+    } else if (tool === 'rect') {
+      attributes['rx'] = (this.ctx.canvasMgr.shapeConfig?.rectCornerRadius || 0).toString();
+    }
+
     return {
       id,
       tagName: 'path',
-      attributes: {
-        id,
-        d,
-        fill: isClosed ? '#6366f1' : 'none',
-        stroke: '#ffffff',
-        'stroke-width': '2',
-        'data-node-types': vertices.map((v) => v.nodeType).join(','),
-      },
+      attributes,
       vertices,
       isClosed,
     };

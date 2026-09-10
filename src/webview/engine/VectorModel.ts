@@ -365,6 +365,7 @@ export class VectorModel {
             // Normalize shapes into path vertices for unified vector editing
             elem.vertices = this.convertShapeToVertices(tag, attrs);
             elem.tagName = 'path';
+            elem.attributes['data-shape'] = tag;
             shapeAttrs.forEach((sa) => delete elem.attributes[sa]);
 
             elem.isClosed = tag !== 'line' && tag !== 'polyline';
@@ -1025,6 +1026,39 @@ export class VectorModel {
     if (el.tagName && ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(el.tagName)) return true;
     if (el.tagName && ['line', 'polyline'].includes(el.tagName)) return false;
     if (el.attributes?.d && /[zZ]/.test(el.attributes.d)) return true;
+    return false;
+  }
+
+  /**
+   * Technical Rationale (FIX-19):
+   * Identifies whether a vector element represents an ellipse or circle primitive.
+   *
+   * Why this approach:
+   * 1. Direct tag recognition: Supports native `<ellipse>` and `<circle>` SVG elements.
+   * 2. Metadata recognition: Supports `data-shape="ellipse"` or `data-shape="circle"` stored on shape creation.
+   * 3. Geometric heuristic recognition: Detects closed 4-vertex symmetric/smooth Bézier approximations
+   *    matching canonical ellipse topology, unless the user explicitly converted the shape to freeform curves
+   *    (`data-shape="path"`).
+   *
+   * Edge cases handled:
+   * - Elements explicitly converted to free curves via "Convert to Curves" set `data-shape="path"`,
+   *   preventing the geometric heuristic from falsely re-identifying them as constrained ellipses.
+   */
+  public isEllipse(el: VectorElement): boolean {
+    if (el.attributes?.['data-shape'] === 'path') {
+      return false;
+    }
+    if (el.attributes && (el.attributes['data-shape'] === 'ellipse' || el.attributes['data-shape'] === 'circle')) {
+      return true;
+    }
+    if (el.tagName === 'ellipse' || el.tagName === 'circle') {
+      return true;
+    }
+    if (el.isClosed && el.vertices && el.vertices.length === 4) {
+      return el.vertices.every(
+        (v) => (v.nodeType === 'symmetric' || v.nodeType === 'smooth') && v.handleIn && v.handleOut
+      );
+    }
     return false;
   }
 

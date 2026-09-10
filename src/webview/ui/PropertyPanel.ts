@@ -1472,6 +1472,12 @@ export class PropertyPanel {
       this.selectionTool.restorePivotForElement(el);
     }
     const pivot = box ? this.selectionTool.getPivot(box) : { x: 0, y: 0 };
+    const isEllipse = this.model.isEllipse(el);
+    const ellipseCx = box ? box.cx : (parseFloat(el.attributes['cx'] || '0') || 0);
+    const ellipseCy = box ? box.cy : (parseFloat(el.attributes['cy'] || '0') || 0);
+    const ellipseRx = box ? box.width / 2 : (parseFloat(el.attributes['rx'] || '0') || 0);
+    const ellipseRy = box ? box.height / 2 : (parseFloat(el.attributes['ry'] || '0') || 0);
+    const isCircle = Math.abs(ellipseRx - ellipseRy) < 0.5;
 
     this.container.innerHTML = `
       <div class="panel-section">
@@ -1500,6 +1506,49 @@ export class PropertyPanel {
           <span style="font-weight:600; color:var(--text-main); font-size:12px;">${el.vertices ? el.vertices.length : 0} nodes (${isClosed ? 'closed' : 'open'})</span>
         </div>
       </div>
+
+      ${isEllipse ? `
+      <!-- Ellipse / Circle Geometry Controls (FIX-19) -->
+      <div class="panel-section">
+        <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
+          <span>Elipse / Círculo</span>
+          <span style="font-size:10px; color:var(--accent-color); font-weight:600; text-transform:none;">
+            ${isCircle ? '● Círculo' : '⬭ Elipse'}
+          </span>
+        </div>
+        <div class="prop-row" style="gap: 6px;">
+          <span class="prop-label" style="width: 46px;" title="Coordenadas del centro de la elipse">Centro</span>
+          <div class="prop-coord-group">
+            <div class="prop-coord-box" title="Coordenada X del centro de la elipse">
+              <span class="prop-coord-sublabel">X</span>
+              <input type="number" class="prop-coord-input" id="ellipse-cx" value="${Math.round(ellipseCx)}" />
+            </div>
+            <div class="prop-coord-box" title="Coordenada Y del centro de la elipse">
+              <span class="prop-coord-sublabel">Y</span>
+              <input type="number" class="prop-coord-input" id="ellipse-cy" value="${Math.round(ellipseCy)}" />
+            </div>
+          </div>
+        </div>
+        <div class="prop-row" style="gap: 6px;">
+          <span class="prop-label" style="width: 46px;" title="Radios horizontal y vertical">Radios</span>
+          <div class="prop-coord-group">
+            <div class="prop-coord-box" title="Radio horizontal (rx)">
+              <span class="prop-coord-sublabel">Rx</span>
+              <input type="number" class="prop-coord-input" id="ellipse-rx" value="${Math.round(ellipseRx)}" min="1" />
+            </div>
+            <div class="prop-coord-box" title="Radio vertical (ry)">
+              <span class="prop-coord-sublabel">Ry</span>
+              <input type="number" class="prop-coord-input" id="ellipse-ry" value="${Math.round(ellipseRy)}" min="1" />
+            </div>
+          </div>
+          <button class="prop-input" id="btn-ellipse-make-circle" style="width: auto; padding: 2px 6px; height: 26px; cursor: pointer; flex-shrink: 0;" title="Convertir a círculo perfecto 1:1">1:1</button>
+        </div>
+        <div class="prop-row" style="gap: 6px; margin-top: 4px;">
+          <button class="prop-input" id="btn-ellipse-swap-radii" style="flex: 1; cursor: pointer; height: 24px; font-size: 10px; text-align: center;" title="Intercambiar radio horizontal y vertical (Rotar 90°)">⇄ Rotar 90°</button>
+          <button class="prop-input" id="btn-ellipse-to-path" style="flex: 1; cursor: pointer; height: 24px; font-size: 10px; text-align: center;" title="Convertir a curvas Bézier independientes">Convertir a Curvas</button>
+        </div>
+      </div>
+      ` : ''}
 
       <div class="panel-section">
         <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
@@ -1879,6 +1928,94 @@ export class PropertyPanel {
         this.callbacks.onUpdateElement(el);
         this.callbacks.onRenderOverlay?.();
       });
+    }
+
+    /**
+     * Technical Rationale (FIX-19):
+     * Event listeners for dedicated Ellipse / Circle inspector controls.
+     * When user modifies Center X/Y or Radius X/Y:
+     * - Re-generates canonical Bézier vertices using `convertShapeToVertices('ellipse', ...)`
+     *   preserving smooth symmetric curvature.
+     * - Updates element attributes (`cx, cy, rx, ry`, `data-shape="ellipse"`, `d`).
+     * - Dispatches `onPushUndo` and `onUpdateElement` to update canvas, DOM and metadata.
+     * - Re-renders element properties so bounding box and transform numbers stay strictly aligned.
+     */
+    if (isEllipse && box) {
+      const ellipseCxInput = this.container.querySelector<HTMLInputElement>('#ellipse-cx');
+      const ellipseCyInput = this.container.querySelector<HTMLInputElement>('#ellipse-cy');
+      const ellipseRxInput = this.container.querySelector<HTMLInputElement>('#ellipse-rx');
+      const ellipseRyInput = this.container.querySelector<HTMLInputElement>('#ellipse-ry');
+      const btnEllipseMakeCircle = this.container.querySelector<HTMLButtonElement>('#btn-ellipse-make-circle');
+      const btnEllipseSwapRadii = this.container.querySelector<HTMLButtonElement>('#btn-ellipse-swap-radii');
+      const btnEllipseToPath = this.container.querySelector<HTMLButtonElement>('#btn-ellipse-to-path');
+
+      const applyEllipseGeometry = (newCx: number, newCy: number, newRx: number, newRy: number) => {
+        if (this.callbacks.onPushUndo) this.callbacks.onPushUndo();
+        const clampedRx = Math.max(1, newRx);
+        const clampedRy = Math.max(1, newRy);
+        el.vertices = this.model.convertShapeToVertices('ellipse', {
+          cx: newCx.toString(),
+          cy: newCy.toString(),
+          rx: clampedRx.toString(),
+          ry: clampedRy.toString(),
+        });
+        el.attributes['data-shape'] = 'ellipse';
+        el.attributes['cx'] = newCx.toString();
+        el.attributes['cy'] = newCy.toString();
+        el.attributes['rx'] = clampedRx.toString();
+        el.attributes['ry'] = clampedRy.toString();
+        el.attributes['data-node-types'] = el.vertices.map((v) => v.nodeType).join(',');
+        el.attributes.d = this.model.compilePathD(el.vertices, true);
+
+        const newBox = this.selectionTool.getBoundingBox(el);
+        if (newBox) {
+          this.selectionTool.updatePivotOnScale(box, newBox, [el]);
+        }
+        this.callbacks.onUpdateElement(el);
+        this.renderElementProperties(el);
+      };
+
+      if (ellipseCxInput && ellipseCyInput) {
+        const onCenterChange = () => {
+          const targetCx = parseFloat(ellipseCxInput.value) || 0;
+          const targetCy = parseFloat(ellipseCyInput.value) || 0;
+          applyEllipseGeometry(targetCx, targetCy, ellipseRx, ellipseRy);
+        };
+        ellipseCxInput.addEventListener('change', onCenterChange);
+        ellipseCyInput.addEventListener('change', onCenterChange);
+      }
+
+      if (ellipseRxInput && ellipseRyInput) {
+        const onRadiiChange = () => {
+          const targetRx = Math.max(1, parseFloat(ellipseRxInput.value) || 1);
+          const targetRy = Math.max(1, parseFloat(ellipseRyInput.value) || 1);
+          applyEllipseGeometry(ellipseCx, ellipseCy, targetRx, targetRy);
+        };
+        ellipseRxInput.addEventListener('change', onRadiiChange);
+        ellipseRyInput.addEventListener('change', onRadiiChange);
+      }
+
+      if (btnEllipseMakeCircle) {
+        btnEllipseMakeCircle.addEventListener('click', () => {
+          const uniformR = Math.max(1, Math.round((ellipseRx + ellipseRy) / 2));
+          applyEllipseGeometry(ellipseCx, ellipseCy, uniformR, uniformR);
+        });
+      }
+
+      if (btnEllipseSwapRadii) {
+        btnEllipseSwapRadii.addEventListener('click', () => {
+          applyEllipseGeometry(ellipseCx, ellipseCy, ellipseRy, ellipseRx);
+        });
+      }
+
+      if (btnEllipseToPath) {
+        btnEllipseToPath.addEventListener('click', () => {
+          if (this.callbacks.onPushUndo) this.callbacks.onPushUndo();
+          el.attributes['data-shape'] = 'path';
+          this.callbacks.onUpdateElement(el);
+          this.renderElementProperties(el);
+        });
+      }
     }
 
     let activeStopIdx = 0;
