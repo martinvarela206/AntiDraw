@@ -993,8 +993,8 @@ export class BooleanOperations {
    * Helper to parse marker identifier from an attribute value like 'url(#ad-marker-arrow-filled-start)'
    */
   private static parseMarkerType(attrVal?: string): string {
-    if (!attrVal) return 'none';
-    const m = attrVal.match(/#ad-marker-([^'")\s]+)/);
+    if (!attrVal || attrVal === 'none') return 'none';
+    const m = attrVal.match(/#(?:\w+-)*marker-([^'")\s]+)/) || attrVal.match(/#([^'")\s]+)/);
     if (!m) return 'none';
     return m[1];
   }
@@ -1019,6 +1019,13 @@ export class BooleanOperations {
    * 3. Tangent Stability & Degeneracy Immunity:
    *    If incoming/outgoing tangent vectors collapse to zero length (< 0.0001), fallback tangents
    *    are computed from adjacent vertex chords or outgoing tangents, preventing NaN singularities.
+   * 4. HISTORICAL ARCHITECTURE (FIX-15) - Exact Marker Topology & Linecap Fidelity:
+   *    - Open Arrow ('arrow-open'): In SVG `<path d="M 9 1.5 L 1 5 L 9 8.5" stroke-linecap="round" stroke-linejoin="round" />`,
+   *      both terminal wing tips (p0, p2) have round linecaps (discs of radius halfLeg) and the apex (p1) has a round join disc.
+   *      Previously, leg ends were chopped flat with rectangular butt caps, deforming the arrow.
+   *    - Bar Cap ('bar-cap'): In SVG `<line stroke-linecap="round" stroke-width="2" />`, the perpendicular bar terminates with
+   *      semicircular round caps at (refX, 1) and (refX, 9). Semicircular discs are now placed at both ends to yield a faithful capsule.
+   *    - Circle Dot ('circle-dot'): Discretized with 32 polygon vertices for silky circular contour without visible polygonal facets.
    */
   private static createMarkerPolygons(
     markerId: string,
@@ -1044,9 +1051,19 @@ export class BooleanOperations {
       ];
     };
 
+    const makeCircle = (cx: number, cy: number, r: number, steps: number = 24): Polygon => {
+      const ring: Ring = [];
+      for (let s = 0; s < steps; s++) {
+        const th = (s / steps) * Math.PI * 2;
+        ring.push([cx + r * Math.cos(th), cy + r * Math.sin(th)]);
+      }
+      ring.push([ring[0][0], ring[0][1]]);
+      return [ring];
+    };
+
     const polys: Polygon[] = [];
 
-    if (markerId.startsWith('arrow-filled')) {
+    if (markerId.includes('arrow-filled')) {
       let pts: [number, number][];
       let refX = 5;
       let refY = 5;
@@ -1069,17 +1086,11 @@ export class BooleanOperations {
       const ring: Ring = pts.map(([x, y]) => transform(x, y, refX, refY, mw, mh));
       ring.push([ring[0][0], ring[0][1]]);
       polys.push([ring]);
-    } else if (markerId.startsWith('circle-dot')) {
+    } else if (markerId.includes('circle-dot')) {
+      // 32-step smooth circle matching cx=5, cy=5, r=3.5 in 10x10 viewBox with mw=5, mh=5
       const r = 3.5 * 0.5 * strokeWidth;
-      const steps = 16;
-      const ring: Ring = [];
-      for (let s = 0; s < steps; s++) {
-        const theta = (s / steps) * Math.PI * 2;
-        ring.push([anchor.x + r * Math.cos(theta), anchor.y + r * Math.sin(theta)]);
-      }
-      ring.push([ring[0][0], ring[0][1]]);
-      polys.push([ring]);
-    } else if (markerId.startsWith('square-block')) {
+      polys.push(makeCircle(anchor.x, anchor.y, r, 32));
+    } else if (markerId.includes('square-block')) {
       const refX = 5;
       const refY = 5;
       const mw = 5;
@@ -1088,12 +1099,13 @@ export class BooleanOperations {
       const ring: Ring = corners.map(([x, y]) => transform(x, y, refX, refY, mw, mh));
       ring.push([ring[0][0], ring[0][1]]);
       polys.push([ring]);
-    } else if (markerId.startsWith('bar-cap')) {
+    } else if (markerId.includes('bar-cap')) {
       const isStart = markerId.includes('start');
       const refX = isStart ? 2 : 8;
       const refY = 5;
       const mw = 5;
       const mh = 6;
+      // Perpendicular rectangular bar body
       const corners: [number, number][] = [
         [refX - 1, 1],
         [refX + 1, 1],
@@ -1103,7 +1115,14 @@ export class BooleanOperations {
       const ring: Ring = corners.map(([x, y]) => transform(x, y, refX, refY, mw, mh));
       ring.push([ring[0][0], ring[0][1]]);
       polys.push([ring]);
-    } else if (markerId.startsWith('arrow-open')) {
+
+      // stroke-linecap="round" on line ends: semicircular round caps centered at (refX, 1) and (refX, 9)
+      const rCap = 1.0 * (mh / 10) * strokeWidth;
+      const pTop = transform(refX, 1, refX, refY, mw, mh);
+      const pBot = transform(refX, 9, refX, refY, mw, mh);
+      polys.push(makeCircle(pTop[0], pTop[1], rCap, 16));
+      polys.push(makeCircle(pBot[0], pBot[1], rCap, 16));
+    } else if (markerId.includes('arrow-open')) {
       const isStart = markerId.includes('start');
       const refX = isStart ? 1 : 9;
       const refY = 5;
@@ -1114,7 +1133,7 @@ export class BooleanOperations {
         : [[1, 1.5], [9, 5], [1, 8.5]];
 
       const p0 = transform(vPts[0][0], vPts[0][1], refX, refY, mw, mh);
-      const p1 = transform(vPts[1][0], vPts[1][1], refX, refY, mw, mh);
+      const p1 = transform(vPts[1][0], vPts[1][1], refX, refY, mw, mh); // apex
       const p2 = transform(vPts[2][0], vPts[2][1], refX, refY, mw, mh);
       const legThickness = 1.8 * 0.6 * strokeWidth;
       const halfLeg = legThickness / 2;
@@ -1136,14 +1155,13 @@ export class BooleanOperations {
 
       polys.push(extrudeLeg(p0, p1));
       polys.push(extrudeLeg(p1, p2));
-      const discSteps = 12;
-      const tipRing: Ring = [];
-      for (let s = 0; s < discSteps; s++) {
-        const th = (s / discSteps) * Math.PI * 2;
-        tipRing.push([p1[0] + halfLeg * Math.cos(th), p1[1] + halfLeg * Math.sin(th)]);
-      }
-      tipRing.push([tipRing[0][0], tipRing[0][1]]);
-      polys.push([tipRing]);
+
+      // stroke-linejoin="round" at apex (p1)
+      polys.push(makeCircle(p1[0], p1[1], halfLeg, 20));
+
+      // stroke-linecap="round" on outer endpoints of wings (p0, p2)
+      polys.push(makeCircle(p0[0], p0[1], halfLeg, 20));
+      polys.push(makeCircle(p2[0], p2[1], halfLeg, 20));
     }
 
     return polys;
@@ -1288,13 +1306,13 @@ export class BooleanOperations {
         let p2Left: Pair = [p2.x + nx * halfW, p2.y + ny * halfW];
         let p2Right: Pair = [p2.x - nx * halfW, p2.y - ny * halfW];
 
-        // Square linecap extension on open ends
+        // Square linecap extension on open ends (suppressed when a marker is attached to that end)
         if (!isClosed && strokeLinecap === 'square') {
-          if (i === 0) {
+          if (i === 0 && markerStartType === 'none') {
             p1Left = [p1Left[0] - (dx / len) * halfW, p1Left[1] - (dy / len) * halfW];
             p1Right = [p1Right[0] - (dx / len) * halfW, p1Right[1] - (dy / len) * halfW];
           }
-          if (i === pts.length - 2) {
+          if (i === pts.length - 2 && markerEndType === 'none') {
             p2Left = [p2Left[0] + (dx / len) * halfW, p2Left[1] + (dy / len) * halfW];
             p2Right = [p2Right[0] + (dx / len) * halfW, p2Right[1] + (dy / len) * halfW];
           }
@@ -1322,10 +1340,14 @@ export class BooleanOperations {
         }
       }
 
-      // Round linecaps on open endpoints
+      // Round linecaps on open endpoints (suppressed when a marker is attached to prevent protruding blobs)
       if (!isClosed && strokeLinecap === 'round') {
-        thickPolygons.push(makeDisc(pts[0].x, pts[0].y, halfW));
-        thickPolygons.push(makeDisc(pts[pts.length - 1].x, pts[pts.length - 1].y, halfW));
+        if (markerStartType === 'none') {
+          thickPolygons.push(makeDisc(pts[0].x, pts[0].y, halfW));
+        }
+        if (markerEndType === 'none') {
+          thickPolygons.push(makeDisc(pts[pts.length - 1].x, pts[pts.length - 1].y, halfW));
+        }
       }
 
       // Append marker geometry into thickPolygons
@@ -1336,22 +1358,31 @@ export class BooleanOperations {
           const hx = sp[0].handleOut.x - sp[0].x;
           const hy = sp[0].handleOut.y - sp[0].y;
           if (Math.hypot(hx, hy) > 0.001) v0Tan = { x: hx, y: hy };
+        } else if (sp[1].handleIn) {
+          const hx = sp[1].handleIn.x - sp[0].x;
+          const hy = sp[1].handleIn.y - sp[0].y;
+          if (Math.hypot(hx, hy) > 0.001) v0Tan = { x: hx, y: hy };
         }
         const mPolys = this.createMarkerPolygons(markerStartType, sp[0], v0Tan, strokeWidth);
         thickPolygons.push(...mPolys);
       }
 
       // 2. marker-mid on intermediate vertices of subpath
-      if (markerMidType !== 'none' && sp.length >= 3) {
-        for (let i = 1; i < sp.length - 1; i++) {
+      if (markerMidType !== 'none' && sp.length >= 2) {
+        const midCount = isClosed ? sp.length : sp.length - 1;
+        for (let i = 1; i < midCount; i++) {
           const curr = sp[i];
           const prev = sp[i - 1];
-          const next = sp[i + 1];
+          const next = isClosed && i === sp.length - 1 ? sp[0] : sp[i + 1];
 
           let inTan = { x: curr.x - prev.x, y: curr.y - prev.y };
           if (curr.handleIn) {
             const hx = curr.x - curr.handleIn.x;
             const hy = curr.y - curr.handleIn.y;
+            if (Math.hypot(hx, hy) > 0.001) inTan = { x: hx, y: hy };
+          } else if (prev.handleOut) {
+            const hx = curr.x - prev.handleOut.x;
+            const hy = curr.y - prev.handleOut.y;
             if (Math.hypot(hx, hy) > 0.001) inTan = { x: hx, y: hy };
           }
           const inLen = Math.hypot(inTan.x, inTan.y) || 1;
@@ -1361,6 +1392,10 @@ export class BooleanOperations {
           if (curr.handleOut) {
             const hx = curr.handleOut.x - curr.x;
             const hy = curr.handleOut.y - curr.y;
+            if (Math.hypot(hx, hy) > 0.001) outTan = { x: hx, y: hy };
+          } else if (next.handleIn) {
+            const hx = next.handleIn.x - curr.x;
+            const hy = next.handleIn.y - curr.y;
             if (Math.hypot(hx, hy) > 0.001) outTan = { x: hx, y: hy };
           }
           const outLen = Math.hypot(outTan.x, outTan.y) || 1;
@@ -1374,20 +1409,41 @@ export class BooleanOperations {
         }
       }
 
-      // 3. marker-end on last vertex of subpath
+      // 3. marker-end on last vertex of subpath (or closing vertex of closed subpath)
       if (markerEndType !== 'none' && sp.length >= 2) {
-        const lastIdx = sp.length - 1;
-        const lastV = sp[lastIdx];
-        const prevV = sp[lastIdx - 1];
+        if (isClosed) {
+          const lastV = sp[sp.length - 1];
+          const firstV = sp[0];
+          let vnTan = { x: firstV.x - lastV.x, y: firstV.y - lastV.y };
+          if (firstV.handleIn) {
+            const hx = firstV.x - firstV.handleIn.x;
+            const hy = firstV.y - firstV.handleIn.y;
+            if (Math.hypot(hx, hy) > 0.001) vnTan = { x: hx, y: hy };
+          } else if (lastV.handleOut) {
+            const hx = firstV.x - lastV.handleOut.x;
+            const hy = firstV.y - lastV.handleOut.y;
+            if (Math.hypot(hx, hy) > 0.001) vnTan = { x: hx, y: hy };
+          }
+          const mPolys = this.createMarkerPolygons(markerEndType, firstV, vnTan, strokeWidth);
+          thickPolygons.push(...mPolys);
+        } else {
+          const lastIdx = sp.length - 1;
+          const lastV = sp[lastIdx];
+          const prevV = sp[lastIdx - 1];
 
-        let vnTan = { x: lastV.x - prevV.x, y: lastV.y - prevV.y };
-        if (lastV.handleIn) {
-          const hx = lastV.x - lastV.handleIn.x;
-          const hy = lastV.y - lastV.handleIn.y;
-          if (Math.hypot(hx, hy) > 0.001) vnTan = { x: hx, y: hy };
+          let vnTan = { x: lastV.x - prevV.x, y: lastV.y - prevV.y };
+          if (lastV.handleIn) {
+            const hx = lastV.x - lastV.handleIn.x;
+            const hy = lastV.y - lastV.handleIn.y;
+            if (Math.hypot(hx, hy) > 0.001) vnTan = { x: hx, y: hy };
+          } else if (prevV.handleOut) {
+            const hx = lastV.x - prevV.handleOut.x;
+            const hy = lastV.y - prevV.handleOut.y;
+            if (Math.hypot(hx, hy) > 0.001) vnTan = { x: hx, y: hy };
+          }
+          const mPolys = this.createMarkerPolygons(markerEndType, lastV, vnTan, strokeWidth);
+          thickPolygons.push(...mPolys);
         }
-        const mPolys = this.createMarkerPolygons(markerEndType, lastV, vnTan, strokeWidth);
-        thickPolygons.push(...mPolys);
       }
     }
 

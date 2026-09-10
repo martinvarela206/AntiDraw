@@ -1395,9 +1395,19 @@ export class PropertyPanel {
     const strokeMiterlimit = parseFloat(el.attributes['stroke-miterlimit'] || '4') || 4;
     const miterAngleDeg = miterLimitToDegrees(strokeMiterlimit);
 
-    const markerStart = el.attributes['marker-start'] || '';
-    const markerMid = el.attributes['marker-mid'] || '';
-    const markerEnd = el.attributes['marker-end'] || '';
+    const parseMarkerId = (val?: string): string => {
+      if (!val || val === 'none') return 'none';
+      if (val.includes('arrow-open')) return 'arrow-open';
+      if (val.includes('arrow-filled')) return 'arrow-filled';
+      if (val.includes('circle-dot')) return 'circle-dot';
+      if (val.includes('square-block')) return 'square-block';
+      if (val.includes('bar-cap')) return 'bar-cap';
+      return 'none';
+    };
+
+    const markerStart = parseMarkerId(el.attributes['marker-start']);
+    const markerMid = parseMarkerId(el.attributes['marker-mid']);
+    const markerEnd = parseMarkerId(el.attributes['marker-end']);
 
     const box = this.selectionTool.getBoundingBox(el);
     const x = box ? Math.round(box.x) : 0;
