@@ -859,11 +859,40 @@ export class SelectToolHandler implements IToolHandler {
     if (this.activeHandle === 'guide-move' && this.ctx.canvasMgr.selectedGuideId) {
       const g = this.ctx.canvasMgr.getGuide(this.ctx.canvasMgr.selectedGuideId);
       if (g) {
+        /**
+         * ARCHITECTURAL RATIONALE: Physical Ruler Hit-Testing for Guide Deletion (FIX-04)
+         *
+         * 1. Elimination of Rigid ViewBox Boundary Checks:
+         *    Previously, dragging a guide beyond the viewBox (pt.y < 0 || pt.y > canvas.height,
+         *    or pt.x < 0 || pt.x > canvas.width) erroneously deleted the guide immediately.
+         *    In vector graphics editors (CorelDraw, Illustrator, Figma), guides are infinite construction
+         *    lines that can exist and be positioned freely in the pasteboard / outer workspace area.
+         *
+         * 2. Physical DOM Ruler Area Hit-Testing:
+         *    A guide is deleted ONLY when the user drags and drops it directly back onto the physical
+         *    ruler bar from which it originated (or corner button).
+         *    We evaluate screen client coordinates (e.clientX, e.clientY) against the DOM bounding
+         *    rects via ctx.isPointerOverRuler (with fallback to direct DOM element inspection).
+         */
         let shouldDelete = false;
-        if (g.orientation === 'horizontal' && (pt.y < 0 || pt.y > this.ctx.model.canvas.height)) {
-          shouldDelete = true;
-        } else if (g.orientation === 'vertical' && (pt.x < 0 || pt.x > this.ctx.model.canvas.width)) {
-          shouldDelete = true;
+        if (this.ctx.isPointerOverRuler) {
+          shouldDelete = this.ctx.isPointerOverRuler(e.clientX, e.clientY, g.orientation);
+        } else if (this.ctx.canvasMgr.showRulers) {
+          const topEl = document.getElementById('ruler-top-container');
+          const leftEl = document.getElementById('ruler-left-container');
+          const cornerEl = document.getElementById('ruler-corner');
+          const isInside = (el: HTMLElement | null) => {
+            if (!el) return false;
+            const r = el.getBoundingClientRect();
+            return r.width > 0 && r.height > 0 && e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+          };
+          if (g.orientation === 'horizontal') {
+            shouldDelete = isInside(topEl) || isInside(cornerEl);
+          } else if (g.orientation === 'vertical') {
+            shouldDelete = isInside(leftEl) || isInside(cornerEl);
+          } else {
+            shouldDelete = isInside(topEl) || isInside(leftEl) || isInside(cornerEl);
+          }
         }
 
         if (shouldDelete) {

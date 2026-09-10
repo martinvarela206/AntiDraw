@@ -16,6 +16,7 @@ export interface ToolContext {
   setTool(tool: ToolType): void;
   getActiveTool(): ToolType;
   applyCanvasSize?(): void;
+  isPointerOverRuler?(clientX: number, clientY: number, orientation?: 'horizontal' | 'vertical' | 'angled'): boolean;
 }
 
 /**

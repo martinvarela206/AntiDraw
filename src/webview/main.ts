@@ -101,6 +101,7 @@ class AntiDrawApp {
       setTool: (t) => this.toolbar.setTool(t),
       getActiveTool: () => this.toolbar.activeTool,
       applyCanvasSize: () => this.applyCanvasSize(),
+      isPointerOverRuler: (clientX, clientY, orientation) => this.rulerView?.isPointOverRuler(clientX, clientY, orientation) ?? false,
     };
     this.selectToolHandler = new SelectToolHandler(toolCtx, this.nodeEditorTool, {
       onSelectionChanged: () => {
@@ -1235,11 +1236,12 @@ class AntiDrawApp {
       const snappedPt = this.snapPoint(pt, allVerts);
       const pos = Math.round(isHoriz ? snappedPt.y : snappedPt.x);
 
-      const isInside = isHoriz
-        ? pos >= 0 && pos <= this.model.canvas.height
-        : pos >= 0 && pos <= this.model.canvas.width;
+      // ARCHITECTURAL RATIONALE: Physical Ruler Drag Cancellation (FIX-04)
+      // When dragging from a ruler, cancel creation only if dropped back onto the physical ruler bar.
+      // Guides can exist and be manipulated across the entire workspace, including outside the viewBox.
+      const isDroppedOnRuler = this.rulerView?.isPointOverRuler(e.clientX, e.clientY, this.dragGuideOrientation);
 
-      if (isInside) {
+      if (!isDroppedOnRuler) {
         const newG = this.canvasMgr.addGuide(
           this.dragGuideOrientation,
           pos,

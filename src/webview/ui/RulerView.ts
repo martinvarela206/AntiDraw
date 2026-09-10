@@ -397,6 +397,53 @@ export class RulerView {
     // Synchronize DOM markers with updated camera offset/zoom
     this.updateCursorMarkers();
   }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Physical Ruler Hit-Testing for Guide Deletion & Creation (FIX-04)
+   *
+   * 1. ViewBox Bounds Deletion Flaw:
+   *    Previously, dragging a guide beyond the strict SVG viewBox (pt.y < 0 || pt.y > canvas.height,
+   *    or pt.x < 0 || pt.x > canvas.width) erroneously deleted the guide.
+   *    In professional vector software (CorelDraw, Illustrator, Figma), guides are infinite construction
+   *    lines that can exist outside the artboard in the surrounding pasteboard workspace.
+   *    A guide must ONLY be deleted when dragging it directly back onto the physical ruler bar itself.
+   *
+   * 2. Physical DOM Geometry vs Logical Artboard Coordinates:
+   *    The canvas workspace scrolls and zooms dynamically, meaning artboard coordinates (pt.x, pt.y)
+   *    have no fixed correspondence to the physical ruler position on screen.
+   *    Therefore, ruler hit-testing must be evaluated against the physical DOM bounding client rects
+   *    of the ruler containers (`#ruler-top-container`, `#ruler-left-container`, and `#ruler-corner`).
+   */
+  public isPointOverRuler(
+    clientX: number,
+    clientY: number,
+    orientation?: 'horizontal' | 'vertical' | 'angled'
+  ): boolean {
+    if (!this.canvasMgr.showRulers) return false;
+
+    const isInsideRect = (el: HTMLElement | null): boolean => {
+      if (!el) return false;
+      const rect = el.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return false;
+      return (
+        clientX >= rect.left &&
+        clientX <= rect.right &&
+        clientY >= rect.top &&
+        clientY <= rect.bottom
+      );
+    };
+
+    const topContainer = (this.topRulerCanvas?.parentElement as HTMLElement) || this.topRulerCanvas;
+    const leftContainer = (this.leftRulerCanvas?.parentElement as HTMLElement) || this.leftRulerCanvas;
+
+    if (orientation === 'horizontal') {
+      return isInsideRect(topContainer) || isInsideRect(this.cornerBtn);
+    } else if (orientation === 'vertical') {
+      return isInsideRect(leftContainer) || isInsideRect(this.cornerBtn);
+    } else {
+      return isInsideRect(topContainer) || isInsideRect(leftContainer) || isInsideRect(this.cornerBtn);
+    }
+  }
 }
 
 
