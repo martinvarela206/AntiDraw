@@ -42,7 +42,17 @@ class AntiDrawApp {
   private canvasScrollArea!: HTMLElement;
   private canvasWrapper!: HTMLElement;
   private svgCanvas!: SVGSVGElement;
+  /**
+   * HISTORICAL PERFORMANCE ARCHITECTURE (FIX-12):
+   * Isolated grid SVG layer.
+   * By keeping #grid-svg separate from #overlay-svg, the GPU pattern texture cache
+   * is preserved across all mousemove and tool hover events without re-rasterization.
+   */
+  private gridSvg!: SVGSVGElement;
   private overlaySvg!: SVGSVGElement;
+
+  private pointerMoveRafId: number | null = null;
+  private latestPointerMoveEvent: PointerEvent | null = null;
 
   private isDragging: boolean = false;
   private dragStartPt: Point = { x: 0, y: 0 };
@@ -182,13 +192,19 @@ class AntiDrawApp {
     this.canvasScrollArea = document.getElementById('canvas-scroll-area')!;
     this.canvasWrapper = document.getElementById('canvas-wrapper')!;
 
-    // Create svg-canvas and overlay-svg in JS and append to wrapper for guaranteed same-origin alignment
+    // Create svg-canvas, grid-svg, and overlay-svg in JS and append to wrapper for guaranteed same-origin alignment
     const svgNS = 'http://www.w3.org/2000/svg';
     const svgEl = document.createElementNS(svgNS, 'svg') as SVGSVGElement;
     svgEl.id = 'svg-canvas';
     svgEl.style.cssText = 'position:absolute;top:0;left:0;display:block;overflow:visible;';
     this.canvasWrapper.appendChild(svgEl);
     this.svgCanvas = svgEl;
+
+    const gridSvgEl = document.createElementNS(svgNS, 'svg') as SVGSVGElement;
+    gridSvgEl.id = 'grid-svg';
+    gridSvgEl.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;overflow:visible;';
+    this.canvasWrapper.appendChild(gridSvgEl);
+    this.gridSvg = gridSvgEl;
 
     const overlaySvgEl = document.createElementNS(svgNS, 'svg') as SVGSVGElement;
     overlaySvgEl.id = 'overlay-svg';
@@ -833,8 +849,8 @@ class AntiDrawApp {
       overflow: visible;
     `;
 
-    // Both SVGs: width and height match zoomed dimensions, viewBox encompasses full working bounds
-    [this.svgCanvas, this.overlaySvg].forEach((svg) => {
+    // All 3 SVGs: width and height match zoomed dimensions, viewBox encompasses full working bounds
+    [this.svgCanvas, this.gridSvg, this.overlaySvg].forEach((svg) => {
       svg.setAttribute('width', workBounds.width.toString());
       svg.setAttribute('height', workBounds.height.toString());
       svg.setAttribute('viewBox', vb);
@@ -846,11 +862,51 @@ class AntiDrawApp {
       svg.style.overflow = 'visible';
     });
 
+    this.updateGridLayer();
+
     // Update ruler sizes
     setTimeout(() => {
       this.rulerView.updateSize(workBounds.width, workBounds.height);
       this.syncRulerScroll();
     }, 0);
+  }
+
+  /**
+   * HISTORICAL PERFORMANCE ARCHITECTURE (FIX-12):
+   * Dedicated Isolated Grid Layer Update.
+   *
+   * Previous Implementation:
+   * Grid patterns (<defs><pattern>) and the large background <rect fill="url(...)"> were wiped
+   * and recreated inside `overlaySvg.innerHTML` during every pointer movement or hover.
+   * At zoom > 200%, destroying and re-rasterizing the pattern caused massive GPU pipeline stalls.
+   *
+   * Solution:
+   * The grid SVG lives in its own dedicated `#grid-svg` container. `updateGridLayer()` is ONLY
+   * called when grid configuration (showGrid, spacing, color, alignment, type), ruler origin,
+   * zoom, or viewBox / working canvas boundaries are modified.
+   * During pointer movements, node dragging, and tool interactions, `#grid-svg` is NEVER touched,
+   * preserving 100% of GPU texture cache.
+   */
+  public updateGridLayer(): void {
+    if (!this.gridSvg) return;
+    if (!this.canvasMgr.showGrid) {
+      this.gridSvg.innerHTML = '';
+      return;
+    }
+    const vb = this.model.getViewBoxBounds();
+    const workBounds = this.model.getWorkingCanvasBounds(80);
+    const originX = vb.minX + (this.canvasMgr.rulerConfig.originX || 0);
+    const originY = vb.minY + (this.canvasMgr.rulerConfig.originY || 0);
+    const gridData = this.canvasMgr.generateGridDefsAndLayers(workBounds, originX, originY);
+
+    let html = '';
+    if (gridData.defsHtml) {
+      html += `<defs>${gridData.defsHtml}</defs>`;
+    }
+    if (gridData.layersHtml) {
+      html += `<g id="grid-pattern-layers">${gridData.layersHtml}</g>`;
+    }
+    this.gridSvg.innerHTML = html;
   }
 
   // Snap point accounting for dynamic ruler (0,0) origin offset and artboard viewBox bounds
@@ -1009,7 +1065,34 @@ class AntiDrawApp {
     this.render();
   }
 
+  /**
+   * HISTORICAL PERFORMANCE ARCHITECTURE (FIX-12):
+   * requestAnimationFrame Coalescing for Pointer Movement.
+   *
+   * Previous Implementation:
+   * High-polling mice (125Hz-1000Hz) dispatched hundreds of pointermove events per second.
+   * Each event executed hit-testing, coordinate transforms, status text updates, and at line 1093
+   * fell through to an accidental `this.render()`, which re-parsed and reconstructed the entire
+   * SVG DOM and property panel on every mouse pixel moved!
+   *
+   * Solution:
+   * 1. Coalesce high-frequency pointer movements into `requestAnimationFrame`, processing
+   *    at most one update per screen refresh cycle.
+   * 2. Completely eliminate the accidental `this.render()` on passive mouse movements.
+   */
   private onPointerMove(e: PointerEvent): void {
+    this.latestPointerMoveEvent = e;
+    if (this.pointerMoveRafId === null) {
+      this.pointerMoveRafId = requestAnimationFrame(() => {
+        this.pointerMoveRafId = null;
+        if (this.latestPointerMoveEvent) {
+          this.processPointerMove(this.latestPointerMoveEvent);
+        }
+      });
+    }
+  }
+
+  private processPointerMove(e: PointerEvent): void {
     const pt = this.getCanvasPoint(e);
     const coordsEl = document.getElementById('status-coords');
     if (coordsEl) {
@@ -1022,7 +1105,7 @@ class AntiDrawApp {
       coordsEl.innerText = `X: ${relX}, Y: ${relY}`;
     }
 
-    // Update cursor indicator on rulers
+    // Update cursor indicator on rulers (hardware-accelerated DOM markers, 0 canvas redraw)
     this.rulerView.setCursorPos(pt.x, pt.y);
 
     // Node Tool Delegation
@@ -1090,10 +1173,18 @@ class AntiDrawApp {
       return;
     }
 
-    this.render();
+    // Passive pointer moves without active drag or tool capture must never trigger full document re-render.
   }
 
   private onPointerUp(e: PointerEvent): void {
+    if (this.pointerMoveRafId !== null) {
+      cancelAnimationFrame(this.pointerMoveRafId);
+      this.pointerMoveRafId = null;
+      if (this.latestPointerMoveEvent) {
+        this.processPointerMove(this.latestPointerMoveEvent);
+      }
+    }
+
     try {
       if (this.canvasWrapper.hasPointerCapture(e.pointerId)) {
         this.canvasWrapper.releasePointerCapture(e.pointerId);

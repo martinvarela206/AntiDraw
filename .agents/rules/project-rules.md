@@ -74,5 +74,10 @@ This file contains rules specific to the AntiDraw project. Rules are written in 
      - **Which naive or alternate approaches were discarded and why**.
    - Comments must be placed immediately above or within the relevant functions, event handlers, and data structures.
 
+10. **Permanent Preservation of Historical and Technical In-Code Comments**:
+   - All historical, architectural, algorithmic, and optimization comments placed within code files MUST be preserved permanently across all future edits and refactorings.
+   - These comments serve as living technical documentation and learning records for the repository. Never remove, strip, or truncate existing in-code rationale, performance diagnostics, or architectural comments unless the underlying subsystem itself is formally deprecated and removed.
+
+
 
 

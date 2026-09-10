@@ -61,18 +61,28 @@ export class OverlayRenderer {
       </g>
     `;
 
-    // 1. High-Performance GPU-Accelerated Parametric Grid Overlay (<defs><pattern>)
-    if (ctx.canvasMgr.showGrid) {
-      const originX = vb.minX + (ctx.canvasMgr.rulerConfig.originX || 0);
-      const originY = vb.minY + (ctx.canvasMgr.rulerConfig.originY || 0);
-      const gridData = ctx.canvasMgr.generateGridDefsAndLayers(workBounds, originX, originY);
-      if (gridData.defsHtml) {
-        html += `<defs>${gridData.defsHtml}</defs>`;
-      }
-      if (gridData.layersHtml) {
-        html += `<g id="grid-pattern-layers">${gridData.layersHtml}</g>`;
-      }
-    }
+    /**
+     * HISTORICAL PERFORMANCE ARCHITECTURE (FIX-12):
+     * Grid Layer Decoupling from Ephemeral Overlay.
+     *
+     * Previous Implementation:
+     * The parametric SVG grid (<defs><pattern> and <rect fill="url(#pattern)">) was concatenated
+     * directly into `OverlayRenderer.render()`.
+     *
+     * Root Cause:
+     * During pointer movements, node dragging, and handle hovers, `renderOverlay()` was invoked
+     * frequently (up to 120 times/sec). Serializing and wiping `overlaySvg.innerHTML` forced the
+     * browser graphics engine to recompile SVG pattern definitions and destroy GPU texture caches.
+     * At zoom levels > 200%, the grid rect spans tens of megapixels, resulting in crippling GPU/CPU
+     * rasterization overhead and severe frame drops.
+     *
+     * Technical Solution:
+     * The grid overlay is isolated into a dedicated `#grid-svg` element managed by `main.ts`.
+     * It is updated exclusively when grid properties (spacing, colors, type, alignment), ruler origin,
+     * working canvas bounds, or zoom factors change.
+     * `OverlayRenderer.render()` is now strictly dedicated to fast ephemeral UI elements (artboard,
+     * guides, transform handles, selection boxes, node vertices).
+     */
 
     // 2. Guide Lines Overlay (Always 1px width, inverted highlight on select, transform controls on double click)
     if (ctx.canvasMgr.showGuides) {

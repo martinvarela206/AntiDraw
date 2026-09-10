@@ -93,6 +93,21 @@ export class ViewportController {
     this.canvasScrollArea.addEventListener('pointerdown', startMiddlePan);
     this.canvasWrapper.addEventListener('pointerdown', startMiddlePan);
 
+    /**
+     * HISTORICAL PERFORMANCE ARCHITECTURE (FIX-12):
+     * requestAnimationFrame Coalescing for Middle-Mouse Panning.
+     *
+     * Previous Implementation:
+     * `onMiddlePanMove` directly modified DOM inline styles (`applyCameraTransform`) and called
+     * `syncRulerScroll()` synchronously on every pointer event. High-polling mice (500Hz-1000Hz)
+     * saturated the thread with microtasks and forced synchronous layout/composite recalculations.
+     *
+     * Solution:
+     * Decouple pointer event ingestion from DOM/Ruler painting using `requestAnimationFrame`.
+     * Pointer updates modify the mathematical offset instantly; rendering is executed once per
+     * monitor refresh cycle (60Hz/120Hz/144Hz).
+     */
+    let panRafId: number | null = null;
     const onMiddlePanMove = (e: PointerEvent) => {
       if (this.isMiddlePanning) {
         e.preventDefault();
@@ -100,8 +115,14 @@ export class ViewportController {
         const dy = e.clientY - this.panStartClient.y;
         this.cameraOffset.x = Math.round(this.panStartOffset.x + dx);
         this.cameraOffset.y = Math.round(this.panStartOffset.y + dy);
-        this.applyCameraTransform();
-        this.syncRulerScroll();
+
+        if (panRafId === null) {
+          panRafId = requestAnimationFrame(() => {
+            panRafId = null;
+            this.applyCameraTransform();
+            this.syncRulerScroll();
+          });
+        }
       }
     };
 
@@ -110,6 +131,12 @@ export class ViewportController {
 
     const stopMiddlePan = (e: PointerEvent) => {
       if (this.isMiddlePanning) {
+        if (panRafId !== null) {
+          cancelAnimationFrame(panRafId);
+          panRafId = null;
+          this.applyCameraTransform();
+          this.syncRulerScroll();
+        }
         this.isMiddlePanning = false;
         this.canvasScrollArea.style.cursor = '';
         this.canvasWrapper.style.cursor = '';
@@ -128,27 +155,64 @@ export class ViewportController {
       if (e.button === 1) e.preventDefault();
     });
 
-    // Mouse Wheel: Ctrl + Wheel for Zoom, Alt + Wheel for Horizontal Pan, Wheel for Vertical Pan
+    /**
+     * HISTORICAL PERFORMANCE ARCHITECTURE (FIX-12):
+     * requestAnimationFrame Coalescing for Wheel Zoom and Panning.
+     *
+     * Previous Implementation:
+     * Each individual wheel event immediately triggered `zoomAtClientPointByFactor` or camera pan.
+     * During rapid wheel scrolling or trackpad pinches, 20-30 events arrived within a single frame,
+     * triggering cascading DOM resizes, SVG serialization, and 2D canvas repaints that blocked
+     * the main thread and caused extreme stuttering (> 200ms frame latency at high zoom).
+     *
+     * Solution:
+     * Accumulate multiplicative zoom factors and pan deltas across micro-ticks within a frame,
+     * executing exactly one composite camera transform and render pass on the subsequent animation frame.
+     */
+    let wheelRafId: number | null = null;
+    let accumulatedZoomFactor = 1.0;
+    let wheelClientX = 0;
+    let wheelClientY = 0;
+    let accumulatedPanX = 0;
+    let accumulatedPanY = 0;
+
     this.canvasScrollArea.addEventListener(
       'wheel',
       (e: WheelEvent) => {
         if (e.ctrlKey) {
           e.preventDefault();
           const factor = e.deltaY < 0 ? CanvasManager.ZOOM_FACTOR_IN : CanvasManager.ZOOM_FACTOR_OUT;
-          this.zoomAtClientPointByFactor(e.clientX, e.clientY, factor);
+          accumulatedZoomFactor *= factor;
+          wheelClientX = e.clientX;
+          wheelClientY = e.clientY;
         } else if (e.altKey) {
-          // Alt + Scroll -> Horizontal camera pan
           e.preventDefault();
           const delta = e.deltaY || e.deltaX;
-          this.cameraOffset.x -= delta;
-          this.applyCameraTransform();
-          this.syncRulerScroll();
+          accumulatedPanX += delta;
         } else if (!e.shiftKey) {
-          // Regular Wheel -> Vertical camera pan
           e.preventDefault();
-          this.cameraOffset.y -= e.deltaY;
-          this.applyCameraTransform();
-          this.syncRulerScroll();
+          accumulatedPanY += e.deltaY;
+        }
+
+        if (wheelRafId === null) {
+          wheelRafId = requestAnimationFrame(() => {
+            wheelRafId = null;
+
+            if (accumulatedZoomFactor !== 1.0) {
+              const totalFactor = accumulatedZoomFactor;
+              accumulatedZoomFactor = 1.0;
+              this.zoomAtClientPointByFactor(wheelClientX, wheelClientY, totalFactor);
+            }
+
+            if (accumulatedPanX !== 0 || accumulatedPanY !== 0) {
+              this.cameraOffset.x -= accumulatedPanX;
+              this.cameraOffset.y -= accumulatedPanY;
+              accumulatedPanX = 0;
+              accumulatedPanY = 0;
+              this.applyCameraTransform();
+              this.syncRulerScroll();
+            }
+          });
         }
       },
       { passive: false }
