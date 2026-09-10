@@ -189,7 +189,20 @@ export class VectorModel {
       this.canvas = { width, height, viewBox, backgroundColor: bg };
       this.elements = [];
 
-      // Parse external <defs> if present, filtering out our standard markers to avoid duplicates
+      // HISTORICAL ARCHITECTURE (FIX-20):
+      // Strict Defs Sanitization & Orphaned Comments Elimination.
+      // Why this was built:
+      // Previously, when cloning <defs>, standard markers (`ad-marker-*`), filters (`ad-filter-*`),
+      // and gradients (`ad-grad-*`) elements were removed from the DOM clone, but their accompanying
+      // XML comments (e.g. "<!-- AntiDraw Standard SVG Markers -->", "<!-- Arrow Open Start -->", etc.)
+      // and whitespace text nodes remained in clone.innerHTML. When serialized back to SVG via `toSvgString`,
+      // STANDARD_MARKERS_INNER_XML was prepended while the leftover comments in this.customDefs were appended.
+      // Over repeated save/reload cycles or when deleting vectors with markers, orphaned comments multiplied
+      // uncontrollably in <defs>.
+      // Solution:
+      // 1. Explicitly traverse and remove all XML comment nodes referring to AntiDraw markers, filters, or gradients.
+      // 2. If no valid child element tags remain in clone, treat customDefs as strictly empty ('').
+      // 3. Normalize residual whitespace, preventing ghost comment accumulation in SVG files.
       const defsEl = svgEl.querySelector('defs');
       if (defsEl) {
         const clone = defsEl.cloneNode(true) as HTMLElement;
@@ -205,7 +218,42 @@ export class VectorModel {
         });
         clone.querySelectorAll('[id^="ad-filter-"]').forEach((f) => f.remove());
         clone.querySelectorAll('[id^="ad-grad-"]').forEach((g) => g.remove());
-        this.customDefs = clone.innerHTML.trim();
+
+        // Remove all comment nodes associated with AntiDraw template blocks or orphaned markers
+        const removeOrphanComments = (parent: Node) => {
+          const nodes = Array.from(parent.childNodes);
+          for (const node of nodes) {
+            if (node.nodeType === 8 /* Node.COMMENT_NODE */) {
+              const text = node.nodeValue || '';
+              if (
+                text.includes('AntiDraw') ||
+                text.includes('marker') ||
+                text.includes('Arrow') ||
+                text.includes('Circle Dot') ||
+                text.includes('Square Block') ||
+                text.includes('Bar Cap') ||
+                text.includes('Filter') ||
+                text.includes('Gradient')
+              ) {
+                node.remove();
+              }
+            } else if (node.hasChildNodes()) {
+              removeOrphanComments(node);
+            }
+          }
+        };
+        removeOrphanComments(clone);
+
+        // If no functional child elements remain in clone, defs had only standard AntiDraw resources
+        if (clone.children.length === 0) {
+          this.customDefs = '';
+        } else {
+          this.customDefs = clone.innerHTML
+            .split('\n')
+            .filter((line) => line.trim().length > 0)
+            .join('\n')
+            .trim();
+        }
       } else {
         this.customDefs = '';
       }
@@ -522,7 +570,8 @@ export class VectorModel {
     const filterDefs = this.compileElementFilters();
     const gradientDefs = this.compileElementGradients();
 
-    if (hasMarkers || filterDefs.length > 0 || gradientDefs.length > 0 || (this.customDefs && this.customDefs.length > 0)) {
+    const hasCustomDefs = !!(this.customDefs && this.customDefs.trim().length > 0);
+    if (hasMarkers || filterDefs.length > 0 || gradientDefs.length > 0 || hasCustomDefs) {
       svg += `  <defs id="antidraw-defs">\n`;
       if (hasMarkers) {
         svg += STANDARD_MARKERS_INNER_XML;
@@ -533,8 +582,8 @@ export class VectorModel {
       if (gradientDefs.length > 0) {
         svg += gradientDefs;
       }
-      if (this.customDefs && this.customDefs.length > 0) {
-        svg += `    ${this.customDefs}\n`;
+      if (hasCustomDefs) {
+        svg += `    ${this.customDefs.trim()}\n`;
       }
       svg += `  </defs>\n`;
     }
