@@ -90,6 +90,13 @@ export class NodeToolHandler implements IToolHandler {
 
     const isClosed = this.isElementClosed(selectedEl);
 
+    // ARCHITECTURAL RATIONALE: Parametric Element Free Node Edit Lock (FEAT-01)
+    // Parametric primitives (<rect>, <circle>, <ellipse>, etc.) strictly prohibit free node insertion
+    // or free vertex deletion. The user must explicitly convert to curves (Ctrl+Q) before subdividing.
+    if (this.ctx.model.isParametricElement(selectedEl)) {
+      return true;
+    }
+
     // 1. Double-click on existing vertex -> Delete vertex
     const hitNode = this.nodeEditorTool.hitTestVertices(
       selectedEl.vertices,
@@ -209,6 +216,11 @@ export class NodeToolHandler implements IToolHandler {
       }
 
       // 2. Check if clicking directly on a path segment
+      // Parametric primitives block free segment dragging/distortion
+      if (this.ctx.model.isParametricElement(selectedEl)) {
+        return false;
+      }
+
       const hitSegment = this.nodeEditorTool.hitTestSegment(
         selectedEl.vertices,
         pt,
@@ -298,6 +310,59 @@ export class NodeToolHandler implements IToolHandler {
           }
         });
         const snappedPt = this.ctx.snapPoint(pt, otherVertices);
+
+        // ARCHITECTURAL RATIONALE: Constrained Parametric Primitive Dragging (FEAT-01)
+        // When moving vertices of a parametric primitive, maintain its geometric invariants
+        // (orthogonal rectangle angles, 4-node smooth ellipse curvature, etc.) rather than
+        // distorting it into an asymmetrical polygon.
+        if (this.ctx.model.isParametricElement(selectedEl)) {
+          const vIdx = this.initialVertices.findIndex((v) => v.id === this.nodeEditorTool.selectedVertexId);
+          const tag = selectedEl.shapeType || selectedEl.tagName;
+
+          if (tag === 'rect' && this.initialVertices.length === 4) {
+            // Rect vertex 0=top-left, 1=top-right, 2=bottom-right, 3=bottom-left
+            const oppIdx = (vIdx + 2) % 4;
+            const opp = this.initialVertices[oppIdx];
+            const minX = Math.min(opp.x, snappedPt.x);
+            const maxX = Math.max(opp.x, snappedPt.x);
+            const minY = Math.min(opp.y, snappedPt.y);
+            const maxY = Math.max(opp.y, snappedPt.y);
+            const w = Math.max(1, maxX - minX);
+            const h = Math.max(1, maxY - minY);
+            this.ghostNodeVertices = this.ctx.model.convertShapeToVertices('rect', {
+              x: minX.toString(),
+              y: minY.toString(),
+              width: w.toString(),
+              height: h.toString(),
+            });
+            this.ctx.renderOverlay();
+            return true;
+          } else if ((tag === 'ellipse' || tag === 'circle') && this.initialVertices.length === 4) {
+            // Ellipse vertices 0=top 12h, 1=right 3h, 2=bottom 6h, 3=left 9h
+            const cx = (this.initialVertices[1].x + this.initialVertices[3].x) / 2;
+            const cy = (this.initialVertices[0].y + this.initialVertices[2].y) / 2;
+            let rx = Math.abs(this.initialVertices[1].x - cx);
+            let ry = Math.abs(this.initialVertices[0].y - cy);
+            if (vIdx === 0 || vIdx === 2) {
+              ry = Math.max(1, Math.abs(snappedPt.y - cy));
+            } else {
+              rx = Math.max(1, Math.abs(snappedPt.x - cx));
+            }
+            if (tag === 'circle') {
+              const uniformR = Math.max(rx, ry);
+              rx = uniformR;
+              ry = uniformR;
+            }
+            this.ghostNodeVertices = this.ctx.model.convertShapeToVertices('ellipse', {
+              cx: cx.toString(),
+              cy: cy.toString(),
+              rx: rx.toString(),
+              ry: ry.toString(),
+            });
+            this.ctx.renderOverlay();
+            return true;
+          }
+        }
 
         const result = this.nodeEditorTool.moveVertex(
           this.initialVertices,
@@ -463,7 +528,8 @@ export class NodeToolHandler implements IToolHandler {
   public deleteSelectedVertex(): boolean {
     if (!this.nodeEditorTool.selectedVertexId) return false;
     const selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
-    if (selectedEl && selectedEl.vertices && selectedEl.vertices.length > 2) {
+    if (!selectedEl || this.ctx.model.isParametricElement(selectedEl)) return false;
+    if (selectedEl.vertices && selectedEl.vertices.length > 2) {
       this.ctx.pushUndo();
       selectedEl.vertices = this.nodeEditorTool.deleteVertex(selectedEl.vertices, this.nodeEditorTool.selectedVertexId);
       const isClosed = this.isElementClosed(selectedEl);
@@ -543,7 +609,8 @@ export class NodeToolHandler implements IToolHandler {
 
   public handleNodeTypeChange(type: NodeType): void {
     const selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
-    if (selectedEl && selectedEl.vertices && this.nodeEditorTool.selectedVertexId) {
+    if (!selectedEl || this.ctx.model.isParametricElement(selectedEl)) return;
+    if (selectedEl.vertices && this.nodeEditorTool.selectedVertexId) {
       this.ctx.pushUndo();
       const isClosed = this.isElementClosed(selectedEl);
       /**
@@ -570,7 +637,8 @@ export class NodeToolHandler implements IToolHandler {
 
   public handleSplitNode(): void {
     const selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
-    if (selectedEl && selectedEl.vertices && this.nodeEditorTool.selectedVertexId) {
+    if (!selectedEl || this.ctx.model.isParametricElement(selectedEl)) return;
+    if (selectedEl.vertices && this.nodeEditorTool.selectedVertexId) {
       this.ctx.pushUndo();
       const isClosed = this.isElementClosed(selectedEl);
       const splitResult = this.nodeEditorTool.splitNode(
@@ -613,8 +681,8 @@ export class NodeToolHandler implements IToolHandler {
 
     const selectedEls = this.ctx.model.elements.filter((el) => this.ctx.selectionTool.isSelected(el.id));
 
-    // 1. Node Edit Mode Bézier Handles for Selected Element (rendered when not actively dragging ghost)
-    if (!this.ghostNodeVertices && selectedEls.length === 1 && selectedEls[0].vertices && this.ctx.getActiveTool() === 'node') {
+    // 1. Node Edit Mode Bézier Handles for Selected Element (rendered when not actively dragging ghost and not parametric)
+    if (!this.ghostNodeVertices && selectedEls.length === 1 && selectedEls[0].vertices && this.ctx.getActiveTool() === 'node' && !this.ctx.model.isParametricElement(selectedEls[0])) {
       const selectedEl = selectedEls[0];
       const verts = selectedEl.vertices!;
       const selectedIdx = verts.findIndex((v) => v.id === this.nodeEditorTool.selectedVertexId);

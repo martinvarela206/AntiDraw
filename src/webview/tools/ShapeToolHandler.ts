@@ -257,12 +257,14 @@ export class ShapeToolHandler implements IToolHandler {
       'data-shape': tool,
     };
 
+    const isParametric = tool === 'rect' || tool === 'ellipse';
+
     /**
-     * Technical Rationale (FIX-19):
-     * Persisting explicit geometric shape metadata on created elements allows
-     * PropertyPanel to recognize and expose dedicated geometric controls
-     * (e.g. Center X/Y, Radius X/Y, aspect ratio constraints) when selected,
-     * maintaining high fidelity while retaining standard path representation.
+     * ARCHITECTURAL RATIONALE: Native Parametric Shape Creation (FEAT-01)
+     * When drawing standard rectangles or ellipses, AntiDraw marks them as native parametric primitives
+     * (`tagName: 'rect'` or `tagName: 'ellipse'`, `isParametric: true`).
+     * They store standard SVG attributes (x, y, width, height for rect; cx, cy, rx, ry for ellipse)
+     * and only convert to curves upon explicit command (Ctrl+Q / context menu / inspector button).
      */
     if (tool === 'ellipse') {
       attributes['cx'] = bounds.cx.toString();
@@ -270,15 +272,22 @@ export class ShapeToolHandler implements IToolHandler {
       attributes['rx'] = bounds.rx.toString();
       attributes['ry'] = bounds.ry.toString();
     } else if (tool === 'rect') {
+      attributes['x'] = bounds.x.toString();
+      attributes['y'] = bounds.y.toString();
+      attributes['width'] = bounds.w.toString();
+      attributes['height'] = bounds.h.toString();
       attributes['rx'] = (this.ctx.canvasMgr.shapeConfig?.rectCornerRadius || 0).toString();
     }
+    attributes['data-parametric'] = isParametric ? 'true' : 'false';
 
     return {
       id,
-      tagName: 'path',
+      tagName: isParametric ? (tool as any) : 'path',
       attributes,
       vertices,
       isClosed,
+      isParametric,
+      shapeType: isParametric ? (tool as any) : 'path',
     };
   }
 }

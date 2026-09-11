@@ -485,3 +485,73 @@ button.prop-input.active {
   border-color: var(--accent-color);
 }
 
+/* CONTEXT MENU */
+.ad-context-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 200px;
+  background: rgba(26, 27, 35, 0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+  padding: 4px;
+  user-select: none;
+}
+
+.ad-context-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  color: var(--text-main);
+  font-size: 12px;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.ad-context-item:hover:not(.disabled) {
+  background: var(--accent-color);
+  color: #ffffff;
+}
+
+.ad-context-item.disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.ad-context-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+
+.ad-context-icon {
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ad-context-shortcut {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-left: 16px;
+  font-family: var(--font-family);
+  opacity: 0.85;
+}
+
+.ad-context-item:hover:not(.disabled) .ad-context-shortcut {
+  color: #e0e7ff;
+}
+
+.ad-context-divider {
+  height: 1px;
+  background: var(--border-color);
+  margin: 4px 2px;
+}
+
+

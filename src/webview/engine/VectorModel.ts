@@ -21,12 +21,16 @@ export interface PathSegment {
   type: 'L' | 'C';
 }
 
+export type ParametricShapeType = 'rect' | 'circle' | 'ellipse' | 'line' | 'polyline' | 'polygon';
+
 export interface VectorElement {
   id: string;
-  tagName: string; // 'path' | 'rect' | 'ellipse' | 'circle' | 'line' | 'polygon'
+  tagName: string; // 'path' | 'rect' | 'ellipse' | 'circle' | 'line' | 'polygon' | 'polyline'
   attributes: Record<string, string>;
   vertices?: PathVertex[];
   isClosed?: boolean;
+  isParametric?: boolean;
+  shapeType?: ParametricShapeType | 'path' | 'star';
 }
 
 export interface CanvasSettings {
@@ -377,15 +381,28 @@ export class VectorModel {
             elem.vertices = this.parsePathD(attrs.d || '', nodeTypesStr);
             elem.isClosed = (attrs.d || '').toUpperCase().includes('Z');
             shapeAttrs.forEach((sa) => delete elem.attributes[sa]);
+            if (attrs['data-shape'] && ['rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon'].includes(attrs['data-shape']) && attrs['data-parametric'] === 'true') {
+              elem.isParametric = true;
+              elem.shapeType = attrs['data-shape'] as ParametricShapeType;
+              elem.tagName = attrs['data-shape'];
+            } else {
+              elem.isParametric = false;
+              elem.shapeType = 'path';
+            }
           } else {
-            // Normalize shapes into path vertices for unified vector editing
+            /**
+             * ARCHITECTURAL RATIONALE: Native Parametric Shape Ingestion (FEAT-01)
+             * Instead of destroying native SVG primitives (<rect>, <circle>, <ellipse>, <line>, <polyline>, <polygon>)
+             * by forcibly mutating them into <path>, AntiDraw preserves their original tagName, parametric attributes,
+             * and data-shape markers while calculating unified vertices for canvas rendering and bounding box calculation.
+             */
             elem.vertices = this.convertShapeToVertices(tag, attrs);
-            elem.tagName = 'path';
+            elem.tagName = tag;
+            elem.isParametric = true;
+            elem.shapeType = tag as ParametricShapeType;
             elem.attributes['data-shape'] = tag;
-            shapeAttrs.forEach((sa) => delete elem.attributes[sa]);
-
+            elem.attributes['data-parametric'] = 'true';
             elem.isClosed = tag !== 'line' && tag !== 'polyline';
-            elem.attributes.d = this.compilePathD(elem.vertices, elem.isClosed);
           }
 
           /**
@@ -629,28 +646,51 @@ export class VectorModel {
       // HISTORICAL ARCHITECTURE (FIX-19): Guarantee attributes.id strictly reflects model el.id upon serialization
       el.attributes.id = el.id;
 
-      if (el.vertices && el.vertices.length > 0) {
-        el.attributes.d = this.compilePathD(el.vertices, el.isClosed);
-        // Persist nodeType for each vertex so re-parsing restores it reliably
-        el.attributes['data-node-types'] = el.vertices.map((v) => v.nodeType).join(',');
-      }
+      if (this.isParametricElement(el) && el.tagName !== 'path') {
+        /**
+         * ARCHITECTURAL RATIONALE: Native Parametric SVG Export (FEAT-01)
+         * Preserves original SVG primitives (<rect>, <ellipse>, <circle>, <line>, <polyline>, <polygon>)
+         * in the output SVG document without converting them to path commands.
+         */
+        this.syncParametricAttributes(el);
+        const cleanAttrs: Record<string, string> = { ...el.attributes };
+        delete cleanAttrs.d;
+        delete cleanAttrs['data-node-types'];
 
-      /**
-       * HISTORICAL ARCHITECTURE (FIX-13):
-       * Open Vector Fill Suppression in SVG Serialization.
-       * If an element is open (!isElementClosed), its fill attribute is strictly set to 'none'
-       * and any gradient definitions are unlinked to eliminate false straight-line polygon fills.
-       */
-      if (!this.isElementClosed(el)) {
-        el.attributes.fill = 'none';
-        delete el.attributes['data-gradient'];
-      }
+        if (!this.isElementClosed(el)) {
+          cleanAttrs.fill = 'none';
+          delete cleanAttrs['data-gradient'];
+        }
 
-      svg += `  <${el.tagName}`;
-      for (const [key, val] of Object.entries(el.attributes)) {
-        svg += ` ${key}="${escapeXml(val)}"`;
+        svg += `  <${el.tagName}`;
+        for (const [key, val] of Object.entries(cleanAttrs)) {
+          svg += ` ${key}="${escapeXml(val)}"`;
+        }
+        svg += ` />\n`;
+      } else {
+        if (el.vertices && el.vertices.length > 0) {
+          el.attributes.d = this.compilePathD(el.vertices, el.isClosed);
+          // Persist nodeType for each vertex so re-parsing restores it reliably
+          el.attributes['data-node-types'] = el.vertices.map((v) => v.nodeType).join(',');
+        }
+
+        /**
+         * HISTORICAL ARCHITECTURE (FIX-13):
+         * Open Vector Fill Suppression in SVG Serialization.
+         * If an element is open (!isElementClosed), its fill attribute is strictly set to 'none'
+         * and any gradient definitions are unlinked to eliminate false straight-line polygon fills.
+         */
+        if (!this.isElementClosed(el)) {
+          el.attributes.fill = 'none';
+          delete el.attributes['data-gradient'];
+        }
+
+        svg += `  <${el.tagName}`;
+        for (const [key, val] of Object.entries(el.attributes)) {
+          svg += ` ${key}="${escapeXml(val)}"`;
+        }
+        svg += ` />\n`;
       }
-      svg += ` />\n`;
     });
 
     svg += `</svg>`;
@@ -1096,6 +1136,104 @@ export class VectorModel {
       );
     }
     return false;
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Hybrid Model Primitives & Parametric State Identification (FEAT-01)
+   *
+   * 1. Why Hybrid Representation:
+   *    Traditional vector engines either flatten every SVG primitive into `<path>` (losing parametric metadata,
+   *    corner radii, center points, and inflating file size) or isolate primitives into inflexible components
+   *    that cannot participate in vector calculations. AntiDraw's Hybrid Model maintains native SVG tags
+   *    (`<rect>`, `<circle>`, `<ellipse>`, `<line>`, `<polyline>`, `<polygon>`) in memory and serialization,
+   *    while synchronizing unified `vertices` in the background for universal bounding boxes, transforms,
+   *    and snapping.
+   *
+   * 2. Non-Accidental Conversion:
+   *    `isParametricElement` returns true only if the element has not been explicitly converted to curves
+   *    (`data-shape="path"` or `isParametric === false`). Interacting with handles never alters this flag.
+   */
+  public isParametricElement(el: VectorElement): boolean {
+    if (el.isParametric === false) return false;
+    if (el.attributes?.['data-shape'] === 'path' || el.attributes?.['data-parametric'] === 'false') {
+      return false;
+    }
+    if (el.isParametric === true) return true;
+    if (el.shapeType && el.shapeType !== 'path' && el.shapeType !== 'star') return true;
+    if (['rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon'].includes(el.tagName)) return true;
+    if (el.attributes && ['rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon'].includes(el.attributes['data-shape'])) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Explicit Conversion from Parametric Primitive to Freeform Curves (Ctrl+Q).
+   * Irreversibly transforms native <rect>, <circle>, <ellipse>, etc. into pure <path> with free Bézier nodes.
+   */
+  public convertToCurves(element: VectorElement): void {
+    element.isParametric = false;
+    element.shapeType = 'path';
+    element.tagName = 'path';
+    element.attributes['data-shape'] = 'path';
+    element.attributes['data-parametric'] = 'false';
+    if (element.vertices && element.vertices.length > 0) {
+      element.attributes.d = this.compilePathD(element.vertices, element.isClosed);
+      element.attributes['data-node-types'] = element.vertices.map((v) => v.nodeType).join(',');
+    }
+    const shapeAttrs = ['x', 'y', 'width', 'height', 'cx', 'cy', 'r', 'rx', 'ry', 'x1', 'y1', 'x2', 'y2', 'points'];
+    shapeAttrs.forEach((attr) => delete element.attributes[attr]);
+  }
+
+  /**
+   * Synchronizes native SVG attributes from internal vertices for clean parametric serialization.
+   */
+  public syncParametricAttributes(element: VectorElement): void {
+    if (!this.isParametricElement(element) || !element.vertices || element.vertices.length === 0) return;
+    const tag = element.shapeType || element.tagName;
+
+    if (tag === 'rect') {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      element.vertices.forEach((v) => {
+        minX = Math.min(minX, v.x);
+        minY = Math.min(minY, v.y);
+        maxX = Math.max(maxX, v.x);
+        maxY = Math.max(maxY, v.y);
+      });
+      element.attributes.x = formatNum(minX);
+      element.attributes.y = formatNum(minY);
+      element.attributes.width = formatNum(Math.max(1, maxX - minX));
+      element.attributes.height = formatNum(Math.max(1, maxY - minY));
+    } else if (tag === 'circle' || tag === 'ellipse') {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      element.vertices.forEach((v) => {
+        minX = Math.min(minX, v.x);
+        minY = Math.min(minY, v.y);
+        maxX = Math.max(maxX, v.x);
+        maxY = Math.max(maxY, v.y);
+      });
+      const cx = (minX + maxX) / 2;
+      const cy = (minY + maxY) / 2;
+      const rx = Math.max(1, (maxX - minX) / 2);
+      const ry = Math.max(1, (maxY - minY) / 2);
+      element.attributes.cx = formatNum(cx);
+      element.attributes.cy = formatNum(cy);
+      if (tag === 'circle') {
+        element.attributes.r = formatNum((rx + ry) / 2);
+      } else {
+        element.attributes.rx = formatNum(rx);
+        element.attributes.ry = formatNum(ry);
+      }
+    } else if (tag === 'line') {
+      if (element.vertices.length >= 2) {
+        element.attributes.x1 = formatNum(element.vertices[0].x);
+        element.attributes.y1 = formatNum(element.vertices[0].y);
+        element.attributes.x2 = formatNum(element.vertices[1].x);
+        element.attributes.y2 = formatNum(element.vertices[1].y);
+      }
+    } else if (tag === 'polygon' || tag === 'polyline') {
+      element.attributes.points = element.vertices.map((v) => `${formatNum(v.x)},${formatNum(v.y)}`).join(' ');
+    }
   }
 
   // Convert shape tags (rect, circle, ellipse, star, line, polygon) to path vertices

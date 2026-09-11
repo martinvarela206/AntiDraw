@@ -33,6 +33,10 @@ export interface PropertyPanelCallbacks {
    * intersect, exclude, combine, fragment) directly to BooleanOperations engine.
    */
   onBoolean?: (op: 'union' | 'subtract' | 'intersect' | 'exclude' | 'combine' | 'fragment') => void;
+  /**
+   * Converts a parametric primitive to freeform Bézier curves (Ctrl+Q).
+   */
+  onConvertToCurves?: (el: VectorElement) => void;
 }
 
 export interface ViewBoxPreset {
@@ -1575,6 +1579,13 @@ export class PropertyPanel {
           <span class="prop-label">Nodes</span>
           <span style="font-weight:600; color:var(--text-main); font-size:12px;">${el.vertices ? el.vertices.length : 0} nodes (${isClosed ? 'closed' : 'open'})</span>
         </div>
+        ${this.model.isParametricElement(el) ? `
+        <div class="prop-row" style="margin-top: 6px;">
+          <button class="prop-input" id="btn-convert-to-path" style="flex:1; cursor:pointer; background:#312e81; color:#c7d2fe; border:1px solid #6366f1; font-weight:600; padding:6px; display:flex; align-items:center; justify-content:center; gap:6px;" title="Convertir primitiva paramétrica a curvas libres editables con herramienta de Nodos (Ctrl+Q)">
+            <span style="font-size:13px;">⤹</span>
+            <span>Convertir a Curvas (Ctrl+Q)</span>
+          </button>
+        </div>` : ''}
       </div>
 
       ${isEllipse ? `
@@ -2117,11 +2128,29 @@ export class PropertyPanel {
       if (btnEllipseToPath) {
         btnEllipseToPath.addEventListener('click', () => {
           if (this.callbacks.onPushUndo) this.callbacks.onPushUndo();
-          el.attributes['data-shape'] = 'path';
-          this.callbacks.onUpdateElement(el);
-          this.renderElementProperties(el);
+          this.model.convertToCurves(el);
+          if (this.callbacks.onConvertToCurves) {
+            this.callbacks.onConvertToCurves(el);
+          } else {
+            this.callbacks.onUpdateElement(el);
+            this.renderElementProperties(el);
+          }
         });
       }
+    }
+
+    const btnConvertToPath = this.container.querySelector<HTMLButtonElement>('#btn-convert-to-path');
+    if (btnConvertToPath) {
+      btnConvertToPath.addEventListener('click', () => {
+        if (this.callbacks.onPushUndo) this.callbacks.onPushUndo();
+        this.model.convertToCurves(el);
+        if (this.callbacks.onConvertToCurves) {
+          this.callbacks.onConvertToCurves(el);
+        } else {
+          this.callbacks.onUpdateElement(el);
+          this.renderElementProperties(el);
+        }
+      });
     }
 
     let activeStopIdx = 0;

@@ -16,6 +16,7 @@ import { Toolbar, ToolType } from './ui/Toolbar.js';
 import { TopBar } from './ui/TopBar.js';
 import { PropertyPanel } from './ui/PropertyPanel.js';
 import { RulerView } from './ui/RulerView.js';
+import { ContextMenu, ContextMenuItem } from './ui/ContextMenu.js';
 import './styles/main.css';
 
 class AntiDrawApp {
@@ -37,6 +38,7 @@ class AntiDrawApp {
   private topBar!: TopBar;
   private propertyPanel!: PropertyPanel;
   private rulerView!: RulerView;
+  private contextMenu: ContextMenu = new ContextMenu();
 
   private canvasContainer!: HTMLElement;
   private canvasScrollArea!: HTMLElement;
@@ -416,6 +418,7 @@ class AntiDrawApp {
         },
         onBoolean: (op) => this.handleBoolean(op),
         onStrokeToPath: () => this.handleStrokeToPath(),
+        onConvertToCurves: (_el) => this.handleConvertToCurves(),
         onPushUndo: () => this.pushUndo(),
       }
     );
@@ -486,6 +489,14 @@ class AntiDrawApp {
         if (this.selectionTool.selectedElementIds.size > 0 || this.canvasMgr.selectedGuideId) {
           e.preventDefault();
           this.copySelection();
+          return;
+        }
+      }
+
+      if (isCtrl && (e.key === 'q' || e.key === 'Q')) {
+        if (this.selectionTool.selectedElementIds.size > 0) {
+          e.preventDefault();
+          this.handleConvertToCurves();
           return;
         }
       }
@@ -716,11 +727,93 @@ class AntiDrawApp {
       }
     });
 
-    // Right-click / Context Menu cancellation
+    // Right-click / Context Menu
     const handleContextMenu = (e: MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      this.cancelCurrentAction();
+
+      const pt = this.getCanvasPoint(e);
+      const z = this.canvasMgr.zoom || 1;
+      const hit = this.selectionTool.hitTest(this.model.elements, pt, z);
+
+      if (hit) {
+        if (!this.selectionTool.isSelected(hit.element.id)) {
+          this.selectionTool.select(hit.element.id);
+          this.propertyPanel.update(null, this.toolbar.activeTool);
+          this.render();
+        }
+      }
+
+      const selectedEls = this.model.elements.filter((el) => this.selectionTool.isSelected(el.id));
+      if (selectedEls.length > 0) {
+        const hasParametric = selectedEls.some((el) => this.model.isParametricElement(el));
+
+        const menuItems: ContextMenuItem[] = [
+          {
+            id: 'convert-to-path',
+            label: 'Convertir a Curvas',
+            shortcut: 'Ctrl+Q',
+            disabled: !hasParametric,
+            action: () => this.handleConvertToCurves(),
+          },
+          { id: 'separator', label: '', action: () => {} },
+          {
+            id: 'cut',
+            label: 'Cortar',
+            shortcut: 'Ctrl+X',
+            action: () => this.cutSelection(),
+          },
+          {
+            id: 'copy',
+            label: 'Copiar',
+            shortcut: 'Ctrl+C',
+            action: () => this.copySelection(),
+          },
+          {
+            id: 'paste',
+            label: 'Pegar',
+            shortcut: 'Ctrl+V',
+            disabled: this.clipboardElements.length === 0 && this.clipboardGuides.length === 0,
+            action: () => this.pasteClipboard(),
+          },
+          {
+            id: 'duplicate',
+            label: 'Duplicar',
+            shortcut: 'Ctrl+D',
+            action: () => this.duplicateSelection(),
+          },
+          { id: 'separator', label: '', action: () => {} },
+          {
+            id: 'bring-to-front',
+            label: 'Traer al Frente',
+            action: () => this.handleZOrder('front'),
+          },
+          {
+            id: 'send-to-back',
+            label: 'Enviar al Fondo',
+            action: () => this.handleZOrder('back'),
+          },
+          { id: 'separator', label: '', action: () => {} },
+          {
+            id: 'delete',
+            label: 'Eliminar',
+            shortcut: 'Supr',
+            action: () => {
+              this.pushUndo();
+              this.model.elements = this.model.elements.filter((el) => !this.selectionTool.isSelected(el.id));
+              this.selectionTool.deselectAll();
+              this.propertyPanel.resetPanelMode();
+              this.render();
+              this.syncToHost();
+            },
+          },
+        ];
+
+        this.contextMenu.show(e.clientX, e.clientY, menuItems);
+      } else {
+        this.contextMenu.hide();
+        this.cancelCurrentAction();
+      }
     };
     this.canvasContainer.addEventListener('contextmenu', handleContextMenu);
     this.canvasWrapper.addEventListener('contextmenu', handleContextMenu);
@@ -963,6 +1056,8 @@ class AntiDrawApp {
 
   private cancelCurrentAction(): void {
     let needsRender = false;
+
+    this.contextMenu?.hide();
 
     // 1. Select tool cancellation
     if (this.selectToolHandler.cancel()) {
@@ -1475,6 +1570,35 @@ class AntiDrawApp {
         this.syncToHost();
       }
     }
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Explicit Parametric Shape to Curves Conversion (FEAT-01)
+   *
+   * Why this exists:
+   * Translates native SVG parametric primitives (<rect>, <circle>, <ellipse>, <line>, <polyline>, <polygon>)
+   * into standard editable <path> elements with independent Bézier anchor nodes and tangents.
+   *
+   * Non-Accidental Invariant:
+   * Conversion is NEVER performed automatically during selection, dragging, or handle manipulation.
+   * It is triggered exclusively by explicit user intent via:
+   * 1. Keyboard shortcut `Ctrl + Q`
+   * 2. Right-click context menu "Convertir a Curvas"
+   * 3. Inspector property button "Convertir a Curvas"
+   */
+  private handleConvertToCurves(): void {
+    const selected = this.model.elements.filter((el) => this.selectionTool.isSelected(el.id));
+    const parametricEls = selected.filter((el) => this.model.isParametricElement(el));
+    if (parametricEls.length === 0) return;
+
+    this.pushUndo();
+    parametricEls.forEach((el) => {
+      this.model.convertToCurves(el);
+    });
+    this.propertyPanel.resetPanelMode();
+    this.propertyPanel.update(null, this.toolbar.activeTool);
+    this.render();
+    this.syncToHost();
   }
 
 

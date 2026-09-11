@@ -164,11 +164,18 @@ export class OverlayRenderer {
         if (el.vertices) {
           const isNodeMode = ctx.activeTool === 'node' && selectedEls.length === 1;
           const selectedVertexId = ctx.nodeEditorTool.selectedVertexId;
+          const isParametric = ctx.model.isParametricElement(el);
 
           el.vertices.forEach((v) => {
             const isSelectedVertex = isNodeMode && v.id === selectedVertexId;
             const vR = (isSelectedVertex ? 4.5 : 3.5) / z;
-            html += `<circle cx="${v.x}" cy="${v.y}" r="${vR}" fill="${isSelectedVertex ? '#38bdf8' : '#ffffff'}" stroke="#0284c7" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
+            if (isNodeMode && isParametric) {
+              // Distinctive square node handles for parametric primitives
+              const side = (isSelectedVertex ? 8 : 6) / z;
+              html += `<rect x="${v.x - side / 2}" y="${v.y - side / 2}" width="${side}" height="${side}" rx="1" fill="${isSelectedVertex ? '#6366f1' : '#ffffff'}" stroke="#4338ca" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
+            } else {
+              html += `<circle cx="${v.x}" cy="${v.y}" r="${vR}" fill="${isSelectedVertex ? '#38bdf8' : '#ffffff'}" stroke="#0284c7" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
+            }
           });
         }
       });
