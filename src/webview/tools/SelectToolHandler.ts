@@ -60,6 +60,9 @@ export class SelectToolHandler implements IToolHandler {
   public translateInteraction = new TranslateInteraction();
   public transformInteraction = new TransformInteraction();
 
+  private lastClickTime: number = 0;
+  private lastClickPt: Point = { x: 0, y: 0 };
+
   constructor(
     private ctx: ToolContext,
     private nodeEditorTool: NodeEditorTool,
@@ -241,6 +244,16 @@ export class SelectToolHandler implements IToolHandler {
       if ((hit && this.ctx.selectionTool.isSelected(hit.element.id)) || isInsideBox) {
         this.isDragging = false;
         this.activeHandle = null;
+        const now = Date.now();
+        const z = this.ctx.canvasMgr.zoom || 1;
+        const dist = Math.hypot(pt.x - this.lastClickPt.x, pt.y - this.lastClickPt.y);
+        if (now - this.lastClickTime < 350 && dist < 8 / z) {
+          this.transformInteraction.toggleSelectionMode(this.ctx, this.callbacks);
+          this.lastClickTime = 0;
+        } else {
+          this.lastClickTime = now;
+          this.lastClickPt = { x: pt.x, y: pt.y };
+        }
         return true;
       }
     }
@@ -256,7 +269,7 @@ export class SelectToolHandler implements IToolHandler {
         this.activeHandle = 'move';
         this.translateInteraction.start(this.ctx, pt, selectedEls, groupBox);
         this.callbacks.onClearPanelMode?.();
-        this.ctx.render();
+        this.ctx.renderOverlay();
         return true;
       }
     }
@@ -358,7 +371,30 @@ export class SelectToolHandler implements IToolHandler {
     }
 
     if (currentHandle === 'move') {
-      return this.translateInteraction.onPointerUp(this.ctx, this.callbacks);
+      const moved = this.translateInteraction.onPointerUp(this.ctx, this.callbacks);
+      if (!moved) {
+        /**
+         * ARCHITECTURAL RATIONALE: Synthetic Double-Click Detection (FIX-22)
+         * In complex SVG webview editors, native DOM `dblclick` events are frequently dropped by browsers
+         * if the event target node is re-rendered or unmounted during mousedown/mouseup cycles,
+         * or if pointer capture is acquired.
+         * Tracking click timestamps and coordinates here guarantees 100% reliable double-click detection
+         * to alternate between 'transform' and 'rotate' modes without event loss.
+         */
+        const now = Date.now();
+        const z = this.ctx.canvasMgr.zoom || 1;
+        const dist = Math.hypot(pt.x - this.lastClickPt.x, pt.y - this.lastClickPt.y);
+        if (now - this.lastClickTime < 350 && dist < 8 / z) {
+          this.transformInteraction.toggleSelectionMode(this.ctx, this.callbacks);
+          this.lastClickTime = 0;
+        } else {
+          this.lastClickTime = now;
+          this.lastClickPt = { x: pt.x, y: pt.y };
+        }
+      } else {
+        this.lastClickTime = 0;
+      }
+      return true;
     }
 
     if (currentHandle) {

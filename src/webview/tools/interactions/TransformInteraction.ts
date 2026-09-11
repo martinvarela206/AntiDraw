@@ -456,7 +456,29 @@ export class TransformInteraction {
     return handled;
   }
 
+  public lastToggleTime: number = 0;
+
+  /**
+   * ARCHITECTURAL RATIONALE: Encapsulated Selection Mode Toggle (FIX-22)
+   * Alternates between 'transform' (scale/bounding box resize handles) and 'rotate' (rotation handles & pivot).
+   * Encapsulating this in TransformInteraction respects Single Responsibility Principle (SRP)
+   * and allows both synthetic double-click gesture detectors and native DOM dblclick events
+   * to trigger clean, synchronized state transitions across UI inspectors and canvas overlays.
+   */
+  public toggleSelectionMode(ctx: ToolContext, callbacks: SelectToolCallbacks): void {
+    ctx.selectionTool.selectionMode =
+      ctx.selectionTool.selectionMode === 'transform' ? 'rotate' : 'transform';
+    this.lastToggleTime = Date.now();
+    callbacks.onSelectionChanged?.();
+    ctx.renderOverlay();
+  }
+
   public onDoubleClick(ctx: ToolContext, pt: Point, callbacks: SelectToolCallbacks): boolean {
+    const now = Date.now();
+    if (now - this.lastToggleTime < 250) {
+      return true; // Debounce if synthetic double-click already handled the transition
+    }
+
     const selectedEls = ctx.model.elements.filter((el) => ctx.selectionTool.isSelected(el.id));
     const z = ctx.canvasMgr.zoom || 1;
 
@@ -479,10 +501,7 @@ export class TransformInteraction {
         pt.y <= groupBox.y + groupBox.height;
 
       if ((hit && ctx.selectionTool.isSelected(hit.element.id)) || isInsideBox) {
-        ctx.selectionTool.selectionMode =
-          ctx.selectionTool.selectionMode === 'transform' ? 'rotate' : 'transform';
-        callbacks.onSelectionChanged?.();
-        ctx.renderOverlay();
+        this.toggleSelectionMode(ctx, callbacks);
         return true;
       }
     }
