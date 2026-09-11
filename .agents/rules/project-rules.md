@@ -39,7 +39,8 @@ This file contains rules specific to the AntiDraw project. Rules are written in 
 ## Multi-Item Prompt Decomposition & Atomic Loop Execution
 
 6. **Dynamic Task Ingestion into `Docs/TODO.md`**:
-   - Whenever a user prompt mentions, enumerates, or identifies problems, bugs, corrections, missing functionality, or new features, these items MUST immediately be cataloged and added to `Docs/TODO.md` before execution.
+   - Whenever a user prompt mentions, enumerates, or identifies problems, bugs, corrections, missing functionality, or new features, these items MUST be cataloged and added to `Docs/TODO.md` before execution.
+   - **Exception / Direct Flow**: If `Docs/TODO.md` has no pending items (empty list) and a problem is diagnosed, do not leave it parked in the TODO; immediately initiate the required implementation to resolve it.
 
 7. **Mandatory Decomposition of Multi-Item Prompts**:
    - Whenever the prompt or active TODO list contains multiple tasks, bullet points, fixes, additions, or removals (2 or more distinct items):

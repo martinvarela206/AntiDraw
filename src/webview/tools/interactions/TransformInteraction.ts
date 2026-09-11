@@ -1,6 +1,7 @@
 import { ToolContext } from '../IToolHandler.js';
 import { VectorElement, PathVertex, Point, GradientConfig } from '../../engine/VectorModel.js';
 import { HandleType } from '../../engine/SelectionTool.js';
+import { SvgSerializer } from '../../engine/serialization/SvgSerializer.js';
 import type { SelectToolCallbacks } from '../SelectToolHandler.js';
 
 /**
@@ -233,22 +234,13 @@ export class TransformInteraction {
 
             const gradDom = document.getElementById(`ad-grad-${el.id}`);
             if (gradDom) {
-              const cx = grad.cx ?? 0.5;
-              const cy = grad.cy ?? 0.5;
-              const rx = grad.rx ?? grad.r ?? 0.5;
-              const ry = grad.ry ?? grad.r ?? 0.5;
-              const rotation = grad.rotation ?? 0;
-              const sy = rx > 0.0001 ? Math.round((ry / rx) * 1000) / 1000 : 1;
-              gradDom.setAttribute('cx', cx.toString());
-              gradDom.setAttribute('cy', cy.toString());
-              gradDom.setAttribute('r', rx.toString());
-              gradDom.setAttribute('fx', (grad.fx ?? cx).toString());
-              gradDom.setAttribute('fy', (grad.fy ?? cy).toString());
-              if (Math.abs(sy - 1) > 0.001 || Math.abs(rotation) > 0.1) {
-                gradDom.setAttribute('gradientTransform', `translate(${cx}, ${cy}) rotate(${rotation}) scale(1, ${sy}) translate(-${cx}, -${cy})`);
-              } else {
-                gradDom.removeAttribute('gradientTransform');
-              }
+              const comp = SvgSerializer.computeRadialGradientMatrix(grad, box);
+              gradDom.setAttribute('cx', comp.cx.toString());
+              gradDom.setAttribute('cy', comp.cy.toString());
+              gradDom.setAttribute('r', comp.r.toString());
+              gradDom.setAttribute('fx', comp.fx.toString());
+              gradDom.setAttribute('fy', comp.fy.toString());
+              gradDom.setAttribute('gradientTransform', comp.transform);
             }
 
             ctx.renderOverlay();

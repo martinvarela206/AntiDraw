@@ -312,12 +312,29 @@ export class SvgSerializer {
 
                       const gTrans = gradEl.getAttribute('gradientTransform');
                       if (gTrans) {
-                        const rotMatch = gTrans.match(/rotate\(([-\d.]+)/);
-                        if (rotMatch) gradConfig.rotation = parseFloat(rotMatch[1]);
-                        const scaleMatch = gTrans.match(/scale\(1,\s*([-\d.]+)\)/);
-                        if (scaleMatch && gradConfig.rx) {
-                          const sy = parseFloat(scaleMatch[1]);
-                          gradConfig.ry = Math.round(gradConfig.rx * sy * 1000) / 1000;
+                        const matMatch = gTrans.match(/matrix\(\s*([-\d.e]+)[\s,]+([-\d.e]+)[\s,]+([-\d.e]+)[\s,]+([-\d.e]+)[\s,]+([-\d.e]+)[\s,]+([-\d.e]+)\s*\)/i);
+                        if (matMatch) {
+                          const a = parseFloat(matMatch[1]);
+                          const b = parseFloat(matMatch[2]);
+                          const c = parseFloat(matMatch[3]);
+                          const d = parseFloat(matMatch[4]);
+                          const e = parseFloat(matMatch[5]);
+                          const f = parseFloat(matMatch[6]);
+                          gradConfig.cx = Math.round(e * 1000) / 1000;
+                          gradConfig.cy = Math.round(f * 1000) / 1000;
+                          const angleRad = Math.atan2(b, a);
+                          gradConfig.rotation = Math.round(((angleRad * 180) / Math.PI) * 10) / 10;
+                          gradConfig.rx = Math.round(Math.hypot(a, b) * 1000) / 1000;
+                          gradConfig.ry = Math.round(Math.hypot(c, d) * 1000) / 1000;
+                          gradConfig.r = gradConfig.rx;
+                        } else {
+                          const rotMatch = gTrans.match(/rotate\(([-\d.]+)/);
+                          if (rotMatch) gradConfig.rotation = parseFloat(rotMatch[1]);
+                          const scaleMatch = gTrans.match(/scale\(1,\s*([-\d.]+)\)/);
+                          if (scaleMatch && gradConfig.rx) {
+                            const sy = parseFloat(scaleMatch[1]);
+                            gradConfig.ry = Math.round(gradConfig.rx * sy * 1000) / 1000;
+                          }
                         }
                       }
                     }
@@ -491,6 +508,98 @@ export class SvgSerializer {
    *    This aligns with standard CSS linear-gradient where 0° points left-to-right and 90° points top-to-bottom.
    * 3. For radial gradients, default cx=0.5, cy=0.5, r=0.5 produces a centered circular/elliptical glow conforming to the bounding box.
    */
+  /**
+   * ARCHITECTURAL RATIONALE: Anisotropic Aspect-Compensated Radial Gradient Matrix (FIX-21)
+   *
+   * 1. The Naive gradientTransform Fallacy in objectBoundingBox:
+   *    In SVG, `gradientUnits="objectBoundingBox"` defines a normalized coordinate space [0, 1] x [0, 1].
+   *    When a vector element is non-square (W != H), rotating by an angle theta inside this normalized space
+   *    via `rotate(theta) scale(1, sy)` applies the rotation before the bounding box stretch S(W, H).
+   *    Because S(W, H) and R(theta) do NOT commute when W != H, the resulting projection on screen suffers
+   *    from severe non-orthogonal shear (skewing) and quadratic aspect distortion (e.g. a 2:1 horizontal
+   *    ellipse rotated 90° collapses into an 8:1 razor-thin slit instead of a 2:1 vertical ellipse).
+   *
+   * 2. Rigorous Mathematical Formulation & Aspect Ratio Compensation:
+   *    We map the unit circle from gradient space (u', v') to canvas pixels (X, Y) via:
+   *      [X - Cx]   [cos(theta)  -sin(theta)] [Rx   0] [u']
+   *      [Y - Cy] = [sin(theta)   cos(theta)] [ 0  Ry] [v']
+   *    where Rx = grad.rx * W, Ry = grad.ry * H, and (W, H) are the bounding box dimensions.
+   *    To express this in SVG objectBoundingBox units (u, v) where X = x0 + u*W and Y = y0 + v*H:
+   *      u - cx = (Rx * cos(theta) / W) * u' - (Ry * sin(theta) / W) * v'
+   *      v - cy = (Rx * sin(theta) / H) * u' + (Ry * cos(theta) / H) * v'
+   *    Substituting Rx = grad.rx * W and Ry = grad.ry * H yields:
+   *      a = grad.rx * cos(theta)
+   *      b = grad.rx * (W / H) * sin(theta)
+   *      c = -grad.ry * (H / W) * sin(theta)
+   *      d = grad.ry * cos(theta)
+   *      e = cx
+   *      f = cy
+   *    This guarantees that the axes on screen are STRICTLY ORTHOGONAL (dot product = 0)
+   *    and have EXACT physical lengths Rx and Ry at angle theta across all angles and aspect ratios.
+   *
+   * 3. Focal Point Inverse Mapping:
+   *    The determinant det = ad - bc = grad.rx * grad.ry.
+   *    The focal point (fx, fy) is mapped into the local gradient space via:
+   *      u'_f = (d * (fx - cx) - c * (fy - cy)) / det
+   *      v'_f = (-b * (fx - cx) + a * (fy - cy)) / det
+   *    and clamped within length <= 0.98 to prevent W3C boundary singularities.
+   */
+  public static computeRadialGradientMatrix(
+    grad: GradientConfig,
+    bbox: { width: number; height: number }
+  ): { cx: number; cy: number; r: number; fx: number; fy: number; transform: string; transformAttr: string } {
+    const W = Math.max(bbox.width, 1);
+    const H = Math.max(bbox.height, 1);
+    const cx = grad.cx ?? 0.5;
+    const cy = grad.cy ?? 0.5;
+    const rx = Math.max(0.001, grad.rx ?? grad.r ?? 0.5);
+    const ry = Math.max(0.001, grad.ry ?? grad.r ?? 0.5);
+    const fx = grad.fx ?? cx;
+    const fy = grad.fy ?? cy;
+    const rotation = grad.rotation ?? 0;
+    const rad = (rotation * Math.PI) / 180;
+
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    const aspect = W / H;
+
+    const a = rx * cos;
+    const b = rx * aspect * sin;
+    const c = -ry * (1 / aspect) * sin;
+    const d = ry * cos;
+    const e = cx;
+    const f = cy;
+
+    let uF = 0;
+    let vF = 0;
+    const det = rx * ry;
+    if (det > 0.000001) {
+      const dfx = fx - cx;
+      const dfy = fy - cy;
+      uF = (d * dfx - c * dfy) / det;
+      vF = (-b * dfx + a * dfy) / det;
+      const fDist = Math.hypot(uF, vF);
+      if (fDist > 0.98) {
+        uF = (uF / fDist) * 0.98;
+        vF = (vF / fDist) * 0.98;
+      }
+    }
+
+    const fmt = (n: number) => (Math.round(n * 10000) / 10000).toString();
+    const transform = `matrix(${fmt(a)} ${fmt(b)} ${fmt(c)} ${fmt(d)} ${fmt(e)} ${fmt(f)})`;
+    const transformAttr = ` gradientTransform="${transform}"`;
+
+    return {
+      cx: 0,
+      cy: 0,
+      r: 1,
+      fx: Math.round(uF * 10000) / 10000,
+      fy: Math.round(vF * 10000) / 10000,
+      transform,
+      transformAttr,
+    };
+  }
+
   public static compileElementGradients(elements: VectorElement[]): string {
     let out = '';
     elements.forEach((el) => {
@@ -535,32 +644,35 @@ export class SvgSerializer {
 
         out += `    <linearGradient id="${gradId}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" gradientUnits="objectBoundingBox">\n`;
       } else {
-        const cx = grad.cx ?? 0.5;
-        const cy = grad.cy ?? 0.5;
-        const rx = grad.rx ?? grad.r ?? 0.5;
-        const ry = grad.ry ?? grad.r ?? 0.5;
-        const fx = grad.fx ?? cx;
-        const fy = grad.fy ?? cy;
-        const rotation = grad.rotation ?? 0;
-
-        // In SVG <radialGradient>, r is the reference radius. Using rx as base,
-        // any differing ry or rotation is expressed cleanly via gradientTransform.
-        const r = rx;
-        const sy = rx > 0.0001 ? Math.round((ry / rx) * 1000) / 1000 : 1;
-
-        let transformAttr = '';
-        if (Math.abs(sy - 1) > 0.001 || Math.abs(rotation) > 0.1) {
-          /**
-           * ARCHITECTURAL RATIONALE: Multiaxis Radial Gradient via gradientTransform (FIX-06)
-           * SVG specification allows elliptical shaping and arbitrary rotation of radial gradients
-           * through gradientTransform="translate(cx, cy) rotate(deg) scale(1, sy) translate(-cx, -cy)".
-           * This guarantees solidary rotation and multi-axis rx/ry aspect preservation across all
-           * SVG viewers and renderers without warping into circles upon bounding box aspect changes.
-           */
-          transformAttr = ` gradientTransform="translate(${cx}, ${cy}) rotate(${rotation}) scale(1, ${sy}) translate(-${cx}, -${cy})"`;
+        // Calculate element's visual bounding box for anisotropic aspect ratio compensation
+        let bboxWidth = 100;
+        let bboxHeight = 100;
+        if (el.vertices && el.vertices.length > 0) {
+          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+          el.vertices.forEach((v) => {
+            if (v.x < minX) minX = v.x;
+            if (v.y < minY) minY = v.y;
+            if (v.x > maxX) maxX = v.x;
+            if (v.y > maxY) maxY = v.y;
+          });
+          if (minX !== Infinity) {
+            bboxWidth = Math.max(maxX - minX, 1);
+            bboxHeight = Math.max(maxY - minY, 1);
+          }
+        } else if (el.attributes.width && el.attributes.height) {
+          bboxWidth = Math.max(parseFloat(el.attributes.width) || 100, 1);
+          bboxHeight = Math.max(parseFloat(el.attributes.height) || 100, 1);
+        } else if (el.attributes.rx && el.attributes.ry) {
+          bboxWidth = Math.max((parseFloat(el.attributes.rx) || 50) * 2, 1);
+          bboxHeight = Math.max((parseFloat(el.attributes.ry) || 50) * 2, 1);
+        } else if (el.attributes.r) {
+          const rad = Math.max(parseFloat(el.attributes.r) || 50, 1);
+          bboxWidth = rad * 2;
+          bboxHeight = rad * 2;
         }
 
-        out += `    <radialGradient id="${gradId}" cx="${cx}" cy="${cy}" r="${r}" fx="${fx}" fy="${fy}"${transformAttr} gradientUnits="objectBoundingBox">\n`;
+        const comp = SvgSerializer.computeRadialGradientMatrix(grad, { width: bboxWidth, height: bboxHeight });
+        out += `    <radialGradient id="${gradId}" cx="${comp.cx}" cy="${comp.cy}" r="${comp.r}" fx="${comp.fx}" fy="${comp.fy}"${comp.transformAttr} gradientUnits="objectBoundingBox">\n`;
       }
 
       // Sort stops by offset ascending
