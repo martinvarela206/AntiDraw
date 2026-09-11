@@ -1601,6 +1601,44 @@ export class VectorModel {
   }
 
   /**
+   * ARCHITECTURAL RATIONALE: Native SVG Primitive Identification (FEAT-04)
+   *
+   * Identifies whether a vector element represents a native/parametric <line>, <polyline>,
+   * <polygon>, or <circle> primitive.
+   *
+   * Why this approach:
+   * 1. Direct tag recognition: Native SVG element tags.
+   * 2. Metadata recognition: `data-shape="..."` with `data-parametric="true"`.
+   * 3. Invariant Protection: Any element explicitly converted to freeform curves (`data-shape="path"`)
+   *    must never be identified as a constrained primitive.
+   */
+  public isLine(el: VectorElement): boolean {
+    if (el.attributes?.['data-shape'] === 'path' || el.attributes?.['data-parametric'] === 'false') return false;
+    return el.tagName === 'line' || el.attributes?.['data-shape'] === 'line';
+  }
+
+  public isPolyline(el: VectorElement): boolean {
+    if (el.attributes?.['data-shape'] === 'path' || el.attributes?.['data-parametric'] === 'false') return false;
+    return el.tagName === 'polyline' || el.attributes?.['data-shape'] === 'polyline';
+  }
+
+  public isPolygon(el: VectorElement): boolean {
+    if (el.attributes?.['data-shape'] === 'path' || el.attributes?.['data-parametric'] === 'false') return false;
+    return el.tagName === 'polygon' || el.attributes?.['data-shape'] === 'polygon';
+  }
+
+  public isCircle(el: VectorElement): boolean {
+    if (el.attributes?.['data-shape'] === 'path' || el.attributes?.['data-parametric'] === 'false') return false;
+    if (el.tagName === 'circle' || el.attributes?.['data-shape'] === 'circle') return true;
+    if (this.isEllipse(el)) {
+      const rx = parseFloat(el.attributes.rx || el.attributes.r || '0');
+      const ry = parseFloat(el.attributes.ry || el.attributes.r || '0');
+      return Math.abs(rx - ry) < 0.001;
+    }
+    return false;
+  }
+
+  /**
    * ARCHITECTURAL RATIONALE: Independent Corner Radii Parsing & Extraction (FEAT-03)
    *
    * Extracts corner curvature settings (TL, TR, BR, BL, mode, unit) from an element's attributes.

@@ -170,10 +170,14 @@ export class NodeToolHandler implements IToolHandler {
 
     const isClosed = this.isElementClosed(selectedEl);
 
-    // ARCHITECTURAL RATIONALE: Parametric Element Free Node Edit Lock (FEAT-01)
-    // Parametric primitives (<rect>, <circle>, <ellipse>, etc.) strictly prohibit free node insertion
+    // ARCHITECTURAL RATIONALE: Parametric Element Free Node Edit Lock vs Polyline/Polygon (FEAT-04)
+    // Parametric primitives (<rect>, <circle>, <ellipse>, <line>) strictly prohibit free node insertion
     // or free vertex deletion. The user must explicitly convert to curves (Ctrl+Q) before subdividing.
-    if (this.ctx.model.isParametricElement(selectedEl)) {
+    // In contrast, <polyline> and <polygon> natively represent arbitrary sequences of straight points,
+    // so vertex addition (along segments) and deletion (>= 2 for polyline, >= 3 for polygon) are allowed,
+    // keeping them as native <polyline>/<polygon> with their `points` attribute updated without Béziers.
+    const isPoly = this.ctx.model.isPolyline(selectedEl) || this.ctx.model.isPolygon(selectedEl);
+    if (this.ctx.model.isParametricElement(selectedEl) && !isPoly) {
       return true;
     }
 
@@ -186,11 +190,15 @@ export class NodeToolHandler implements IToolHandler {
     );
 
     if (hitNode && hitNode.type === 'vertex') {
-      if (selectedEl.vertices.length > 2) {
+      const minVerts = selectedEl.tagName === 'polygon' ? 3 : 2;
+      if (selectedEl.vertices.length > minVerts) {
         this.ctx.pushUndo();
         selectedEl.vertices = this.nodeEditorTool.deleteVertex(selectedEl.vertices, hitNode.vertex.id);
         selectedEl.attributes.d = this.ctx.model.compilePathD(selectedEl.vertices, isClosed);
         selectedEl.attributes['data-node-types'] = selectedEl.vertices.map((v) => v.nodeType).join(',');
+        if (this.ctx.model.isParametricElement(selectedEl)) {
+          this.ctx.model.syncParametricAttributes(selectedEl);
+        }
         this.nodeEditorTool.selectedVertexId = null;
         this.nodeEditorTool.selectedHandleType = null;
         this.nodeEditorTool.selectedSegmentIdx = null;
@@ -215,6 +223,9 @@ export class NodeToolHandler implements IToolHandler {
       selectedEl.vertices = res.updatedVertices;
       selectedEl.attributes.d = this.ctx.model.compilePathD(selectedEl.vertices, isClosed);
       selectedEl.attributes['data-node-types'] = selectedEl.vertices.map((v) => v.nodeType).join(',');
+      if (this.ctx.model.isParametricElement(selectedEl)) {
+        this.ctx.model.syncParametricAttributes(selectedEl);
+      }
       this.nodeEditorTool.selectedVertexId = res.newVertexId;
       this.nodeEditorTool.selectedHandleType = 'vertex';
       this.nodeEditorTool.selectedSegmentIdx = null;
@@ -630,6 +641,34 @@ export class NodeToolHandler implements IToolHandler {
             });
             this.ctx.renderOverlay();
             return true;
+          } else if (tag === 'line' && this.initialVertices.length === 2) {
+            /**
+             * ARCHITECTURAL RATIONALE: Restricted <line> Vertex Dragging (FEAT-04)
+             * A native <line> only allows displacing either of its two endpoints (x1, y1) or (x2, y2).
+             * Zero Bézier distortion is allowed; straight line geometry is strictly preserved.
+             */
+            const updatedVerts = this.initialVertices.map((v, i) =>
+              i === vIdx
+                ? { ...v, x: snappedPt.x, y: snappedPt.y, handleIn: undefined, handleOut: undefined }
+                : { ...v, handleIn: undefined, handleOut: undefined }
+            );
+            this.ghostNodeVertices = updatedVerts;
+            this.ctx.renderOverlay();
+            return true;
+          } else if (tag === 'polyline' || tag === 'polygon') {
+            /**
+             * ARCHITECTURAL RATIONALE: Restricted <polyline> and <polygon> Vertex Dragging (FEAT-04)
+             * Vertices are moved purely as linear sharp/corner points without Bézier handles,
+             * directly updating the native SVG `points` attribute without mutating to <path>.
+             */
+            const updatedVerts = this.initialVertices.map((v, i) =>
+              i === vIdx
+                ? { ...v, x: snappedPt.x, y: snappedPt.y, handleIn: undefined, handleOut: undefined }
+                : { ...v, handleIn: undefined, handleOut: undefined }
+            );
+            this.ghostNodeVertices = updatedVerts;
+            this.ctx.renderOverlay();
+            return true;
           }
         }
 
@@ -799,6 +838,9 @@ export class NodeToolHandler implements IToolHandler {
         selectedEl.vertices = this.ghostNodeVertices;
         selectedEl.attributes.d = this.ctx.model.compilePathD(selectedEl.vertices, isClosed);
         selectedEl.attributes['data-node-types'] = selectedEl.vertices.map((v) => v.nodeType).join(',');
+        if (this.ctx.model.isParametricElement(selectedEl)) {
+          this.ctx.model.syncParametricAttributes(selectedEl);
+        }
 
         if (this.nodeEditorTool.selectedVertexId && this.callbacks.onNodeSelected) {
           const activeV = selectedEl.vertices.find((v) => v.id === this.nodeEditorTool.selectedVertexId);
@@ -869,13 +911,19 @@ export class NodeToolHandler implements IToolHandler {
   public deleteSelectedVertex(): boolean {
     if (!this.nodeEditorTool.selectedVertexId) return false;
     const selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
-    if (!selectedEl || this.ctx.model.isParametricElement(selectedEl)) return false;
-    if (selectedEl.vertices && selectedEl.vertices.length > 2) {
+    if (!selectedEl) return false;
+    const isPoly = this.ctx.model.isPolyline(selectedEl) || this.ctx.model.isPolygon(selectedEl);
+    if (this.ctx.model.isParametricElement(selectedEl) && !isPoly) return false;
+    const minVerts = selectedEl.tagName === 'polygon' ? 3 : 2;
+    if (selectedEl.vertices && selectedEl.vertices.length > minVerts) {
       this.ctx.pushUndo();
       selectedEl.vertices = this.nodeEditorTool.deleteVertex(selectedEl.vertices, this.nodeEditorTool.selectedVertexId);
       const isClosed = this.isElementClosed(selectedEl);
       selectedEl.attributes.d = this.ctx.model.compilePathD(selectedEl.vertices, isClosed);
       selectedEl.attributes['data-node-types'] = selectedEl.vertices.map((v) => v.nodeType).join(',');
+      if (this.ctx.model.isParametricElement(selectedEl)) {
+        this.ctx.model.syncParametricAttributes(selectedEl);
+      }
       this.nodeEditorTool.selectedVertexId = null;
       if (this.ctx.applyCanvasSize) this.ctx.applyCanvasSize();
       this.ctx.render();
