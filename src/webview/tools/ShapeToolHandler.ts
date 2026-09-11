@@ -275,11 +275,20 @@ export class ShapeToolHandler implements IToolHandler {
       attributes['data-start-angle'] = '0';
       attributes['data-end-angle'] = '360';
     } else if (tool === 'rect') {
+      const cr = (this.ctx.canvasMgr.shapeConfig?.rectCornerRadius || 0).toString();
       attributes['x'] = bounds.x.toString();
       attributes['y'] = bounds.y.toString();
       attributes['width'] = bounds.w.toString();
       attributes['height'] = bounds.h.toString();
-      attributes['rx'] = (this.ctx.canvasMgr.shapeConfig?.rectCornerRadius || 0).toString();
+      attributes['rx'] = cr;
+      attributes['ry'] = cr;
+      attributes['data-corner-mode'] = 'uniform';
+      attributes['data-corner-unit'] = 'px';
+      attributes['data-corner-radius'] = `${cr},${cr},${cr},${cr}`;
+      attributes['data-corner-tl'] = cr;
+      attributes['data-corner-tr'] = cr;
+      attributes['data-corner-br'] = cr;
+      attributes['data-corner-bl'] = cr;
     }
     attributes['data-parametric'] = isParametric ? 'true' : 'false';
 

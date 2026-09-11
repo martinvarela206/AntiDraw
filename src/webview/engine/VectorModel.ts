@@ -21,6 +21,15 @@ export interface PathSegment {
   type: 'L' | 'C';
 }
 
+export interface RectCorners {
+  tl: number;
+  tr: number;
+  br: number;
+  bl: number;
+  mode: 'uniform' | 'independent';
+  unit: 'px' | '%';
+}
+
 export type ParametricShapeType = 'rect' | 'circle' | 'ellipse' | 'line' | 'polyline' | 'polygon';
 
 export interface VectorElement {
@@ -682,6 +691,45 @@ export class VectorModel {
             svg += ` ${key}="${escapeXml(val)}"`;
           }
           svg += ` />\n`;
+        } else if (this.isRect(el)) {
+          /**
+           * ARCHITECTURAL RATIONALE: Native Parametric Rect Serialization (FEAT-03)
+           * When all 4 corner radii are uniform and measured in pixels, serialize as native
+           * SVG <rect x="..." y="..." width="..." height="..." rx="..." ry="..." />.
+           * When corners have independent radii or percentage units, native SVG <rect> cannot
+           * express them; serialize as compliant <path> carrying parametric rect metadata
+           * (data-shape="rect", data-parametric="true", data-corner-radius, data-corner-unit, data-corner-mode, x, y, width, height)
+           * guaranteeing standard SVG renderers display the exact corner geometry without losing re-editability in AntiDraw.
+           */
+          const x = parseFloat(cleanAttrs.x || '0');
+          const y = parseFloat(cleanAttrs.y || '0');
+          const w = parseFloat(cleanAttrs.width || '100');
+          const h = parseFloat(cleanAttrs.height || '100');
+          const corners = this.getRectCorners(el, w, h);
+          const isUniform = corners.mode === 'uniform' || (corners.tl === corners.tr && corners.tr === corners.br && corners.br === corners.bl);
+
+          if (isUniform && corners.unit === 'px') {
+            cleanAttrs.rx = corners.tl.toString();
+            cleanAttrs.ry = corners.tl.toString();
+            delete cleanAttrs.d;
+            delete cleanAttrs['data-node-types'];
+            svg += `  <rect`;
+            for (const [key, val] of Object.entries(cleanAttrs)) {
+              svg += ` ${key}="${escapeXml(val)}"`;
+            }
+            svg += ` />\n`;
+          } else {
+            const eff = this.calculateEffectiveCorners(w, h, corners);
+            cleanAttrs.d = this.compileRectD(x, y, w, h, eff.tl, eff.tr, eff.br, eff.bl);
+            cleanAttrs['data-shape'] = 'rect';
+            cleanAttrs['data-parametric'] = 'true';
+            delete cleanAttrs['data-node-types'];
+            svg += `  <path`;
+            for (const [key, val] of Object.entries(cleanAttrs)) {
+              svg += ` ${key}="${escapeXml(val)}"`;
+            }
+            svg += ` />\n`;
+          }
         } else {
           delete cleanAttrs.d;
           delete cleanAttrs['data-node-types'];
@@ -1529,6 +1577,322 @@ export class VectorModel {
   }
 
   /**
+   * ARCHITECTURAL RATIONALE: Rect Primitive Identification (FEAT-03)
+   *
+   * Identifies whether a vector element represents a parametric rectangle primitive.
+   *
+   * Why this approach:
+   * 1. Direct tag recognition: Native `<rect>` SVG elements.
+   * 2. Metadata recognition: `data-shape="rect"` with `data-parametric="true"`.
+   * 3. Invariant Protection: Elements explicitly converted to curves (`data-shape="path"`)
+   *    must never be identified as parametric rectangles.
+   */
+  public isRect(el: VectorElement): boolean {
+    if (el.attributes?.['data-shape'] === 'path' || el.attributes?.['data-parametric'] === 'false') {
+      return false;
+    }
+    if (el.attributes && el.attributes['data-shape'] === 'rect') {
+      return true;
+    }
+    if (el.tagName === 'rect') {
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Independent Corner Radii Parsing & Extraction (FEAT-03)
+   *
+   * Extracts corner curvature settings (TL, TR, BR, BL, mode, unit) from an element's attributes.
+   * Supports:
+   * 1. Dedicated attributes: `data-corner-tl`, `data-corner-tr`, `data-corner-br`, `data-corner-bl`.
+   * 2. Compound attribute: `data-corner-radius="tl,tr,br,bl"`.
+   * 3. Standard SVG single-radius attributes: `rx`, `ry` (with automatic percentage detection if ending in '%').
+   */
+  public getRectCorners(el: VectorElement, w: number = 100, h: number = 100): RectCorners {
+    return this.parseCornersFromAttrs(el.attributes || {}, w, h);
+  }
+
+  public parseCornersFromAttrs(attrs: Record<string, string>, _w: number = 100, _h: number = 100): RectCorners {
+    let mode: 'uniform' | 'independent' = (attrs['data-corner-mode'] as 'uniform' | 'independent') || 'uniform';
+
+    let tl = 0;
+    let tr = 0;
+    let br = 0;
+    let bl = 0;
+
+    if (attrs['data-corner-radius']) {
+      const parts = attrs['data-corner-radius'].split(',').map((p) => parseFloat(p.trim()) || 0);
+      if (parts.length === 4) {
+        [tl, tr, br, bl] = parts;
+      } else if (parts.length === 1) {
+        tl = tr = br = bl = parts[0];
+      }
+    } else if (
+      attrs['data-corner-tl'] !== undefined ||
+      attrs['data-corner-tr'] !== undefined ||
+      attrs['data-corner-br'] !== undefined ||
+      attrs['data-corner-bl'] !== undefined
+    ) {
+      tl = parseFloat(attrs['data-corner-tl'] || '0') || 0;
+      tr = parseFloat(attrs['data-corner-tr'] || '0') || 0;
+      br = parseFloat(attrs['data-corner-br'] || '0') || 0;
+      bl = parseFloat(attrs['data-corner-bl'] || '0') || 0;
+    } else if (attrs.rx || attrs.ry) {
+      const rxStr = attrs.rx || attrs.ry || '0';
+      const isPct = rxStr.includes('%');
+      const val = parseFloat(rxStr) || 0;
+      tl = tr = br = bl = val;
+      return {
+        tl,
+        tr,
+        br,
+        bl,
+        mode: 'uniform',
+        unit: isPct ? '%' : (attrs['data-corner-unit'] === '%' ? '%' : 'px'),
+      };
+    }
+
+    if (tl !== tr || tr !== br || br !== bl) {
+      mode = 'independent';
+    }
+
+    return {
+      tl: Math.max(0, tl),
+      tr: Math.max(0, tr),
+      br: Math.max(0, br),
+      bl: Math.max(0, bl),
+      mode,
+      unit: attrs['data-corner-unit'] === '%' ? '%' : 'px',
+    };
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: CSS/SVG Corner Overlap Scaling and Percentage Conversion (FEAT-03)
+   *
+   * Converts percentage-based radii to pixels and applies the standard CSS Backgrounds and Borders
+   * Level 3 (Section 5.5) proportional constraint scaling:
+   * When adjacent corner radii exceed the side length (e.g. TL + TR > width), all radii are
+   * proportionally scaled down by factor f = min(w / (TL + TR), w / (BL + BR), h / (TL + BL), h / (TR + BR)).
+   * This prevents overlapping or intersecting arcs.
+   */
+  public calculateEffectiveCorners(
+    w: number,
+    h: number,
+    corners: RectCorners
+  ): { tl: number; tr: number; br: number; bl: number } {
+    w = Math.max(1, w);
+    h = Math.max(1, h);
+    const minDim = Math.min(w, h);
+    const maxRadius = minDim / 2;
+
+    let tl = corners.tl;
+    let tr = corners.tr;
+    let br = corners.br;
+    let bl = corners.bl;
+
+    if (corners.unit === '%') {
+      tl = Math.min(maxRadius, (minDim * tl) / 100);
+      tr = Math.min(maxRadius, (minDim * tr) / 100);
+      br = Math.min(maxRadius, (minDim * br) / 100);
+      bl = Math.min(maxRadius, (minDim * bl) / 100);
+    } else {
+      tl = Math.min(maxRadius, tl);
+      tr = Math.min(maxRadius, tr);
+      br = Math.min(maxRadius, br);
+      bl = Math.min(maxRadius, bl);
+    }
+
+    const topSum = tl + tr;
+    const bottomSum = bl + br;
+    const leftSum = tl + bl;
+    const rightSum = tr + br;
+
+    let scale = 1;
+    if (topSum > w && topSum > 0) scale = Math.min(scale, w / topSum);
+    if (bottomSum > w && bottomSum > 0) scale = Math.min(scale, w / bottomSum);
+    if (leftSum > h && leftSum > 0) scale = Math.min(scale, h / leftSum);
+    if (rightSum > h && rightSum > 0) scale = Math.min(scale, h / rightSum);
+
+    return {
+      tl: Math.max(0, tl * scale),
+      tr: Math.max(0, tr * scale),
+      br: Math.max(0, br * scale),
+      bl: Math.max(0, bl * scale),
+    };
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Exact Cubic Bézier Vertex Compilation for 4-Corner Rectangles (FEAT-03)
+   *
+   * Constructs topologically sound closed polygon or rounded contours with 90-degree quadrant
+   * cubic Bézier handles matching kappa constant k = 4/3 * (sqrt(2) - 1) ≈ 0.55228474983.
+   * Each rounded corner yields 2 smooth vertices (entry and exit) with directional tangent handles.
+   * Sharp corners (radius 0) yield exactly 1 sharp vertex.
+   */
+  public convertRectToVertices(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    tl: number,
+    tr: number,
+    br: number,
+    bl: number
+  ): PathVertex[] {
+    tl = Math.max(0, tl);
+    tr = Math.max(0, tr);
+    br = Math.max(0, br);
+    bl = Math.max(0, bl);
+
+    if (tl === 0 && tr === 0 && br === 0 && bl === 0) {
+      let idx = 0;
+      return [
+        { id: `v_${idx++}`, x, y, command: 'M', nodeType: 'sharp' },
+        { id: `v_${idx++}`, x: x + w, y, command: 'L', nodeType: 'sharp' },
+        { id: `v_${idx++}`, x: x + w, y: y + h, command: 'L', nodeType: 'sharp' },
+        { id: `v_${idx++}`, x, y: y + h, command: 'L', nodeType: 'sharp' },
+      ];
+    }
+
+    const k = 0.55228474983;
+    let idx = 0;
+    const vertices: PathVertex[] = [];
+
+    // 1. Top-Left corner start / Top edge
+    if (tl > 0) {
+      vertices.push({
+        id: `v_${idx++}`,
+        x: x + tl,
+        y,
+        handleIn: { x: x + tl - tl * k, y },
+        nodeType: 'smooth',
+        command: 'M',
+      });
+    } else {
+      vertices.push({
+        id: `v_${idx++}`,
+        x,
+        y,
+        nodeType: 'sharp',
+        command: 'M',
+      });
+    }
+
+    // 2. Top-Right corner
+    if (tr > 0) {
+      vertices.push({
+        id: `v_${idx++}`,
+        x: x + w - tr,
+        y,
+        handleOut: { x: x + w - tr + tr * k, y },
+        nodeType: 'smooth',
+        command: 'L',
+      });
+      vertices.push({
+        id: `v_${idx++}`,
+        x: x + w,
+        y: y + tr,
+        handleIn: { x: x + w, y: y + tr - tr * k },
+        nodeType: 'smooth',
+        command: 'C',
+      });
+    } else {
+      vertices.push({
+        id: `v_${idx++}`,
+        x: x + w,
+        y,
+        nodeType: 'sharp',
+        command: 'L',
+      });
+    }
+
+    // 3. Bottom-Right corner
+    if (br > 0) {
+      vertices.push({
+        id: `v_${idx++}`,
+        x: x + w,
+        y: y + h - br,
+        handleOut: { x: x + w, y: y + h - br + br * k },
+        nodeType: 'smooth',
+        command: 'L',
+      });
+      vertices.push({
+        id: `v_${idx++}`,
+        x: x + w - br,
+        y: y + h,
+        handleIn: { x: x + w - br + br * k, y: y + h },
+        nodeType: 'smooth',
+        command: 'C',
+      });
+    } else {
+      vertices.push({
+        id: `v_${idx++}`,
+        x: x + w,
+        y: y + h,
+        nodeType: 'sharp',
+        command: 'L',
+      });
+    }
+
+    // 4. Bottom-Left corner
+    if (bl > 0) {
+      vertices.push({
+        id: `v_${idx++}`,
+        x: x + bl,
+        y: y + h,
+        handleOut: { x: x + bl - bl * k, y: y + h },
+        nodeType: 'smooth',
+        command: 'L',
+      });
+      vertices.push({
+        id: `v_${idx++}`,
+        x,
+        y: y + h - bl,
+        handleIn: { x, y: y + h - bl + bl * k },
+        nodeType: 'smooth',
+        command: 'C',
+      });
+    } else {
+      vertices.push({
+        id: `v_${idx++}`,
+        x,
+        y: y + h,
+        nodeType: 'sharp',
+        command: 'L',
+      });
+    }
+
+    // 5. Closing back to Top-Left
+    if (tl > 0) {
+      vertices.push({
+        id: `v_${idx++}`,
+        x,
+        y: y + tl,
+        handleOut: { x, y: y + tl - tl * k },
+        nodeType: 'smooth',
+        command: 'L',
+      });
+    }
+
+    return vertices;
+  }
+
+  public compileRectD(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    tl: number,
+    tr: number,
+    br: number,
+    bl: number
+  ): string {
+    const verts = this.convertRectToVertices(x, y, w, h, tl, tr, br, bl);
+    return this.compilePathD(verts, true);
+  }
+
+  /**
    * ARCHITECTURAL RATIONALE: Hybrid Model Primitives & Parametric State Identification (FEAT-01)
    *
    * 1. Why Hybrid Representation:
@@ -1595,6 +1959,18 @@ export class VectorModel {
       delete element.attributes['data-end-angle'];
     }
 
+    if (this.isRect(element)) {
+      const x = parseFloat(element.attributes.x || '0');
+      const y = parseFloat(element.attributes.y || '0');
+      const w = parseFloat(element.attributes.width || '100');
+      const h = parseFloat(element.attributes.height || '100');
+      const corners = this.getRectCorners(element, w, h);
+      const eff = this.calculateEffectiveCorners(w, h, corners);
+      element.vertices = this.convertRectToVertices(x, y, w, h, eff.tl, eff.tr, eff.br, eff.bl);
+      element.attributes.d = this.compilePathD(element.vertices, true);
+      element.isClosed = true;
+    }
+
     element.isParametric = false;
     element.shapeType = 'path';
     element.tagName = 'path';
@@ -1606,7 +1982,10 @@ export class VectorModel {
     if (element.vertices && element.vertices.length > 0) {
       element.attributes['data-node-types'] = element.vertices.map((v) => v.nodeType).join(',');
     }
-    const shapeAttrs = ['x', 'y', 'width', 'height', 'cx', 'cy', 'r', 'rx', 'ry', 'x1', 'y1', 'x2', 'y2', 'points'];
+    const shapeAttrs = [
+      'x', 'y', 'width', 'height', 'cx', 'cy', 'r', 'rx', 'ry', 'x1', 'y1', 'x2', 'y2', 'points',
+      'data-corner-mode', 'data-corner-unit', 'data-corner-radius', 'data-corner-tl', 'data-corner-tr', 'data-corner-br', 'data-corner-bl'
+    ];
     shapeAttrs.forEach((attr) => delete element.attributes[attr]);
   }
 
@@ -1699,27 +2078,9 @@ export class VectorModel {
       const y = parseFloat(attrs.y || '0');
       const w = parseFloat(attrs.width || '100');
       const h = parseFloat(attrs.height || '100');
-      const rx = parseFloat(attrs.rx || '0');
-      const ry = parseFloat(attrs.ry || attrs.rx || '0');
-
-      if (rx > 0 || ry > 0) {
-        const k = 0.5522847498;
-        const ox = rx * k;
-        const oy = ry * k;
-        vertices.push(mkV(x + rx, y, undefined, undefined, 'asymmetric'));
-        vertices.push(mkV(x + w - rx, y, undefined, { x: x + w - rx + ox, y: y }, 'smooth'));
-        vertices.push(mkV(x + w, y + ry, { x: x + w, y: y + ry - oy }, undefined, 'smooth'));
-        vertices.push(mkV(x + w, y + h - ry, undefined, { x: x + w, y: y + h - ry + oy }, 'smooth'));
-        vertices.push(mkV(x + w - rx, y + h, { x: x + w - rx + ox, y: y + h }, undefined, 'smooth'));
-        vertices.push(mkV(x + rx, y + h, undefined, { x: x + rx - ox, y: y + h }, 'smooth'));
-        vertices.push(mkV(x, y + h - ry, { x: x, y: y + h - ry + oy }, undefined, 'smooth'));
-        vertices.push(mkV(x, y + ry, undefined, { x: x, y: y + ry - oy }, 'smooth'));
-      } else {
-        vertices.push(mkV(x, y));
-        vertices.push(mkV(x + w, y));
-        vertices.push(mkV(x + w, y + h));
-        vertices.push(mkV(x, y + h));
-      }
+      const corners = this.parseCornersFromAttrs(attrs, w, h);
+      const eff = this.calculateEffectiveCorners(w, h, corners);
+      return this.convertRectToVertices(x, y, w, h, eff.tl, eff.tr, eff.br, eff.bl);
     } else if (tag === 'circle' || tag === 'ellipse') {
       const cx = parseFloat(attrs.cx || '50');
       const cy = parseFloat(attrs.cy || '50');
