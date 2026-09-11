@@ -56,6 +56,7 @@ export class SelectionTool {
    *      exact SVG serialization, and seamless undo/redo snapshotting.
    */
   public customPivot: Point | null = null;
+  public selectionMode: 'transform' | 'rotate' = 'transform';
 
   // Backward compatibility getter & setter
   public get selectedElementId(): string | null {
@@ -77,6 +78,7 @@ export class SelectionTool {
   public select(id: string, element?: VectorElement): void {
     if (this.selectedElementIds.size !== 1 || !this.selectedElementIds.has(id)) {
       this.customPivot = null;
+      this.selectionMode = 'transform';
     }
     this.selectedElementIds.clear();
     this.selectedElementIds.add(id);
@@ -87,6 +89,7 @@ export class SelectionTool {
 
   public toggleSelect(id: string): void {
     this.customPivot = null;
+    this.selectionMode = 'transform';
     if (this.selectedElementIds.has(id)) {
       this.selectedElementIds.delete(id);
     } else {
@@ -97,11 +100,15 @@ export class SelectionTool {
   public deselect(id: string): void {
     this.customPivot = null;
     this.selectedElementIds.delete(id);
+    if (this.selectedElementIds.size === 0) {
+      this.selectionMode = 'transform';
+    }
   }
 
   public deselectAll(): void {
     this.customPivot = null;
     this.selectedElementIds.clear();
+    this.selectionMode = 'transform';
   }
 
   public getPivot(box: BoundingBox): Point {
@@ -489,13 +496,35 @@ export class SelectionTool {
     return inside;
   }
 
-  // Check hit on 8 bounding box resize handles + 1 rotation handle
+  /**
+   * ARCHITECTURAL RATIONALE: Bimodal Handle Hit-Testing (FIX-05)
+   * Depending on `selectionMode`:
+   * - 'transform' mode: Only tests the 8 bounding box scale/resize handles. Rotation handles are excluded.
+   * - 'rotate' mode: Tests the top rotation stem handle and the 4 corner rotation handles. Scale handles are excluded.
+   */
   public hitTestHandle(
     box: BoundingBox,
     pt: Point,
     handleRadius: number = 12,
-    rotateOffset: number = 20
+    rotateOffset: number = 20,
+    mode: 'transform' | 'rotate' = 'transform'
   ): HandleType | null {
+    if (mode === 'rotate') {
+      const rotHandles: { type: HandleType; x: number; y: number }[] = [
+        { type: 'rotate', x: box.cx, y: box.y - rotateOffset },
+        { type: 'rotate', x: box.x, y: box.y },
+        { type: 'rotate', x: box.x + box.width, y: box.y },
+        { type: 'rotate', x: box.x, y: box.y + box.height },
+        { type: 'rotate', x: box.x + box.width, y: box.y + box.height },
+      ];
+      for (const h of rotHandles) {
+        if (Math.hypot(pt.x - h.x, pt.y - h.y) <= handleRadius) {
+          return h.type;
+        }
+      }
+      return null;
+    }
+
     const handles: { type: HandleType; x: number; y: number }[] = [
       { type: 'nw', x: box.x, y: box.y },
       { type: 'n',  x: box.cx, y: box.y },
@@ -505,13 +534,10 @@ export class SelectionTool {
       { type: 'sw', x: box.x, y: box.y + box.height },
       { type: 's',  x: box.cx, y: box.y + box.height },
       { type: 'se', x: box.x + box.width, y: box.y + box.height },
-      { type: 'rotate', x: box.cx, y: box.y - rotateOffset },
     ];
 
     for (const h of handles) {
-      const dx = pt.x - h.x;
-      const dy = pt.y - h.y;
-      if (Math.hypot(dx, dy) <= handleRadius) {
+      if (Math.hypot(pt.x - h.x, pt.y - h.y) <= handleRadius) {
         return h.type;
       }
     }

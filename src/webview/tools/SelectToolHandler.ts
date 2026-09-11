@@ -94,6 +94,73 @@ export class SelectToolHandler implements IToolHandler {
     private callbacks: SelectToolCallbacks = {}
   ) {}
 
+  /**
+   * ARCHITECTURAL RATIONALE: Proximity Anchor Detection (FIX-05)
+   * Evaluates all vertices of the selected elements and the group bounding box pivot/center.
+   * If any vertex or the center is within `20 / zoom` pixels of `pt`, the closest one is returned
+   * as the definitive magnetic anchor coordinate for translation (`dragAnchorPt`).
+   * This guarantees zero-tolerance magnetic snapping to grid, guidelines, and other vertices
+   * without requiring pixel-perfect clicking directly on sub-pixel vertex handles.
+   */
+  private findClosestMoveAnchor(
+    selectedEls: VectorElement[],
+    pt: Point,
+    groupBox: any,
+    zoom: number
+  ): Point {
+    const threshold = 20 / (zoom || 1);
+    let bestPt: Point = { x: pt.x, y: pt.y };
+    let bestDist = threshold;
+
+    if (groupBox) {
+      const pivot = this.ctx.selectionTool.getPivot(groupBox);
+      const dPivot = Math.hypot(pt.x - pivot.x, pt.y - pivot.y);
+      if (dPivot < bestDist) {
+        bestDist = dPivot;
+        bestPt = { x: pivot.x, y: pivot.y };
+      }
+    }
+
+    for (const el of selectedEls) {
+      if (el.vertices) {
+        for (const v of el.vertices) {
+          const d = Math.hypot(pt.x - v.x, pt.y - v.y);
+          if (d < bestDist) {
+            bestDist = d;
+            bestPt = { x: v.x, y: v.y };
+          }
+        }
+      }
+    }
+
+    return bestPt;
+  }
+
+  private isNearSelectionAnchor(
+    selectedEls: VectorElement[],
+    pt: Point,
+    groupBox: any,
+    zoom: number
+  ): boolean {
+    const threshold = 20 / (zoom || 1);
+    if (groupBox) {
+      const pivot = this.ctx.selectionTool.getPivot(groupBox);
+      if (Math.hypot(pt.x - pivot.x, pt.y - pivot.y) <= threshold) {
+        return true;
+      }
+    }
+    for (const el of selectedEls) {
+      if (el.vertices) {
+        for (const v of el.vertices) {
+          if (Math.hypot(pt.x - v.x, pt.y - v.y) <= threshold) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
   public onPointerDown(e: PointerEvent, pt: Point): boolean {
     this.dragStartPt = pt;
     this.isDragging = true;
@@ -222,8 +289,11 @@ export class SelectToolHandler implements IToolHandler {
       }
     }
 
-    // 4a. Check hit directly on the Arbitrary Rotation Pivot marker
-    if (selectedEls.length > 0) {
+    // 4a. Check hit directly on the Arbitrary Rotation Pivot marker (ONLY in 'rotate' mode)
+    // ARCHITECTURAL RATIONALE: Bimodal Pivot Interactivity (FIX-05)
+    // In 'transform' mode, the pivot is a fixed visual reference and not reubicable.
+    // In 'rotate' mode, the pivot becomes fully interactive and magnetically relocatable.
+    if (selectedEls.length > 0 && this.ctx.selectionTool.selectionMode === 'rotate') {
       const z = this.ctx.canvasMgr.zoom || 1;
       const groupBox = this.ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 6 / z);
       if (groupBox && this.ctx.selectionTool.hitTestPivot(groupBox, pt, 8 / z)) {
@@ -294,50 +364,18 @@ export class SelectToolHandler implements IToolHandler {
       } catch {}
     }
 
-    // 4b. Check hit directly on a selected element's vertex to use that vertex as precise snap anchor
-    let hitVertex: Point | null = null;
-    if (selectedEls.length > 0) {
-      const z = this.ctx.canvasMgr.zoom || 1;
-      for (const selEl of selectedEls) {
-        if (selEl.vertices) {
-          for (const v of selEl.vertices) {
-            if (Math.hypot(pt.x - v.x, pt.y - v.y) <= 8 / z) {
-              hitVertex = { x: v.x, y: v.y };
-              break;
-            }
-          }
-          if (hitVertex) break;
-        }
-      }
-    }
-
-    if (hitVertex) {
-      this.activeHandle = 'move';
-      this.dragAnchorPt = hitVertex;
-      this.initialElementsMap.clear();
-      this.ghostDragOffset = null;
-      selectedEls.forEach((el) => {
-        if (el.vertices) {
-          this.initialElementsMap.set(el.id, JSON.parse(JSON.stringify(el.vertices)));
-        }
-      });
-      // ARCHITECTURAL RATIONALE: Synchronize initialBox with the moved selection bounds.
-      // If initialBox is left stale from a previous transform, the ghost overlay draws an obsolete
-      // bounding box at a static position. Computing the exact group bounding box here guarantees
-      // that the ghost dashed rectangle moves coherently with the dragged elements.
-      const z = this.ctx.canvasMgr.zoom || 1;
-      this.initialBox = this.ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 6 / z);
-      this.callbacks.onClearPanelMode?.();
-      this.ctx.render();
-      return true;
-    }
-
-    // 4c. Check hit on composite bounding box handles if vector elements are selected
+    // 4b. Check hit on composite bounding box handles depending on selectionMode
     if (selectedEls.length > 0) {
       const z = this.ctx.canvasMgr.zoom || 1;
       const groupBox = this.ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 6 / z);
       if (groupBox) {
-        const handle = this.ctx.selectionTool.hitTestHandle(groupBox, pt, 12 / z, 18 / z);
+        const handle = this.ctx.selectionTool.hitTestHandle(
+          groupBox,
+          pt,
+          12 / z,
+          18 / z,
+          this.ctx.selectionTool.selectionMode
+        );
         if (handle) {
           this.activeHandle = handle;
           this.isDragging = true;
@@ -366,16 +404,18 @@ export class SelectToolHandler implements IToolHandler {
 
     // 4c. Hit test vector elements under cursor (fill or stroke/border)
     const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, this.ctx.canvasMgr.zoom);
-    if (hit) {
-      if (!this.ctx.selectionTool.isSelected(hit.element.id)) {
-        this.ctx.selectionTool.select(hit.element.id, hit.element);
-        this.callbacks.onSelectionChanged?.();
-      }
+
+    // Case 1: Clicked on a different, unselected vector element -> switch selection
+    if (hit && !this.ctx.selectionTool.isSelected(hit.element.id)) {
+      this.ctx.selectionTool.select(hit.element.id, hit.element);
+      this.callbacks.onSelectionChanged?.();
 
       const nowSelected = this.ctx.model.elements.filter((el) => this.ctx.selectionTool.isSelected(el.id));
       if (nowSelected.length > 0) {
         this.activeHandle = 'move';
-        this.dragAnchorPt = { x: pt.x, y: pt.y };
+        const z = this.ctx.canvasMgr.zoom || 1;
+        const groupBox = this.ctx.selectionTool.getGroupSelectionBoundingBox(nowSelected, 6 / z);
+        this.dragAnchorPt = this.findClosestMoveAnchor(nowSelected, pt, groupBox, z);
         this.initialElementsMap.clear();
         this.ghostDragOffset = null;
         nowSelected.forEach((el) => {
@@ -383,37 +423,79 @@ export class SelectToolHandler implements IToolHandler {
             this.initialElementsMap.set(el.id, JSON.parse(JSON.stringify(el.vertices)));
           }
         });
-        // ARCHITECTURAL RATIONALE: Recalculate initialBox for the newly clicked vector selection.
-        const z = this.ctx.canvasMgr.zoom || 1;
-        this.initialBox = this.ctx.selectionTool.getGroupSelectionBoundingBox(nowSelected, 6 / z);
+        this.initialBox = groupBox;
       }
       this.callbacks.onClearPanelMode?.();
       this.ctx.render();
       return true;
-    } else {
-      // 4d. Clicked on empty canvas space: start Marquee selection
-      const hadSelection =
-        this.ctx.selectionTool.selectedElementIds.size > 0 ||
-        this.ctx.canvasMgr.selectedGuideId !== null ||
-        this.nodeEditorTool.selectedVertexId !== null;
-
-      this.ctx.selectionTool.deselectAll();
-      this.ctx.canvasMgr.selectedGuideId = null;
-      this.ctx.canvasMgr.activeGuideTransformId = null;
-      this.nodeEditorTool.selectedVertexId = null;
-      this.marqueeStartPt = pt;
-      this.activeHandle = 'marquee';
-      this.initialBox = null;
-      this.ctx.selectionTool.isDeselectMarquee = false;
-      this.callbacks.onClearPanelMode?.();
-      this.callbacks.onSelectionChanged?.();
-      this.ctx.canvasMgr.isCanvasSelected = true;
-
-      if (hadSelection) {
-        this.ctx.render();
-      }
-      return true;
     }
+
+    // Case 2: In 'rotate' mode, if clicking on an already selected element or inside its bounding box,
+    // general translation is strictly blocked.
+    if (selectedEls.length > 0 && this.ctx.selectionTool.selectionMode === 'rotate') {
+      const z = this.ctx.canvasMgr.zoom || 1;
+      const groupBox = this.ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 6 / z);
+      const isInsideBox =
+        groupBox &&
+        pt.x >= groupBox.x &&
+        pt.x <= groupBox.x + groupBox.width &&
+        pt.y >= groupBox.y &&
+        pt.y <= groupBox.y + groupBox.height;
+
+      if ((hit && this.ctx.selectionTool.isSelected(hit.element.id)) || isInsideBox) {
+        this.isDragging = false;
+        this.activeHandle = null;
+        return true;
+      }
+    }
+
+    // Case 3: In 'transform' mode, click on an already selected element OR within proximity threshold (20 / zoom)
+    // of any of its vertices or center
+    if (selectedEls.length > 0 && this.ctx.selectionTool.selectionMode === 'transform') {
+      const z = this.ctx.canvasMgr.zoom || 1;
+      const groupBox = this.ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 6 / z);
+      const isHitSelected = hit && this.ctx.selectionTool.isSelected(hit.element.id);
+      const isNearAnchor = this.isNearSelectionAnchor(selectedEls, pt, groupBox, z);
+
+      if (isHitSelected || isNearAnchor) {
+        this.activeHandle = 'move';
+        this.dragAnchorPt = this.findClosestMoveAnchor(selectedEls, pt, groupBox, z);
+        this.initialElementsMap.clear();
+        this.ghostDragOffset = null;
+        selectedEls.forEach((el) => {
+          if (el.vertices) {
+            this.initialElementsMap.set(el.id, JSON.parse(JSON.stringify(el.vertices)));
+          }
+        });
+        this.initialBox = groupBox;
+        this.callbacks.onClearPanelMode?.();
+        this.ctx.render();
+        return true;
+      }
+    }
+
+    // Case 4: Clicked on empty canvas space: start Marquee selection
+    const hadSelection =
+      this.ctx.selectionTool.selectedElementIds.size > 0 ||
+      this.ctx.canvasMgr.selectedGuideId !== null ||
+      this.nodeEditorTool.selectedVertexId !== null;
+
+    this.ctx.selectionTool.deselectAll();
+    this.ctx.canvasMgr.selectedGuideId = null;
+    this.ctx.canvasMgr.activeGuideTransformId = null;
+    this.nodeEditorTool.selectedVertexId = null;
+    this.marqueeStartPt = pt;
+    this.activeHandle = 'marquee';
+    this.initialBox = null;
+    this.ctx.selectionTool.isDeselectMarquee = false;
+    this.callbacks.onClearPanelMode?.();
+    this.callbacks.onSelectionChanged?.();
+    this.ctx.canvasMgr.isCanvasSelected = true;
+
+    if (hadSelection) {
+      this.ctx.render();
+    }
+    return true;
   }
 
   public onPointerMove(e: PointerEvent, pt: Point): boolean {
@@ -460,16 +542,20 @@ export class SelectToolHandler implements IToolHandler {
         const z = this.ctx.canvasMgr.zoom || 1;
         const box = this.ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 6 / z);
         if (box) {
-          if (this.ctx.selectionTool.hitTestPivot(box, pt, 8 / z)) {
-            cursor = 'move';
+          if (this.ctx.selectionTool.selectionMode === 'rotate') {
+            if (this.ctx.selectionTool.hitTestPivot(box, pt, 8 / z)) {
+              cursor = 'move';
+            } else {
+              const h = this.ctx.selectionTool.hitTestHandle(box, pt, 12 / z, 18 / z, 'rotate');
+              if (h === 'rotate') cursor = 'grab';
+            }
           } else {
-            const h = this.ctx.selectionTool.hitTestHandle(box, pt, 12 / z, 18 / z);
+            const h = this.ctx.selectionTool.hitTestHandle(box, pt, 12 / z, 18 / z, 'transform');
             if (h) {
               if (h === 'nw' || h === 'se') cursor = 'nwse-resize';
               else if (h === 'ne' || h === 'sw') cursor = 'nesw-resize';
               else if (h === 'n' || h === 's') cursor = 'ns-resize';
               else if (h === 'w' || h === 'e') cursor = 'ew-resize';
-              else if (h === 'rotate') cursor = 'grab';
             }
           }
         }
@@ -507,7 +593,13 @@ export class SelectToolHandler implements IToolHandler {
       if (cursor === 'default') {
         const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt);
         this.ctx.selectionTool.hoveredElementId = hit ? hit.element.id : null;
-        if (hit) cursor = 'move';
+        if (hit) {
+          if (this.ctx.selectionTool.selectionMode === 'rotate' && this.ctx.selectionTool.isSelected(hit.element.id)) {
+            cursor = 'default';
+          } else {
+            cursor = 'move';
+          }
+        }
       }
 
       this.callbacks.setCursor?.(cursor);
@@ -1053,15 +1145,42 @@ export class SelectToolHandler implements IToolHandler {
   }
 
   public onDoubleClick(e: MouseEvent, pt: Point): boolean {
-    // 1. Double-click on selection pivot -> reset pivot to bounding box center
     const selectedEls = this.ctx.model.elements.filter((el) => this.ctx.selectionTool.isSelected(el.id));
+    const z = this.ctx.canvasMgr.zoom || 1;
+
+    // 1. Double-click on selection pivot -> reset pivot to bounding box center
     if (selectedEls.length > 0) {
-      const z = this.ctx.canvasMgr.zoom || 1;
       const groupBox = this.ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 6 / z);
       if (groupBox && this.ctx.selectionTool.hitTestPivot(groupBox, pt, 10 / z)) {
         this.ctx.selectionTool.resetPivot(selectedEls.length === 1 ? selectedEls[0] : undefined);
         this.callbacks.onSelectionChanged?.();
         this.ctx.syncToHost();
+        this.ctx.renderOverlay();
+        return true;
+      }
+
+      /**
+       * ARCHITECTURAL RATIONALE: Bimodal Selection Toggle via Double-Click (FIX-05)
+       * Double-clicking directly on the body of a selected vector or anywhere inside its
+       * bounding box toggles between 'transform' (scale/move) and 'rotate' (rotation handles/pivot) modes.
+       * 
+       * Why double-click toggles mode:
+       * In professional vector illustration workflows (CorelDraw, Inkscape), double-clicking
+       * an active selection seamlessly switches between transformation and rotation without
+       * forcing the user to navigate away to the inspector or toolbar.
+       */
+      const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, this.ctx.canvasMgr.zoom);
+      const isInsideBox =
+        groupBox &&
+        pt.x >= groupBox.x &&
+        pt.x <= groupBox.x + groupBox.width &&
+        pt.y >= groupBox.y &&
+        pt.y <= groupBox.y + groupBox.height;
+
+      if ((hit && this.ctx.selectionTool.isSelected(hit.element.id)) || isInsideBox) {
+        this.ctx.selectionTool.selectionMode =
+          this.ctx.selectionTool.selectionMode === 'transform' ? 'rotate' : 'transform';
+        this.callbacks.onSelectionChanged?.();
         this.ctx.renderOverlay();
         return true;
       }
@@ -1175,38 +1294,58 @@ export class SelectToolHandler implements IToolHandler {
       }
     }
 
-    // 3. Bounding Box & 8 Resize Handles + Rotation Handle for Selected Elements
+    // 3. Bounding Box & Handles for Selected Elements (Bimodal: Transform vs Rotate)
     const selectedEls = this.ctx.model.elements.filter((e) => this.ctx.selectionTool.isSelected(e.id));
     if (selectedEls.length > 0) {
       const groupBox = this.ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 6 / z);
       if (groupBox) {
-        html += `<rect x="${groupBox.x}" y="${groupBox.y}" width="${groupBox.width}" height="${groupBox.height}" fill="none" stroke="#38bdf8" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke" />`;
+        const mode = this.ctx.selectionTool.selectionMode;
 
-        const handles = [
-          { x: groupBox.x, y: groupBox.y },
-          { x: groupBox.cx, y: groupBox.y },
-          { x: groupBox.x + groupBox.width, y: groupBox.y },
-          { x: groupBox.x, y: groupBox.cy },
-          { x: groupBox.x + groupBox.width, y: groupBox.cy },
-          { x: groupBox.x, y: groupBox.y + groupBox.height },
-          { x: groupBox.cx, y: groupBox.y + groupBox.height },
-          { x: groupBox.x + groupBox.width, y: groupBox.y + groupBox.height },
-        ];
+        // Bounding Box Rectangle: sky blue in 'transform', amber in 'rotate'
+        const boxStroke = mode === 'rotate' ? '#f59e0b' : '#38bdf8';
+        html += `<rect x="${groupBox.x}" y="${groupBox.y}" width="${groupBox.width}" height="${groupBox.height}" fill="none" stroke="${boxStroke}" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke" />`;
 
-        const hSize = 7 / z;
-        const hHalf = hSize / 2;
-        const hRx = 1 / z;
-        handles.forEach((hPos) => {
-          html += `<rect x="${hPos.x - hHalf}" y="${hPos.y - hHalf}" width="${hSize}" height="${hSize}" fill="#ffffff" stroke="#0284c7" stroke-width="1" rx="${hRx}" vector-effect="non-scaling-stroke" />`;
-        });
-
-        // Rotation Handle
         const rotOffset = 18 / z;
-        const rotR = 3.5 / z;
-        html += `<line x1="${groupBox.cx}" y1="${groupBox.y}" x2="${groupBox.cx}" y2="${groupBox.y - rotOffset}" stroke="#38bdf8" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
-        html += `<circle cx="${groupBox.cx}" cy="${groupBox.y - rotOffset}" r="${rotR}" fill="#38bdf8" stroke="#ffffff" stroke-width="1" vector-effect="non-scaling-stroke" />`;
 
-        // 3.0. Arbitrary Rotation Pivot Marker
+        if (mode === 'transform') {
+          // 8 Scale / Resize Handles
+          const handles = [
+            { x: groupBox.x, y: groupBox.y },
+            { x: groupBox.cx, y: groupBox.y },
+            { x: groupBox.x + groupBox.width, y: groupBox.y },
+            { x: groupBox.x, y: groupBox.cy },
+            { x: groupBox.x + groupBox.width, y: groupBox.cy },
+            { x: groupBox.x, y: groupBox.y + groupBox.height },
+            { x: groupBox.cx, y: groupBox.y + groupBox.height },
+            { x: groupBox.x + groupBox.width, y: groupBox.y + groupBox.height },
+          ];
+
+          const hSize = 7 / z;
+          const hHalf = hSize / 2;
+          const hRx = 1 / z;
+          handles.forEach((hPos) => {
+            html += `<rect x="${hPos.x - hHalf}" y="${hPos.y - hHalf}" width="${hSize}" height="${hSize}" fill="#ffffff" stroke="#0284c7" stroke-width="1" rx="${hRx}" vector-effect="non-scaling-stroke" />`;
+          });
+        } else {
+          // Rotate Mode: Top rotation stem handle + 4 corner rotation handles
+          const rotR = 4 / z;
+          // Top stem
+          html += `<line x1="${groupBox.cx}" y1="${groupBox.y}" x2="${groupBox.cx}" y2="${groupBox.y - rotOffset}" stroke="#f59e0b" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
+          html += `<circle cx="${groupBox.cx}" cy="${groupBox.y - rotOffset}" r="${rotR}" fill="#f59e0b" stroke="#ffffff" stroke-width="1.2" vector-effect="non-scaling-stroke" style="cursor: grab;" />`;
+
+          // 4 Corner Rotation Handles
+          const rotCorners = [
+            { x: groupBox.x, y: groupBox.y },
+            { x: groupBox.x + groupBox.width, y: groupBox.y },
+            { x: groupBox.x, y: groupBox.y + groupBox.height },
+            { x: groupBox.x + groupBox.width, y: groupBox.y + groupBox.height },
+          ];
+          rotCorners.forEach((c) => {
+            html += `<circle cx="${c.x}" cy="${c.y}" r="${rotR}" fill="#f59e0b" stroke="#ffffff" stroke-width="1.2" vector-effect="non-scaling-stroke" style="cursor: grab;" />`;
+          });
+        }
+
+        // 3.0. Rotation Pivot Marker
         if (selectedEls.length === 1 && !this.ctx.selectionTool.customPivot && selectedEls[0].attributes['data-pivot']) {
           this.ctx.selectionTool.restorePivotForElement(selectedEls[0]);
         }
@@ -1218,26 +1357,35 @@ export class SelectToolHandler implements IToolHandler {
 
         // If displaced from bounding box center, draw a dashed lever line connecting center to custom pivot
         if (isCustomPivot) {
-          html += `<line x1="${groupBox.cx}" y1="${groupBox.cy}" x2="${pivot.x}" y2="${pivot.y}" stroke="#0284c7" stroke-width="1" stroke-dasharray="2 2" opacity="0.75" vector-effect="non-scaling-stroke" />`;
+          const leverColor = mode === 'rotate' ? '#f59e0b' : '#0284c7';
+          html += `<line x1="${groupBox.cx}" y1="${groupBox.cy}" x2="${pivot.x}" y2="${pivot.y}" stroke="${leverColor}" stroke-width="1" stroke-dasharray="2 2" opacity="0.75" vector-effect="non-scaling-stroke" />`;
         }
 
         // Bullseye crosshair pivot marker
+        // ARCHITECTURAL RATIONALE: Visual & Interactive Differentiation of Pivot by Mode
+        // In 'transform' mode: Rendered as a muted, fixed reference marker with pointer-events: none (not draggable).
+        // In 'rotate' mode: Rendered as a vibrant, interactive anchor with cursor: move and pointer-events: auto.
         const pR = 5.5 / z;
         const tick = 8.5 / z;
+        const pColor = mode === 'rotate' ? '#f59e0b' : '#0284c7';
+        const pCursor = mode === 'rotate' ? 'move' : 'default';
+        const pPointerEvents = mode === 'rotate' ? 'auto' : 'none';
+        const pOpacity = mode === 'rotate' ? '1.0' : '0.65';
+
         html += `
-          <g class="selection-pivot-marker" style="cursor: move;">
-            <circle cx="${pivot.x}" cy="${pivot.y}" r="${pR}" fill="#ffffff" stroke="#0284c7" stroke-width="1.5" vector-effect="non-scaling-stroke" />
-            <line x1="${pivot.x - tick}" y1="${pivot.y}" x2="${pivot.x + tick}" y2="${pivot.y}" stroke="#0284c7" stroke-width="1.2" vector-effect="non-scaling-stroke" />
-            <line x1="${pivot.x}" y1="${pivot.y - tick}" x2="${pivot.x}" y2="${pivot.y + tick}" stroke="#0284c7" stroke-width="1.2" vector-effect="non-scaling-stroke" />
-            <circle cx="${pivot.x}" cy="${pivot.y}" r="${1.6 / z}" fill="#0284c7" />
+          <g class="selection-pivot-marker" style="cursor: ${pCursor}; pointer-events: ${pPointerEvents};" opacity="${pOpacity}">
+            <circle cx="${pivot.x}" cy="${pivot.y}" r="${pR}" fill="#ffffff" stroke="${pColor}" stroke-width="1.5" vector-effect="non-scaling-stroke" />
+            <line x1="${pivot.x - tick}" y1="${pivot.y}" x2="${pivot.x + tick}" y2="${pivot.y}" stroke="${pColor}" stroke-width="1.2" vector-effect="non-scaling-stroke" />
+            <line x1="${pivot.x}" y1="${pivot.y - tick}" x2="${pivot.x}" y2="${pivot.y + tick}" stroke="${pColor}" stroke-width="1.2" vector-effect="non-scaling-stroke" />
+            <circle cx="${pivot.x}" cy="${pivot.y}" r="${1.6 / z}" fill="${pColor}" />
           </g>
         `;
 
         // If currently rotating, draw a visual guide ray from the pivot to the rotation handle and snapped point
         if (this.activeHandle === 'rotate' && this.rotationPivot) {
-          html += `<line x1="${pivot.x}" y1="${pivot.y}" x2="${groupBox.cx}" y2="${groupBox.y - rotOffset}" stroke="#0ea5e9" stroke-width="1" stroke-dasharray="3 2" opacity="0.8" vector-effect="non-scaling-stroke" />`;
+          html += `<line x1="${pivot.x}" y1="${pivot.y}" x2="${groupBox.cx}" y2="${groupBox.y - rotOffset}" stroke="#f59e0b" stroke-width="1" stroke-dasharray="3 2" opacity="0.8" vector-effect="non-scaling-stroke" />`;
           if (this.currentRotationSnappedPt) {
-            html += `<line x1="${pivot.x}" y1="${pivot.y}" x2="${this.currentRotationSnappedPt.x}" y2="${this.currentRotationSnappedPt.y}" stroke="#f59e0b" stroke-width="1.2" stroke-dasharray="3 2" opacity="0.9" vector-effect="non-scaling-stroke" />`;
+            html += `<line x1="${pivot.x}" y1="${pivot.y}" x2="${this.currentRotationSnappedPt.x}" y2="${this.currentRotationSnappedPt.y}" stroke="#10b981" stroke-width="1.2" stroke-dasharray="3 2" opacity="0.9" vector-effect="non-scaling-stroke" />`;
           }
         }
       }

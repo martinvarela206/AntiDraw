@@ -1004,6 +1004,13 @@ export class PropertyPanel {
       <div class="panel-section">
         <div class="panel-title">Transform (Group)</div>
         <div class="prop-row">
+          <span class="prop-label">Modo</span>
+          <div style="display:flex; gap:4px; flex:1;">
+            <button class="prop-input" id="btn-multi-mode-transform" style="flex:1; cursor:pointer; font-weight:600; ${this.selectionTool.selectionMode === 'transform' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Modo Mover y Redimensionar: muestra tiradores de escala y anclaje magnético por proximidad">⤢ Escalar</button>
+            <button class="prop-input" id="btn-multi-mode-rotate" style="flex:1; cursor:pointer; font-weight:600; ${this.selectionTool.selectionMode === 'rotate' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Modo Rotación: muestra tiradores de giro y permite reubicar libremente el centro de rotación">↻ Rotar</button>
+          </div>
+        </div>
+        <div class="prop-row">
           <span class="prop-label">Pivot</span>
           <input type="number" class="prop-input" id="multi-pivot-x" value="${Math.round(multiPivot.x)}" title="Coordenada X del pivote de rotación grupal" />
           <span class="prop-label" style="width:20px; text-align:right;">Y</span>
@@ -1177,6 +1184,19 @@ export class PropertyPanel {
         this.callbacks.onRenderOverlay?.();
       });
     }
+
+    const btnMultiModeTransform = this.container.querySelector<HTMLButtonElement>('#btn-multi-mode-transform');
+    const btnMultiModeRotate = this.container.querySelector<HTMLButtonElement>('#btn-multi-mode-rotate');
+    btnMultiModeTransform?.addEventListener('click', () => {
+      this.selectionTool.selectionMode = 'transform';
+      this.callbacks.onRenderOverlay?.();
+      this.renderMultiElementProperties(elements);
+    });
+    btnMultiModeRotate?.addEventListener('click', () => {
+      this.selectionTool.selectionMode = 'rotate';
+      this.callbacks.onRenderOverlay?.();
+      this.renderMultiElementProperties(elements);
+    });
   }
 
   /**
@@ -1525,6 +1545,13 @@ export class PropertyPanel {
     this.container.innerHTML = `
       <div class="panel-section">
         <div class="panel-title">Transform</div>
+        <div class="prop-row">
+          <span class="prop-label">Modo</span>
+          <div style="display:flex; gap:4px; flex:1;">
+            <button class="prop-input" id="btn-mode-transform" style="flex:1; cursor:pointer; font-weight:600; ${this.selectionTool.selectionMode === 'transform' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Modo Mover y Redimensionar: muestra tiradores de escala y anclaje magnético por proximidad">⤢ Escalar</button>
+            <button class="prop-input" id="btn-mode-rotate" style="flex:1; cursor:pointer; font-weight:600; ${this.selectionTool.selectionMode === 'rotate' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Modo Rotación: muestra tiradores de giro y permite reubicar libremente el centro de rotación">↻ Rotar</button>
+          </div>
+        </div>
         <div class="prop-row">
           <span class="prop-label">X</span>
           <input type="number" class="prop-input" id="el-x" value="${x}" />
@@ -1979,6 +2006,19 @@ export class PropertyPanel {
         this.callbacks.onRenderOverlay?.();
       });
     }
+
+    const btnModeTransform = this.container.querySelector<HTMLButtonElement>('#btn-mode-transform');
+    const btnModeRotate = this.container.querySelector<HTMLButtonElement>('#btn-mode-rotate');
+    btnModeTransform?.addEventListener('click', () => {
+      this.selectionTool.selectionMode = 'transform';
+      this.callbacks.onRenderOverlay?.();
+      this.renderElementProperties(el);
+    });
+    btnModeRotate?.addEventListener('click', () => {
+      this.selectionTool.selectionMode = 'rotate';
+      this.callbacks.onRenderOverlay?.();
+      this.renderElementProperties(el);
+    });
 
     /**
      * Technical Rationale (FIX-19):
