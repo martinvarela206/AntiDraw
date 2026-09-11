@@ -1155,11 +1155,12 @@ export class VectorModel {
    */
   public isParametricElement(el: VectorElement): boolean {
     if (el.isParametric === false) return false;
+    if (el.shapeType === 'path') return false;
     if (el.attributes?.['data-shape'] === 'path' || el.attributes?.['data-parametric'] === 'false') {
       return false;
     }
     if (el.isParametric === true) return true;
-    if (el.shapeType && el.shapeType !== 'path' && el.shapeType !== 'star') return true;
+    if (el.shapeType && el.shapeType !== 'star') return true;
     if (['rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon'].includes(el.tagName)) return true;
     if (el.attributes && ['rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon'].includes(el.attributes['data-shape'])) {
       return true;
@@ -1168,8 +1169,23 @@ export class VectorModel {
   }
 
   /**
-   * Explicit Conversion from Parametric Primitive to Freeform Curves (Ctrl+Q).
-   * Irreversibly transforms native <rect>, <circle>, <ellipse>, etc. into pure <path> with free Bézier nodes.
+   * ARCHITECTURAL RATIONALE: De-structuring Parametric Primitives to Freeform Curves (FEAT-01 & FIX-07)
+   *
+   * 1. Total Parametric De-structuring:
+   *    Irreversibly transforms native SVG parametric primitives (<rect>, <circle>, <ellipse>, <line>, <polyline>, <polygon>)
+   *    into pure <path> elements with independent Bézier nodes.
+   *    All primitive attributes (x, y, width, height, cx, cy, r, rx, ry, x1, y1, x2, y2, points) are purged
+   *    to prevent conflicts with the compiled `d` path attribute.
+   *
+   * 2. Invariant Propagation:
+   *    Enforces `isParametric = false`, `shapeType = 'path'`, `tagName = 'path'`,
+   *    `attributes['data-shape'] = 'path'`, and `attributes['data-parametric'] = 'false'`.
+   *    This guarantees that neither the node editor tool nor serialization logic treats the element
+   *    as a parametric primitive ever again.
+   *
+   * 3. Discarded Alternate Approaches:
+   *    - Naive approach: only modifying `tagName = 'path'`. Discarded because residual `data-shape` and `width/height`
+   *      attributes caused PropertyPanel and SVG exporter to attempt parametric synchronization, destroying freeform curves.
    */
   public convertToCurves(element: VectorElement): void {
     element.isParametric = false;
@@ -1183,6 +1199,21 @@ export class VectorModel {
     }
     const shapeAttrs = ['x', 'y', 'width', 'height', 'cx', 'cy', 'r', 'rx', 'ry', 'x1', 'y1', 'x2', 'y2', 'points'];
     shapeAttrs.forEach((attr) => delete element.attributes[attr]);
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Mandatory De-structuring for Vector-Vector Operations (FIX-07)
+   *
+   * Why this exists:
+   * When any parametric primitive participates in an operation with another vector
+   * (Boolean union, subtract/trim, intersect, exclude, combine compound paths, fragment),
+   * its rigid parametric constraint must be dissolved so that the resulting topological geometry
+   * is represented accurately as a freeform <path> without conflicting shape attributes.
+   */
+  public ensureCurves(element: VectorElement): void {
+    if (this.isParametricElement(element)) {
+      this.convertToCurves(element);
+    }
   }
 
   /**

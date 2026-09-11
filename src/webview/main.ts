@@ -1441,7 +1441,13 @@ class AntiDrawApp {
       );
       aligned.forEach((aEl) => {
         const target = this.model.elements.find((e) => e.id === aEl.id);
-        if (target) target.vertices = aEl.vertices;
+        if (target) {
+          target.vertices = aEl.vertices;
+          target.attributes.d = this.model.compilePathD(target.vertices || [], this.model.isElementClosed(target));
+          if (this.model.isParametricElement(target)) {
+            this.model.syncParametricAttributes(target);
+          }
+        }
       });
       this.render();
       this.syncToHost();
@@ -1506,9 +1512,15 @@ class AntiDrawApp {
         this.syncToHost();
       }
     } else if (op === 'combine') {
-      // Union / Boundary while retaining source objects
-      const result = BooleanOperations.union(selectedEls, this.model);
+      /**
+       * ARCHITECTURAL RATIONALE: Compound Path (Combine) with Source Removal (FIX-07)
+       * Combines multiple vector contours into a single unified <path fill-rule="evenodd">
+       * and removes the source shapes so inner contours render as actual cutouts/holes.
+       */
+      const result = BooleanOperations.combine(selectedEls, this.model);
       if (result) {
+        const removeIds = new Set(selectedEls.map((e) => e.id));
+        this.model.elements = this.model.elements.filter((e) => !removeIds.has(e.id));
         this.model.elements.push(result);
         this.selectionTool.select(result.id);
         this.propertyPanel.resetPanelMode();

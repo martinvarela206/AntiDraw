@@ -1132,6 +1132,9 @@ export class SelectToolHandler implements IToolHandler {
             }));
             const isClosed = this.ctx.model.isElementClosed(el);
             el.attributes.d = this.ctx.model.compilePathD(el.vertices, isClosed);
+            if (this.ctx.model.isParametricElement(el)) {
+              this.ctx.model.syncParametricAttributes(el);
+            }
           }
         });
         // Translate custom pivot solidarily with moved vectors
@@ -1151,6 +1154,9 @@ export class SelectToolHandler implements IToolHandler {
           el.vertices = transformedVerts;
           const isClosed = this.ctx.model.isElementClosed(el);
           el.attributes.d = this.ctx.model.compilePathD(el.vertices, isClosed);
+          if (this.ctx.model.isParametricElement(el)) {
+            this.ctx.model.syncParametricAttributes(el);
+          }
         }
       });
       // Synchronize custom pivot solidarily with rotation or scaling

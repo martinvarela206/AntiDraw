@@ -151,7 +151,22 @@ export class BooleanOperations {
       d,
       'fill-rule': 'evenodd',
       'data-node-types': vertices.map((v) => v.nodeType).join(','),
+      'data-shape': 'path',
+      'data-parametric': 'false',
     };
+
+    /**
+     * ARCHITECTURAL RATIONALE: Parametric Attribute Purging (FIX-07)
+     * Why this exists:
+     * When Boolean operations produce a new vector outline from parametric shapes (<rect>, <ellipse>, etc.),
+     * copying baseAttrs blindly retains 'x', 'y', 'width', 'height', 'rx', 'ry', 'points', etc.
+     * These residual attributes confuse the PropertyPanel and SVG serializer into treating the newly created
+     * complex polygon as an unedited primitive, overwriting vertices with axis-aligned bounding boxes.
+     * Explicitly deleting shape-specific attributes guarantees that the resulting geometry is treated strictly
+     * as an editable freeform <path> (shapeType: 'path', isParametric: false).
+     */
+    const shapeAttrs = ['x', 'y', 'width', 'height', 'cx', 'cy', 'r', 'rx', 'ry', 'x1', 'y1', 'x2', 'y2', 'points'];
+    shapeAttrs.forEach((attr) => delete attrs[attr]);
 
     /**
      * ARCHITECTURAL RATIONALE: Gradient & Filter Reference Re-Targeting
@@ -172,6 +187,8 @@ export class BooleanOperations {
     return {
       id,
       tagName: 'path',
+      shapeType: 'path',
+      isParametric: false,
       attributes: attrs,
       vertices,
       isClosed: true,
@@ -551,7 +568,11 @@ export class BooleanOperations {
           d,
           'fill-rule': 'evenodd',
           'data-node-types': combinedVertices.map((v) => v.nodeType).join(','),
+          'data-shape': 'path',
+          'data-parametric': 'false',
         };
+        const shapeAttrs = ['x', 'y', 'width', 'height', 'cx', 'cy', 'r', 'rx', 'ry', 'x1', 'y1', 'x2', 'y2', 'points'];
+        shapeAttrs.forEach((attr) => delete attrs[attr]);
         if (attrs['fill'] && attrs['fill'].includes('ad-grad-')) {
           attrs['fill'] = `url(#ad-grad-${id})`;
         }
@@ -561,18 +582,28 @@ export class BooleanOperations {
         return {
           id,
           tagName: 'path',
+          shapeType: 'path',
+          isParametric: false,
           attributes: attrs,
           vertices: combinedVertices,
           isClosed: true,
         };
       }
 
-      // Disjoint: cutter is completely outside target -> target unchanged
+      // Disjoint: cutter is completely outside target -> target is de-structured to freeform curves (FIX-07)
       const disjointId = `trimmed_${Date.now().toString(36)}`;
+      const disjointD = targetEl.attributes.d || model.compilePathD(targetEl.vertices || [], true);
       const disjointAttrs: Record<string, string> = {
         ...targetEl.attributes,
         id: disjointId,
+        d: disjointD,
+        'fill-rule': 'evenodd',
+        'data-node-types': (targetEl.vertices || []).map((v) => v.nodeType).join(','),
+        'data-shape': 'path',
+        'data-parametric': 'false',
       };
+      const shapeAttrs = ['x', 'y', 'width', 'height', 'cx', 'cy', 'r', 'rx', 'ry', 'x1', 'y1', 'x2', 'y2', 'points'];
+      shapeAttrs.forEach((attr) => delete disjointAttrs[attr]);
       if (disjointAttrs['fill'] && disjointAttrs['fill'].includes('ad-grad-')) {
         disjointAttrs['fill'] = `url(#ad-grad-${disjointId})`;
       }
@@ -582,7 +613,11 @@ export class BooleanOperations {
       return {
         ...targetEl,
         id: disjointId,
+        tagName: 'path',
+        shapeType: 'path',
+        isParametric: false,
         attributes: disjointAttrs,
+        isClosed: true,
       };
     }
 
@@ -732,7 +767,12 @@ export class BooleanOperations {
       d,
       'fill-rule': 'evenodd',
       'data-node-types': finalVertices.map((v) => v.nodeType).join(','),
+      'data-shape': 'path',
+      'data-parametric': 'false',
     };
+
+    const shapeAttrs = ['x', 'y', 'width', 'height', 'cx', 'cy', 'r', 'rx', 'ry', 'x1', 'y1', 'x2', 'y2', 'points'];
+    shapeAttrs.forEach((attr) => delete attrs[attr]);
 
     /**
      * ARCHITECTURAL RATIONALE: Preserving Gradient Fill and Filter Links After Bezier Trim
@@ -752,6 +792,8 @@ export class BooleanOperations {
     return {
       id,
       tagName: 'path',
+      shapeType: 'path',
+      isParametric: false,
       attributes: attrs,
       vertices: finalVertices,
       isClosed: true,
@@ -865,6 +907,86 @@ export class BooleanOperations {
     if (elExc) result.push(elExc);
 
     return result.length > 0 ? result : null;
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Compound Path Combination (Combine) with Parametric De-structuring (FIX-07)
+   *
+   * 1. Multi-Contour Assembly with EvenOdd Fill Rule:
+   *    Combines multiple vector shapes (closed outlines, holes, rings) into a single unified `<path>` element.
+   *    Each element's vertices form independent subpaths (beginning with command 'M').
+   *    Under `fill-rule="evenodd"`, nested or concentric shapes naturally render as holes/cutouts (e.g. donut, letter 'O')
+   *    without requiring destructive planar boolean clipping.
+   *
+   * 2. Mandatory Parametric De-Structuring:
+   *    When any participating element is a parametric primitive (<rect>, <circle>, <ellipse>, <polygon>, etc.),
+   *    it is de-structured and converted into freeform Bézier/linear path vertices (`shapeType: 'path'`, `isParametric: false`).
+   *    All primitive attributes (x, y, width, height, cx, cy, r, rx, ry, points) are stripped to guarantee clean
+   *    SVG output and enable full freeform node manipulation (`node` tool).
+   *
+   * 3. Gradient and Filter Re-Targeting:
+   *    Re-binds fill="url(#ad-grad-${id})" and filter="url(#ad-filter-shadow-${id})" to the newly generated element ID.
+   */
+  public static combine(elements: VectorElement[], model: VectorModel): VectorElement | null {
+    if (!elements || elements.length === 0) return null;
+    if (elements.length === 1) {
+      if (model.isParametricElement(elements[0])) {
+        model.convertToCurves(elements[0]);
+      }
+      return elements[0];
+    }
+
+    const combinedVertices: PathVertex[] = [];
+
+    elements.forEach((el, elIdx) => {
+      const verts = el.vertices && el.vertices.length > 0
+        ? el.vertices
+        : (el.tagName !== 'path' ? model.convertShapeToVertices(el.tagName, el.attributes) : []);
+      if (!verts || verts.length === 0) return;
+
+      verts.forEach((v, vIdx) => {
+        combinedVertices.push({
+          ...v,
+          id: `v_comb_${elIdx}_${vIdx}_${Date.now().toString(36)}`,
+          command: vIdx === 0 ? 'M' : v.command,
+        });
+      });
+    });
+
+    if (combinedVertices.length === 0) return null;
+
+    const id = `combine_${Date.now().toString(36)}`;
+    const d = model.compilePathD(combinedVertices, true);
+    const baseAttrs = elements[0].attributes || {};
+    const attrs: Record<string, string> = {
+      ...baseAttrs,
+      id,
+      d,
+      'fill-rule': 'evenodd',
+      'data-node-types': combinedVertices.map((v) => v.nodeType).join(','),
+      'data-shape': 'path',
+      'data-parametric': 'false',
+    };
+
+    const shapeAttrs = ['x', 'y', 'width', 'height', 'cx', 'cy', 'r', 'rx', 'ry', 'x1', 'y1', 'x2', 'y2', 'points'];
+    shapeAttrs.forEach((attr) => delete attrs[attr]);
+
+    if (attrs['fill'] && attrs['fill'].includes('ad-grad-')) {
+      attrs['fill'] = `url(#ad-grad-${id})`;
+    }
+    if (attrs['filter'] && attrs['filter'].includes('ad-filter-shadow-')) {
+      attrs['filter'] = `url(#ad-filter-shadow-${id})`;
+    }
+
+    return {
+      id,
+      tagName: 'path',
+      shapeType: 'path',
+      isParametric: false,
+      attributes: attrs,
+      vertices: combinedVertices,
+      isClosed: true,
+    };
   }
 
   // Helper to get element bounding box
