@@ -1724,13 +1724,29 @@ export class PropertyPanel {
               <button class="prop-input" id="btn-reset-radial-center" style="width: 26px; height: 26px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;" title="Centrar al 50%, 50%">⟲</button>
             </div>
             <div class="prop-row" style="gap: 6px;">
-              <span class="prop-label" style="width: 46px;" title="Radio de dispersión del gradiente radial">Radio</span>
-              <div class="prop-coord-box" style="flex: 1;" title="Radio de dispersión del gradiente radial (%)">
-                <span class="prop-coord-sublabel">R</span>
-                <input type="number" class="prop-coord-input" id="radial-r" value="${Math.round((grad.r ?? 0.5) * 100)}" min="1" max="500" step="5" />
-                <span class="prop-coord-sublabel">%</span>
+              <span class="prop-label" style="width: 46px;" title="Radios de dispersión elíptica del gradiente radial (Rx / Ry)">Radios</span>
+              <div class="prop-coord-group">
+                <div class="prop-coord-box" title="Radio eje X (%)">
+                  <span class="prop-coord-sublabel">Rx</span>
+                  <input type="number" class="prop-coord-input" id="radial-rx" value="${Math.round((grad.rx ?? grad.r ?? 0.5) * 100)}" min="1" max="500" step="5" />
+                  <span class="prop-coord-sublabel">%</span>
+                </div>
+                <div class="prop-coord-box" title="Radio eje Y (%)">
+                  <span class="prop-coord-sublabel">Ry</span>
+                  <input type="number" class="prop-coord-input" id="radial-ry" value="${Math.round((grad.ry ?? grad.rx ?? grad.r ?? 0.5) * 100)}" min="1" max="500" step="5" />
+                  <span class="prop-coord-sublabel">%</span>
+                </div>
               </div>
-              <button class="prop-input" id="btn-reset-radial-radius" style="width: auto; padding: 2px 8px; height: 26px; cursor: pointer; flex-shrink: 0;" title="Restablecer radio al 50%">50%</button>
+              <button class="prop-input" id="btn-reset-radial-radius" style="width: auto; padding: 2px 8px; height: 26px; cursor: pointer; flex-shrink: 0;" title="Restablecer radios al 50% (círculo simétrico)">50%</button>
+            </div>
+            <div class="prop-row" style="gap: 6px;">
+              <span class="prop-label" style="width: 46px;" title="Giro o rotación angular del gradiente radial elíptico en grados">Giro</span>
+              <div class="prop-coord-box" style="flex: 1;" title="Ángulo de rotación del gradiente radial (°)">
+                <span class="prop-coord-sublabel">∠</span>
+                <input type="number" class="prop-coord-input" id="radial-rotation" value="${Math.round(grad.rotation ?? 0)}" min="-360" max="360" step="5" />
+                <span class="prop-coord-sublabel">°</span>
+              </div>
+              <button class="prop-input" id="btn-reset-radial-rotation" style="width: 26px; height: 26px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;" title="Restablecer rotación a 0°">⟲</button>
             </div>
             <div class="prop-row" style="gap: 6px;">
               <span class="prop-label" style="width: 46px;" title="Foco de iluminación del gradiente radial">Foco</span>
@@ -2192,6 +2208,9 @@ export class PropertyPanel {
           grad!.cx = grad!.cx ?? 0.5;
           grad!.cy = grad!.cy ?? 0.5;
           grad!.r = grad!.r ?? 0.5;
+          grad!.rx = grad!.rx ?? grad!.r ?? 0.5;
+          grad!.ry = grad!.ry ?? grad!.rx ?? 0.5;
+          grad!.rotation = grad!.rotation ?? 0;
         }
         applyFillChanges();
       });
@@ -2372,21 +2391,50 @@ export class PropertyPanel {
       });
     }
 
-    const radialR = this.container.querySelector<HTMLInputElement>('#radial-r');
+    const radialRx = this.container.querySelector<HTMLInputElement>('#radial-rx');
+    const radialRy = this.container.querySelector<HTMLInputElement>('#radial-ry');
     const btnResetRadialRadius = this.container.querySelector<HTMLButtonElement>('#btn-reset-radial-radius');
-    if (radialR) {
-      radialR.addEventListener('change', () => {
-        if (this.callbacks.onPushUndo) this.callbacks.onPushUndo();
-        const rPct = Math.max(1, parseFloat(radialR.value || '50') || 50);
-        grad!.r = Math.round((rPct / 100) * 1000) / 1000;
-        applyFillChanges();
-      });
-    }
+    const radialRotation = this.container.querySelector<HTMLInputElement>('#radial-rotation');
+    const btnResetRadialRotation = this.container.querySelector<HTMLButtonElement>('#btn-reset-radial-rotation');
+
+    const updateRadialRadii = () => {
+      if (this.callbacks.onPushUndo) this.callbacks.onPushUndo();
+      const rxPct = Math.max(1, parseFloat(radialRx?.value || '50') || 50);
+      const ryPct = Math.max(1, parseFloat(radialRy?.value || '50') || 50);
+      grad!.rx = Math.round((rxPct / 100) * 1000) / 1000;
+      grad!.ry = Math.round((ryPct / 100) * 1000) / 1000;
+      grad!.r = grad!.rx;
+      applyFillChanges();
+    };
+
+    if (radialRx) radialRx.addEventListener('change', updateRadialRadii);
+    if (radialRy) radialRy.addEventListener('change', updateRadialRadii);
     if (btnResetRadialRadius) {
       btnResetRadialRadius.addEventListener('click', () => {
         if (this.callbacks.onPushUndo) this.callbacks.onPushUndo();
-        if (radialR) radialR.value = '50';
+        if (radialRx) radialRx.value = '50';
+        if (radialRy) radialRy.value = '50';
+        grad!.rx = 0.5;
+        grad!.ry = 0.5;
         grad!.r = 0.5;
+        applyFillChanges();
+      });
+    }
+
+    if (radialRotation) {
+      radialRotation.addEventListener('change', () => {
+        if (this.callbacks.onPushUndo) this.callbacks.onPushUndo();
+        const rotVal = parseFloat(radialRotation.value || '0') || 0;
+        grad!.rotation = Math.round((((rotVal % 360) + 360) % 360) * 10) / 10;
+        applyFillChanges();
+      });
+    }
+
+    if (btnResetRadialRotation) {
+      btnResetRadialRotation.addEventListener('click', () => {
+        if (this.callbacks.onPushUndo) this.callbacks.onPushUndo();
+        if (radialRotation) radialRotation.value = '0';
+        grad!.rotation = 0;
         applyFillChanges();
       });
     }

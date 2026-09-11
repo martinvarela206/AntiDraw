@@ -50,6 +50,7 @@ export class SelectToolHandler implements IToolHandler {
     | 'selection-pivot'
     | 'grad-radial-center'
     | 'grad-radial-radius'
+    | 'grad-radial-radius-y'
     | 'grad-radial-focus'
     | null = null;
 
@@ -319,19 +320,37 @@ export class SelectToolHandler implements IToolHandler {
             const hSize = 8 / z;
             const cx = box.x + (grad.cx ?? 0.5) * box.width;
             const cy = box.y + (grad.cy ?? 0.5) * box.height;
-            const rx = (grad.r ?? 0.5) * box.width;
+            const rx = (grad.rx ?? grad.r ?? 0.5) * box.width;
+            const ry = (grad.ry ?? grad.r ?? 0.5) * box.height;
+            const rotRad = ((grad.rotation ?? 0) * Math.PI) / 180;
+            const hx1 = cx + rx * Math.cos(rotRad);
+            const hy1 = cy + rx * Math.sin(rotRad);
+            const hx2 = cx - ry * Math.sin(rotRad);
+            const hy2 = cy + ry * Math.cos(rotRad);
             const fx = box.x + (grad.fx ?? grad.cx ?? 0.5) * box.width;
             const fy = box.y + (grad.fy ?? grad.cy ?? 0.5) * box.height;
             const isCoincident = Math.hypot(fx - cx, fy - cy) < 4 / z;
 
-            // Priority 1: Radius perimeter handle (blue circle at cx + rx, cy)
-            if (Math.hypot(pt.x - (cx + rx), pt.y - cy) <= hSize) {
+            // Priority 1: Radius X handle (primary axis, blue circle at hx1, hy1)
+            if (Math.hypot(pt.x - hx1, pt.y - hy1) <= hSize) {
               this.activeHandle = 'grad-radial-radius';
               this.isDragging = true;
               this.dragStartPt = pt;
               this.activeGradientElementId = el.id;
               this.initialGradientJson = el.attributes['data-gradient'];
               this.callbacks.setCursor?.('ew-resize');
+              this.ctx.renderOverlay();
+              return true;
+            }
+
+            // Priority 1b: Radius Y handle (secondary axis, emerald circle at hx2, hy2)
+            if (Math.hypot(pt.x - hx2, pt.y - hy2) <= hSize) {
+              this.activeHandle = 'grad-radial-radius-y';
+              this.isDragging = true;
+              this.dragStartPt = pt;
+              this.activeGradientElementId = el.id;
+              this.initialGradientJson = el.attributes['data-gradient'];
+              this.callbacks.setCursor?.('ns-resize');
               this.ctx.renderOverlay();
               return true;
             }
@@ -572,13 +591,21 @@ export class SelectToolHandler implements IToolHandler {
                 const hSize = 8 / z;
                 const cx = box.x + (grad.cx ?? 0.5) * box.width;
                 const cy = box.y + (grad.cy ?? 0.5) * box.height;
-                const rx = (grad.r ?? 0.5) * box.width;
+                const rx = (grad.rx ?? grad.r ?? 0.5) * box.width;
+                const ry = (grad.ry ?? grad.r ?? 0.5) * box.height;
+                const rotRad = ((grad.rotation ?? 0) * Math.PI) / 180;
+                const hx1 = cx + rx * Math.cos(rotRad);
+                const hy1 = cy + rx * Math.sin(rotRad);
+                const hx2 = cx - ry * Math.sin(rotRad);
+                const hy2 = cy + ry * Math.cos(rotRad);
                 const fx = box.x + (grad.fx ?? grad.cx ?? 0.5) * box.width;
                 const fy = box.y + (grad.fy ?? grad.cy ?? 0.5) * box.height;
                 const isCoincident = Math.hypot(fx - cx, fy - cy) < 4 / z;
 
-                if (Math.hypot(pt.x - (cx + rx), pt.y - cy) <= hSize) {
+                if (Math.hypot(pt.x - hx1, pt.y - hy1) <= hSize) {
                   cursor = 'ew-resize';
+                } else if (Math.hypot(pt.x - hx2, pt.y - hy2) <= hSize) {
+                  cursor = 'ns-resize';
                 } else if (!isCoincident && Math.hypot(pt.x - fx, pt.y - fy) <= hSize) {
                   cursor = 'crosshair';
                 } else if (Math.hypot(pt.x - cx, pt.y - cy) <= hSize) {
@@ -642,6 +669,7 @@ export class SelectToolHandler implements IToolHandler {
     if (
       this.activeHandle === 'grad-radial-center' ||
       this.activeHandle === 'grad-radial-radius' ||
+      this.activeHandle === 'grad-radial-radius-y' ||
       this.activeHandle === 'grad-radial-focus'
     ) {
       const el = this.ctx.model.elements.find((e) => e.id === this.activeGradientElementId);
@@ -667,10 +695,31 @@ export class SelectToolHandler implements IToolHandler {
               this.callbacks.setCursor?.('ew-resize');
               const cx = box.x + (grad.cx ?? 0.5) * box.width;
               const cy = box.y + (grad.cy ?? 0.5) * box.height;
-              const normDx = (pt.x - cx) / box.width;
-              const normDy = (pt.y - cy) / box.height;
-              const newR = Math.max(0.01, Math.hypot(normDx, normDy));
-              grad.r = Math.round(newR * 1000) / 1000;
+              const rotRad = ((grad.rotation ?? 0) * Math.PI) / 180;
+              const dx = pt.x - cx;
+              const dy = pt.y - cy;
+              // Project onto primary axis
+              const projX = dx * Math.cos(rotRad) + dy * Math.sin(rotRad);
+              const newRx = Math.max(0.01, Math.abs(projX) / box.width);
+              grad.rx = Math.round(newRx * 1000) / 1000;
+              grad.r = grad.rx;
+
+              // If dragging with Shift held, steer rotation angle
+              if (e.shiftKey) {
+                const angleDeg = Math.round((Math.atan2(dy, dx) * 180) / Math.PI);
+                grad.rotation = ((angleDeg % 360) + 360) % 360;
+              }
+            } else if (this.activeHandle === 'grad-radial-radius-y') {
+              this.callbacks.setCursor?.('ns-resize');
+              const cx = box.x + (grad.cx ?? 0.5) * box.width;
+              const cy = box.y + (grad.cy ?? 0.5) * box.height;
+              const rotRad = ((grad.rotation ?? 0) * Math.PI) / 180;
+              const dx = pt.x - cx;
+              const dy = pt.y - cy;
+              // Project onto secondary axis
+              const projY = -dx * Math.sin(rotRad) + dy * Math.cos(rotRad);
+              const newRy = Math.max(0.01, Math.abs(projY) / box.height);
+              grad.ry = Math.round(newRy * 1000) / 1000;
             } else if (this.activeHandle === 'grad-radial-focus') {
               this.callbacks.setCursor?.('crosshair');
               const newFx = (pt.x - box.x) / box.width;
@@ -683,18 +732,27 @@ export class SelectToolHandler implements IToolHandler {
 
             /**
              * ARCHITECTURAL RATIONALE: Direct DOM SVG Defs Attribute Mutation
-             * Mutating cx, cy, r, fx, fy directly on the live SVG `<radialGradient>` element
-             * allows the GPU renderer to repaint the fill instantly at 60fps while dragging.
-             * This avoids expensive complete DOM teardown of the canvas or PropertyPanel,
-             * eliminating input defocusing and jitter.
+             * Mutating cx, cy, r, fx, fy and gradientTransform directly on the live SVG
+             * `<radialGradient>` element allows GPU repainting at 60fps while dragging.
              */
             const gradDom = document.getElementById(`ad-grad-${el.id}`);
             if (gradDom) {
-              gradDom.setAttribute('cx', (grad.cx ?? 0.5).toString());
-              gradDom.setAttribute('cy', (grad.cy ?? 0.5).toString());
-              gradDom.setAttribute('r', (grad.r ?? 0.5).toString());
-              gradDom.setAttribute('fx', (grad.fx ?? grad.cx ?? 0.5).toString());
-              gradDom.setAttribute('fy', (grad.fy ?? grad.cy ?? 0.5).toString());
+              const cx = grad.cx ?? 0.5;
+              const cy = grad.cy ?? 0.5;
+              const rx = grad.rx ?? grad.r ?? 0.5;
+              const ry = grad.ry ?? grad.r ?? 0.5;
+              const rotation = grad.rotation ?? 0;
+              const sy = rx > 0.0001 ? Math.round((ry / rx) * 1000) / 1000 : 1;
+              gradDom.setAttribute('cx', cx.toString());
+              gradDom.setAttribute('cy', cy.toString());
+              gradDom.setAttribute('r', rx.toString());
+              gradDom.setAttribute('fx', (grad.fx ?? cx).toString());
+              gradDom.setAttribute('fy', (grad.fy ?? cy).toString());
+              if (Math.abs(sy - 1) > 0.001 || Math.abs(rotation) > 0.1) {
+                gradDom.setAttribute('gradientTransform', `translate(${cx}, ${cy}) rotate(${rotation}) scale(1, ${sy}) translate(-${cx}, -${cy})`);
+              } else {
+                gradDom.removeAttribute('gradientTransform');
+              }
             }
 
             this.ctx.renderOverlay();
@@ -1098,6 +1156,28 @@ export class SelectToolHandler implements IToolHandler {
       // Synchronize custom pivot solidarily with rotation or scaling
       if (this.activeHandle === 'rotate' && this.rotationPivot) {
         this.ctx.selectionTool.updatePivotOnRotate(this.rotationPivot, this.lastDeltaAngle, selectedEls);
+
+        // ARCHITECTURAL RATIONALE: Solidary Gradient Rotation (FIX-06)
+        // Rotates linear angles and transforms radial gradient center, focus, radii (rx, ry)
+        // and rotation angle solidarily around the rotation pivot.
+        selectedEls.forEach((el) => {
+          if (el.attributes['data-gradient']) {
+            const initialVerts = this.initialElementsMap.get(el.id);
+            const oldElBox = initialVerts
+              ? this.ctx.selectionTool.getBoundingBox({ ...el, vertices: initialVerts })
+              : this.initialBox;
+            const newElBox = this.ctx.selectionTool.getBoundingBox(el);
+            if (oldElBox && newElBox) {
+              this.ctx.selectionTool.rotateElementGradient(
+                el,
+                this.rotationPivot!,
+                this.lastDeltaAngle,
+                oldElBox,
+                newElBox
+              );
+            }
+          }
+        });
       } else if (this.initialBox) {
         const z = this.ctx.canvasMgr.zoom || 1;
         const newBox = this.ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 6 / z);
@@ -1244,6 +1324,7 @@ export class SelectToolHandler implements IToolHandler {
     if (
       this.activeHandle === 'grad-radial-center' ||
       this.activeHandle === 'grad-radial-radius' ||
+      this.activeHandle === 'grad-radial-radius-y' ||
       this.activeHandle === 'grad-radial-focus'
     ) {
       if (this.activeGradientElementId && this.initialGradientJson) {
@@ -1420,21 +1501,30 @@ export class SelectToolHandler implements IToolHandler {
             } else if (grad.type === 'radial') {
               const cx = box.x + (grad.cx ?? 0.5) * box.width;
               const cy = box.y + (grad.cy ?? 0.5) * box.height;
-              const rx = (grad.r ?? 0.5) * box.width;
-              const ry = (grad.r ?? 0.5) * box.height;
+              const rx = (grad.rx ?? grad.r ?? 0.5) * box.width;
+              const ry = (grad.ry ?? grad.r ?? 0.5) * box.height;
+              const rot = grad.rotation ?? 0;
+              const rotRad = (rot * Math.PI) / 180;
               const fx = box.x + (grad.fx ?? grad.cx ?? 0.5) * box.width;
               const fy = box.y + (grad.fy ?? grad.cy ?? 0.5) * box.height;
               const hSize = 7 / z;
               const isCoincident = Math.hypot(fx - cx, fy - cy) < 4 / z;
 
-              // 1. Dispersion perimeter boundary ellipse
-              html += `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="none" stroke="#ec4899" stroke-width="1.2" stroke-dasharray="3 2" opacity="0.85" vector-effect="non-scaling-stroke" />`;
+              const hx1 = cx + rx * Math.cos(rotRad);
+              const hy1 = cy + rx * Math.sin(rotRad);
+              const hx2 = cx - ry * Math.sin(rotRad);
+              const hy2 = cy + ry * Math.cos(rotRad);
 
-              // 2. Radial ray connecting center to radius perimeter handle
-              html += `<line x1="${cx}" y1="${cy}" x2="${cx + rx}" y2="${cy}" stroke="#3b82f6" stroke-width="1.2" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
+              // 1. Dispersion perimeter boundary ellipse (rotated)
+              html += `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" transform="rotate(${rot}, ${cx}, ${cy})" fill="none" stroke="#ec4899" stroke-width="1.2" stroke-dasharray="3 2" opacity="0.85" vector-effect="non-scaling-stroke" />`;
 
-              // 3. Radius perimeter handle (east direction, ew-resize)
-              html += `<circle cx="${cx + rx}" cy="${cy}" r="${hSize / 2}" fill="#3b82f6" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" style="cursor: ew-resize;" />`;
+              // 2. Primary axis ray & handle (Radius X - blue)
+              html += `<line x1="${cx}" y1="${cy}" x2="${hx1}" y2="${hy1}" stroke="#3b82f6" stroke-width="1.2" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
+              html += `<circle cx="${hx1}" cy="${hy1}" r="${hSize / 2}" fill="#3b82f6" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" style="cursor: ew-resize;" />`;
+
+              // 3. Secondary axis ray & handle (Radius Y - emerald)
+              html += `<line x1="${cx}" y1="${cy}" x2="${hx2}" y2="${hy2}" stroke="#10b981" stroke-width="1.2" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
+              html += `<circle cx="${hx2}" cy="${hy2}" r="${hSize / 2}" fill="#10b981" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" style="cursor: ns-resize;" />`;
 
               // 4. Focus point ray and handle (if distinct from center)
               if (!isCoincident) {

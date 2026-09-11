@@ -684,6 +684,87 @@ export class SelectionTool {
       return next;
     });
   }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Solidary Gradient Transformation on Rotation (FIX-06)
+   *
+   * 1. The Core Problem:
+   *    In SVG, gradients defined with `objectBoundingBox` stretch across the element's axis-aligned bounding box (AABB).
+   *    When a vector rotates, its AABB width and height change dynamically depending on the angle.
+   *    Without solidary transformation, an elliptical or circular radial gradient deforms unpredictably,
+   *    wobbling between horizontal ellipse, circle, and vertical ellipse as the bounding box aspect ratio shifts.
+   *    Furthermore, linear gradient angles stay static in world space instead of turning with the object.
+   *
+   * 2. The Solidary Solution:
+   *    - Linear Gradient: Increment `grad.angle` by `deltaAngleDeg`, maintaining orientation locked to the vector body.
+   *    - Radial Gradient:
+   *      a) Rotate absolute center (cx, cy) and focus (fx, fy) around the rotation pivot by `deltaAngleRad`,
+   *         then re-project into normalized fractions of the element's new post-rotation bounding box.
+   *      b) Measure physical world canvas radii (Rx = rx * oldBox.w, Ry = ry * oldBox.h) and re-normalize to
+   *         (newBox.w, newBox.h). This guarantees the physical dispersion footprint in pixels remains invariant.
+   *      c) Increment `grad.rotation` by `deltaAngleDeg`, ensuring the elliptical axes turn solidarily with the vector.
+   */
+  public rotateElementGradient(
+    el: VectorElement,
+    pivot: Point,
+    deltaAngleRad: number,
+    oldBox: BoundingBox,
+    newBox: BoundingBox
+  ): void {
+    if (!el.attributes['data-gradient']) return;
+    try {
+      const grad: any = JSON.parse(el.attributes['data-gradient']);
+      const deltaDeg = Math.round((deltaAngleRad * 180) / Math.PI);
+
+      if (grad.type === 'linear') {
+        let ang = (grad.angle ?? 0) + deltaDeg;
+        ang = ((ang % 360) + 360) % 360;
+        grad.angle = Math.round(ang);
+        el.attributes['data-gradient'] = JSON.stringify(grad);
+      } else if (grad.type === 'radial') {
+        if (oldBox.width <= 0 || oldBox.height <= 0 || newBox.width <= 0 || newBox.height <= 0) return;
+
+        const cos = Math.cos(deltaAngleRad);
+        const sin = Math.sin(deltaAngleRad);
+
+        // 1. Rotate absolute center around pivot
+        const oldCxAbs = oldBox.x + (grad.cx ?? 0.5) * oldBox.width;
+        const oldCyAbs = oldBox.y + (grad.cy ?? 0.5) * oldBox.height;
+        const dxC = oldCxAbs - pivot.x;
+        const dyC = oldCyAbs - pivot.y;
+        const newCxAbs = pivot.x + (dxC * cos - dyC * sin);
+        const newCyAbs = pivot.y + (dxC * sin + dyC * cos);
+        grad.cx = Math.round(((newCxAbs - newBox.x) / newBox.width) * 1000) / 1000;
+        grad.cy = Math.round(((newCyAbs - newBox.y) / newBox.height) * 1000) / 1000;
+
+        // 2. Rotate absolute focus around pivot (if defined)
+        if (grad.fx !== undefined || grad.fy !== undefined) {
+          const oldFxAbs = oldBox.x + (grad.fx ?? grad.cx ?? 0.5) * oldBox.width;
+          const oldFyAbs = oldBox.y + (grad.fy ?? grad.cy ?? 0.5) * oldBox.height;
+          const dxF = oldFxAbs - pivot.x;
+          const dyF = oldFyAbs - pivot.y;
+          const newFxAbs = pivot.x + (dxF * cos - dyF * sin);
+          const newFyAbs = pivot.y + (dxF * sin + dyF * cos);
+          grad.fx = Math.round(((newFxAbs - newBox.x) / newBox.width) * 1000) / 1000;
+          grad.fy = Math.round(((newFyAbs - newBox.y) / newBox.height) * 1000) / 1000;
+        }
+
+        // 3. Preserve physical canvas radii (Rx, Ry) to avoid aspect ratio mutation
+        const rxAbs = (grad.rx ?? grad.r ?? 0.5) * oldBox.width;
+        const ryAbs = (grad.ry ?? grad.r ?? 0.5) * oldBox.height;
+        grad.rx = Math.round((rxAbs / newBox.width) * 1000) / 1000;
+        grad.ry = Math.round((ryAbs / newBox.height) * 1000) / 1000;
+        grad.r = grad.rx;
+
+        // 4. Update gradient rotation angle
+        let rot = (grad.rotation ?? 0) + deltaDeg;
+        rot = ((rot % 360) + 360) % 360;
+        grad.rotation = Math.round(rot);
+
+        el.attributes['data-gradient'] = JSON.stringify(grad);
+      }
+    } catch {}
+  }
 }
 
 // Distance from point to line segment

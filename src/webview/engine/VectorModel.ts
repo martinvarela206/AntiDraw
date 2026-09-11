@@ -69,10 +69,13 @@ export interface GradientConfig {
   y2?: number;
   cx?: number; // 0.0 to 1.0 for radial
   cy?: number;
-  r?: number;
+  r?: number; // fallback single radius
+  rx?: number; // 0.0 to 1.0 horizontal radius
+  ry?: number; // 0.0 to 1.0 vertical radius
   fx?: number;
   fy?: number;
   angle?: number; // angle in degrees for linear (0 = left-to-right, 90 = top-to-bottom)
+  rotation?: number; // angle in degrees for radial (0 to 360)
   stops: GradientStop[];
 }
 
@@ -331,8 +334,21 @@ export class VectorModel {
                       gradConfig.cx = parsePctOrNum(gradEl.getAttribute('cx'), 0.5);
                       gradConfig.cy = parsePctOrNum(gradEl.getAttribute('cy'), 0.5);
                       gradConfig.r = parsePctOrNum(gradEl.getAttribute('r'), 0.5);
+                      gradConfig.rx = parsePctOrNum(gradEl.getAttribute('rx'), gradConfig.r);
+                      gradConfig.ry = parsePctOrNum(gradEl.getAttribute('ry'), gradConfig.r);
                       if (gradEl.hasAttribute('fx')) gradConfig.fx = parsePctOrNum(gradEl.getAttribute('fx'), gradConfig.cx);
                       if (gradEl.hasAttribute('fy')) gradConfig.fy = parsePctOrNum(gradEl.getAttribute('fy'), gradConfig.cy);
+
+                      const gTrans = gradEl.getAttribute('gradientTransform');
+                      if (gTrans) {
+                        const rotMatch = gTrans.match(/rotate\(([-\d.]+)/);
+                        if (rotMatch) gradConfig.rotation = parseFloat(rotMatch[1]);
+                        const scaleMatch = gTrans.match(/scale\(1,\s*([-\d.]+)\)/);
+                        if (scaleMatch && gradConfig.rx) {
+                          const sy = parseFloat(scaleMatch[1]);
+                          gradConfig.ry = Math.round(gradConfig.rx * sy * 1000) / 1000;
+                        }
+                      }
                     }
                     attrs['data-gradient'] = JSON.stringify(gradConfig);
                   }
@@ -537,10 +553,30 @@ export class VectorModel {
       } else {
         const cx = grad.cx ?? 0.5;
         const cy = grad.cy ?? 0.5;
-        const r = grad.r ?? 0.5;
+        const rx = grad.rx ?? grad.r ?? 0.5;
+        const ry = grad.ry ?? grad.r ?? 0.5;
         const fx = grad.fx ?? cx;
         const fy = grad.fy ?? cy;
-        out += `    <radialGradient id="${gradId}" cx="${cx}" cy="${cy}" r="${r}" fx="${fx}" fy="${fy}" gradientUnits="objectBoundingBox">\n`;
+        const rotation = grad.rotation ?? 0;
+
+        // In SVG <radialGradient>, r is the reference radius. Using rx as base,
+        // any differing ry or rotation is expressed cleanly via gradientTransform.
+        const r = rx;
+        const sy = rx > 0.0001 ? Math.round((ry / rx) * 1000) / 1000 : 1;
+
+        let transformAttr = '';
+        if (Math.abs(sy - 1) > 0.001 || Math.abs(rotation) > 0.1) {
+          /**
+           * ARCHITECTURAL RATIONALE: Multiaxis Radial Gradient via gradientTransform (FIX-06)
+           * SVG specification allows elliptical shaping and arbitrary rotation of radial gradients
+           * through gradientTransform="translate(cx, cy) rotate(deg) scale(1, sy) translate(-cx, -cy)".
+           * This guarantees solidary rotation and multi-axis rx/ry aspect preservation across all
+           * SVG viewers and renderers without warping into circles upon bounding box aspect changes.
+           */
+          transformAttr = ` gradientTransform="translate(${cx}, ${cy}) rotate(${rotation}) scale(1, ${sy}) translate(-${cx}, -${cy})"`;
+        }
+
+        out += `    <radialGradient id="${gradId}" cx="${cx}" cy="${cy}" r="${r}" fx="${fx}" fy="${fy}"${transformAttr} gradientUnits="objectBoundingBox">\n`;
       }
 
       // Sort stops by offset ascending
