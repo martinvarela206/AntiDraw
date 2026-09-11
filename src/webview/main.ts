@@ -747,6 +747,7 @@ class AntiDrawApp {
       const selectedEls = this.model.elements.filter((el) => this.selectionTool.isSelected(el.id));
       if (selectedEls.length > 0) {
         const hasParametric = selectedEls.some((el) => this.model.isParametricElement(el));
+        const canSimplifyToPrimitive = selectedEls.some((el) => !this.model.isParametricElement(el) && el.tagName === 'path' && this.model.detectPrimitiveFromPath(el) !== null);
 
         const menuItems: ContextMenuItem[] = [
           {
@@ -755,6 +756,12 @@ class AntiDrawApp {
             shortcut: 'Ctrl+Q',
             disabled: !hasParametric,
             action: () => this.handleConvertToCurves(),
+          },
+          {
+            id: 'convert-to-primitive',
+            label: 'Simplificar a Primitivas SVG',
+            disabled: !canSimplifyToPrimitive,
+            action: () => this.handleConvertToPrimitives(),
           },
           { id: 'separator', label: '', action: () => {} },
           {
@@ -1606,6 +1613,29 @@ class AntiDrawApp {
     this.pushUndo();
     parametricEls.forEach((el) => {
       this.model.convertToCurves(el);
+    });
+    this.propertyPanel.resetPanelMode();
+    this.propertyPanel.update(null, this.toolbar.activeTool);
+    this.render();
+    this.syncToHost();
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Batch Path to Primitive Optimizer (FEAT-05)
+   * Scans all selected non-parametric <path> elements, performs inverse geometric recognition,
+   * converts them to their canonical native SVG primitives (<line>, <polyline>, <polygon>, <rect>, <circle>, <ellipse>),
+   * purges path d attributes, recalculates vertex bounds, and records undo state.
+   */
+  private handleConvertToPrimitives(): void {
+    const selected = this.model.elements.filter((el) => this.selectionTool.isSelected(el.id));
+    const convertibleEls = selected.filter(
+      (el) => !this.model.isParametricElement(el) && el.tagName === 'path' && this.model.detectPrimitiveFromPath(el) !== null
+    );
+    if (convertibleEls.length === 0) return;
+
+    this.pushUndo();
+    convertibleEls.forEach((el) => {
+      this.model.convertPathToPrimitive(el);
     });
     this.propertyPanel.resetPanelMode();
     this.propertyPanel.update(null, this.toolbar.activeTool);

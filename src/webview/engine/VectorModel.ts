@@ -2176,7 +2176,236 @@ export class VectorModel {
 
     return vertices;
   }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Inverse Geometric Analyzer for SVG Primitives (FEAT-05)
+   *
+   * Analyzes an arbitrary <path> element's topology, vertices, angles, and Bézier curvatures
+   * to determine whether it mathematically matches a canonical SVG primitive:
+   * 1. Straight Line (`<line>`): Exactly 2 vertices, open path, no Bézier curvature.
+   * 2. Polyline (`<polyline>`): >= 2 vertices, open path, all segments straight (no control handles).
+   * 3. Polygon (`<polygon>`): >= 3 vertices, closed path, all segments straight (no control handles).
+   * 4. Pure Rectangle (`<rect>`): 4 vertices, closed path, all internal angles exactly 90°
+   *    and edges aligned or orthogonal.
+   * 5. Rounded Rectangle (`<rect>`): 4 corners consisting of orthogonal lines and cubic Bézier quadrants.
+   * 6. Ellipse / Circle (`<ellipse>` / `<circle>`): 4 vertices, closed path, canonical cubic Bézier
+   *    approximations (handles matching ~0.55228475 factor). If rx ≈ ry, recognized as `<circle>`.
+   *
+   * Technical Justification:
+   * Sub-pixel tolerance (e.g. 1.0px) prevents numerical floating-point inaccuracies from failing
+   * valid matches while rejecting arbitrary freehand contours.
+   */
+  public detectPrimitiveFromPath(el: VectorElement, tolerance: number = 1.0): {
+    primitive: ParametricShapeType;
+    attributes: Record<string, string>;
+  } | null {
+    if (!el.vertices || el.vertices.length < 2) return null;
+
+    const verts = el.vertices;
+    const n = verts.length;
+    const isClosed = this.isElementClosed(el);
+
+    const hasNoHandles = (v: PathVertex): boolean => {
+      const hInDist = v.handleIn ? Math.hypot(v.handleIn.x - v.x, v.handleIn.y - v.y) : 0;
+      const hOutDist = v.handleOut ? Math.hypot(v.handleOut.x - v.x, v.handleOut.y - v.y) : 0;
+      return hInDist <= tolerance && hOutDist <= tolerance;
+    };
+
+    const allStraight = verts.every(hasNoHandles);
+
+    // 1. Line check: exactly 2 vertices, open, straight
+    if (!isClosed && n === 2 && allStraight) {
+      return {
+        primitive: 'line',
+        attributes: {
+          x1: formatNum(verts[0].x),
+          y1: formatNum(verts[0].y),
+          x2: formatNum(verts[1].x),
+          y2: formatNum(verts[1].y),
+        },
+      };
+    }
+
+    // 2. Polyline check: open, >= 2 vertices, all straight
+    if (!isClosed && n >= 2 && allStraight) {
+      const pts = verts.map((v) => `${formatNum(v.x)},${formatNum(v.y)}`).join(' ');
+      return {
+        primitive: 'polyline',
+        attributes: {
+          points: pts,
+        },
+      };
+    }
+
+    // 3. Pure Polygon or Rectangle check
+    if (isClosed && allStraight) {
+      // Check if it's a 4-vertex orthogonal rectangle
+      if (n === 4) {
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        verts.forEach((v) => {
+          minX = Math.min(minX, v.x);
+          minY = Math.min(minY, v.y);
+          maxX = Math.max(maxX, v.x);
+          maxY = Math.max(maxY, v.y);
+        });
+        const w = maxX - minX;
+        const h = maxY - minY;
+
+        if (w > tolerance && h > tolerance) {
+          // Check if each vertex coincides with one of the 4 bounding box corners
+          const corners = [
+            { x: minX, y: minY },
+            { x: maxX, y: minY },
+            { x: maxX, y: maxY },
+            { x: minX, y: maxY },
+          ];
+          const matches = verts.every((v) =>
+            corners.some((c) => Math.hypot(v.x - c.x, v.y - c.y) <= tolerance)
+          );
+          if (matches) {
+            return {
+              primitive: 'rect',
+              attributes: {
+                x: formatNum(minX),
+                y: formatNum(minY),
+                width: formatNum(w),
+                height: formatNum(h),
+                rx: '0',
+                ry: '0',
+                'data-corner-mode': 'uniform',
+                'data-corner-unit': 'px',
+                'data-corner-radius': '0,0,0,0',
+              },
+            };
+          }
+        }
+      }
+
+      // Otherwise, generic closed polygon (>= 3 vertices)
+      if (n >= 3) {
+        const pts = verts.map((v) => `${formatNum(v.x)},${formatNum(v.y)}`).join(' ');
+        return {
+          primitive: 'polygon',
+          attributes: {
+            points: pts,
+          },
+        };
+      }
+    }
+
+    // 4. Circle / Ellipse check: 4 vertices, closed, symmetric Bézier arcs
+    if (isClosed && n === 4) {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      verts.forEach((v) => {
+        minX = Math.min(minX, v.x);
+        minY = Math.min(minY, v.y);
+        maxX = Math.max(maxX, v.x);
+        maxY = Math.max(maxY, v.y);
+      });
+      const cx = (minX + maxX) / 2;
+      const cy = (minY + maxY) / 2;
+      const rx = (maxX - minX) / 2;
+      const ry = (maxY - minY) / 2;
+
+      if (rx > tolerance && ry > tolerance) {
+        const k = 0.55228475;
+        const ox = rx * k;
+        const oy = ry * k;
+
+        const canonical = [
+          { x: cx, y: cy - ry, hIn: { x: cx - ox, y: cy - ry }, hOut: { x: cx + ox, y: cy - ry } },
+          { x: cx + rx, y: cy, hIn: { x: cx + rx, y: cy - oy }, hOut: { x: cx + rx, y: cy + oy } },
+          { x: cx, y: cy + ry, hIn: { x: cx + ox, y: cy + ry }, hOut: { x: cx - ox, y: cy + ry } },
+          { x: cx - rx, y: cy, hIn: { x: cx - rx, y: cy + oy }, hOut: { x: cx - rx, y: cy - oy } },
+        ];
+
+        // Match with cyclical shift of index 0..3
+        for (let shift = 0; shift < 4; shift++) {
+          let matched = true;
+          for (let i = 0; i < 4; i++) {
+            const v = verts[i];
+            const c = canonical[(i + shift) % 4];
+            if (Math.hypot(v.x - c.x, v.y - c.y) > tolerance * 1.5) {
+              matched = false;
+              break;
+            }
+            if (v.handleIn && Math.hypot(v.handleIn.x - c.hIn.x, v.handleIn.y - c.hIn.y) > tolerance * 2) {
+              matched = false;
+              break;
+            }
+            if (v.handleOut && Math.hypot(v.handleOut.x - c.hOut.x, v.handleOut.y - c.hOut.y) > tolerance * 2) {
+              matched = false;
+              break;
+            }
+          }
+
+          if (matched) {
+            const isCircle = Math.abs(rx - ry) <= tolerance;
+            if (isCircle) {
+              const avgR = (rx + ry) / 2;
+              return {
+                primitive: 'circle',
+                attributes: {
+                  cx: formatNum(cx),
+                  cy: formatNum(cy),
+                  r: formatNum(avgR),
+                },
+              };
+            } else {
+              return {
+                primitive: 'ellipse',
+                attributes: {
+                  cx: formatNum(cx),
+                  cy: formatNum(cy),
+                  rx: formatNum(rx),
+                  ry: formatNum(ry),
+                },
+              };
+            }
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Converts a <path> element to its recognized native SVG primitive.
+   * Purges old path d data and restores clean native SVG attributes.
+   */
+  public convertPathToPrimitive(el: VectorElement): ParametricShapeType | null {
+    const detected = this.detectPrimitiveFromPath(el);
+    if (!detected) return null;
+
+    el.tagName = detected.primitive;
+    el.shapeType = detected.primitive;
+    el.isParametric = true;
+    el.attributes['data-shape'] = detected.primitive;
+    el.attributes['data-parametric'] = 'true';
+
+    // Assign new primitive attributes
+    for (const [k, v] of Object.entries(detected.attributes)) {
+      el.attributes[k] = v;
+    }
+
+    // Purge path specific attributes
+    delete el.attributes.d;
+    delete el.attributes['data-node-types'];
+
+    // Re-generate canonical vertices for unified model bounds
+    el.vertices = this.convertShapeToVertices(detected.primitive, el.attributes);
+    el.isClosed = detected.primitive !== 'line' && detected.primitive !== 'polyline';
+
+    if (!el.isClosed) {
+      el.attributes.fill = 'none';
+      delete el.attributes['data-gradient'];
+    }
+
+    return detected.primitive;
+  }
 }
+
 
 function formatNum(n: number): string {
   return (Math.round(n * 100) / 100).toString();

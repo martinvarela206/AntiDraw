@@ -1566,6 +1566,13 @@ export class PropertyPanel {
     const circleCx = parseFloat(el.attributes.cx || (x + w / 2).toString());
     const circleCy = parseFloat(el.attributes.cy || (y + h / 2).toString());
 
+    // Inverse Primitive Recognition (FEAT-05):
+    // If element is a pure path and not currently parametric, detect whether its vertices
+    // conform to canonical native SVG primitives (line, polyline, polygon, rect, circle, ellipse).
+    const detectedPrimitive = !this.model.isParametricElement(el) && el.tagName === 'path'
+      ? this.model.detectPrimitiveFromPath(el)
+      : null;
+
     this.container.innerHTML = `
       <div class="panel-section">
         <div class="panel-title">Transform</div>
@@ -1605,7 +1612,17 @@ export class PropertyPanel {
             <span style="font-size:13px;">⤹</span>
             <span>Convertir a Curvas (Ctrl+Q)</span>
           </button>
-        </div>` : ''}
+        </div>` : (detectedPrimitive ? `
+        <div class="prop-row" style="margin-top: 6px; flex-direction: column; gap: 4px; background: rgba(16, 185, 129, 0.08); border: 1px dashed #10b981; border-radius: 4px; padding: 6px;">
+          <div style="font-size: 10px; color: #10b981; font-weight: 600; display: flex; align-items: center; justify-content: space-between;">
+            <span>⚡ Primitiva detectada</span>
+            <span style="text-transform: uppercase; font-family: monospace;">&lt;${detectedPrimitive.primitive}&gt;</span>
+          </div>
+          <button class="prop-input" id="btn-simplify-to-primitive" style="cursor:pointer; background:#065f46; color:#a7f3d0; border:1px solid #10b981; font-weight:600; padding:5px; display:flex; align-items:center; justify-content:center; gap:6px; font-size:11px;" title="Simplificar trazado &lt;path&gt; a forma geométrica SVG canónica &lt;${detectedPrimitive.primitive}&gt;">
+            <span>⚡</span>
+            <span>Simplificar a &lt;${detectedPrimitive.primitive}&gt;</span>
+          </button>
+        </div>` : '')}
       </div>
 
       ${isEllipse ? `
@@ -2664,6 +2681,27 @@ export class PropertyPanel {
         } else {
           this.callbacks.onUpdateElement(el);
           this.renderElementProperties(el);
+        }
+      });
+    }
+
+    /**
+     * ARCHITECTURAL RATIONALE: Inverse Primitive Converter Action (FEAT-05)
+     * When user clicks "Simplificar a <primitive>", executes conversion algorithm in VectorModel,
+     * resets tag name, restores native attributes, updates element, records undo state,
+     * and refreshes inspector properties and canvas overlay.
+     */
+    const btnSimplifyToPrimitive = this.container.querySelector<HTMLButtonElement>('#btn-simplify-to-primitive');
+    if (btnSimplifyToPrimitive) {
+      btnSimplifyToPrimitive.addEventListener('click', () => {
+        if (this.callbacks.onPushUndo) this.callbacks.onPushUndo();
+        const converted = this.model.convertPathToPrimitive(el);
+        if (converted) {
+          this.callbacks.onUpdateElement(el);
+          this.renderElementProperties(el);
+          if (this.callbacks.onRenderOverlay) {
+            this.callbacks.onRenderOverlay();
+          }
         }
       });
     }
