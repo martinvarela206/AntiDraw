@@ -271,6 +271,9 @@ export class ShapeToolHandler implements IToolHandler {
       attributes['cy'] = bounds.cy.toString();
       attributes['rx'] = bounds.rx.toString();
       attributes['ry'] = bounds.ry.toString();
+      attributes['data-ellipse-type'] = 'ellipse';
+      attributes['data-start-angle'] = '0';
+      attributes['data-end-angle'] = '360';
     } else if (tool === 'rect') {
       attributes['x'] = bounds.x.toString();
       attributes['y'] = bounds.y.toString();

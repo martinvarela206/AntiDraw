@@ -648,25 +648,55 @@ export class VectorModel {
 
       if (this.isParametricElement(el) && el.tagName !== 'path') {
         /**
-         * ARCHITECTURAL RATIONALE: Native Parametric SVG Export (FEAT-01)
+         * ARCHITECTURAL RATIONALE: Native Parametric SVG Export (FEAT-01 & FEAT-02)
          * Preserves original SVG primitives (<rect>, <ellipse>, <circle>, <line>, <polyline>, <polygon>)
          * in the output SVG document without converting them to path commands.
+         * For parametric ellipse in 'pie' or 'arc' mode: native SVG lacks start/end angle attributes,
+         * so AntiDraw serializes them as compliant <path> carrying parametric metadata (data-shape="ellipse",
+         * data-parametric="true", data-ellipse-type, data-start-angle, data-end-angle, cx, cy, rx, ry),
+         * guaranteeing standard SVG renderers display the wedge or arc without losing re-editability.
          */
         this.syncParametricAttributes(el);
         const cleanAttrs: Record<string, string> = { ...el.attributes };
-        delete cleanAttrs.d;
-        delete cleanAttrs['data-node-types'];
+        const ellipseType = cleanAttrs['data-ellipse-type'];
 
-        if (!this.isElementClosed(el)) {
-          cleanAttrs.fill = 'none';
-          delete cleanAttrs['data-gradient'];
-        }
+        if (ellipseType === 'pie' || ellipseType === 'arc') {
+          const cx = parseFloat(cleanAttrs.cx || '0');
+          const cy = parseFloat(cleanAttrs.cy || '0');
+          const rx = parseFloat(cleanAttrs.rx || '1');
+          const ry = parseFloat(cleanAttrs.ry || '1');
+          const startAngle = parseFloat(cleanAttrs['data-start-angle'] || '0');
+          const endAngle = parseFloat(cleanAttrs['data-end-angle'] || '360');
 
-        svg += `  <${el.tagName}`;
-        for (const [key, val] of Object.entries(cleanAttrs)) {
-          svg += ` ${key}="${escapeXml(val)}"`;
+          cleanAttrs.d = this.compileEllipseD(cx, cy, rx, ry, ellipseType as 'pie' | 'arc', startAngle, endAngle);
+          cleanAttrs['data-shape'] = 'ellipse';
+          cleanAttrs['data-parametric'] = 'true';
+
+          if (ellipseType === 'arc') {
+            cleanAttrs.fill = 'none';
+            delete cleanAttrs['data-gradient'];
+          }
+
+          svg += `  <path`;
+          for (const [key, val] of Object.entries(cleanAttrs)) {
+            svg += ` ${key}="${escapeXml(val)}"`;
+          }
+          svg += ` />\n`;
+        } else {
+          delete cleanAttrs.d;
+          delete cleanAttrs['data-node-types'];
+
+          if (!this.isElementClosed(el)) {
+            cleanAttrs.fill = 'none';
+            delete cleanAttrs['data-gradient'];
+          }
+
+          svg += `  <${el.tagName}`;
+          for (const [key, val] of Object.entries(cleanAttrs)) {
+            svg += ` ${key}="${escapeXml(val)}"`;
+          }
+          svg += ` />\n`;
         }
-        svg += ` />\n`;
       } else {
         if (el.vertices && el.vertices.length > 0) {
           el.attributes.d = this.compilePathD(el.vertices, el.isClosed);
@@ -902,6 +932,36 @@ export class VectorModel {
           nodeType: 'asymmetric',
           command: 'C',
         });
+      } else if (cmdUpper === 'A') {
+        if (i + 6 >= tokens.length) break;
+        const rx = Math.abs(tokens[i] as number);
+        const ry = Math.abs(tokens[i + 1] as number);
+        const rot = tokens[i + 2] as number;
+        const largeArc = (tokens[i + 3] as number) ? 1 : 0;
+        const sweep = (tokens[i + 4] as number) ? 1 : 0;
+        let x = tokens[i + 5] as number;
+        let y = tokens[i + 6] as number;
+        i += 7;
+        if (isRelative) {
+          x += curX;
+          y += curY;
+        }
+        const beziers = VectorModel.arcToBezier(curX, curY, rx, ry, rot, largeArc, sweep, x, y);
+        for (const b of beziers) {
+          if (vertices.length > 0) {
+            vertices[vertices.length - 1].handleOut = { x: b.p1.x, y: b.p1.y };
+          }
+          vertices.push({
+            id: `v_${vIndex++}`,
+            x: b.p.x,
+            y: b.p.y,
+            handleIn: { x: b.p2.x, y: b.p2.y },
+            nodeType: 'smooth',
+            command: 'C',
+          });
+        }
+        curX = x;
+        curY = y;
       } else if (cmdUpper === 'Z') {
         // ARCHITECTURAL RATIONALE: Parsing Terminal Coincident Nodes in 'Z' Subpaths
         // When standard SVG generators emit an explicit final coordinate identical to the subpath origin
@@ -939,6 +999,335 @@ export class VectorModel {
           v.nodeType = t;
         }
       });
+    }
+
+    return vertices;
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: W3C SVG 1.1 Appendix F.6 Arc-to-Bézier Conversion Engine (FEAT-02)
+   *
+   * Why this exists:
+   * Standard SVG elliptical arc commands ('A' / 'a') define arcs using endpoint parameterization
+   * (rx, ry, x-axis-rotation, large-arc-flag, sweep-flag, x, y). However, internal vector engines,
+   * node editors, and canvas rendering pipelines operate on center/cubic Bézier curves ('C').
+   * This algorithm converts any arbitrary elliptical arc into equivalent cubic Bézier segments (<= 90° each)
+   * with sub-pixel mathematical precision.
+   *
+   * Edge Cases Handled:
+   * 1. Coincident endpoints: returns empty array.
+   * 2. Zero or negative radii: treated as straight line.
+   * 3. Insufficient radii: automatically scaled up by Lambda factor as mandated by W3C specification.
+   * 4. Numerical stability: radicals clamped with Math.max(0, ...) to prevent NaN from floating point inaccuracies.
+   */
+  public static arcToBezier(
+    x1: number,
+    y1: number,
+    rx: number,
+    ry: number,
+    phiDeg: number,
+    largeArc: number,
+    sweep: number,
+    x2: number,
+    y2: number
+  ): { p1: Point; p2: Point; p: Point }[] {
+    if (Math.hypot(x2 - x1, y2 - y1) < 1e-6) {
+      return [];
+    }
+    rx = Math.abs(rx);
+    ry = Math.abs(ry);
+    if (rx < 1e-6 || ry < 1e-6) {
+      return [{ p1: { x: x1, y: y1 }, p2: { x: x2, y: y2 }, p: { x: x2, y: y2 } }];
+    }
+
+    const phi = (phiDeg * Math.PI) / 180;
+    const cosPhi = Math.cos(phi);
+    const sinPhi = Math.sin(phi);
+
+    // Step 1: Compute (x1', y1')
+    const dx = (x1 - x2) / 2;
+    const dy = (y1 - y2) / 2;
+    const x1p = cosPhi * dx + sinPhi * dy;
+    const y1p = -sinPhi * dx + cosPhi * dy;
+
+    // Step 2: Ensure radii are large enough
+    const prx = rx * rx;
+    const pry = ry * ry;
+    const px1p = x1p * x1p;
+    const py1p = y1p * y1p;
+    const lambda = px1p / prx + py1p / pry;
+    if (lambda > 1) {
+      const sqrtLambda = Math.sqrt(lambda);
+      rx *= sqrtLambda;
+      ry *= sqrtLambda;
+    }
+
+    // Step 3: Compute (cx', cy')
+    const sign = largeArc === sweep ? -1 : 1;
+    const num = Math.max(0, rx * rx * ry * ry - rx * rx * y1p * y1p - ry * ry * x1p * x1p);
+    const den = rx * rx * y1p * y1p + ry * ry * x1p * x1p;
+    const factor = sign * Math.sqrt(den > 0 ? num / den : 0);
+    const cxp = factor * ((rx * y1p) / ry);
+    const cyp = factor * (-(ry * x1p) / rx);
+
+    // Step 4: Compute center (cx, cy)
+    const cx = cosPhi * cxp - sinPhi * cyp + (x1 + x2) / 2;
+    const cy = sinPhi * cxp + cosPhi * cyp + (y1 + y2) / 2;
+
+    // Step 5: Compute start angle and angle delta
+    const ux = (x1p - cxp) / rx;
+    const uy = (y1p - cyp) / ry;
+    const vx = (-x1p - cxp) / rx;
+    const vy = (-y1p - cyp) / ry;
+
+    const angleBetween = (uX: number, uY: number, vX: number, vY: number): number => {
+      const dot = uX * vX + uY * vY;
+      const len = Math.sqrt(uX * uX + uY * uY) * Math.sqrt(vX * vX + vY * vY);
+      const val = Math.max(-1, Math.min(1, dot / (len || 1)));
+      const ang = Math.acos(val);
+      return uX * vY - uY * vX < 0 ? -ang : ang;
+    };
+
+    let startAngle = angleBetween(1, 0, ux, uy);
+    let deltaAngle = angleBetween(ux, uy, vx, vy);
+
+    if (sweep === 0 && deltaAngle > 0) {
+      deltaAngle -= 2 * Math.PI;
+    } else if (sweep === 1 && deltaAngle < 0) {
+      deltaAngle += 2 * Math.PI;
+    }
+
+    // Step 6: Subdivide into segments of at most PI / 2
+    const numSegments = Math.max(1, Math.ceil(Math.abs(deltaAngle) / (Math.PI / 2)));
+    const segDelta = deltaAngle / numSegments;
+    const alpha = (4 / 3) * Math.tan(segDelta / 4);
+
+    const segments: { p1: Point; p2: Point; p: Point }[] = [];
+    let currentAngle = startAngle;
+
+    for (let s = 0; s < numSegments; s++) {
+      const nextAngle = currentAngle + segDelta;
+
+      const cosA1 = Math.cos(currentAngle);
+      const sinA1 = Math.sin(currentAngle);
+      const cosA2 = Math.cos(nextAngle);
+      const sinA2 = Math.sin(nextAngle);
+
+      // Points on unit circle with tangent handles
+      const ep1x = cosA1 - alpha * sinA1;
+      const ep1y = sinA1 + alpha * cosA1;
+      const ep2x = cosA2 + alpha * sinA2;
+      const ep2y = sinA2 - alpha * cosA2;
+      const endX = cosA2;
+      const endY = sinA2;
+
+      // Transform to ellipse and rotate
+      const mapPt = (uX: number, uY: number): Point => {
+        const sX = uX * rx;
+        const sY = uY * ry;
+        return {
+          x: cosPhi * sX - sinPhi * sY + cx,
+          y: sinPhi * sX + cosPhi * sY + cy,
+        };
+      };
+
+      segments.push({
+        p1: mapPt(ep1x, ep1y),
+        p2: mapPt(ep2x, ep2y),
+        p: mapPt(endX, endY),
+      });
+
+      currentAngle = nextAngle;
+    }
+
+    return segments;
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Faithful Parametric Arc and Pie Path Compilation (FEAT-02)
+   *
+   * Formulates native SVG path strings using standard 'A', 'L', and 'Z' commands.
+   * - 'ellipse': compiles full 360° closed path via two 180° arcs.
+   * - 'pie': begins at center (M cx cy), draws radius line to start angle (L x1 y1),
+   *   curves along arc to end angle (A rx ry 0 largeArc sweep x2 y2), and closes back to center (Z).
+   * - 'arc': begins at start angle (M x1 y1), curves along perimeter to end angle, and remains open (no Z).
+   */
+  public compileEllipseD(
+    cx: number,
+    cy: number,
+    rx: number,
+    ry: number,
+    type: 'ellipse' | 'pie' | 'arc' = 'ellipse',
+    startAngleDeg: number = 0,
+    endAngleDeg: number = 360
+  ): string {
+    rx = Math.max(0.1, rx);
+    ry = Math.max(0.1, ry);
+
+    if (type === 'ellipse' || Math.abs(endAngleDeg - startAngleDeg) >= 360) {
+      const x0 = cx + rx;
+      const x1 = cx - rx;
+      return `M ${formatNum(x0)} ${formatNum(cy)} A ${formatNum(rx)} ${formatNum(ry)} 0 1 1 ${formatNum(x1)} ${formatNum(cy)} A ${formatNum(rx)} ${formatNum(ry)} 0 1 1 ${formatNum(x0)} ${formatNum(cy)} Z`;
+    }
+
+    // Normalize angles
+    const a1 = (startAngleDeg * Math.PI) / 180;
+    const a2 = (endAngleDeg * Math.PI) / 180;
+
+    let deltaDeg = endAngleDeg - startAngleDeg;
+    while (deltaDeg < 0) deltaDeg += 360;
+    while (deltaDeg > 360) deltaDeg -= 360;
+    if (deltaDeg === 0) deltaDeg = 360;
+
+    const largeArc = deltaDeg > 180 ? 1 : 0;
+    const sweep = 1;
+
+    const x1 = cx + rx * Math.cos(a1);
+    const y1 = cy + ry * Math.sin(a1);
+    const x2 = cx + rx * Math.cos(a2);
+    const y2 = cy + ry * Math.sin(a2);
+
+    if (type === 'pie') {
+      return `M ${formatNum(cx)} ${formatNum(cy)} L ${formatNum(x1)} ${formatNum(y1)} A ${formatNum(rx)} ${formatNum(ry)} 0 ${largeArc} ${sweep} ${formatNum(x2)} ${formatNum(y2)} Z`;
+    } else {
+      // type === 'arc'
+      return `M ${formatNum(x1)} ${formatNum(y1)} A ${formatNum(rx)} ${formatNum(ry)} 0 ${largeArc} ${sweep} ${formatNum(x2)} ${formatNum(y2)}`;
+    }
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Parametric Ellipse, Pie & Arc Vertices Generation (FEAT-02)
+   *
+   * Generates unified PathVertex[] representation for canvas rendering, node inspection,
+   * and bounding box calculations:
+   * - 'ellipse': 4 canonical symmetric Bézier vertices (top 12h, right 3h, bottom 6h, left 9h).
+   * - 'pie': Center vertex V_0 (M cx cy), spoke vertex V_1 (L x1 y1), cubic Bézier arc segments
+   *   divided into <= 90° chunks ending at (x2, y2), closed back to V_0.
+   * - 'arc': Initial vertex V_0 (M x1 y1), cubic Bézier arc segments ending at (x2, y2), open.
+   */
+  public convertEllipseToVertices(
+    cx: number,
+    cy: number,
+    rx: number,
+    ry: number,
+    type: 'ellipse' | 'pie' | 'arc' = 'ellipse',
+    startAngleDeg: number = 0,
+    endAngleDeg: number = 360
+  ): PathVertex[] {
+    rx = Math.max(0.1, rx);
+    ry = Math.max(0.1, ry);
+
+    if (type === 'ellipse' || Math.abs(endAngleDeg - startAngleDeg) >= 360) {
+      let idx = 0;
+      const mkV = (x: number, y: number, hIn?: Point, hOut?: Point, nodeType: NodeType = 'symmetric'): PathVertex => ({
+        id: `v_${idx++}`,
+        x,
+        y,
+        handleIn: hIn,
+        handleOut: hOut,
+        nodeType: nodeType,
+        command: idx === 1 ? 'M' : 'C',
+      });
+      const k = 0.5522847498;
+      const ox = rx * k;
+      const oy = ry * k;
+      return [
+        mkV(cx, cy - ry, { x: cx - ox, y: cy - ry }, { x: cx + ox, y: cy - ry }),
+        mkV(cx + rx, cy, { x: cx + rx, y: cy - oy }, { x: cx + rx, y: cy + oy }),
+        mkV(cx, cy + ry, { x: cx + ox, y: cy + ry }, { x: cx - ox, y: cy + ry }),
+        mkV(cx - rx, cy, { x: cx - rx, y: cy + oy }, { x: cx - rx, y: cy - oy }),
+      ];
+    }
+
+    let deltaDeg = endAngleDeg - startAngleDeg;
+    while (deltaDeg < 0) deltaDeg += 360;
+    while (deltaDeg > 360) deltaDeg -= 360;
+    if (deltaDeg === 0) deltaDeg = 360;
+
+    const a1 = (startAngleDeg * Math.PI) / 180;
+    const a2 = (endAngleDeg * Math.PI) / 180;
+    const largeArc = deltaDeg > 180 ? 1 : 0;
+    const sweep = 1;
+
+    const x1 = cx + rx * Math.cos(a1);
+    const y1 = cy + ry * Math.sin(a1);
+    const x2 = cx + rx * Math.cos(a2);
+    const y2 = cy + ry * Math.sin(a2);
+
+    const beziers = VectorModel.arcToBezier(x1, y1, rx, ry, 0, largeArc, sweep, x2, y2);
+    const vertices: PathVertex[] = [];
+    let idx = 0;
+
+    if (type === 'pie') {
+      // Vertex 0: Center (command 'M', sharp node)
+      vertices.push({
+        id: `v_${idx++}`,
+        x: cx,
+        y: cy,
+        nodeType: 'sharp',
+        command: 'M',
+      });
+
+      // Vertex 1: Start of arc on perimeter (command 'L', sharp corner transitioning into curve)
+      const v1: PathVertex = {
+        id: `v_${idx++}`,
+        x: x1,
+        y: y1,
+        nodeType: 'asymmetric',
+        command: 'L',
+      };
+      if (beziers.length > 0) {
+        v1.handleOut = { x: beziers[0].p1.x, y: beziers[0].p1.y };
+      }
+      vertices.push(v1);
+
+      // Intermediate and terminal arc vertices (command 'C', smooth)
+      for (let bIdx = 0; bIdx < beziers.length; bIdx++) {
+        const b = beziers[bIdx];
+        const isTerminal = bIdx === beziers.length - 1;
+        const vArc: PathVertex = {
+          id: `v_${idx++}`,
+          x: b.p.x,
+          y: b.p.y,
+          handleIn: { x: b.p2.x, y: b.p2.y },
+          nodeType: isTerminal ? 'sharp' : 'smooth',
+          command: 'C',
+        };
+        if (!isTerminal && bIdx + 1 < beziers.length) {
+          vArc.handleOut = { x: beziers[bIdx + 1].p1.x, y: beziers[bIdx + 1].p1.y };
+        }
+        vertices.push(vArc);
+      }
+    } else {
+      // type === 'arc'
+      // Vertex 0: Start of arc (command 'M')
+      const v0: PathVertex = {
+        id: `v_${idx++}`,
+        x: x1,
+        y: y1,
+        nodeType: 'smooth',
+        command: 'M',
+      };
+      if (beziers.length > 0) {
+        v0.handleOut = { x: beziers[0].p1.x, y: beziers[0].p1.y };
+      }
+      vertices.push(v0);
+
+      for (let bIdx = 0; bIdx < beziers.length; bIdx++) {
+        const b = beziers[bIdx];
+        const vArc: PathVertex = {
+          id: `v_${idx++}`,
+          x: b.p.x,
+          y: b.p.y,
+          handleIn: { x: b.p2.x, y: b.p2.y },
+          nodeType: 'smooth',
+          command: 'C',
+        };
+        if (bIdx + 1 < beziers.length) {
+          vArc.handleOut = { x: beziers[bIdx + 1].p1.x, y: beziers[bIdx + 1].p1.y };
+        }
+        vertices.push(vArc);
+      }
     }
 
     return vertices;
@@ -1098,6 +1487,7 @@ export class VectorModel {
    * - <rect>, <circle>, <ellipse>, <star>, <polygon>: inherently closed polygons.
    */
   public isElementClosed(el: VectorElement): boolean {
+    if (el.attributes?.['data-ellipse-type'] === 'arc') return false;
     if (el.isClosed !== undefined) return el.isClosed;
     if (el.tagName && ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(el.tagName)) return true;
     if (el.tagName && ['line', 'polyline'].includes(el.tagName)) return false;
@@ -1169,7 +1559,7 @@ export class VectorModel {
   }
 
   /**
-   * ARCHITECTURAL RATIONALE: De-structuring Parametric Primitives to Freeform Curves (FEAT-01 & FIX-07)
+   * ARCHITECTURAL RATIONALE: De-structuring Parametric Primitives to Freeform Curves (FEAT-01, FIX-07 & FEAT-02)
    *
    * 1. Total Parametric De-structuring:
    *    Irreversibly transforms native SVG parametric primitives (<rect>, <circle>, <ellipse>, <line>, <polyline>, <polygon>)
@@ -1177,24 +1567,43 @@ export class VectorModel {
    *    All primitive attributes (x, y, width, height, cx, cy, r, rx, ry, x1, y1, x2, y2, points) are purged
    *    to prevent conflicts with the compiled `d` path attribute.
    *
-   * 2. Invariant Propagation:
+   * 2. Faithful Arc and Pie Conversion (FEAT-02):
+   *    When converting an ellipse configured as 'pie' or 'arc', compiles exact SVG 'A', 'L', and 'Z' commands
+   *    into `d` while generating corresponding cubic Bézier vertices, preserving angular orientation and fill.
+   *
+   * 3. Invariant Propagation:
    *    Enforces `isParametric = false`, `shapeType = 'path'`, `tagName = 'path'`,
    *    `attributes['data-shape'] = 'path'`, and `attributes['data-parametric'] = 'false'`.
    *    This guarantees that neither the node editor tool nor serialization logic treats the element
    *    as a parametric primitive ever again.
-   *
-   * 3. Discarded Alternate Approaches:
-   *    - Naive approach: only modifying `tagName = 'path'`. Discarded because residual `data-shape` and `width/height`
-   *      attributes caused PropertyPanel and SVG exporter to attempt parametric synchronization, destroying freeform curves.
    */
   public convertToCurves(element: VectorElement): void {
+    const ellipseType = element.attributes['data-ellipse-type'];
+    if (this.isEllipse(element) && (ellipseType === 'pie' || ellipseType === 'arc')) {
+      const cx = parseFloat(element.attributes.cx || '0');
+      const cy = parseFloat(element.attributes.cy || '0');
+      const rx = parseFloat(element.attributes.rx || element.attributes.r || '1');
+      const ry = parseFloat(element.attributes.ry || element.attributes.r || '1');
+      const startAngle = parseFloat(element.attributes['data-start-angle'] || '0');
+      const endAngle = parseFloat(element.attributes['data-end-angle'] || '360');
+
+      element.attributes.d = this.compileEllipseD(cx, cy, rx, ry, ellipseType as 'pie' | 'arc', startAngle, endAngle);
+      element.vertices = this.convertEllipseToVertices(cx, cy, rx, ry, ellipseType as 'pie' | 'arc', startAngle, endAngle);
+      element.isClosed = ellipseType !== 'arc';
+      delete element.attributes['data-ellipse-type'];
+      delete element.attributes['data-start-angle'];
+      delete element.attributes['data-end-angle'];
+    }
+
     element.isParametric = false;
     element.shapeType = 'path';
     element.tagName = 'path';
     element.attributes['data-shape'] = 'path';
     element.attributes['data-parametric'] = 'false';
-    if (element.vertices && element.vertices.length > 0) {
+    if (element.vertices && element.vertices.length > 0 && !element.attributes.d) {
       element.attributes.d = this.compilePathD(element.vertices, element.isClosed);
+    }
+    if (element.vertices && element.vertices.length > 0) {
       element.attributes['data-node-types'] = element.vertices.map((v) => v.nodeType).join(',');
     }
     const shapeAttrs = ['x', 'y', 'width', 'height', 'cx', 'cy', 'r', 'rx', 'ry', 'x1', 'y1', 'x2', 'y2', 'points'];
@@ -1236,6 +1645,10 @@ export class VectorModel {
       element.attributes.width = formatNum(Math.max(1, maxX - minX));
       element.attributes.height = formatNum(Math.max(1, maxY - minY));
     } else if (tag === 'circle' || tag === 'ellipse') {
+      if (element.attributes['data-ellipse-type'] === 'pie' || element.attributes['data-ellipse-type'] === 'arc') {
+        // Pie and arc slices preserve their specified center and radii invariants during parametric sync
+        return;
+      }
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
       element.vertices.forEach((v) => {
         minX = Math.min(minX, v.x);
@@ -1312,6 +1725,14 @@ export class VectorModel {
       const cy = parseFloat(attrs.cy || '50');
       const rx = tag === 'circle' ? parseFloat(attrs.r || '50') : parseFloat(attrs.rx || '50');
       const ry = tag === 'circle' ? parseFloat(attrs.r || '50') : parseFloat(attrs.ry || '50');
+      const ellipseType = (attrs['data-ellipse-type'] as 'ellipse' | 'pie' | 'arc') || 'ellipse';
+      const startAngle = parseFloat(attrs['data-start-angle'] || '0');
+      const endAngle = parseFloat(attrs['data-end-angle'] || '360');
+
+      if (ellipseType === 'pie' || ellipseType === 'arc') {
+        return this.convertEllipseToVertices(cx, cy, rx, ry, ellipseType, startAngle, endAngle);
+      }
+
       const k = 0.5522847498;
       const ox = rx * k;
       const oy = ry * k;

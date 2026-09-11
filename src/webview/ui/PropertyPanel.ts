@@ -1545,6 +1545,9 @@ export class PropertyPanel {
     const ellipseRx = box ? box.width / 2 : (parseFloat(el.attributes['rx'] || '0') || 0);
     const ellipseRy = box ? box.height / 2 : (parseFloat(el.attributes['ry'] || '0') || 0);
     const isCircle = Math.abs(ellipseRx - ellipseRy) < 0.5;
+    const ellipseType = (el.attributes['data-ellipse-type'] as 'ellipse' | 'pie' | 'arc') || 'ellipse';
+    const ellipseStartAngle = Math.round(parseFloat(el.attributes['data-start-angle'] || '0'));
+    const ellipseEndAngle = Math.round(parseFloat(el.attributes['data-end-angle'] || '360'));
 
     this.container.innerHTML = `
       <div class="panel-section">
@@ -1589,12 +1592,12 @@ export class PropertyPanel {
       </div>
 
       ${isEllipse ? `
-      <!-- Ellipse / Circle Geometry Controls (FIX-19) -->
+      <!-- Ellipse / Circle Geometry Controls (FIX-19 & FEAT-02) -->
       <div class="panel-section">
         <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
           <span>Elipse / Círculo</span>
           <span style="font-size:10px; color:var(--accent-color); font-weight:600; text-transform:none;">
-            ${isCircle ? '● Círculo' : '⬭ Elipse'}
+            ${ellipseType === 'pie' ? '◔ Tarta' : ellipseType === 'arc' ? '◜ Arco' : isCircle ? '● Círculo' : '⬭ Elipse'}
           </span>
         </div>
         <div class="prop-row" style="gap: 6px;">
@@ -1624,7 +1627,33 @@ export class PropertyPanel {
           </div>
           <button class="prop-input" id="btn-ellipse-make-circle" style="width: auto; padding: 2px 6px; height: 26px; cursor: pointer; flex-shrink: 0;" title="Convertir a círculo perfecto 1:1">1:1</button>
         </div>
-        <div class="prop-row" style="gap: 6px; margin-top: 4px;">
+        <div class="prop-row" style="gap: 4px; margin-top: 6px;">
+          <span class="prop-label" style="width: 46px;" title="Tipo de primitiva: elipse completa, sector cerrado de tarta o arco perimetral abierto">Modo</span>
+          <div style="display:flex; gap:3px; flex:1;">
+            <button class="prop-input" id="btn-ellipse-mode-full" style="flex:1; cursor:pointer; font-size:10px; font-weight:600; ${ellipseType === 'ellipse' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Elipse / Círculo completo (360°)">Elipse</button>
+            <button class="prop-input" id="btn-ellipse-mode-pie" style="flex:1; cursor:pointer; font-size:10px; font-weight:600; ${ellipseType === 'pie' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Sector o porción de tarta cerrada con centro y radios (Pie)">Tarta</button>
+            <button class="prop-input" id="btn-ellipse-mode-arc" style="flex:1; cursor:pointer; font-size:10px; font-weight:600; ${ellipseType === 'arc' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Arco perimetral abierto sin relleno (Arc)">Arco</button>
+          </div>
+        </div>
+        <div id="ellipse-angles-container" style="${ellipseType === 'ellipse' ? 'display:none;' : 'display:flex;'} flex-direction:column; gap:6px; margin-top:6px;">
+          <div class="prop-row" style="gap: 6px;">
+            <span class="prop-label" style="width: 46px;" title="Ángulos inicial y final de corte">Ángulo</span>
+            <div class="prop-coord-group">
+              <div class="prop-coord-box" title="Ángulo inicial en grados (°)">
+                <span class="prop-coord-sublabel">Ini</span>
+                <input type="number" class="prop-coord-input" id="ellipse-start-angle" value="${ellipseStartAngle}" min="0" max="360" step="5" />
+                <span class="prop-coord-sublabel">°</span>
+              </div>
+              <div class="prop-coord-box" title="Ángulo final en grados (°)">
+                <span class="prop-coord-sublabel">Fin</span>
+                <input type="number" class="prop-coord-input" id="ellipse-end-angle" value="${ellipseEndAngle}" min="0" max="360" step="5" />
+                <span class="prop-coord-sublabel">°</span>
+              </div>
+            </div>
+            <button class="prop-input" id="btn-ellipse-invert-angles" style="width: 26px; height: 26px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;" title="Invertir sector angular">⇄</button>
+          </div>
+        </div>
+        <div class="prop-row" style="gap: 6px; margin-top: 6px;">
           <button class="prop-input" id="btn-ellipse-swap-radii" style="flex: 1; cursor: pointer; height: 24px; font-size: 10px; text-align: center;" title="Intercambiar radio horizontal y vertical (Rotar 90°)">⇄ Rotar 90°</button>
           <button class="prop-input" id="btn-ellipse-to-path" style="flex: 1; cursor: pointer; height: 24px; font-size: 10px; text-align: center;" title="Convertir a curvas Bézier independientes">Convertir a Curvas</button>
         </div>
@@ -2066,23 +2095,56 @@ export class PropertyPanel {
       const btnEllipseSwapRadii = this.container.querySelector<HTMLButtonElement>('#btn-ellipse-swap-radii');
       const btnEllipseToPath = this.container.querySelector<HTMLButtonElement>('#btn-ellipse-to-path');
 
-      const applyEllipseGeometry = (newCx: number, newCy: number, newRx: number, newRy: number) => {
+      const applyEllipseGeometry = (
+        newCx: number,
+        newCy: number,
+        newRx: number,
+        newRy: number,
+        newType: 'ellipse' | 'pie' | 'arc' = ellipseType,
+        newStart: number = ellipseStartAngle,
+        newEnd: number = ellipseEndAngle
+      ) => {
         if (this.callbacks.onPushUndo) this.callbacks.onPushUndo();
         const clampedRx = Math.max(1, newRx);
         const clampedRy = Math.max(1, newRy);
-        el.vertices = this.model.convertShapeToVertices('ellipse', {
-          cx: newCx.toString(),
-          cy: newCy.toString(),
-          rx: clampedRx.toString(),
-          ry: clampedRy.toString(),
-        });
         el.attributes['data-shape'] = 'ellipse';
         el.attributes['cx'] = newCx.toString();
         el.attributes['cy'] = newCy.toString();
         el.attributes['rx'] = clampedRx.toString();
         el.attributes['ry'] = clampedRy.toString();
+        el.attributes['data-ellipse-type'] = newType;
+        el.attributes['data-start-angle'] = newStart.toString();
+        el.attributes['data-end-angle'] = newEnd.toString();
+        el.isClosed = newType !== 'arc';
+
+        if (newType === 'arc') {
+          el.attributes.fill = 'none';
+          delete el.attributes['data-gradient'];
+        } else if (newType === 'pie' || newType === 'ellipse') {
+          if (!el.attributes.fill || el.attributes.fill === 'none') {
+            el.attributes.fill = '#6366f1';
+          }
+        }
+
+        el.vertices = this.model.convertEllipseToVertices(
+          newCx,
+          newCy,
+          clampedRx,
+          clampedRy,
+          newType,
+          newStart,
+          newEnd
+        );
+        el.attributes.d = this.model.compileEllipseD(
+          newCx,
+          newCy,
+          clampedRx,
+          clampedRy,
+          newType,
+          newStart,
+          newEnd
+        );
         el.attributes['data-node-types'] = el.vertices.map((v) => v.nodeType).join(',');
-        el.attributes.d = this.model.compilePathD(el.vertices, true);
 
         const newBox = this.selectionTool.getBoundingBox(el);
         if (newBox) {
@@ -2111,6 +2173,46 @@ export class PropertyPanel {
         ellipseRxInput.addEventListener('change', onRadiiChange);
         ellipseRyInput.addEventListener('change', onRadiiChange);
       }
+
+      const btnModeFull = this.container.querySelector<HTMLButtonElement>('#btn-ellipse-mode-full');
+      const btnModePie = this.container.querySelector<HTMLButtonElement>('#btn-ellipse-mode-pie');
+      const btnModeArc = this.container.querySelector<HTMLButtonElement>('#btn-ellipse-mode-arc');
+      const inputStartAngle = this.container.querySelector<HTMLInputElement>('#ellipse-start-angle');
+      const inputEndAngle = this.container.querySelector<HTMLInputElement>('#ellipse-end-angle');
+      const btnInvertAngles = this.container.querySelector<HTMLButtonElement>('#btn-ellipse-invert-angles');
+
+      btnModeFull?.addEventListener('click', () => {
+        applyEllipseGeometry(ellipseCx, ellipseCy, ellipseRx, ellipseRy, 'ellipse', 0, 360);
+      });
+
+      btnModePie?.addEventListener('click', () => {
+        const s = ellipseStartAngle;
+        const e = (ellipseEndAngle === 360 && s === 0) ? 270 : ellipseEndAngle;
+        applyEllipseGeometry(ellipseCx, ellipseCy, ellipseRx, ellipseRy, 'pie', s, e);
+      });
+
+      btnModeArc?.addEventListener('click', () => {
+        const s = ellipseStartAngle;
+        const e = (ellipseEndAngle === 360 && s === 0) ? 270 : ellipseEndAngle;
+        applyEllipseGeometry(ellipseCx, ellipseCy, ellipseRx, ellipseRy, 'arc', s, e);
+      });
+
+      if (inputStartAngle && inputEndAngle) {
+        const onAnglesChange = () => {
+          let s = parseFloat(inputStartAngle.value) || 0;
+          let e = parseFloat(inputEndAngle.value) || 0;
+          s = ((s % 360) + 360) % 360;
+          e = ((e % 360) + 360) % 360;
+          if (s === e) e = (s + 360);
+          applyEllipseGeometry(ellipseCx, ellipseCy, ellipseRx, ellipseRy, ellipseType === 'ellipse' ? 'pie' : ellipseType, s, e);
+        };
+        inputStartAngle.addEventListener('change', onAnglesChange);
+        inputEndAngle.addEventListener('change', onAnglesChange);
+      }
+
+      btnInvertAngles?.addEventListener('click', () => {
+        applyEllipseGeometry(ellipseCx, ellipseCy, ellipseRx, ellipseRy, ellipseType === 'ellipse' ? 'pie' : ellipseType, ellipseEndAngle, ellipseStartAngle);
+      });
 
       if (btnEllipseMakeCircle) {
         btnEllipseMakeCircle.addEventListener('click', () => {

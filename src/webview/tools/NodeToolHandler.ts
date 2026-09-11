@@ -39,10 +39,18 @@ export class NodeToolHandler implements IToolHandler {
   private callbacks: NodeToolCallbacks;
 
   public ghostNodeVertices: PathVertex[] | null = null;
-  public activeHandle: 'vertex' | 'handleIn' | 'handleOut' | 'segment' | null = null;
+  public activeHandle: 'vertex' | 'handleIn' | 'handleOut' | 'segment' | 'quadrant' | null = null;
   public dragStartPt: Point = { x: 0, y: 0 };
   public initialVertices: PathVertex[] = [];
   public isDragging: boolean = false;
+
+  // FEAT-02: Parametric Ellipse Quadrant Control Handle State
+  public quadrantGhostMode: 'ellipse' | 'pie' | 'arc' = 'ellipse';
+  public quadrantGhostStartAngle: number = 0;
+  public quadrantGhostEndAngle: number = 360;
+  public quadrantCenter: Point = { x: 0, y: 0 };
+  public quadrantRadii: { rx: number; ry: number } = { rx: 1, ry: 1 };
+  public quadrantGhostD: string = '';
 
   private lastClickTime: number = 0;
   private lastClickPt: Point = { x: 0, y: 0 };
@@ -56,6 +64,26 @@ export class NodeToolHandler implements IToolHandler {
 
   private isElementClosed(el: VectorElement): boolean {
     return this.ctx.model.isElementClosed(el);
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Interactive Ellipse Quadrant Control Point (FEAT-02)
+   *
+   * Computes the canvas coordinate of the quadrant control handle on an ellipse's perimeter.
+   * By default, it resides at the terminal endAngle (or 0° / 360° for full ellipse).
+   */
+  public getQuadrantHandlePoint(el: VectorElement): Point | null {
+    if (!this.ctx.model.isParametricElement(el) || !this.ctx.model.isEllipse(el)) return null;
+    const cx = parseFloat(el.attributes.cx || '0');
+    const cy = parseFloat(el.attributes.cy || '0');
+    const rx = parseFloat(el.attributes.rx || el.attributes.r || '1');
+    const ry = parseFloat(el.attributes.ry || el.attributes.r || '1');
+    const endAngle = parseFloat(el.attributes['data-end-angle'] || '360');
+    const rad = (endAngle * Math.PI) / 180;
+    return {
+      x: cx + rx * Math.cos(rad),
+      y: cy + ry * Math.sin(rad),
+    };
   }
 
   /**
@@ -188,6 +216,29 @@ export class NodeToolHandler implements IToolHandler {
     }
 
     if (selectedEl && selectedEl.vertices && selectedEl.vertices.length > 0) {
+      // 0. Check if clicking on parametric ellipse quadrant control handle (FEAT-02)
+      if (this.ctx.model.isParametricElement(selectedEl) && this.ctx.model.isEllipse(selectedEl)) {
+        const qPt = this.getQuadrantHandlePoint(selectedEl);
+        if (qPt && Math.hypot(pt.x - qPt.x, pt.y - qPt.y) <= 12 / z) {
+          this.activeHandle = 'quadrant';
+          this.dragStartPt = { x: pt.x, y: pt.y };
+          this.initialVertices = JSON.parse(JSON.stringify(selectedEl.vertices));
+          const cx = parseFloat(selectedEl.attributes.cx || '0');
+          const cy = parseFloat(selectedEl.attributes.cy || '0');
+          const rx = parseFloat(selectedEl.attributes.rx || selectedEl.attributes.r || '1');
+          const ry = parseFloat(selectedEl.attributes.ry || selectedEl.attributes.r || '1');
+          this.quadrantCenter = { x: cx, y: cy };
+          this.quadrantRadii = { rx, ry };
+          this.quadrantGhostMode = (selectedEl.attributes['data-ellipse-type'] as 'ellipse' | 'pie' | 'arc') || 'ellipse';
+          this.quadrantGhostStartAngle = parseFloat(selectedEl.attributes['data-start-angle'] || '0');
+          this.quadrantGhostEndAngle = parseFloat(selectedEl.attributes['data-end-angle'] || '360');
+          this.quadrantGhostD = selectedEl.attributes.d || '';
+          this.isDragging = true;
+          this.ctx.renderOverlay();
+          return true;
+        }
+      }
+
       const isClosed = this.isElementClosed(selectedEl);
 
       // 1. Check if clicking on an existing vertex or Bézier handle
@@ -297,6 +348,77 @@ export class NodeToolHandler implements IToolHandler {
       const isClosed = this.isElementClosed(selectedEl);
       const isShift = e.shiftKey;
       const isCtrl = e.ctrlKey || e.metaKey;
+
+      if (this.activeHandle === 'quadrant' && selectedEl) {
+        const cx = this.quadrantCenter.x;
+        const cy = this.quadrantCenter.y;
+        const rx = Math.max(1, this.quadrantRadii.rx);
+        const ry = Math.max(1, this.quadrantRadii.ry);
+
+        const dx = pt.x - cx;
+        const dy = pt.y - cy;
+        // Normalized radial distance from center
+        const D = Math.sqrt((dx / rx) ** 2 + (dy / ry) ** 2);
+
+        // Polar angle in degrees (0 to 360)
+        const rad = Math.atan2(dy / ry, dx / rx);
+        let deg = (rad * 180) / Math.PI;
+        if (deg < 0) deg += 360;
+
+        if (isShift || isCtrl) {
+          deg = Math.round(deg / 15) * 15;
+        } else {
+          // Snap within 3 degrees of cardinal angles (0, 90, 180, 270, 360)
+          for (const cardinal of [0, 90, 180, 270, 360]) {
+            if (Math.abs(deg - (cardinal % 360)) <= 3) {
+              deg = cardinal % 360;
+              break;
+            }
+          }
+        }
+        deg = Math.round(deg * 10) / 10;
+
+        let startAngle = this.quadrantGhostStartAngle;
+        let endAngle = deg;
+
+        let mode: 'ellipse' | 'pie' | 'arc' = 'pie';
+        const delta = Math.abs(endAngle - startAngle);
+        if (delta < 2 || Math.abs(delta - 360) < 2) {
+          mode = 'ellipse';
+          startAngle = 0;
+          endAngle = 360;
+        } else {
+          // D > 1.0 -> outside perimeter -> Open Arc
+          // D <= 1.0 -> on or inside perimeter -> Closed Pie Wedge
+          mode = D > 1.0 ? 'arc' : 'pie';
+        }
+
+        this.quadrantGhostMode = mode;
+        this.quadrantGhostStartAngle = startAngle;
+        this.quadrantGhostEndAngle = endAngle;
+
+        this.ghostNodeVertices = this.ctx.model.convertEllipseToVertices(
+          cx,
+          cy,
+          rx,
+          ry,
+          mode,
+          startAngle,
+          endAngle
+        );
+        this.quadrantGhostD = this.ctx.model.compileEllipseD(
+          cx,
+          cy,
+          rx,
+          ry,
+          mode,
+          startAngle,
+          endAngle
+        );
+
+        this.ctx.renderOverlay();
+        return true;
+      }
 
       if (this.activeHandle === 'vertex' && this.nodeEditorTool.selectedVertexId) {
         const otherVertices: Point[] = [];
@@ -431,6 +553,44 @@ export class NodeToolHandler implements IToolHandler {
     if (this.isDragging) {
       this.isDragging = false;
       const selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
+
+      if (this.activeHandle === 'quadrant' && selectedEl) {
+        this.ctx.pushUndo();
+        selectedEl.attributes['data-ellipse-type'] = this.quadrantGhostMode;
+        selectedEl.attributes['data-start-angle'] = this.quadrantGhostStartAngle.toString();
+        selectedEl.attributes['data-end-angle'] = this.quadrantGhostEndAngle.toString();
+        selectedEl.isClosed = this.quadrantGhostMode !== 'arc';
+
+        if (this.quadrantGhostMode === 'arc') {
+          selectedEl.attributes.fill = 'none';
+          delete selectedEl.attributes['data-gradient'];
+        } else if (this.quadrantGhostMode === 'pie' || this.quadrantGhostMode === 'ellipse') {
+          if (!selectedEl.attributes.fill || selectedEl.attributes.fill === 'none') {
+            selectedEl.attributes.fill = '#6366f1';
+          }
+        }
+
+        selectedEl.vertices = this.ghostNodeVertices || this.initialVertices;
+        selectedEl.attributes.d = this.quadrantGhostD || this.ctx.model.compileEllipseD(
+          this.quadrantCenter.x,
+          this.quadrantCenter.y,
+          this.quadrantRadii.rx,
+          this.quadrantRadii.ry,
+          this.quadrantGhostMode,
+          this.quadrantGhostStartAngle,
+          this.quadrantGhostEndAngle
+        );
+        selectedEl.attributes['data-node-types'] = selectedEl.vertices.map((v) => v.nodeType).join(',');
+
+        this.activeHandle = null;
+        this.ghostNodeVertices = null;
+        this.quadrantGhostD = '';
+        this.initialVertices = [];
+        if (this.ctx.applyCanvasSize) this.ctx.applyCanvasSize();
+        this.ctx.render();
+        this.ctx.syncToHost();
+        return true;
+      }
 
       if (selectedEl && this.ghostNodeVertices) {
         this.ctx.pushUndo();
@@ -732,8 +892,36 @@ export class NodeToolHandler implements IToolHandler {
       }
     }
 
-    // 3. Render Ghost Node Tool Path & Handles during active dragging
-    if (this.ghostNodeVertices) {
+    // 3. Render Quadrant Ghost during active quadrant dragging (FEAT-02)
+    if (this.activeHandle === 'quadrant') {
+      const isArc = this.quadrantGhostMode === 'arc';
+      const fill = isArc ? 'none' : 'rgba(245, 158, 11, 0.2)';
+      const d = this.quadrantGhostD;
+      html += `<path d="${d}" fill="${fill}" stroke="#f59e0b" stroke-width="2" stroke-dasharray="4 3" vector-effect="non-scaling-stroke" />`;
+      const cx = this.quadrantCenter.x;
+      const cy = this.quadrantCenter.y;
+      const rx = this.quadrantRadii.rx;
+      const ry = this.quadrantRadii.ry;
+      const endRad = (this.quadrantGhostEndAngle * Math.PI) / 180;
+      const qx = cx + rx * Math.cos(endRad);
+      const qy = cy + ry * Math.sin(endRad);
+
+      // Ray from center to quadrant handle
+      html += `<line x1="${cx}" y1="${cy}" x2="${qx}" y2="${qy}" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
+      html += `<circle cx="${cx}" cy="${cy}" r="${3 / z}" fill="#f59e0b" />`;
+      // Quadrant handle circle
+      html += `<circle cx="${qx}" cy="${qy}" r="${6 / z}" fill="#f59e0b" stroke="#ffffff" stroke-width="2" vector-effect="non-scaling-stroke" />`;
+      // Angle and mode badge
+      const badgeW = 92;
+      const badgeH = 18;
+      html += `
+        <g opacity="0.95">
+          <rect x="${qx + 10}" y="${qy - 22}" width="${badgeW}" height="${badgeH}" rx="3" fill="#1e1b4b" stroke="#f59e0b" stroke-width="1" vector-effect="non-scaling-stroke" />
+          <text x="${qx + 14}" y="${qy - 9}" font-size="10" fill="#fde68a" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" font-weight="600">${Math.round(this.quadrantGhostEndAngle)}° [${this.quadrantGhostMode.toUpperCase()}]</text>
+        </g>
+      `;
+    } else if (this.ghostNodeVertices) {
+      // 4. Render Ghost Node Tool Path & Handles during active dragging
       const selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
       if (selectedEl) {
         const isClosed = this.isElementClosed(selectedEl);
@@ -756,6 +944,19 @@ export class NodeToolHandler implements IToolHandler {
             html += `<circle cx="${gv.x}" cy="${gv.y}" r="${3.5 / z}" fill="#ffffff" stroke="#0284c7" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
           }
         });
+      }
+    }
+
+    // 5. Quadrant handle on parametric ellipse when idle in Node Mode (FEAT-02)
+    if (!this.ghostNodeVertices && !this.activeHandle && selectedEls.length === 1 && this.ctx.model.isParametricElement(selectedEls[0]) && this.ctx.model.isEllipse(selectedEls[0])) {
+      const qPt = this.getQuadrantHandlePoint(selectedEls[0]);
+      if (qPt) {
+        html += `
+          <g style="cursor: crosshair;">
+            <circle cx="${qPt.x}" cy="${qPt.y}" r="${6 / z}" fill="#f59e0b" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" />
+            <circle cx="${qPt.x}" cy="${qPt.y}" r="${2.5 / z}" fill="#ffffff" />
+          </g>
+        `;
       }
     }
 
