@@ -267,9 +267,10 @@ export class CanvasManager {
     position: number,
     canvasW: number = 800,
     canvasH: number = 600,
-    angle?: number
+    angle?: number,
+    initialPivot?: Point
   ): GuideLine {
-    return this.guideManager.addGuide(orientation, position, canvasW, canvasH, angle);
+    return this.guideManager.addGuide(orientation, position, canvasW, canvasH, angle, initialPivot);
   }
 
   public removeGuide(id: string): void {

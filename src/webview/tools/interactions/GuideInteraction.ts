@@ -79,8 +79,13 @@ export class GuideInteraction {
         const isRotateMode = activeG.mode === 'rotate';
         const centerPt = isRotateMode ? geom.pivot : geom.visualCenter;
 
-        // Check center handle click (move mode: translates guide; rotate mode: repositions pivot)
-        if (Math.hypot(pt.x - centerPt.x, pt.y - centerPt.y) <= 14) {
+        // ARCHITECTURAL RATIONALE: Magnetic Cursor Snap to Guide Center Handle
+        // In Move mode, if the cursor is in close proximity to the visual center handle,
+        // snap the cursor directly to the center coordinate for flawless single-click acquisition.
+        const centerDist = Math.hypot(pt.x - centerPt.x, pt.y - centerPt.y);
+        const centerSnapRadius = 18 / (ctx.canvasMgr.zoom || 1);
+        if (centerDist <= centerSnapRadius) {
+          pt = { ...centerPt };
           this.guideInitialState = { ...activeG };
           ctx.render();
           return { handled: true, activeHandle: 'guide-pivot' };
@@ -128,7 +133,10 @@ export class GuideInteraction {
       const isRotateMode = hitGuide.mode === 'rotate';
       const centerPt = isRotateMode ? geom.pivot : geom.visualCenter;
       let activeHandle: GuideHandleType = 'guide-move';
-      if (Math.hypot(pt.x - centerPt.x, pt.y - centerPt.y) <= 14) {
+      const centerDist = Math.hypot(pt.x - centerPt.x, pt.y - centerPt.y);
+      const centerSnapRadius = 18 / (ctx.canvasMgr.zoom || 1);
+      if (centerDist <= centerSnapRadius) {
+        pt = { ...centerPt };
         activeHandle = 'guide-pivot';
       }
 
@@ -204,6 +212,9 @@ export class GuideInteraction {
       if (g) {
         const otherVertices = ctx.getOtherVertices();
         const snapped = ctx.snapPoint(pt, otherVertices, g.id);
+        const isMagneticallySnapped = Math.hypot(snapped.x - pt.x, snapped.y - pt.y) > 0.001;
+        this.currentRotationSnappedPt = isMagneticallySnapped ? snapped : null;
+
         g.pivotX = Math.round(snapped.x);
         g.pivotY = Math.round(snapped.y);
         if (g.orientation === 'horizontal') g.position = g.pivotY;

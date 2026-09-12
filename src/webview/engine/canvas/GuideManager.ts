@@ -52,12 +52,13 @@ export class GuideManager {
     position: number,
     canvasW: number = 800,
     canvasH: number = 600,
-    angle?: number
+    angle?: number,
+    initialPivot?: Point
   ): GuideLine {
     const isHoriz = orientation === 'horizontal';
     const computedAngle = angle !== undefined ? angle : isHoriz ? 0 : 90;
-    const pivotX = isHoriz ? canvasW / 2 : position;
-    const pivotY = isHoriz ? position : canvasH / 2;
+    const pivotX = initialPivot ? initialPivot.x : (isHoriz ? canvasW / 2 : position);
+    const pivotY = initialPivot ? initialPivot.y : (isHoriz ? position : canvasH / 2);
 
     const guide: GuideLine = {
       id: `guide_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`,

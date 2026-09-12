@@ -1349,11 +1349,21 @@ class AntiDrawApp {
       const isDroppedOnRuler = this.rulerView?.isPointOverRuler(e.clientX, e.clientY, this.dragGuideOrientation);
 
       if (!isDroppedOnRuler) {
+        // ARCHITECTURAL RATIONALE: Ruler Drop Center Positioning
+        // When dragging a guideline from a ruler, its initial center point is placed
+        // directly at the coordinates where the drag was released (snappedPt), instead
+        // of arbitrarily defaulting to canvas center (W/2 or H/2).
+        const initialPivot = {
+          x: Math.round(snappedPt.x),
+          y: Math.round(snappedPt.y),
+        };
         const newG = this.canvasMgr.addGuide(
           this.dragGuideOrientation,
           pos,
           this.model.canvas.width,
-          this.model.canvas.height
+          this.model.canvas.height,
+          undefined,
+          initialPivot
         );
         this.canvasMgr.selectedGuideId = newG.id;
         this.propertyPanel.showGuideSettings(newG);
