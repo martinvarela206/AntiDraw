@@ -21,6 +21,17 @@ export interface OverlayRenderContext {
 }
 
 /**
+ * Exact rotation indicator path data from user-created SVGs:
+ * - GUIDE_ROTATE_LEFT_PATH from double_arrow_vertical_left_rotate.svg
+ * - GUIDE_ROTATE_RIGHT_PATH from double_arrow_vertical_right_rotate.svg
+ */
+export const GUIDE_ROTATE_LEFT_PATH =
+  'M 17 24.83 C 16.02 22.57 14.98 19.61 14.87 17.06 C 14.76 14.21 16.08 10.22 17.23 7.29 L 18.75 8.03 L 19.46 0 L 13.48 5.45 L 15.33 6.36 C 14.05 9.53 12.55 14 12.68 17.15 C 12.79 20.05 14.03 23.4 15.17 25.9 L 13.31 26.99 L 19.67 32 L 18.39 24.03 Z';
+
+export const GUIDE_ROTATE_RIGHT_PATH =
+  'M 15.34 7.17 C 16.32 9.43 17.36 12.39 17.47 14.94 C 17.58 17.79 16.26 21.78 15.11 24.71 L 13.59 23.97 L 12.88 32 L 18.86 26.55 L 17.01 25.64 C 18.29 22.47 19.79 18 19.66 14.85 C 19.55 11.95 18.31 8.6 17.17 6.1 L 19.03 5.01 L 12.67 0 L 13.95 7.97 Z';
+
+/**
  * ARCHITECTURAL RATIONALE: Dedicated Overlay Rendering Engine (OverlayRenderer)
  *
  * 1. Visual Decoupling:
@@ -109,22 +120,32 @@ export class OverlayRenderer {
             <line x1="${geom.pivot.x}" y1="${geom.pivot.y - 9}" x2="${geom.pivot.x}" y2="${geom.pivot.y + 9}" stroke="${guideColor}" stroke-width="1" vector-effect="non-scaling-stroke" />
           `;
 
-          // Curved Double-Ended Arrows at both visible limits
-          const arrowRot = (g.angle || 0) + 90;
+          // ARCHITECTURAL RATIONALE: High-Fidelity Guide Line Rotation Indicators
+          // Replaces the legacy wireframe path with the user-crafted SVG vector indicators:
+          // - `double_arrow_vertical_right_rotate.svg` at Arrow 1 (curves concentrically towards pivot)
+          // - `double_arrow_vertical_left_rotate.svg` at Arrow 2 (curves concentrically towards pivot)
+          // Both indicators are centered at (-16, -16) to align their 32x32 bounding box origin with
+          // the geometric arrow points along the guide axis, rotated by `g.angle` to maintain
+          // exact tangential steering perpendicular to the guideline at any orientation.
+          const arrowRot = g.angle || 0;
 
-          // Arrow 1
+          // Arrow 1 (Negative offset along guideline axis)
           html += `
             <g transform="translate(${geom.arrow1.x}, ${geom.arrow1.y}) rotate(${arrowRot})">
-              <path d="M -8,-5 C -4,-10 4,-10 8,-5 M 8,-5 L 4,-7 M 8,-5 L 8,-1 M -8,-5 L -4,-7 M -8,-5 L -8,-1 M -8,5 C -4,10 4,10 8,5 M 8,5 L 4,7 M 8,5 L 8,1 M -8,5 L -4,7 M -8,5 L -8,1" fill="none" stroke="${guideColor}" stroke-width="2" vector-effect="non-scaling-stroke" />
-              <circle cx="0" cy="0" r="14" fill="transparent" />
+              <g transform="translate(-16, -16)">
+                <path d="${GUIDE_ROTATE_RIGHT_PATH}" fill="${guideColor}" stroke="#1e293b" stroke-width="0.8" vector-effect="non-scaling-stroke" fill-rule="evenodd" />
+              </g>
+              <circle cx="0" cy="0" r="16" fill="transparent" />
             </g>
           `;
 
-          // Arrow 2
+          // Arrow 2 (Positive offset along guideline axis)
           html += `
             <g transform="translate(${geom.arrow2.x}, ${geom.arrow2.y}) rotate(${arrowRot})">
-              <path d="M -8,-5 C -4,-10 4,-10 8,-5 M 8,-5 L 4,-7 M 8,-5 L 8,-1 M -8,-5 L -4,-7 M -8,-5 L -8,-1 M -8,5 C -4,10 4,10 8,5 M 8,5 L 4,7 M 8,5 L 8,1 M -8,5 L -4,7 M -8,5 L -8,1" fill="none" stroke="${guideColor}" stroke-width="2" vector-effect="non-scaling-stroke" />
-              <circle cx="0" cy="0" r="14" fill="transparent" />
+              <g transform="translate(-16, -16)">
+                <path d="${GUIDE_ROTATE_LEFT_PATH}" fill="${guideColor}" stroke="#1e293b" stroke-width="0.8" vector-effect="non-scaling-stroke" fill-rule="evenodd" />
+              </g>
+              <circle cx="0" cy="0" r="16" fill="transparent" />
             </g>
           `;
         }
