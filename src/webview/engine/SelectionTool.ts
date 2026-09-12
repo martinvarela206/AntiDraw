@@ -1,4 +1,4 @@
-import { VectorElement, PathVertex, Point } from './VectorModel.js';
+import { VectorElement, PathVertex, Point, GradientConfig } from './VectorModel.js';
 
 export interface BoundingBox {
   x: number;
@@ -716,10 +716,31 @@ export class SelectionTool {
       const grad: any = JSON.parse(el.attributes['data-gradient']);
       const deltaDeg = Math.round((deltaAngleRad * 180) / Math.PI);
 
+      const shouldRotateAngle = grad.lockRotation !== false;
+      const shouldRotatePos = grad.lockPosition !== false;
+
       if (grad.type === 'linear') {
-        let ang = (grad.angle ?? 0) + deltaDeg;
-        ang = ((ang % 360) + 360) % 360;
-        grad.angle = Math.round(ang);
+        if (shouldRotateAngle) {
+          let ang = (grad.angle ?? 0) + deltaDeg;
+          ang = ((ang % 360) + 360) % 360;
+          grad.angle = Math.round(ang);
+        }
+        if (oldBox.width > 0 && oldBox.height > 0 && newBox.width > 0 && newBox.height > 0) {
+          const oldCxAbs = oldBox.x + (grad.cx ?? 0.5) * oldBox.width;
+          const oldCyAbs = oldBox.y + (grad.cy ?? 0.5) * oldBox.height;
+          let newCxAbs = oldCxAbs;
+          let newCyAbs = oldCyAbs;
+          if (shouldRotatePos) {
+            const cos = Math.cos(deltaAngleRad);
+            const sin = Math.sin(deltaAngleRad);
+            const dxC = oldCxAbs - pivot.x;
+            const dyC = oldCyAbs - pivot.y;
+            newCxAbs = pivot.x + (dxC * cos - dyC * sin);
+            newCyAbs = pivot.y + (dxC * sin + dyC * cos);
+          }
+          grad.cx = Math.round(((newCxAbs - newBox.x) / newBox.width) * 1000) / 1000;
+          grad.cy = Math.round(((newCyAbs - newBox.y) / newBox.height) * 1000) / 1000;
+        }
         el.attributes['data-gradient'] = JSON.stringify(grad);
       } else if (grad.type === 'radial') {
         if (oldBox.width <= 0 || oldBox.height <= 0 || newBox.width <= 0 || newBox.height <= 0) return;
@@ -727,24 +748,32 @@ export class SelectionTool {
         const cos = Math.cos(deltaAngleRad);
         const sin = Math.sin(deltaAngleRad);
 
-        // 1. Rotate absolute center around pivot
+        // 1. Center handling based on lockPosition
         const oldCxAbs = oldBox.x + (grad.cx ?? 0.5) * oldBox.width;
         const oldCyAbs = oldBox.y + (grad.cy ?? 0.5) * oldBox.height;
-        const dxC = oldCxAbs - pivot.x;
-        const dyC = oldCyAbs - pivot.y;
-        const newCxAbs = pivot.x + (dxC * cos - dyC * sin);
-        const newCyAbs = pivot.y + (dxC * sin + dyC * cos);
+        let newCxAbs = oldCxAbs;
+        let newCyAbs = oldCyAbs;
+        if (shouldRotatePos) {
+          const dxC = oldCxAbs - pivot.x;
+          const dyC = oldCyAbs - pivot.y;
+          newCxAbs = pivot.x + (dxC * cos - dyC * sin);
+          newCyAbs = pivot.y + (dxC * sin + dyC * cos);
+        }
         grad.cx = Math.round(((newCxAbs - newBox.x) / newBox.width) * 1000) / 1000;
         grad.cy = Math.round(((newCyAbs - newBox.y) / newBox.height) * 1000) / 1000;
 
-        // 2. Rotate absolute focus around pivot (if defined)
+        // 2. Focus handling based on lockPosition
         if (grad.fx !== undefined || grad.fy !== undefined) {
           const oldFxAbs = oldBox.x + (grad.fx ?? grad.cx ?? 0.5) * oldBox.width;
           const oldFyAbs = oldBox.y + (grad.fy ?? grad.cy ?? 0.5) * oldBox.height;
-          const dxF = oldFxAbs - pivot.x;
-          const dyF = oldFyAbs - pivot.y;
-          const newFxAbs = pivot.x + (dxF * cos - dyF * sin);
-          const newFyAbs = pivot.y + (dxF * sin + dyF * cos);
+          let newFxAbs = oldFxAbs;
+          let newFyAbs = oldFyAbs;
+          if (shouldRotatePos) {
+            const dxF = oldFxAbs - pivot.x;
+            const dyF = oldFyAbs - pivot.y;
+            newFxAbs = pivot.x + (dxF * cos - dyF * sin);
+            newFyAbs = pivot.y + (dxF * sin + dyF * cos);
+          }
           grad.fx = Math.round(((newFxAbs - newBox.x) / newBox.width) * 1000) / 1000;
           grad.fy = Math.round(((newFyAbs - newBox.y) / newBox.height) * 1000) / 1000;
         }
@@ -756,13 +785,109 @@ export class SelectionTool {
         grad.ry = Math.round((ryAbs / newBox.height) * 1000) / 1000;
         grad.r = grad.rx;
 
-        // 4. Update gradient rotation angle
-        let rot = (grad.rotation ?? 0) + deltaDeg;
-        rot = ((rot % 360) + 360) % 360;
-        grad.rotation = Math.round(rot);
+        // 4. Update gradient rotation angle only if lockRotation !== false
+        if (shouldRotateAngle) {
+          let rot = (grad.rotation ?? 0) + deltaDeg;
+          rot = ((rot % 360) + 360) % 360;
+          grad.rotation = Math.round(rot);
+        }
 
         el.attributes['data-gradient'] = JSON.stringify(grad);
       }
+    } catch {}
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Fill Transformation Position Lock Compensation
+   *
+   * When `grad.lockPosition === false` (unlocked / candado abierto):
+   * In standard SVG objectBoundingBox space, moving an element by (dx, dy) causes the
+   * gradient to travel solidarily with the element. To keep the gradient stationary
+   * in world coordinates (canvas space), the normalized coordinates [u, v] in the new box
+   * must be shifted inversely by (-dx / width, -dy / height).
+   */
+  public compensateGradientOnTranslate(
+    el: VectorElement,
+    dx: number,
+    dy: number,
+    box: BoundingBox
+  ): void {
+    if (!el.attributes['data-gradient']) return;
+    try {
+      const grad: GradientConfig = JSON.parse(el.attributes['data-gradient']);
+      if (grad.lockPosition !== false) return; // Default is locked (moves with vector)
+
+      if (box.width <= 0 || box.height <= 0) return;
+
+      const du = dx / box.width;
+      const dv = dy / box.height;
+
+      grad.cx = Math.round(((grad.cx ?? 0.5) - du) * 1000) / 1000;
+      grad.cy = Math.round(((grad.cy ?? 0.5) - dv) * 1000) / 1000;
+
+      if (grad.fx !== undefined) {
+        grad.fx = Math.round((grad.fx - du) * 1000) / 1000;
+      }
+      if (grad.fy !== undefined) {
+        grad.fy = Math.round((grad.fy - dv) * 1000) / 1000;
+      }
+
+      el.attributes['data-gradient'] = JSON.stringify(grad);
+    } catch {}
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Fill Transformation Scale Lock Compensation
+   *
+   * When `grad.lockScale === false` (unlocked / candado abierto):
+   * In standard SVG objectBoundingBox space, resizing an element by (scaleX, scaleY)
+   * stretches the gradient along with the element. To keep the gradient's physical dimensions
+   * in screen pixels strictly unchanged:
+   * 1. Radial gradients:
+   *    Horizontal physical radius Rx = rx_old * oldBox.width.
+   *    In new box: rx_new = Rx / newBox.width = rx_old * (oldBox.width / newBox.width) = rx_old / scaleX.
+   *    Vertical physical radius Ry = ry_old * oldBox.height.
+   *    In new box: ry_new = Ry / newBox.height = ry_old * (oldBox.height / newBox.height) = ry_old / scaleY.
+   * 2. Linear gradients:
+   *    Compensates half-length span inversely by average dimension change.
+   * 3. Position interaction:
+   *    If lockPosition is also false, ensures center remains pinned to world coordinates.
+   */
+  public compensateGradientOnScale(
+    el: VectorElement,
+    oldBox: BoundingBox,
+    newBox: BoundingBox
+  ): void {
+    if (!el.attributes['data-gradient']) return;
+    try {
+      const grad: GradientConfig = JSON.parse(el.attributes['data-gradient']);
+      if (grad.lockScale !== false) return; // Default is locked (scales with vector)
+
+      if (oldBox.width <= 0 || oldBox.height <= 0 || newBox.width <= 0 || newBox.height <= 0) return;
+
+      const scaleX = newBox.width / oldBox.width;
+      const scaleY = newBox.height / oldBox.height;
+
+      if (grad.type === 'radial') {
+        const rx = grad.rx ?? grad.r ?? 0.5;
+        const ry = grad.ry ?? grad.rx ?? grad.r ?? 0.5;
+        grad.rx = Math.round((rx / scaleX) * 1000) / 1000;
+        grad.ry = Math.round((ry / scaleY) * 1000) / 1000;
+        grad.r = grad.rx;
+      } else if (grad.type === 'linear') {
+        const r = grad.r ?? 0.5;
+        const scaleAvg = Math.sqrt(scaleX * scaleY);
+        grad.r = Math.round((r / scaleAvg) * 1000) / 1000;
+      }
+
+      if (grad.lockPosition === false) {
+        const oldCx = oldBox.x + (grad.cx ?? 0.5) * oldBox.width;
+        const oldCy = oldBox.y + (grad.cy ?? 0.5) * oldBox.height;
+        grad.cx = Math.round(((oldCx - newBox.x) / newBox.width) * 1000) / 1000;
+        grad.cy = Math.round(((oldCy - newBox.y) / newBox.height) * 1000) / 1000;
+      }
+
+      el.attributes['data-gradient'] = JSON.stringify(grad);
     } catch {}
   }
 }

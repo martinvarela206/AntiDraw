@@ -89,6 +89,10 @@ export interface GradientConfig {
   fy?: number;
   angle?: number; // angle in degrees for linear (0 = left-to-right, 90 = top-to-bottom)
   rotation?: number; // angle in degrees for radial (0 to 360)
+  // Fill Transformation Locks (default true when undefined: accompanies vector transform)
+  lockScale?: boolean; // true = scales with vector; false = maintains physical screen size
+  lockPosition?: boolean; // true = translates with vector; false = remains fixed in canvas coordinates
+  lockRotation?: boolean; // true = rotates with vector; false = preserves absolute canvas angle
   stops: GradientStop[];
 }
 

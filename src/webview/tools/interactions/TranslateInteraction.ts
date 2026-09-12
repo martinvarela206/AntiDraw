@@ -181,6 +181,17 @@ export class TranslateInteraction {
       });
       // Translate custom pivot solidarily with moved vectors
       ctx.selectionTool.updatePivotOnTranslate(this.ghostDragOffset.x, this.ghostDragOffset.y, selectedEls);
+
+      // Compensate gradients for elements with lockPosition === false
+      selectedEls.forEach((el) => {
+        if (el.attributes['data-gradient']) {
+          const box = ctx.selectionTool.getBoundingBox(el);
+          if (box) {
+            ctx.selectionTool.compensateGradientOnTranslate(el, this.ghostDragOffset!.x, this.ghostDragOffset!.y, box);
+          }
+        }
+      });
+
       hasChanges = true;
     }
 

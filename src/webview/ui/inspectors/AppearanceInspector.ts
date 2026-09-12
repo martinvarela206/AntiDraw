@@ -201,6 +201,46 @@ export class AppearanceInspector {
             </div>
           </div>
 
+          <!-- Fill Transformation Locks & Aspect Reset Controls -->
+          <div style="margin: 8px 0 6px 0; padding: 6px 0; border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); display: flex; flex-direction: column; gap: 5px;">
+            <div style="font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 2px;">
+              Fijación y Ajuste de Relleno
+            </div>
+
+            <!-- Lock Escala -->
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
+              <span class="prop-label" style="width: auto; flex: 1; font-size: 11px;" title="Bloquear escala: el relleno escala con el vector. Desbloqueado: conserva dimensiones fijas en pantalla.">Escala</span>
+              <button class="prop-input" id="btn-lock-fill-scale" style="width: 28px; height: 24px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px;" title="${grad.lockScale !== false ? 'Escala bloqueada (acompaña al vector). Clic para desbloquear y mantener tamaño fijo.' : 'Escala desbloqueada (mantiene tamaño fijo en pantalla). Clic para bloquear.'}">
+                ${grad.lockScale !== false ? '🔒' : '🔓'}
+              </button>
+              <button class="prop-input" id="btn-reset-fill-scale" style="width: 28px; height: 24px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px;" title="Restablecer escala del relleno a las dimensiones del vector">
+                ⟲
+              </button>
+            </div>
+
+            <!-- Lock Posición -->
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
+              <span class="prop-label" style="width: auto; flex: 1; font-size: 11px;" title="Bloquear posición: el relleno se traslada con el vector. Desbloqueado: permanece fijo en el lienzo.">Posición</span>
+              <button class="prop-input" id="btn-lock-fill-pos" style="width: 28px; height: 24px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px;" title="${grad.lockPosition !== false ? 'Posición bloqueada (acompaña al vector). Clic para desbloquear y fijar al lienzo.' : 'Posición desbloqueada (fijo en el lienzo). Clic para bloquear.'}">
+                ${grad.lockPosition !== false ? '🔒' : '🔓'}
+              </button>
+              <button class="prop-input" id="btn-reset-fill-pos" style="width: 28px; height: 24px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px;" title="Recentrar posición del relleno en el centro del vector">
+                ⟲
+              </button>
+            </div>
+
+            <!-- Lock Rotación -->
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
+              <span class="prop-label" style="width: auto; flex: 1; font-size: 11px;" title="Bloquear rotación: el relleno gira con el vector. Desbloqueado: conserva orientación fija en el lienzo.">Rotación</span>
+              <button class="prop-input" id="btn-lock-fill-rot" style="width: 28px; height: 24px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px;" title="${grad.lockRotation !== false ? 'Rotación bloqueada (gira con el vector). Clic para desbloquear y fijar orientación al lienzo.' : 'Rotación desbloqueada (orientación fija en el lienzo). Clic para bloquear.'}">
+                ${grad.lockRotation !== false ? '🔒' : '🔓'}
+              </button>
+              <button class="prop-input" id="btn-reset-fill-rot" style="width: 28px; height: 24px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px;" title="Restablecer rotación del relleno a 0° relativo al vector">
+                ⟲
+              </button>
+            </div>
+          </div>
+
           <!-- Active Stop Selector & Inspector -->
           <div class="prop-row">
             <span class="prop-label">Stop</span>
@@ -638,6 +678,109 @@ export class AppearanceInspector {
         if (radialFx) radialFx.value = Math.round((grad.fx) * 100).toString();
         if (radialFy) radialFy.value = Math.round((grad.fy) * 100).toString();
         applyFillChanges();
+      });
+    }
+
+    // Fill Transformation Locks & Reset Event Listeners
+    const btnLockScale = container.querySelector<HTMLButtonElement>('#btn-lock-fill-scale');
+    if (btnLockScale) {
+      btnLockScale.addEventListener('click', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        grad.lockScale = grad.lockScale !== false ? false : true;
+        btnLockScale.textContent = grad.lockScale ? '🔒' : '🔓';
+        btnLockScale.title = grad.lockScale
+          ? 'Escala bloqueada (acompaña al vector). Clic para desbloquear y mantener tamaño fijo.'
+          : 'Escala desbloqueada (mantiene tamaño fijo en pantalla). Clic para bloquear.';
+        applyFillChanges();
+      });
+    }
+
+    const btnResetScale = container.querySelector<HTMLButtonElement>('#btn-reset-fill-scale');
+    if (btnResetScale) {
+      btnResetScale.addEventListener('click', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        if (grad.type === 'radial') {
+          grad.rx = 0.5;
+          grad.ry = 0.5;
+          grad.r = 0.5;
+          const rxInput = container.querySelector<HTMLInputElement>('#radial-rx');
+          const ryInput = container.querySelector<HTMLInputElement>('#radial-ry');
+          if (rxInput) rxInput.value = '50';
+          if (ryInput) ryInput.value = '50';
+        } else {
+          grad.r = 0.5;
+        }
+        applyFillChanges();
+        callbacks.onRenderOverlay?.();
+      });
+    }
+
+    const btnLockPos = container.querySelector<HTMLButtonElement>('#btn-lock-fill-pos');
+    if (btnLockPos) {
+      btnLockPos.addEventListener('click', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        grad.lockPosition = grad.lockPosition !== false ? false : true;
+        btnLockPos.textContent = grad.lockPosition ? '🔒' : '🔓';
+        btnLockPos.title = grad.lockPosition
+          ? 'Posición bloqueada (acompaña al vector). Clic para desbloquear y fijar al lienzo.'
+          : 'Posición desbloqueada (fijo en el lienzo). Clic para bloquear.';
+        applyFillChanges();
+      });
+    }
+
+    const btnResetPos = container.querySelector<HTMLButtonElement>('#btn-reset-fill-pos');
+    if (btnResetPos) {
+      btnResetPos.addEventListener('click', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        grad.cx = 0.5;
+        grad.cy = 0.5;
+        if (grad.type === 'radial') {
+          grad.fx = 0.5;
+          grad.fy = 0.5;
+          const cxInput = container.querySelector<HTMLInputElement>('#radial-cx');
+          const cyInput = container.querySelector<HTMLInputElement>('#radial-cy');
+          const fxInput = container.querySelector<HTMLInputElement>('#radial-fx');
+          const fyInput = container.querySelector<HTMLInputElement>('#radial-fy');
+          if (cxInput) cxInput.value = '50';
+          if (cyInput) cyInput.value = '50';
+          if (fxInput) fxInput.value = '50';
+          if (fyInput) fyInput.value = '50';
+        }
+        applyFillChanges();
+        callbacks.onRenderOverlay?.();
+      });
+    }
+
+    const btnLockRot = container.querySelector<HTMLButtonElement>('#btn-lock-fill-rot');
+    if (btnLockRot) {
+      btnLockRot.addEventListener('click', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        grad.lockRotation = grad.lockRotation !== false ? false : true;
+        btnLockRot.textContent = grad.lockRotation ? '🔒' : '🔓';
+        btnLockRot.title = grad.lockRotation
+          ? 'Rotación bloqueada (gira con el vector). Clic para desbloquear y fijar orientación al lienzo.'
+          : 'Rotación desbloqueada (orientación fija en el lienzo). Clic para bloquear.';
+        applyFillChanges();
+      });
+    }
+
+    const btnResetRot = container.querySelector<HTMLButtonElement>('#btn-reset-fill-rot');
+    if (btnResetRot) {
+      btnResetRot.addEventListener('click', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        if (grad.type === 'radial') {
+          grad.rotation = 0;
+          const rotInput = container.querySelector<HTMLInputElement>('#radial-rotation');
+          if (rotInput) rotInput.value = '0';
+        } else {
+          grad.angle = 0;
+          const angleInput = container.querySelector<HTMLInputElement>('#gradient-angle');
+          const anglePreset = container.querySelector<HTMLSelectElement>('#gradient-angle-preset');
+          if (angleInput) angleInput.value = '0';
+          if (anglePreset) anglePreset.value = '0';
+        }
+        applyFillChanges();
+        callbacks.onRenderOverlay?.();
       });
     }
 

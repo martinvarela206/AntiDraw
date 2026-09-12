@@ -417,6 +417,20 @@ export class TransformInteraction {
         if (newBox) {
           ctx.selectionTool.updatePivotOnScale(this.initialBox, newBox, selectedEls);
         }
+
+        // Compensate gradients for elements with lockScale === false (FIX-FillLocks)
+        selectedEls.forEach((el) => {
+          if (el.attributes['data-gradient']) {
+            const initialVerts = this.initialElementsMap.get(el.id);
+            const oldElBox = initialVerts
+              ? ctx.selectionTool.getBoundingBox({ ...el, vertices: initialVerts })
+              : this.initialBox;
+            const newElBox = ctx.selectionTool.getBoundingBox(el);
+            if (oldElBox && newElBox) {
+              ctx.selectionTool.compensateGradientOnScale(el, oldElBox, newElBox);
+            }
+          }
+        });
       }
 
       this.ghostTransformMap.clear();

@@ -635,11 +635,14 @@ export class SvgSerializer {
         let y2 = grad.y2 ?? 0;
 
         if (grad.angle !== undefined) {
+          const cx = grad.cx ?? 0.5;
+          const cy = grad.cy ?? 0.5;
+          const halfLen = grad.r ?? 0.5;
           const rad = (grad.angle * Math.PI) / 180;
-          x1 = Math.round((0.5 - 0.5 * Math.cos(rad)) * 1000) / 1000;
-          y1 = Math.round((0.5 - 0.5 * Math.sin(rad)) * 1000) / 1000;
-          x2 = Math.round((0.5 + 0.5 * Math.cos(rad)) * 1000) / 1000;
-          y2 = Math.round((0.5 + 0.5 * Math.sin(rad)) * 1000) / 1000;
+          x1 = Math.round((cx - halfLen * Math.cos(rad)) * 1000) / 1000;
+          y1 = Math.round((cy - halfLen * Math.sin(rad)) * 1000) / 1000;
+          x2 = Math.round((cx + halfLen * Math.cos(rad)) * 1000) / 1000;
+          y2 = Math.round((cy + halfLen * Math.sin(rad)) * 1000) / 1000;
         }
 
         out += `    <linearGradient id="${gradId}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" gradientUnits="objectBoundingBox">\n`;
