@@ -9,6 +9,7 @@ import {
   RectCorners,
   VectorElement,
 } from '../VectorModel.js';
+import { PathGeometryCompiler } from '../geometry/PathGeometryCompiler.js';
 
 export interface IVectorModelSerializerContext {
   canvas: CanvasSettings;
@@ -668,16 +669,11 @@ export class SvgSerializer {
         let bboxWidth = 100;
         let bboxHeight = 100;
         if (el.vertices && el.vertices.length > 0) {
-          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-          el.vertices.forEach((v) => {
-            if (v.x < minX) minX = v.x;
-            if (v.y < minY) minY = v.y;
-            if (v.x > maxX) maxX = v.x;
-            if (v.y > maxY) maxY = v.y;
-          });
-          if (minX !== Infinity) {
-            bboxWidth = Math.max(maxX - minX, 1);
-            bboxHeight = Math.max(maxY - minY, 1);
+          const isClosed = el.isClosed ?? (el.attributes.d ? /z/i.test(el.attributes.d) : true);
+          const bounds = PathGeometryCompiler.computeVerticesBoundingBox(el.vertices, isClosed);
+          if (bounds) {
+            bboxWidth = bounds.width;
+            bboxHeight = bounds.height;
           }
         } else if (el.attributes.width && el.attributes.height) {
           bboxWidth = Math.max(parseFloat(el.attributes.width) || 100, 1);

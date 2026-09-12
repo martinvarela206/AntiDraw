@@ -520,4 +520,106 @@ export class PathGeometryCompiler {
 
     return dParts.join(' ');
   }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Analytical Cubic Bézier 1D Extrema (FIX-ResetFit)
+   *
+   * Computes the exact 1D mathematical extrema of a cubic Bézier curve segment
+   * B(t) = (1-t)^3 * p0 + 3*(1-t)^2 * t * p1 + 3*(1-t) * t^2 * p2 + t^3 * p3
+   * by solving B'(t) = 0 for t in (0, 1).
+   * Used to determine true tight bounding boxes that accurately enclose cubic bulges
+   * beyond endpoint vertices (critical for gradient aspect ratio compensation and reset).
+   */
+  public static getCubicBezierExtrema(p0: number, p1: number, p2: number, p3: number): number[] {
+    const pts: number[] = [];
+    const a = 3 * (-p0 + 3 * p1 - 3 * p2 + p3);
+    const b = 6 * (p0 - 2 * p1 + p2);
+    const c = 3 * (p1 - p0);
+
+    if (Math.abs(a) < 1e-9) {
+      if (Math.abs(b) > 1e-9) {
+        const t = -c / b;
+        if (t > 0 && t < 1) {
+          const mt = 1 - t;
+          pts.push(mt * mt * mt * p0 + 3 * mt * mt * t * p1 + 3 * mt * t * t * p2 + t * t * t * p3);
+        }
+      }
+    } else {
+      const disc = b * b - 4 * a * c;
+      if (disc >= 0) {
+        const sqrtD = Math.sqrt(disc);
+        const t1 = (-b - sqrtD) / (2 * a);
+        const t2 = (-b + sqrtD) / (2 * a);
+        if (t1 > 0 && t1 < 1) {
+          const mt = 1 - t1;
+          pts.push(mt * mt * mt * p0 + 3 * mt * mt * t1 * p1 + 3 * mt * t1 * t1 * p2 + t1 * t1 * t1 * p3);
+        }
+        if (t2 > 0 && t2 < 1) {
+          const mt = 1 - t2;
+          pts.push(mt * mt * mt * p0 + 3 * mt * mt * t2 * p1 + 3 * mt * t2 * t2 * p2 + t2 * t2 * t2 * p3);
+        }
+      }
+    }
+    return pts;
+  }
+
+  /**
+   * Computes the exact analytical bounding box of path vertices including Bézier curve extrema.
+   */
+  public static computeVerticesBoundingBox(
+    vertices: PathVertex[],
+    isClosed: boolean = true
+  ): { minX: number; minY: number; maxX: number; maxY: number; width: number; height: number; cx: number; cy: number } | null {
+    if (!vertices || vertices.length === 0) return null;
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    const n = vertices.length;
+    for (let i = 0; i < n; i++) {
+      const v = vertices[i];
+      minX = Math.min(minX, v.x);
+      minY = Math.min(minY, v.y);
+      maxX = Math.max(maxX, v.x);
+      maxY = Math.max(maxY, v.y);
+
+      if (i < n - 1 || isClosed) {
+        const nextV = vertices[(i + 1) % n];
+        if (v.handleOut || nextV.handleIn) {
+          const p0 = { x: v.x, y: v.y };
+          const p1 = v.handleOut ? { x: v.handleOut.x, y: v.handleOut.y } : p0;
+          const p2 = nextV.handleIn ? { x: nextV.handleIn.x, y: nextV.handleIn.y } : { x: nextV.x, y: nextV.y };
+          const p3 = { x: nextV.x, y: nextV.y };
+
+          const exX = PathGeometryCompiler.getCubicBezierExtrema(p0.x, p1.x, p2.x, p3.x);
+          exX.forEach((xVal) => {
+            minX = Math.min(minX, xVal);
+            maxX = Math.max(maxX, xVal);
+          });
+
+          const exY = PathGeometryCompiler.getCubicBezierExtrema(p0.y, p1.y, p2.y, p3.y);
+          exY.forEach((yVal) => {
+            minY = Math.min(minY, yVal);
+            maxY = Math.max(maxY, yVal);
+          });
+        }
+      }
+    }
+
+    if (minX === Infinity) return null;
+    const width = Math.max(maxX - minX, 1);
+    const height = Math.max(maxY - minY, 1);
+    return {
+      minX,
+      minY,
+      maxX,
+      maxY,
+      width,
+      height,
+      cx: minX + width / 2,
+      cy: minY + height / 2,
+    };
+  }
 }

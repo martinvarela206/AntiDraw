@@ -1,4 +1,5 @@
 import { VectorElement, PathVertex, Point, GradientConfig } from './VectorModel.js';
+import { PathGeometryCompiler } from './geometry/PathGeometryCompiler.js';
 
 export interface BoundingBox {
   x: number;
@@ -213,30 +214,16 @@ export class SelectionTool {
   // Calculate bounding box for a single element
   public getBoundingBox(element: VectorElement): BoundingBox | null {
     if (!element.vertices || element.vertices.length === 0) return null;
-
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-
-    element.vertices.forEach((v) => {
-      minX = Math.min(minX, v.x);
-      minY = Math.min(minY, v.y);
-      maxX = Math.max(maxX, v.x);
-      maxY = Math.max(maxY, v.y);
-    });
-
-    if (minX === Infinity) return null;
-    const width = Math.max(maxX - minX, 1);
-    const height = Math.max(maxY - minY, 1);
-
+    const isClosed = element.isClosed ?? (element.attributes.d ? /z/i.test(element.attributes.d) : true);
+    const bounds = PathGeometryCompiler.computeVerticesBoundingBox(element.vertices, isClosed);
+    if (!bounds) return null;
     return {
-      x: minX,
-      y: minY,
-      width,
-      height,
-      cx: minX + width / 2,
-      cy: minY + height / 2,
+      x: bounds.minX,
+      y: bounds.minY,
+      width: bounds.width,
+      height: bounds.height,
+      cx: bounds.cx,
+      cy: bounds.cy,
     };
   }
 
@@ -264,13 +251,13 @@ export class SelectionTool {
     let maxY = -Infinity;
 
     elements.forEach((el) => {
-      if (!el.vertices) return;
-      el.vertices.forEach((v) => {
-        minX = Math.min(minX, v.x);
-        minY = Math.min(minY, v.y);
-        maxX = Math.max(maxX, v.x);
-        maxY = Math.max(maxY, v.y);
-      });
+      const box = this.getBoundingBox(el);
+      if (box) {
+        minX = Math.min(minX, box.x);
+        minY = Math.min(minY, box.y);
+        maxX = Math.max(maxX, box.x + box.width);
+        maxY = Math.max(maxY, box.y + box.height);
+      }
     });
 
     if (minX === Infinity) return null;
