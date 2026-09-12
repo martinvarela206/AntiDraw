@@ -576,14 +576,29 @@ export class StrokeOutlineGenerator {
         y: Math.round((pr1.y + origIn.y * sR) * 100) / 100,
       };
 
-      // Left side curve (backward from pl1 to pl0)
+      // ARCHITECTURAL RATIONALE: Control Point Mapping for Time-Reversed Bézier Curves
+      // Under Bézier curve time-reversal Q(u) = C(1-u) for u in [0, 1], the control points
+      // are exactly inverted in sequence: (Q0, Q1, Q2, Q3) = (P3, P2, P1, P0).
+      // Specifically:
+      // - The outgoing tangent from Q0 (offset of P3, pl1) into the segment points towards Q1 (offset of P2).
+      //   The vector from P3 to P2 is (p2 - p3), which is `origIn`.
+      //   Therefore, Q1 = pl1 + origIn * sL.
+      // - The incoming tangent approaching Q3 (offset of P0, pl0) from the segment originates at Q2 (offset of P1).
+      //   The vector from P0 to P1 is (p1 - p0), which is `origOut`.
+      //   Therefore, Q2 = pl0 + origOut * sL.
+      //
+      // Bug Fix & Historical Rationale:
+      // Naively subtracting `origIn * sL` and `origOut * sL` inverted the control vectors by 180 degrees,
+      // directing the handles away from the adjacent segment and causing self-intersecting cusp loops / pinches
+      // on convex arcs. Adding `origIn * sL` and `origOut * sL` aligns the control points along the continuous
+      // curvature direction of the outer contour.
       const hOutL = {
-        x: Math.round((pl1.x - origIn.x * sL) * 100) / 100,
-        y: Math.round((pl1.y - origIn.y * sL) * 100) / 100,
+        x: Math.round((pl1.x + origIn.x * sL) * 100) / 100,
+        y: Math.round((pl1.y + origIn.y * sL) * 100) / 100,
       };
       const hInL = {
-        x: Math.round((pl0.x - origOut.x * sL) * 100) / 100,
-        y: Math.round((pl0.y - origOut.y * sL) * 100) / 100,
+        x: Math.round((pl0.x + origOut.x * sL) * 100) / 100,
+        y: Math.round((pl0.y + origOut.y * sL) * 100) / 100,
       };
 
       segmentsData.push({
