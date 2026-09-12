@@ -404,10 +404,10 @@ export class SelectToolHandler implements IToolHandler {
   }
 
   public onDoubleClick(e: MouseEvent, pt: Point): boolean {
-    if (this.transformInteraction.onDoubleClick(this.ctx, pt, this.callbacks)) {
+    if (this.guideInteraction.onDoubleClick(this.ctx, pt, this.callbacks)) {
       return true;
     }
-    if (this.guideInteraction.onDoubleClick(this.ctx, pt, this.callbacks)) {
+    if (this.transformInteraction.onDoubleClick(this.ctx, pt, this.callbacks)) {
       return true;
     }
     return false;

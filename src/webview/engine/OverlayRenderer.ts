@@ -100,7 +100,8 @@ export class OverlayRenderer {
       ctx.canvasMgr.guides.forEach((g) => {
         if (g.visible === false) return;
         const isSelected = g.id === ctx.canvasMgr.selectedGuideId;
-        const isTransforming = g.id === ctx.canvasMgr.activeGuideTransformId;
+        const mode = g.mode || 'move';
+        const isRotateMode = isSelected && mode === 'rotate';
 
         // Inverted color on selection (default cyan #00f0ff -> bright inverse red #ff1a40)
         const guideColor = isSelected ? '#ff1a40' : (g.color || '#00f0ff');
@@ -110,45 +111,45 @@ export class OverlayRenderer {
         // Render full guide line across visible canvas span
         html += `<line x1="${geom.p1.x}" y1="${geom.p1.y}" x2="${geom.p2.x}" y2="${geom.p2.y}" stroke="${guideColor}" stroke-width="1" stroke-dasharray="${dashArray}" vector-effect="non-scaling-stroke" />`;
 
-        // Render Transform Controls when in active Guide Double-Click Mode
-        if (isTransforming) {
-          // Center Pivot Node Handle
+        // ARCHITECTURAL RATIONALE: Independent Guide Line Move & Rotate Modes
+        // Guide lines possess two discrete interaction modes analogous to vector objects:
+        // 1. Move mode (default on select): Displays strictly the central visual handle at 1/2 of visible span.
+        // 2. Rotate mode (toggled via double-click): Displays both the pivot handle and the 1/4 & 3/4 rotation markers.
+        if (isSelected) {
+          const centerPt = isRotateMode ? geom.pivot : geom.visualCenter;
+
+          // Center Handle
           html += `
-            <circle cx="${geom.pivot.x}" cy="${geom.pivot.y}" r="6" fill="#1e293b" stroke="${guideColor}" stroke-width="2" vector-effect="non-scaling-stroke" />
-            <circle cx="${geom.pivot.x}" cy="${geom.pivot.y}" r="2" fill="${guideColor}" />
-            <line x1="${geom.pivot.x - 9}" y1="${geom.pivot.y}" x2="${geom.pivot.x + 9}" y2="${geom.pivot.y}" stroke="${guideColor}" stroke-width="1" vector-effect="non-scaling-stroke" />
-            <line x1="${geom.pivot.x}" y1="${geom.pivot.y - 9}" x2="${geom.pivot.x}" y2="${geom.pivot.y + 9}" stroke="${guideColor}" stroke-width="1" vector-effect="non-scaling-stroke" />
+            <circle cx="${centerPt.x}" cy="${centerPt.y}" r="6" fill="#1e293b" stroke="${guideColor}" stroke-width="2" vector-effect="non-scaling-stroke" />
+            <circle cx="${centerPt.x}" cy="${centerPt.y}" r="2" fill="${guideColor}" />
+            <line x1="${centerPt.x - 9}" y1="${centerPt.y}" x2="${centerPt.x + 9}" y2="${centerPt.y}" stroke="${guideColor}" stroke-width="1" vector-effect="non-scaling-stroke" />
+            <line x1="${centerPt.x}" y1="${centerPt.y - 9}" x2="${centerPt.x}" y2="${centerPt.y + 9}" stroke="${guideColor}" stroke-width="1" vector-effect="non-scaling-stroke" />
           `;
 
-          // ARCHITECTURAL RATIONALE: Concave Guide Line Rotation Indicators
-          // Assigns user-crafted SVG vector indicators with concave curvature facing the center pivot:
-          // - Arrow 1 (Negative offset along guideline axis) uses `GUIDE_ROTATE_LEFT_PATH`
-          //   (hollow/concave arc faces towards positive direction / center pivot).
-          // - Arrow 2 (Positive offset along guideline axis) uses `GUIDE_ROTATE_RIGHT_PATH`
-          //   (hollow/concave arc faces towards negative direction / center pivot).
-          // This eliminates the previous convex bulge inversion, ensuring both rotation indicators
-          // wrap concavely around the center of rotation like a circular steering caliper.
-          const arrowRot = g.angle || 0;
+          // Rotation indicators only appear in Rotate Mode
+          if (isRotateMode) {
+            const arrowRot = g.angle || 0;
 
-          // Arrow 1 (Negative offset along guideline axis)
-          html += `
-            <g transform="translate(${geom.arrow1.x}, ${geom.arrow1.y}) rotate(${arrowRot})">
-              <g transform="translate(-16, -16)">
-                <path d="${GUIDE_ROTATE_LEFT_PATH}" fill="${guideColor}" stroke="#1e293b" stroke-width="0.8" vector-effect="non-scaling-stroke" fill-rule="evenodd" />
+            // Arrow 1 (Negative offset along guideline axis - 1/4 visible span)
+            html += `
+              <g transform="translate(${geom.arrow1.x}, ${geom.arrow1.y}) rotate(${arrowRot})">
+                <g transform="translate(-16, -16)">
+                  <path d="${GUIDE_ROTATE_LEFT_PATH}" fill="${guideColor}" stroke="#1e293b" stroke-width="0.8" vector-effect="non-scaling-stroke" fill-rule="evenodd" />
+                </g>
+                <circle cx="0" cy="0" r="16" fill="transparent" />
               </g>
-              <circle cx="0" cy="0" r="16" fill="transparent" />
-            </g>
-          `;
+            `;
 
-          // Arrow 2 (Positive offset along guideline axis)
-          html += `
-            <g transform="translate(${geom.arrow2.x}, ${geom.arrow2.y}) rotate(${arrowRot})">
-              <g transform="translate(-16, -16)">
-                <path d="${GUIDE_ROTATE_RIGHT_PATH}" fill="${guideColor}" stroke="#1e293b" stroke-width="0.8" vector-effect="non-scaling-stroke" fill-rule="evenodd" />
+            // Arrow 2 (Positive offset along guideline axis - 3/4 visible span)
+            html += `
+              <g transform="translate(${geom.arrow2.x}, ${geom.arrow2.y}) rotate(${arrowRot})">
+                <g transform="translate(-16, -16)">
+                  <path d="${GUIDE_ROTATE_RIGHT_PATH}" fill="${guideColor}" stroke="#1e293b" stroke-width="0.8" vector-effect="non-scaling-stroke" fill-rule="evenodd" />
+                </g>
+                <circle cx="0" cy="0" r="16" fill="transparent" />
               </g>
-              <circle cx="0" cy="0" r="16" fill="transparent" />
-            </g>
-          `;
+            `;
+          }
         }
       });
     }

@@ -10,6 +10,7 @@ export interface GuideLine {
   color?: string;      // Guide line color, default cyan (#00f0ff)
   visible?: boolean;   // Visibility toggle (default true)
   locked?: boolean;    // Lock toggle preventing accidental selection or drag
+  mode?: 'move' | 'rotate'; // Interactive mode: 'move' (only center handle) or 'rotate' (center + rotation markers)
 }
 
 export interface GuideGeometry {
@@ -66,6 +67,7 @@ export class GuideManager {
       pivotX,
       pivotY,
       color: '#00f0ff',
+      mode: 'move',
     };
     this.guides.push(guide);
     return guide;

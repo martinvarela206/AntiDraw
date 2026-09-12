@@ -30,21 +30,23 @@ export class GuideInteraction {
    * Hover cursor evaluation for active guide transformation controls and guide lines.
    */
   public getHoverCursor(ctx: ToolContext, pt: Point): string | null {
-    if (ctx.canvasMgr.activeGuideTransformId) {
-      const activeG = ctx.canvasMgr.getGuide(ctx.canvasMgr.activeGuideTransformId);
+    if (ctx.canvasMgr.selectedGuideId) {
+      const activeG = ctx.canvasMgr.getGuide(ctx.canvasMgr.selectedGuideId);
       if (activeG) {
         const geom = ctx.canvasMgr.getGuideGeometry(activeG, ctx.model.canvas.width, ctx.model.canvas.height);
-        if (
-          Math.hypot(pt.x - geom.pivot.x, pt.y - geom.pivot.y) <= 14 ||
-          Math.hypot(pt.x - geom.visualCenter.x, pt.y - geom.visualCenter.y) <= 14
-        ) {
+        const isRotateMode = activeG.mode === 'rotate';
+        const centerPt = isRotateMode ? geom.pivot : geom.visualCenter;
+
+        if (Math.hypot(pt.x - centerPt.x, pt.y - centerPt.y) <= 14) {
           return 'move';
         }
-        if (
-          Math.hypot(pt.x - geom.arrow1.x, pt.y - geom.arrow1.y) <= 16 ||
-          Math.hypot(pt.x - geom.arrow2.x, pt.y - geom.arrow2.y) <= 16
-        ) {
-          return 'grab';
+        if (isRotateMode) {
+          if (
+            Math.hypot(pt.x - geom.arrow1.x, pt.y - geom.arrow1.y) <= 16 ||
+            Math.hypot(pt.x - geom.arrow2.x, pt.y - geom.arrow2.y) <= 16
+          ) {
+            return 'grab';
+          }
         }
         const hitActive = ctx.canvasMgr.hitTestGuide(pt, ctx.model.canvas.width, ctx.model.canvas.height, 6);
         if (hitActive && hitActive.id === activeG.id) {
@@ -69,39 +71,38 @@ export class GuideInteraction {
     pt: Point,
     callbacks: SelectToolCallbacks
   ): { handled: boolean; activeHandle?: GuideHandleType } {
-    // 1. Check active Guide Transform controls (pivot or curved arrows)
-    if (ctx.canvasMgr.activeGuideTransformId) {
-      const activeG = ctx.canvasMgr.getGuide(ctx.canvasMgr.activeGuideTransformId);
+    // 1. Check controls on already selected Guide Line
+    if (ctx.canvasMgr.selectedGuideId) {
+      const activeG = ctx.canvasMgr.getGuide(ctx.canvasMgr.selectedGuideId);
       if (activeG) {
         const geom = ctx.canvasMgr.getGuideGeometry(activeG, ctx.model.canvas.width, ctx.model.canvas.height);
+        const isRotateMode = activeG.mode === 'rotate';
+        const centerPt = isRotateMode ? geom.pivot : geom.visualCenter;
 
-        // Check pivot or visual center click
-        if (
-          Math.hypot(pt.x - geom.pivot.x, pt.y - geom.pivot.y) <= 14 ||
-          Math.hypot(pt.x - geom.visualCenter.x, pt.y - geom.visualCenter.y) <= 14
-        ) {
+        // Check center handle click (move mode: translates guide; rotate mode: repositions pivot)
+        if (Math.hypot(pt.x - centerPt.x, pt.y - centerPt.y) <= 14) {
           this.guideInitialState = { ...activeG };
           ctx.render();
           return { handled: true, activeHandle: 'guide-pivot' };
         }
 
-        // Check arrow 1 click
-        if (Math.hypot(pt.x - geom.arrow1.x, pt.y - geom.arrow1.y) <= 16) {
-          this.activeRotateArrowIdx = 1;
-          this.guideInitialState = { ...activeG };
-          ctx.render();
-          return { handled: true, activeHandle: 'guide-rotate' };
+        // In rotate mode, check arrows click
+        if (isRotateMode) {
+          if (Math.hypot(pt.x - geom.arrow1.x, pt.y - geom.arrow1.y) <= 16) {
+            this.activeRotateArrowIdx = 1;
+            this.guideInitialState = { ...activeG };
+            ctx.render();
+            return { handled: true, activeHandle: 'guide-rotate' };
+          }
+          if (Math.hypot(pt.x - geom.arrow2.x, pt.y - geom.arrow2.y) <= 16) {
+            this.activeRotateArrowIdx = 2;
+            this.guideInitialState = { ...activeG };
+            ctx.render();
+            return { handled: true, activeHandle: 'guide-rotate' };
+          }
         }
 
-        // Check arrow 2 click
-        if (Math.hypot(pt.x - geom.arrow2.x, pt.y - geom.arrow2.y) <= 16) {
-          this.activeRotateArrowIdx = 2;
-          this.guideInitialState = { ...activeG };
-          ctx.render();
-          return { handled: true, activeHandle: 'guide-rotate' };
-        }
-
-        // Check click anywhere on the active transforming guide line body
+        // Check click on the active guide line body
         const hitActive = ctx.canvasMgr.hitTestGuide(pt, ctx.model.canvas.width, ctx.model.canvas.height, 8);
         if (hitActive && hitActive.id === activeG.id) {
           this.guideInitialState = { ...activeG };
@@ -111,36 +112,33 @@ export class GuideInteraction {
       }
     }
 
-    // 2. Check if clicking on any Guide Line to select it and activate rotation controls immediately
+    // 2. Check clicking on any other Guide Line to select it (starts in move mode)
     const hitGuide = ctx.canvasMgr.hitTestGuide(pt, ctx.model.canvas.width, ctx.model.canvas.height, 8);
     if (hitGuide) {
       ctx.selectionTool.deselectAll();
       ctx.canvasMgr.selectedGuideId = hitGuide.id;
-      ctx.canvasMgr.activeGuideTransformId = hitGuide.id;
+      if (!hitGuide.mode) {
+        hitGuide.mode = 'move';
+      }
+      ctx.canvasMgr.activeGuideTransformId = hitGuide.mode === 'rotate' ? hitGuide.id : null;
       this.guideInitialState = { ...hitGuide };
       callbacks.onGuideSelected?.(hitGuide);
 
       const geom = ctx.canvasMgr.getGuideGeometry(hitGuide, ctx.model.canvas.width, ctx.model.canvas.height);
+      const isRotateMode = hitGuide.mode === 'rotate';
+      const centerPt = isRotateMode ? geom.pivot : geom.visualCenter;
       let activeHandle: GuideHandleType = 'guide-move';
-      if (
-        Math.hypot(pt.x - geom.pivot.x, pt.y - geom.pivot.y) <= 14 ||
-        Math.hypot(pt.x - geom.visualCenter.x, pt.y - geom.visualCenter.y) <= 14
-      ) {
+      if (Math.hypot(pt.x - centerPt.x, pt.y - centerPt.y) <= 14) {
         activeHandle = 'guide-pivot';
-      } else if (
-        Math.hypot(pt.x - geom.arrow1.x, pt.y - geom.arrow1.y) <= 16 ||
-        Math.hypot(pt.x - geom.arrow2.x, pt.y - geom.arrow2.y) <= 16
-      ) {
-        activeHandle = 'guide-rotate';
-        this.activeRotateArrowIdx = Math.hypot(pt.x - geom.arrow2.x, pt.y - geom.arrow2.y) <= 16 ? 2 : 1;
       }
 
       ctx.render();
       return { handled: true, activeHandle };
     }
 
-    // 3. Clicked somewhere else: clear active guide transform
-    if (ctx.canvasMgr.activeGuideTransformId) {
+    // 3. Clicked somewhere else: clear active guide selection
+    if (ctx.canvasMgr.selectedGuideId) {
+      ctx.canvasMgr.selectedGuideId = null;
       ctx.canvasMgr.activeGuideTransformId = null;
     }
 
@@ -326,14 +324,20 @@ export class GuideInteraction {
   }
 
   /**
-   * Double-clicking directly on a guide line opens its angle/pivot transform controls.
+   * ARCHITECTURAL RATIONALE: Bimodal Double-Click Toggle (Move vs Rotate Mode)
+   * Double-clicking directly on a guide line or its center handle alternates between:
+   * 1. 'move' mode: Only the center handle is displayed for translation and snapping.
+   * 2. 'rotate' mode: Center handle acts as the pivot and rotation arrow indicators appear at 1/4 & 3/4.
+   * This matches the bimodal paradigm of vector selection (transform vs rotate).
    */
   public onDoubleClick(ctx: ToolContext, pt: Point, callbacks: SelectToolCallbacks): boolean {
     const hitGuide = ctx.canvasMgr.hitTestGuide(pt, ctx.model.canvas.width, ctx.model.canvas.height, 8);
     if (hitGuide) {
       ctx.selectionTool.deselectAll();
       ctx.canvasMgr.selectedGuideId = hitGuide.id;
-      ctx.canvasMgr.activeGuideTransformId = hitGuide.id;
+      // Toggle between 'move' and 'rotate' mode
+      hitGuide.mode = hitGuide.mode === 'rotate' ? 'move' : 'rotate';
+      ctx.canvasMgr.activeGuideTransformId = hitGuide.mode === 'rotate' ? hitGuide.id : null;
       callbacks.onGuideSelected?.(hitGuide);
       ctx.render();
       return true;
