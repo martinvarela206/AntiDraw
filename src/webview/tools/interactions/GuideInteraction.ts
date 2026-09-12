@@ -34,7 +34,10 @@ export class GuideInteraction {
       const activeG = ctx.canvasMgr.getGuide(ctx.canvasMgr.activeGuideTransformId);
       if (activeG) {
         const geom = ctx.canvasMgr.getGuideGeometry(activeG, ctx.model.canvas.width, ctx.model.canvas.height);
-        if (Math.hypot(pt.x - geom.pivot.x, pt.y - geom.pivot.y) <= 12) {
+        if (
+          Math.hypot(pt.x - geom.pivot.x, pt.y - geom.pivot.y) <= 14 ||
+          Math.hypot(pt.x - geom.visualCenter.x, pt.y - geom.visualCenter.y) <= 14
+        ) {
           return 'move';
         }
         if (
@@ -72,8 +75,11 @@ export class GuideInteraction {
       if (activeG) {
         const geom = ctx.canvasMgr.getGuideGeometry(activeG, ctx.model.canvas.width, ctx.model.canvas.height);
 
-        // Check pivot click
-        if (Math.hypot(pt.x - geom.pivot.x, pt.y - geom.pivot.y) <= 14) {
+        // Check pivot or visual center click
+        if (
+          Math.hypot(pt.x - geom.pivot.x, pt.y - geom.pivot.y) <= 14 ||
+          Math.hypot(pt.x - geom.visualCenter.x, pt.y - geom.visualCenter.y) <= 14
+        ) {
           this.guideInitialState = { ...activeG };
           ctx.render();
           return { handled: true, activeHandle: 'guide-pivot' };
@@ -116,7 +122,10 @@ export class GuideInteraction {
 
       const geom = ctx.canvasMgr.getGuideGeometry(hitGuide, ctx.model.canvas.width, ctx.model.canvas.height);
       let activeHandle: GuideHandleType = 'guide-move';
-      if (Math.hypot(pt.x - geom.pivot.x, pt.y - geom.pivot.y) <= 14) {
+      if (
+        Math.hypot(pt.x - geom.pivot.x, pt.y - geom.pivot.y) <= 14 ||
+        Math.hypot(pt.x - geom.visualCenter.x, pt.y - geom.visualCenter.y) <= 14
+      ) {
         activeHandle = 'guide-pivot';
       } else if (
         Math.hypot(pt.x - geom.arrow1.x, pt.y - geom.arrow1.y) <= 16 ||

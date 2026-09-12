@@ -152,6 +152,8 @@ class AntiDrawApp {
       onRender: () => this.render(),
       onApplyCanvasSize: () => this.applyCanvasSize(),
     });
+
+    this.canvasMgr.visibleBoundsProvider = () => this.viewportCtrl.getVisibleCanvasBounds();
   }
 
   private initLayout(): void {

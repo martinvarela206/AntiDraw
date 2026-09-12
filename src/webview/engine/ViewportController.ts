@@ -386,4 +386,33 @@ export class ViewportController {
 
     return { x: clientX, y: clientY };
   }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Viewport-Relative World Clipping Bounds
+   * Calculates the exact rectangular bounds of the currently visible workspace area in SVG world coordinates.
+   * Maps the four screen corners of `canvasScrollArea` through the SVG CTM inverse.
+   * This provides dynamic spatial boundaries for viewport-relative UI elements (such as guide line
+   * rotation and center markers at 1/4, 1/2, 3/4 of the visible span) invariant to camera zoom and pan.
+   */
+  public getVisibleCanvasBounds(): { minX: number; minY: number; maxX: number; maxY: number } {
+    if (!this.canvasScrollArea) {
+      const vb = this.model.getViewBoxBounds();
+      return { minX: vb.minX - 500, minY: vb.minY - 500, maxX: vb.minX + vb.width + 500, maxY: vb.minY + vb.height + 500 };
+    }
+    const rect = this.canvasScrollArea.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) {
+      const vb = this.model.getViewBoxBounds();
+      return { minX: vb.minX - 500, minY: vb.minY - 500, maxX: vb.minX + vb.width + 500, maxY: vb.minY + vb.height + 500 };
+    }
+    const p1 = this.getCanvasPointFromClient(rect.left, rect.top);
+    const p2 = this.getCanvasPointFromClient(rect.right, rect.top);
+    const p3 = this.getCanvasPointFromClient(rect.left, rect.bottom);
+    const p4 = this.getCanvasPointFromClient(rect.right, rect.bottom);
+    return {
+      minX: Math.min(p1.x, p2.x, p3.x, p4.x),
+      minY: Math.min(p1.y, p2.y, p3.y, p4.y),
+      maxX: Math.max(p1.x, p2.x, p3.x, p4.x),
+      maxY: Math.max(p1.y, p2.y, p3.y, p4.y),
+    };
+  }
 }

@@ -284,6 +284,13 @@ export class CanvasManager {
     return this.guideManager.hitTestGuide(pt, canvasW, canvasH, this.zoom, tolerance);
   }
 
+  public get visibleBoundsProvider(): (() => { minX: number; minY: number; maxX: number; maxY: number }) | undefined {
+    return this.guideManager.visibleBoundsProvider;
+  }
+  public set visibleBoundsProvider(val: (() => { minX: number; minY: number; maxX: number; maxY: number }) | undefined) {
+    this.guideManager.visibleBoundsProvider = val;
+  }
+
   public getGuideGeometry(guide: GuideLine, canvasW: number, canvasH: number): GuideGeometry {
     return this.guideManager.getGuideGeometry(guide, canvasW, canvasH);
   }

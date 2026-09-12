@@ -18,6 +18,7 @@ export interface GuideGeometry {
   arrow1: Point;
   arrow2: Point;
   pivot: Point;
+  visualCenter: Point;
 }
 
 /**
@@ -116,25 +117,107 @@ export class GuideManager {
     return null;
   }
 
+  public visibleBoundsProvider?: () => { minX: number; minY: number; maxX: number; maxY: number };
+
+  /**
+   * ARCHITECTURAL RATIONALE: Liang-Barsky Infinite Line Viewport Clipper
+   * Computes the exact segment where an infinite guide line intersects the visible viewport bounds.
+   * Parameterizes the line as P(t) = P0 + t * (cos, sin).
+   * Calculates entry and exit parameter values [t0, t1], deriving:
+   * - 1/4 point (rotation indicator 1): t = t0 + 0.25 * (t1 - t0)
+   * - 1/2 point (visual center handle): t = t0 + 0.50 * (t1 - t0)
+   * - 3/4 point (rotation indicator 2): t = t0 + 0.75 * (t1 - t0)
+   * This guarantees that rotation and positioning markers dynamically adjust to the user's
+   * visible screen area, remaining visible and uncluttered under any camera pan and zoom.
+   */
+  public clipInfiniteLineToRect(
+    p0: Point,
+    cos: number,
+    sin: number,
+    rect: { minX: number; minY: number; maxX: number; maxY: number }
+  ): { tMin: number; tMax: number; arrow1: Point; visualCenter: Point; arrow2: Point } | null {
+    let t0 = -Infinity;
+    let t1 = Infinity;
+
+    const edges = [
+      { p: -cos, q: p0.x - rect.minX },
+      { p: cos, q: rect.maxX - p0.x },
+      { p: -sin, q: p0.y - rect.minY },
+      { p: sin, q: rect.maxY - p0.y },
+    ];
+
+    for (const edge of edges) {
+      const { p, q } = edge;
+      if (Math.abs(p) < 1e-9) {
+        if (q < 0) return null; // Line is parallel and completely outside viewport
+      } else {
+        const t = q / p;
+        if (p < 0) {
+          if (t > t1) return null;
+          if (t > t0) t0 = t;
+        } else {
+          if (t < t0) return null;
+          if (t < t1) t1 = t;
+        }
+      }
+    }
+
+    if (t0 >= t1) return null;
+
+    const dt = t1 - t0;
+    const tQuarter = t0 + 0.25 * dt;
+    const tHalf = t0 + 0.50 * dt;
+    const tThreeQuarters = t0 + 0.75 * dt;
+
+    return {
+      tMin: t0,
+      tMax: t1,
+      arrow1: { x: p0.x + tQuarter * cos, y: p0.y + tQuarter * sin },
+      visualCenter: { x: p0.x + tHalf * cos, y: p0.y + tHalf * sin },
+      arrow2: { x: p0.x + tThreeQuarters * cos, y: p0.y + tThreeQuarters * sin },
+    };
+  }
+
   /**
    * Calculates guide endpoints and control handles for rendering.
+   * Derives rotation indicators at 1/4 and 3/4 and visual center handle at 1/2 of the visible segment.
    */
-  public getGuideGeometry(guide: GuideLine, canvasW: number, canvasH: number): GuideGeometry {
+  public getGuideGeometry(
+    guide: GuideLine,
+    canvasW: number,
+    canvasH: number,
+    visibleBounds?: { minX: number; minY: number; maxX: number; maxY: number }
+  ): GuideGeometry {
     const rad = ((guide.angle || 0) * Math.PI) / 180;
     const cos = Math.cos(rad);
     const sin = Math.sin(rad);
 
     const px = guide.pivotX ?? (guide.orientation === 'vertical' ? guide.position : canvasW / 2);
     const py = guide.pivotY ?? (guide.orientation === 'horizontal' ? guide.position : canvasH / 2);
+    const p0 = { x: px, y: py };
 
     const span = 100000;
     const p1 = { x: px - cos * span, y: py - sin * span };
     const p2 = { x: px + cos * span, y: py + sin * span };
 
-    const arrowDist = Math.min(canvasW, canvasH) * 0.4;
-    const arrow1 = { x: px - cos * arrowDist, y: py - sin * arrowDist };
-    const arrow2 = { x: px + cos * arrowDist, y: py + sin * arrowDist };
+    const bounds = visibleBounds || this.visibleBoundsProvider?.() || { minX: 0, minY: 0, maxX: canvasW, maxY: canvasH };
+    const clipped = this.clipInfiniteLineToRect(p0, cos, sin, bounds);
 
-    return { p1, p2, arrow1, arrow2, pivot: { x: px, y: py } };
+    let arrow1: Point;
+    let arrow2: Point;
+    let visualCenter: Point;
+
+    if (clipped) {
+      arrow1 = clipped.arrow1;
+      visualCenter = clipped.visualCenter;
+      arrow2 = clipped.arrow2;
+    } else {
+      const fallbackDist = Math.max(Math.min(canvasW, canvasH) * 0.4, 40);
+      arrow1 = { x: px - cos * fallbackDist, y: py - sin * fallbackDist };
+      visualCenter = { x: px, y: py };
+      arrow2 = { x: px + cos * fallbackDist, y: py + sin * fallbackDist };
+    }
+
+    return { p1, p2, arrow1, arrow2, pivot: { x: px, y: py }, visualCenter };
   }
 }
