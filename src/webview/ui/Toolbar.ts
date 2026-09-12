@@ -2,6 +2,7 @@ import { ToolIcons } from '../icons/ToolIcons.js';
 
 export type ToolType =
   | 'select'
+  | 'stroke'
   | 'node'
   | 'polyline'
   | 'pen'
@@ -37,6 +38,7 @@ export class Toolbar {
   private render(): void {
     const tools: { id: ToolType; title: string; icon: string }[] = [
       { id: 'select', title: 'Selection Tool (V)', icon: ToolIcons.select },
+      { id: 'stroke', title: 'Stroke Tool (T)', icon: ToolIcons.stroke },
       { id: 'node', title: 'Node Edit Tool (N)', icon: ToolIcons.node },
       { id: 'polyline', title: 'Polyline Tool (Y)', icon: ToolIcons.polyline },
       { id: 'pen', title: 'Bézier Curve Tool (P)', icon: ToolIcons.pen },

@@ -60,15 +60,6 @@ export class AppearanceInspector {
     el: VectorElement,
     isClosed: boolean,
     fill: string,
-    stroke: string,
-    strokeWidth: string,
-    strokeDash: string,
-    strokeLinecap: string,
-    strokeLinejoin: string,
-    miterAngleDeg: number,
-    markerStart: string,
-    markerMid: string,
-    markerEnd: string,
     grad: GradientConfig,
     fillType: 'solid' | 'linear' | 'radial' | 'none',
     gradientCss: string
@@ -170,175 +161,145 @@ export class AppearanceInspector {
                   <span class="prop-coord-sublabel">Ry</span>
                   <input type="number" class="prop-coord-input" id="radial-ry" value="${Math.round((grad.ry ?? grad.rx ?? grad.r ?? 0.5) * 100)}" min="1" max="500" step="5" />
                   <span class="prop-coord-sublabel">%</span>
-                </div>
-              </div>
-              <button class="prop-input" id="btn-reset-radial-radius" style="width: auto; padding: 2px 8px; height: 26px; cursor: pointer; flex-shrink: 0;" title="Restablecer radios al 50% (círculo simétrico)">50%</button>
-            </div>
-            <div class="prop-row" style="gap: 6px;">
-              <span class="prop-label" style="width: 46px;" title="Giro o rotación angular del gradiente radial elíptico en grados">Giro</span>
-              <div class="prop-coord-box" style="flex: 1;" title="Ángulo de rotación del gradiente radial (°)">
-                <span class="prop-coord-sublabel">∠</span>
-                <input type="number" class="prop-coord-input" id="radial-rotation" value="${Math.round(grad.rotation ?? 0)}" min="-360" max="360" step="5" />
-                <span class="prop-coord-sublabel">°</span>
-              </div>
-              <button class="prop-input" id="btn-reset-radial-rotation" style="width: 26px; height: 26px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;" title="Restablecer rotación a 0°">⟲</button>
-            </div>
-            <div class="prop-row" style="gap: 6px;">
-              <span class="prop-label" style="width: 46px;" title="Foco de iluminación del gradiente radial">Foco</span>
-              <div class="prop-coord-group">
-                <div class="prop-coord-box" title="Foco X del gradiente radial (%)">
-                  <span class="prop-coord-sublabel">X</span>
-                  <input type="number" class="prop-coord-input" id="radial-fx" value="${Math.round((grad.fx ?? grad.cx ?? 0.5) * 100)}" min="-100" max="200" step="5" />
-                  <span class="prop-coord-sublabel">%</span>
-                </div>
-                <div class="prop-coord-box" title="Foco Y del gradiente radial (%)">
-                  <span class="prop-coord-sublabel">Y</span>
-                  <input type="number" class="prop-coord-input" id="radial-fy" value="${Math.round((grad.fy ?? grad.cy ?? 0.5) * 100)}" min="-100" max="200" step="5" />
-                  <span class="prop-coord-sublabel">%</span>
-                </div>
-              </div>
-              <button class="prop-input" id="btn-sync-radial-focus" style="width: 26px; height: 26px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;" title="Igualar foco al centro">⟲</button>
-            </div>
-          </div>
-
-          <!-- Fill Transformation Locks & Aspect Reset Controls -->
-          <div style="margin: 8px 0 6px 0; padding: 6px 0; border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); display: flex; flex-direction: column; gap: 5px;">
-            <div style="font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 2px;">
-              Fijación y Ajuste de Relleno
-            </div>
-
-            <!-- Lock Escala -->
-            <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
-              <span class="prop-label" style="width: auto; flex: 1; font-size: 11px;" title="Bloquear escala: el relleno escala con el vector. Desbloqueado: conserva dimensiones fijas en pantalla.">Escala</span>
-              <button class="prop-input" id="btn-lock-fill-scale" style="width: 28px; height: 24px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px;" title="${grad.lockScale !== false ? 'Escala bloqueada (acompaña al vector). Clic para desbloquear y mantener tamaño fijo.' : 'Escala desbloqueada (mantiene tamaño fijo en pantalla). Clic para bloquear.'}">
-                ${grad.lockScale !== false ? '🔒' : '🔓'}
-              </button>
-              <button class="prop-input" id="btn-reset-fill-scale" style="width: 28px; height: 24px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px;" title="Restablecer escala del relleno a las dimensiones del vector">
-                ⟲
-              </button>
-            </div>
-
-            <!-- Lock Posición -->
-            <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
-              <span class="prop-label" style="width: auto; flex: 1; font-size: 11px;" title="Bloquear posición: el relleno se traslada con el vector. Desbloqueado: permanece fijo en el lienzo.">Posición</span>
-              <button class="prop-input" id="btn-lock-fill-pos" style="width: 28px; height: 24px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px;" title="${grad.lockPosition !== false ? 'Posición bloqueada (acompaña al vector). Clic para desbloquear y fijar al lienzo.' : 'Posición desbloqueada (fijo en el lienzo). Clic para bloquear.'}">
-                ${grad.lockPosition !== false ? '🔒' : '🔓'}
-              </button>
-              <button class="prop-input" id="btn-reset-fill-pos" style="width: 28px; height: 24px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px;" title="Recentrar posición del relleno en el centro del vector">
-                ⟲
-              </button>
-            </div>
-
-            <!-- Lock Rotación -->
-            <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
-              <span class="prop-label" style="width: auto; flex: 1; font-size: 11px;" title="Bloquear rotación: el relleno gira con el vector. Desbloqueado: conserva orientación fija en el lienzo.">Rotación</span>
-              <button class="prop-input" id="btn-lock-fill-rot" style="width: 28px; height: 24px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px;" title="${grad.lockRotation !== false ? 'Rotación bloqueada (gira con el vector). Clic para desbloquear y fijar orientación al lienzo.' : 'Rotación desbloqueada (orientación fija en el lienzo). Clic para bloquear.'}">
-                ${grad.lockRotation !== false ? '🔒' : '🔓'}
-              </button>
-              <button class="prop-input" id="btn-reset-fill-rot" style="width: 28px; height: 24px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px;" title="Restablecer rotación del relleno a 0° relativo al vector">
-                ⟲
-              </button>
-            </div>
-          </div>
-
-          <!-- Active Stop Selector & Inspector -->
-          <div class="prop-row">
-            <span class="prop-label">Stop</span>
-            <select class="prop-input" id="gradient-active-stop-select" style="cursor:pointer;">
-              ${grad.stops.map((s, idx) => `<option value="${idx}">Parada ${idx + 1} (${Math.round(s.offset * 100)}%)</option>`).join('')}
-            </select>
-          </div>
-          <div class="prop-row">
-            <span class="prop-label">Offset %</span>
-            <input type="number" class="prop-input" id="gradient-stop-offset" value="${Math.round((grad.stops[0]?.offset ?? 0) * 100)}" min="0" max="100" step="5" />
-            <span class="prop-label" style="width:40px; text-align:right;">Opac%</span>
-            <input type="number" class="prop-input" id="gradient-stop-opacity" value="${Math.round((grad.stops[0]?.opacity ?? 1) * 100)}" min="0" max="100" step="5" />
-          </div>
+        <!-- Solid Color Controls -->
+        <div id="fill-solid-controls" style="${fillType === 'solid' ? '' : 'display:none;'}">
           <div class="prop-row">
             <span class="prop-label">Color</span>
             <div class="color-picker-row">
-              <input type="color" class="color-swatch" id="gradient-stop-color" value="${grad.stops[0]?.color ?? '#4f46e5'}" />
-              <input type="text" class="prop-input" id="gradient-stop-color-hex" value="${grad.stops[0]?.color ?? '#4f46e5'}" />
+              <input type="color" class="color-swatch" id="el-fill-color" value="${fill === 'none' ? '#000000' : fill}" />
+              <input type="text" class="prop-input" id="el-fill-hex" value="${fill}" />
             </div>
           </div>
         </div>
-        `}
-      </div>
 
-      <div class="panel-section">
-        <div class="panel-title">Stroke</div>
-        <div class="prop-row">
-          <span class="prop-label">Color</span>
-          <div class="color-picker-row">
-            <input type="color" class="color-swatch" id="el-stroke-color" value="${stroke === 'none' ? '#ffffff' : stroke}" />
-            <input type="text" class="prop-input" id="el-stroke-hex" value="${stroke}" />
-          </div>
-        </div>
-        <div class="prop-row">
-          <span class="prop-label">Width</span>
-          <input type="number" class="prop-input" id="el-stroke-width" value="${strokeWidth}" min="0" step="0.5" />
-        </div>
-        <div class="prop-row">
-          <span class="prop-label">Dashes</span>
-          <input type="text" class="prop-input" id="el-stroke-dash" value="${strokeDash}" placeholder="e.g. 4 2" />
-        </div>
-        <div class="prop-row">
-          <span class="prop-label">Cap</span>
-          <select class="prop-input" id="el-stroke-cap" style="cursor:pointer;">
-            <option value="butt" ${strokeLinecap === 'butt' ? 'selected' : ''}>Butt</option>
-            <option value="round" ${strokeLinecap === 'round' ? 'selected' : ''}>Round</option>
-            <option value="square" ${strokeLinecap === 'square' ? 'selected' : ''}>Square</option>
-          </select>
-        </div>
-        <div class="prop-row">
-          <span class="prop-label">Join</span>
-          <div style="display:flex; gap:4px; flex:1; align-items:center;">
-            <select class="prop-input" id="el-stroke-join" style="cursor:pointer; flex:1;">
-              <option value="miter" ${strokeLinejoin === 'miter' ? 'selected' : ''}>Miter</option>
-              <option value="round" ${strokeLinejoin === 'round' ? 'selected' : ''}>Round</option>
-              <option value="bevel" ${strokeLinejoin === 'bevel' ? 'selected' : ''}>Bevel</option>
-            </select>
-            <div id="container-stroke-miterlimit" style="${strokeLinejoin === 'miter' ? 'display:flex;' : 'display:none;'} align-items:center; gap:2px; width:65px;" title="Ángulo mínimo de inglete en grados (°): esquinas más agudas que este valor se cortan a bisel. Valores menores permiten puntas más afiladas.">
-              <input type="number" class="prop-input" id="el-stroke-miter-angle" value="${miterAngleDeg}" min="1" max="170" step="1" style="width:45px; padding:2px 4px; text-align:right;" />
-              <span style="font-size:11px; color:var(--text-muted); font-weight:600;">°</span>
+        <!-- Gradient Controls -->
+        <div id="fill-gradient-controls" style="${fillType === 'linear' || fillType === 'radial' ? '' : 'display:none;'}">
+          <!-- Gradient Bar Preview -->
+          <div style="margin: 6px 0 8px 0;">
+            <div id="gradient-bar-preview" style="height: 16px; border-radius: 3px; border: 1px solid var(--border-color); background: ${gradientCss}; cursor: pointer; position: relative;" title="Clic para añadir una parada de color">
+              ${grad.stops.map((s, idx) => `
+                <div class="grad-stop-marker" data-stop-idx="${idx}" style="position: absolute; top: -2px; bottom: -2px; left: calc(${s.offset * 100}% - 4px); width: 8px; border: 1.5px solid #fff; border-radius: 2px; background: ${s.color}; box-shadow: 0 0 2px rgba(0,0,0,0.8); cursor: pointer;" title="Parada ${idx + 1}: ${Math.round(s.offset * 100)}%"></div>
+              `).join('')}
             </div>
           </div>
-        </div>
-        <div class="prop-row">
-          <span class="prop-label">Start Mkr</span>
-          <select class="prop-input" id="el-marker-start" style="cursor:pointer;" title="Marcador de inicio de trazo (marker-start)">
-            <option value="none" ${markerStart === 'none' ? 'selected' : ''}>None</option>
-            <option value="arrow-open" ${markerStart === 'arrow-open' ? 'selected' : ''}>Arrow (Open)</option>
-            <option value="arrow-filled" ${markerStart === 'arrow-filled' ? 'selected' : ''}>Arrow (Filled)</option>
-            <option value="circle-dot" ${markerStart === 'circle-dot' ? 'selected' : ''}>Circle Dot</option>
-            <option value="square-block" ${markerStart === 'square-block' ? 'selected' : ''}>Square</option>
-            <option value="bar-cap" ${markerStart === 'bar-cap' ? 'selected' : ''}>Bar Cap</option>
-          </select>
-        </div>
-        <div class="prop-row">
-          <span class="prop-label">Mid Mkr</span>
-          <select class="prop-input" id="el-marker-mid" style="cursor:pointer;" title="Marcador en vértices intermedios (marker-mid)">
-            <option value="none" ${markerMid === 'none' ? 'selected' : ''}>None</option>
-            <option value="arrow-filled" ${markerMid === 'arrow-filled' ? 'selected' : ''}>Arrow (Directional)</option>
-            <option value="circle-dot" ${markerMid === 'circle-dot' ? 'selected' : ''}>Circle Dot</option>
-            <option value="square-block" ${markerMid === 'square-block' ? 'selected' : ''}>Square</option>
-          </select>
-        </div>
-        <div class="prop-row">
-          <span class="prop-label">End Mkr</span>
-          <select class="prop-input" id="el-marker-end" style="cursor:pointer;" title="Marcador de final de trazo (marker-end)">
-            <option value="none" ${markerEnd === 'none' ? 'selected' : ''}>None</option>
-            <option value="arrow-open" ${markerEnd === 'arrow-open' ? 'selected' : ''}>Arrow (Open)</option>
-            <option value="arrow-filled" ${markerEnd === 'arrow-filled' ? 'selected' : ''}>Arrow (Filled)</option>
-            <option value="circle-dot" ${markerEnd === 'circle-dot' ? 'selected' : ''}>Circle Dot</option>
-            <option value="square-block" ${markerEnd === 'square-block' ? 'selected' : ''}>Square</option>
-            <option value="bar-cap" ${markerEnd === 'bar-cap' ? 'selected' : ''}>Bar Cap</option>
-          </select>
-        </div>
-        <div class="prop-row" style="margin-top: 8px;">
-          <button class="prop-input" id="btn-stroke-to-path" style="cursor:pointer; background:var(--bg-active); text-align:center; font-weight:600; color:var(--text-main); padding:6px;" title="Convertir geométricamente el trazo en un contorno cerrado independiente con relleno (Outline Stroke)">
-            ⤹ Convertir Trazo a Vector
-          </button>
+
+          <!-- Linear Angle Controls -->
+          <div id="container-linear-angle" style="${fillType === 'linear' ? '' : 'display:none;'}">
+            <div class="prop-row">
+              <span class="prop-label">Ángulo</span>
+              <div style="display:flex; gap:4px; flex:1; align-items:center;">
+                <input type="number" class="prop-input" id="gradient-angle" value="${grad.angle ?? 0}" min="0" max="360" step="15" style="width:55px;" />
+                <select class="prop-input" id="gradient-angle-presets" style="cursor:pointer; flex:1;">
+                  <option value="0" ${(grad.angle ?? 0) === 0 ? 'selected' : ''}>0° (→)</option>
+                  <option value="45" ${(grad.angle ?? 0) === 45 ? 'selected' : ''}>45° (↗)</option>
+                  <option value="90" ${(grad.angle ?? 0) === 90 ? 'selected' : ''}>90° (↑)</option>
+                  <option value="135" ${(grad.angle ?? 0) === 135 ? 'selected' : ''}>135° (↖)</option>
+                  <option value="180" ${(grad.angle ?? 0) === 180 ? 'selected' : ''}>180° (←)</option>
+                  <option value="225" ${(grad.angle ?? 0) === 225 ? 'selected' : ''}>225° (↙)</option>
+                  <option value="270" ${(grad.angle ?? 0) === 270 ? 'selected' : ''}>270° (↓)</option>
+                  <option value="315" ${(grad.angle ?? 0) === 315 ? 'selected' : ''}>315° (↘)</option>
+                </select>
+                <button class="prop-input" id="btn-reverse-gradient" style="width: 26px; height: 26px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;" title="Invertir paradas de color">⇄</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Radial Center / Radius / Focus Controls -->
+          <div id="container-radial-params" style="${fillType === 'radial' ? '' : 'display:none;'}">
+            <!-- Center Position (cx, cy) -->
+            <div class="prop-row">
+              <span class="prop-label">Centro</span>
+              <div style="display:flex; gap:4px; flex:1; align-items:center;">
+                <span style="font-size:10px; color:var(--text-muted);">X</span>
+                <input type="number" class="prop-input" id="gradient-radial-cx" value="${Math.round((grad.cx ?? 0.5) * 100)}" min="-100" max="200" step="5" style="width:48px;" title="Posición horizontal del centro (50% = centro del vector)" />
+                <span style="font-size:10px; color:var(--text-muted); margin-left:4px;">Y</span>
+                <input type="number" class="prop-input" id="gradient-radial-cy" value="${Math.round((grad.cy ?? 0.5) * 100)}" min="-100" max="200" step="5" style="width:48px;" title="Posición vertical del centro (50% = centro del vector)" />
+                <button class="prop-input" id="btn-reset-radial-center" style="width: 26px; height: 26px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;" title="Restablecer centro a (50%, 50%)">⟲</button>
+              </div>
+            </div>
+            <!-- Radius (r) -->
+            <div class="prop-row">
+              <span class="prop-label">Radio</span>
+              <div style="display:flex; gap:4px; flex:1; align-items:center;">
+                <input type="number" class="prop-input" id="gradient-radial-r" value="${Math.round((grad.r ?? 0.5) * 100)}" min="5" max="300" step="5" style="width:55px;" title="Radio de difusión radial (50% = cubre hasta los bordes del vector)" />
+                <span style="font-size:11px; color:var(--text-muted);">%</span>
+                <button class="prop-input" id="btn-reverse-radial-gradient" style="width: 26px; height: 26px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; margin-left: auto;" title="Invertir paradas de color">⇄</button>
+              </div>
+            </div>
+            <!-- Focal Point (fx, fy) -->
+            <div class="prop-row">
+              <span class="prop-label">Foco</span>
+              <div style="display:flex; gap:4px; flex:1; align-items:center;">
+                <span style="font-size:10px; color:var(--text-muted);">X</span>
+                <input type="number" class="prop-input" id="gradient-radial-fx" value="${Math.round((grad.fx ?? grad.cx ?? 0.5) * 100)}" min="-100" max="200" step="5" style="width:48px;" title="Punto focal de iluminación horizontal (fx)" />
+                <span style="font-size:10px; color:var(--text-muted); margin-left:4px;">Y</span>
+                <input type="number" class="prop-input" id="gradient-radial-fy" value="${Math.round((grad.fy ?? grad.cy ?? 0.5) * 100)}" min="-100" max="200" step="5" style="width:48px;" title="Punto focal de iluminación vertical (fy)" />
+                <button class="prop-input" id="btn-sync-radial-focus" style="width: 26px; height: 26px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;" title="Igualar foco al centro">⟲</button>
+              </div>
+            </div>
+
+            <!-- Fill Transformation Locks & Aspect Reset Controls -->
+            <div style="margin: 8px 0 6px 0; padding: 6px 0; border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); display: flex; flex-direction: column; gap: 5px;">
+              <div style="font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 2px;">
+                Fijación y Ajuste de Relleno
+              </div>
+
+              <!-- Lock Escala -->
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
+                <span class="prop-label" style="width: auto; flex: 1; font-size: 11px;" title="Bloquear escala: el relleno escala con el vector. Desbloqueado: conserva dimensiones fijas en pantalla.">Escala</span>
+                <button class="prop-input" id="btn-lock-fill-scale" style="width: 28px; height: 24px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px;" title="${grad.lockScale !== false ? 'Escala bloqueada (acompaña al vector). Clic para desbloquear y mantener tamaño fijo.' : 'Escala desbloqueada (mantiene tamaño fijo en pantalla). Clic para bloquear.'}">
+                  ${grad.lockScale !== false ? '🔒' : '🔓'}
+                </button>
+                <button class="prop-input" id="btn-reset-fill-scale" style="width: 28px; height: 24px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px;" title="Restablecer escala del relleno a las dimensiones del vector">
+                  ⟲
+                </button>
+              </div>
+
+              <!-- Lock Posición -->
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
+                <span class="prop-label" style="width: auto; flex: 1; font-size: 11px;" title="Bloquear posición: el relleno se traslada con el vector. Desbloqueado: permanece fijo en el lienzo.">Posición</span>
+                <button class="prop-input" id="btn-lock-fill-pos" style="width: 28px; height: 24px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px;" title="${grad.lockPosition !== false ? 'Posición bloqueada (acompaña al vector). Clic para desbloquear y fijar al lienzo.' : 'Posición desbloqueada (fijo en el lienzo). Clic para bloquear.'}">
+                  ${grad.lockPosition !== false ? '🔒' : '🔓'}
+                </button>
+                <button class="prop-input" id="btn-reset-fill-pos" style="width: 28px; height: 24px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px;" title="Recentrar posición del relleno en el centro del vector">
+                  ⟲
+                </button>
+              </div>
+
+              <!-- Lock Rotación -->
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
+                <span class="prop-label" style="width: auto; flex: 1; font-size: 11px;" title="Bloquear rotación: el relleno gira con el vector. Desbloqueado: conserva orientación fija en el lienzo.">Rotación</span>
+                <button class="prop-input" id="btn-lock-fill-rot" style="width: 28px; height: 24px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px;" title="${grad.lockRotation !== false ? 'Rotación bloqueada (gira con el vector). Clic para desbloquear y fijar orientación al lienzo.' : 'Rotación desbloqueada (orientación fija en el lienzo). Clic para bloquear.'}">
+                  ${grad.lockRotation !== false ? '🔒' : '🔓'}
+                </button>
+                <button class="prop-input" id="btn-reset-fill-rot" style="width: 28px; height: 24px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px;" title="Restablecer rotación del relleno a 0° relativo al vector">
+                  ⟲
+                </button>
+              </div>
+            </div>
+
+            <!-- Active Stop Selector & Inspector -->
+            <div class="prop-row">
+              <span class="prop-label">Stop</span>
+              <select class="prop-input" id="gradient-active-stop-select" style="cursor:pointer;">
+                ${grad.stops.map((s, idx) => `<option value="${idx}">Parada ${idx + 1} (${Math.round(s.offset * 100)}%)</option>`).join('')}
+              </select>
+            </div>
+            <div class="prop-row">
+              <span class="prop-label">Offset %</span>
+              <input type="number" class="prop-input" id="gradient-stop-offset" value="${Math.round((grad.stops[0]?.offset ?? 0) * 100)}" min="0" max="100" step="5" />
+              <span class="prop-label" style="width:40px; text-align:right;">Opac%</span>
+              <input type="number" class="prop-input" id="gradient-stop-opacity" value="${Math.round((grad.stops[0]?.opacity ?? 1) * 100)}" min="0" max="100" step="5" />
+            </div>
+            <div class="prop-row">
+              <span class="prop-label">Color</span>
+              <div class="color-picker-row">
+                <input type="color" class="color-swatch" id="gradient-stop-color" value="${grad.stops[0]?.color ?? '#4f46e5'}" />
+                <input type="text" class="prop-input" id="gradient-stop-color-hex" value="${grad.stops[0]?.color ?? '#4f46e5'}" />
+              </div>
+            </div>
+          </div>
+          `}
         </div>
       </div>
     `;
@@ -783,122 +744,6 @@ export class AppearanceInspector {
         callbacks.onRenderOverlay?.();
       });
     }
-
-    // Stroke controls
-    const elStrokeColor = container.querySelector<HTMLInputElement>('#el-stroke-color');
-    const elStrokeHex = container.querySelector<HTMLInputElement>('#el-stroke-hex');
-    const elStrokeWidth = container.querySelector<HTMLInputElement>('#el-stroke-width');
-    const elStrokeDash = container.querySelector<HTMLInputElement>('#el-stroke-dash');
-    const elStrokeCap = container.querySelector<HTMLSelectElement>('#el-stroke-cap');
-    const elStrokeJoin = container.querySelector<HTMLSelectElement>('#el-stroke-join');
-
-    if (elStrokeColor) {
-      elStrokeColor.addEventListener('input', () => {
-        el.attributes['stroke'] = elStrokeColor.value;
-        if (elStrokeHex) elStrokeHex.value = elStrokeColor.value;
-        callbacks.onUpdateElement(el);
-      });
-    }
-    if (elStrokeHex) {
-      elStrokeHex.addEventListener('change', () => {
-        el.attributes['stroke'] = elStrokeHex.value;
-        if (elStrokeColor) elStrokeColor.value = elStrokeHex.value;
-        callbacks.onUpdateElement(el);
-      });
-    }
-    if (elStrokeWidth) {
-      elStrokeWidth.addEventListener('input', () => {
-        el.attributes['stroke-width'] = elStrokeWidth.value;
-        callbacks.onUpdateElement(el);
-      });
-    }
-    if (elStrokeDash) {
-      elStrokeDash.addEventListener('change', () => {
-        el.attributes['stroke-dasharray'] = elStrokeDash.value;
-        callbacks.onUpdateElement(el);
-      });
-    }
-    if (elStrokeCap) {
-      elStrokeCap.addEventListener('change', () => {
-        el.attributes['stroke-linecap'] = elStrokeCap.value;
-        callbacks.onUpdateElement(el);
-      });
-    }
-    if (elStrokeJoin) {
-      elStrokeJoin.addEventListener('change', () => {
-        el.attributes['stroke-linejoin'] = elStrokeJoin.value;
-        const miterContainer = container.querySelector<HTMLElement>('#container-stroke-miterlimit');
-        if (miterContainer) {
-          miterContainer.style.display = elStrokeJoin.value === 'miter' ? 'flex' : 'none';
-        }
-        callbacks.onUpdateElement(el);
-      });
-    }
-
-    const elStrokeMiterAngle = container.querySelector<HTMLInputElement>('#el-stroke-miter-angle');
-    if (elStrokeMiterAngle) {
-      const applyMiterAngle = () => {
-        const deg = Math.max(1, Math.min(170, parseFloat(elStrokeMiterAngle.value) || 29));
-        const limit = degreesToMiterLimit(deg);
-        el.attributes['stroke-miterlimit'] = limit.toString();
-        callbacks.onUpdateElement(el);
-      };
-      elStrokeMiterAngle.addEventListener('input', applyMiterAngle);
-      elStrokeMiterAngle.addEventListener('change', () => {
-        if (callbacks.onPushUndo) callbacks.onPushUndo();
-        applyMiterAngle();
-      });
-    }
-
-    const elMarkerStart = container.querySelector<HTMLSelectElement>('#el-marker-start');
-    const elMarkerMid = container.querySelector<HTMLSelectElement>('#el-marker-mid');
-    const elMarkerEnd = container.querySelector<HTMLSelectElement>('#el-marker-end');
-
-    if (elMarkerStart) {
-      elMarkerStart.addEventListener('change', () => {
-        const val = elMarkerStart.value;
-        if (val === 'none') {
-          delete el.attributes['marker-start'];
-        } else if (val === 'circle-dot' || val === 'square-block') {
-          el.attributes['marker-start'] = `url(#ad-marker-${val})`;
-        } else {
-          el.attributes['marker-start'] = `url(#ad-marker-${val}-start)`;
-        }
-        callbacks.onUpdateElement(el);
-      });
-    }
-
-    if (elMarkerMid) {
-      elMarkerMid.addEventListener('change', () => {
-        const val = elMarkerMid.value;
-        if (val === 'none') {
-          delete el.attributes['marker-mid'];
-        } else if (val === 'arrow-filled') {
-          el.attributes['marker-mid'] = 'url(#ad-marker-arrow-filled-mid)';
-        } else {
-          el.attributes['marker-mid'] = `url(#ad-marker-${val})`;
-        }
-        callbacks.onUpdateElement(el);
-      });
-    }
-
-    if (elMarkerEnd) {
-      elMarkerEnd.addEventListener('change', () => {
-        const val = elMarkerEnd.value;
-        if (val === 'none') {
-          delete el.attributes['marker-end'];
-        } else if (val === 'circle-dot' || val === 'square-block') {
-          el.attributes['marker-end'] = `url(#ad-marker-${val})`;
-        } else {
-          el.attributes['marker-end'] = `url(#ad-marker-${val}-end)`;
-        }
-        callbacks.onUpdateElement(el);
-      });
-    }
-
-    bindInspectorMouseDown(container, 'btn-stroke-to-path', () => {
-      if (callbacks.onStrokeToPath) callbacks.onStrokeToPath();
-    });
 
     const closePathBtn = container.querySelector<HTMLButtonElement>('#btn-prop-close-path');
     if (closePathBtn) {

@@ -39,7 +39,7 @@ export interface SelectToolCallbacks {
  *    - Bounding box resize/rotation handles take precedence over element drag.
  */
 export class SelectToolHandler implements IToolHandler {
-  public readonly toolTypes: ToolType[] = ['select'];
+  public readonly toolTypes: ToolType[] = ['select', 'stroke'];
 
   private isDragging: boolean = false;
   private dragStartPt: Point = { x: 0, y: 0 };

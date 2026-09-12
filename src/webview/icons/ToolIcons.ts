@@ -3,6 +3,12 @@ export const ToolIcons = {
     <path d="M3 3l7 18 3-7 7-3L3 3z"/>
   </svg>`,
 
+  stroke: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 15c4-6 10-6 15-2" stroke-width="2.5"/>
+    <path d="M18 10l3 3-3 3" stroke-width="1.8"/>
+    <line x1="3" y1="21" x2="21" y2="21" stroke-width="1.5" stroke-dasharray="2 2"/>
+  </svg>`,
+
   node: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <circle cx="12" cy="12" r="3"/>
     <path d="M5 5l4 4M19 5l-4 4M5 19l4-4M19 19l-4-4"/>

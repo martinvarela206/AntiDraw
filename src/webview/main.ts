@@ -477,6 +477,7 @@ class AntiDrawApp {
       if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'SELECT') return;
 
       if (e.key === 'v' || e.key === 'V') this.toolbar.setTool('select');
+      if (e.key === 't' || e.key === 'T') this.toolbar.setTool('stroke');
       if (e.key === 'n' || e.key === 'N') this.toolbar.setTool('node');
       if (!e.ctrlKey && !e.metaKey && (e.key === 'y' || e.key === 'Y')) this.toolbar.setTool('polyline');
       if (e.key === 'p' || e.key === 'P') this.toolbar.setTool('pen');
@@ -1044,7 +1045,7 @@ class AntiDrawApp {
     if (statusTool) statusTool.innerText = `Tool: ${tool}`;
     this.rulerView.setCornerActive(false);
     this.propertyPanel.resetPanelMode();
-    if (tool !== 'select') {
+    if (tool !== 'select' && tool !== 'stroke') {
       this.canvasMgr.selectedGuideId = null;
       this.canvasMgr.activeGuideTransformId = null;
     }
@@ -1148,7 +1149,7 @@ class AntiDrawApp {
       this.canvasWrapper.setPointerCapture(e.pointerId);
     } catch (_err) {}
 
-    if (activeTool === 'select') {
+    if (activeTool === 'select' || activeTool === 'stroke') {
       if (this.selectToolHandler.onPointerDown(e, pt)) {
         return;
       }
@@ -1264,7 +1265,7 @@ class AntiDrawApp {
     }
 
     // Select Tool Delegation
-    if (this.toolbar.activeTool === 'select') {
+    if (this.toolbar.activeTool === 'select' || this.toolbar.activeTool === 'stroke') {
       if (this.selectToolHandler.onPointerMove(e, pt)) {
         return;
       }
@@ -1362,7 +1363,7 @@ class AntiDrawApp {
     }
 
     // Select Tool Delegation
-    if (this.toolbar.activeTool === 'select') {
+    if (this.toolbar.activeTool === 'select' || this.toolbar.activeTool === 'stroke') {
       this.isDragging = false;
       if (this.selectToolHandler.onPointerUp(e, pt)) {
         return;

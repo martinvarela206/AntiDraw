@@ -49,6 +49,7 @@ import { EffectsInspector } from './inspectors/EffectsInspector.js';
 import { PrimitiveInspector } from './inspectors/PrimitiveInspector.js';
 import { NodeInspector } from './inspectors/NodeInspector.js';
 import { MultiSelectionInspector } from './inspectors/MultiSelectionInspector.js';
+import { StrokeInspector } from './inspectors/StrokeInspector.js';
 
 export class PropertyPanel {
   private container: HTMLElement;
@@ -74,7 +75,7 @@ export class PropertyPanel {
   private callbacks: PropertyPanelCallbacks;
 
   // Track which panel section is currently rendered to avoid full re-builds
-  public currentPanelMode: 'canvas' | 'element' | 'node' | 'pen' | 'polyline' | 'multi' | 'ruler' | 'guide' | 'shape' | null = null;
+  public currentPanelMode: 'canvas' | 'element' | 'node' | 'pen' | 'polyline' | 'multi' | 'ruler' | 'guide' | 'shape' | 'stroke' | null = null;
 
   constructor(
     container: HTMLElement,
@@ -200,6 +201,9 @@ export class PropertyPanel {
           this.renderNodeProperties(selectedEls[0], this.activeVertex);
           this.currentPanelMode = 'node';
         }
+      } else if (this.activeTool === 'stroke') {
+        this.currentPanelMode = 'stroke';
+        this.renderStrokeProperties(selectedEls[0]);
       } else if (selectedEls.length === 1) {
         this.currentPanelMode = 'element';
         this.renderElementProperties(selectedEls[0]);
@@ -207,6 +211,13 @@ export class PropertyPanel {
         this.currentPanelMode = 'multi';
         this.renderMultiElementProperties(selectedEls);
       }
+      return;
+    }
+
+    // Stroke Tool Active without elements selected
+    if (this.activeTool === 'stroke') {
+      this.currentPanelMode = 'stroke';
+      this.renderStrokeEmptyState();
       return;
     }
 
@@ -445,29 +456,8 @@ export class PropertyPanel {
     let fill = isClosed ? (el.attributes['fill'] || 'none') : 'none';
     if (!isClosed) {
       el.attributes['fill'] = 'none';
-      delete el.attributes['data-gradient'];
+      delete el.attributes['fill-rule'];
     }
-    const stroke = el.attributes['stroke'] || '#ffffff';
-    const strokeWidth = el.attributes['stroke-width'] || '1';
-    const strokeDash = el.attributes['stroke-dasharray'] || '';
-    const strokeLinecap = el.attributes['stroke-linecap'] || 'butt';
-    const strokeLinejoin = el.attributes['stroke-linejoin'] || 'miter';
-    const strokeMiterlimit = parseFloat(el.attributes['stroke-miterlimit'] || '4') || 4;
-    const miterAngleDeg = miterLimitToDegrees(strokeMiterlimit);
-
-    const parseMarkerId = (val?: string): string => {
-      if (!val || val === 'none') return 'none';
-      if (val.includes('arrow-open')) return 'arrow-open';
-      if (val.includes('arrow-filled')) return 'arrow-filled';
-      if (val.includes('circle-dot')) return 'circle-dot';
-      if (val.includes('square-block')) return 'square-block';
-      if (val.includes('bar-cap')) return 'bar-cap';
-      return 'none';
-    };
-
-    const markerStart = parseMarkerId(el.attributes['marker-start']);
-    const markerMid = parseMarkerId(el.attributes['marker-mid']);
-    const markerEnd = parseMarkerId(el.attributes['marker-end']);
 
     const box = this.selectionTool.getBoundingBox(el);
     const x = box ? Math.round(box.x) : 0;
@@ -544,19 +534,10 @@ export class PropertyPanel {
 
       ${PrimitiveInspector.renderElementPrimitives(el, this.model, box)}
 
-            ${AppearanceInspector.renderHtml(
+      ${AppearanceInspector.renderHtml(
         el,
         isClosed,
         fill,
-        stroke,
-        strokeWidth,
-        strokeDash,
-        strokeLinecap,
-        strokeLinejoin,
-        miterAngleDeg,
-        markerStart,
-        markerMid,
-        markerEnd,
         grad,
         fillType,
         gradientCss
@@ -598,7 +579,7 @@ export class PropertyPanel {
       () => this.renderElementProperties(el)
     );
 
-        AppearanceInspector.bindEvents(
+    AppearanceInspector.bindEvents(
       this.container,
       el,
       this.model,
@@ -617,6 +598,63 @@ export class PropertyPanel {
     this.bindMouseDown('btn-prop-bool-fragment-single', () => this.callbacks.onBoolean && this.callbacks.onBoolean('fragment'));
 
     EffectsInspector.bindEvents(this.container, el, ds, is, this.callbacks);
+  }
+
+  // Render Stroke Tool Empty State (No vector selected)
+  private renderStrokeEmptyState(): void {
+    this.container.innerHTML = `
+      <div class="panel-section">
+        <div class="panel-title">Stroke Tool (Herramienta Trazo - T)</div>
+        <div style="font-size:11px; color:var(--text-muted); line-height:1.5; margin-top:6px;">
+          Selecciona cualquier vector o trazado en el lienzo para inspeccionar y configurar sus propiedades de línea, remates, uniones y marcadores.
+        </div>
+      </div>
+    `;
+  }
+
+  // Render Dedicated Stroke Tool Properties for single selected vector
+  private renderStrokeProperties(el: VectorElement): void {
+    const stroke = el.attributes['stroke'] || '#ffffff';
+    const strokeWidth = el.attributes['stroke-width'] || '1';
+    const strokeDash = el.attributes['stroke-dasharray'] || '';
+    const strokeLinecap = el.attributes['stroke-linecap'] || 'butt';
+    const strokeLinejoin = el.attributes['stroke-linejoin'] || 'miter';
+    const strokeMiterlimit = parseFloat(el.attributes['stroke-miterlimit'] || '4') || 4;
+    const miterAngleDeg = miterLimitToDegrees(strokeMiterlimit);
+
+    const parseMarkerId = (val?: string): string => {
+      if (!val || val === 'none') return 'none';
+      if (val.includes('arrow-open')) return 'arrow-open';
+      if (val.includes('arrow-filled')) return 'arrow-filled';
+      if (val.includes('circle-dot')) return 'circle-dot';
+      if (val.includes('square-block')) return 'square-block';
+      if (val.includes('bar-cap')) return 'bar-cap';
+      return 'none';
+    };
+
+    const markerStart = parseMarkerId(el.attributes['marker-start']);
+    const markerMid = parseMarkerId(el.attributes['marker-mid']);
+    const markerEnd = parseMarkerId(el.attributes['marker-end']);
+
+    this.container.innerHTML = StrokeInspector.renderHtml(el, {
+      stroke,
+      strokeWidth,
+      strokeDash,
+      strokeLinecap,
+      strokeLinejoin,
+      miterAngleDeg,
+      markerStart,
+      markerMid,
+      markerEnd,
+    });
+
+    StrokeInspector.bindEvents(
+      this.container,
+      el,
+      this.model,
+      this.callbacks,
+      () => this.renderStrokeProperties(el)
+    );
   }
 
   // Render Node Properties for single selected vertex
