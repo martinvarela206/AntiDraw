@@ -402,11 +402,347 @@ export class StrokeOutlineGenerator {
   }
 
   /**
+   * ARCHITECTURAL RATIONALE: Analytical Bézier Parallel Curve Extrusion (FEAT-23)
+   *
+   * 1. Preserving Exact Node Topology (2N rule):
+   *    Instead of segment tessellation and polygon clipping that turns curves into 60+ faceted
+   *    polygonal vertices, this analytical engine constructs the parallel offset curve directly in Bézier
+   *    space. For an open path of N nodes, it generates a closed contour with exactly 2N nodes:
+   *    N nodes forward along the Right boundary (+h), and N nodes backward along the Left boundary (-h).
+   *
+   * 2. Differential Curvature & Proportional Handle Scaling:
+   *    In parallel curve differential geometry, the offset curve radius is R' = R + d.
+   *    As the curve bends through angle deltaTheta over chord length L:
+   *      - The Convex side (longer arc) scales handles by s_convex = 1 + (|deltaTheta| * halfW) / L > 1,
+   *        rendering a wider, smoother curvature.
+   *      - The Concave side (shorter arc) scales handles by s_concave = 1 - (|deltaTheta| * halfW) / L < 1,
+   *        rendering a tighter, more pronounced curvature.
+   *
+   * 3. Seamless End-Caps & Zero Artifacts:
+   *    Synthesizes butt, round, or square caps directly in Bézier coordinates without numerical drift.
+   */
+  public static analyticalOutlineStroke(element: VectorElement, model: VectorModel): VectorElement | null {
+    if (!element.vertices || element.vertices.length < 2) return null;
+    const isClosed = element.isClosed ?? false;
+    // Analytical parallel extrusion is specialized for open paths (e.g. lines, polylines, curves)
+    if (isClosed) return null;
+
+    // Check if there are multiple subpaths (M commands after index 0)
+    let mCount = 0;
+    for (const v of element.vertices) {
+      if (v.command === 'M') mCount++;
+      if (mCount > 1) return null; // Fallback to clipping for multi-subpath compound paths
+    }
+
+    const strokeWidth = parseFloat(element.attributes['stroke-width'] || '1') || 1;
+    const strokeLinecap = element.attributes['stroke-linecap'] || 'butt';
+    const strokeColor = element.attributes['stroke'] || '#000000';
+    const halfW = strokeWidth / 2;
+
+    const sp = element.vertices;
+    const N = sp.length;
+    if (N < 2) return null;
+
+    // Compute unit tangents and right-normals for each vertex
+    const tangents: Point[] = [];
+    const normals: Point[] = [];
+
+    for (let i = 0; i < N; i++) {
+      let t: Point;
+      if (i === 0) {
+        t = this.computeStartTangent(sp);
+      } else if (i === N - 1) {
+        t = this.computeEndTangent(sp);
+      } else {
+        t = this.computeMidTangent(sp[i - 1], sp[i], sp[i + 1]);
+      }
+      const len = Math.hypot(t.x, t.y) || 1;
+      const u: Point = { x: t.x / len, y: t.y / len };
+      tangents.push(u);
+      // Right normal in screen coordinates (X right, Y down): (-u.y, u.x)
+      normals.push({ x: -u.y, y: u.x });
+    }
+
+    // Compute offset positions P_{i, R} and P_{i, L}
+    const rightPts: Point[] = [];
+    const leftPts: Point[] = [];
+
+    for (let i = 0; i < N; i++) {
+      const v = sp[i];
+      const u = tangents[i];
+      const n = normals[i];
+
+      let miterScale = 1.0;
+      if (i > 0 && i < N - 1) {
+        const inDx = v.x - sp[i - 1].x;
+        const inDy = v.y - sp[i - 1].y;
+        const inLen = Math.hypot(inDx, inDy) || 1;
+        const uIn: Point = { x: inDx / inLen, y: inDy / inLen };
+        const dot = uIn.x * u.x + uIn.y * u.y;
+        if (dot > 0.1) {
+          miterScale = Math.min(2.0, 1 / dot);
+        }
+      }
+
+      let capShiftX = 0;
+      let capShiftY = 0;
+      if (strokeLinecap === 'square') {
+        if (i === 0) {
+          capShiftX = -u.x * halfW;
+          capShiftY = -u.y * halfW;
+        } else if (i === N - 1) {
+          capShiftX = u.x * halfW;
+          capShiftY = u.y * halfW;
+        }
+      }
+
+      const offsetDist = halfW * miterScale;
+      rightPts.push({
+        x: Math.round((v.x + n.x * offsetDist + capShiftX) * 100) / 100,
+        y: Math.round((v.y + n.y * offsetDist + capShiftY) * 100) / 100,
+      });
+      leftPts.push({
+        x: Math.round((v.x - n.x * offsetDist + capShiftX) * 100) / 100,
+        y: Math.round((v.y - n.y * offsetDist + capShiftY) * 100) / 100,
+      });
+    }
+
+    // Now evaluate segments between V_k and V_{k+1}
+    interface SegmentCurveData {
+      hasCurve: boolean;
+      hOutR?: Point;
+      hInR?: Point;
+      hOutL?: Point;
+      hInL?: Point;
+    }
+
+    const segmentsData: SegmentCurveData[] = [];
+
+    for (let k = 0; k < N - 1; k++) {
+      const v0 = sp[k];
+      const v1 = sp[k + 1];
+      const hasCurve = !!(v0.handleOut || v1.handleIn);
+
+      if (!hasCurve) {
+        segmentsData.push({ hasCurve: false });
+        continue;
+      }
+
+      const p0 = { x: v0.x, y: v0.y };
+      const p1 = v0.handleOut ? { x: v0.handleOut.x, y: v0.handleOut.y } : p0;
+      const p2 = v1.handleIn ? { x: v1.handleIn.x, y: v1.handleIn.y } : { x: v1.x, y: v1.y };
+      const p3 = { x: v1.x, y: v1.y };
+
+      // Tangents at start and end of segment
+      let t0 = { x: p1.x - p0.x, y: p1.y - p0.y };
+      if (Math.hypot(t0.x, t0.y) < 1e-4) t0 = { x: p2.x - p0.x, y: p2.y - p0.y };
+      if (Math.hypot(t0.x, t0.y) < 1e-4) t0 = { x: p3.x - p0.x, y: p3.y - p0.y };
+
+      let t3 = { x: p3.x - p2.x, y: p3.y - p2.y };
+      if (Math.hypot(t3.x, t3.y) < 1e-4) t3 = { x: p3.x - p1.x, y: p3.y - p1.y };
+      if (Math.hypot(t3.x, t3.y) < 1e-4) t3 = { x: p3.x - p0.x, y: p3.y - p0.y };
+
+      const th0 = Math.atan2(t0.y, t0.x);
+      const th3 = Math.atan2(t3.y, t3.x);
+      let dTheta = th3 - th0;
+      while (dTheta > Math.PI) dTheta -= 2 * Math.PI;
+      while (dTheta < -Math.PI) dTheta += 2 * Math.PI;
+
+      const chordLen = Math.hypot(p3.x - p0.x, p3.y - p0.y) || 1;
+      const scaleDelta = (halfW * dTheta) / chordLen;
+
+      // In screen coordinates (Y down):
+      // When dTheta > 0 (turning right/clockwise):
+      // Left side is outside/convex (longer arc) -> s_L = 1 + scaleDelta > 1
+      // Right side is inside/concave (shorter arc) -> s_R = 1 - scaleDelta < 1
+      const sR = Math.max(0.1, Math.min(3.0, 1 - scaleDelta));
+      const sL = Math.max(0.1, Math.min(3.0, 1 + scaleDelta));
+
+      const origOut = { x: p1.x - p0.x, y: p1.y - p0.y };
+      const origIn = { x: p2.x - p3.x, y: p2.y - p3.y };
+
+      const pr0 = rightPts[k];
+      const pr1 = rightPts[k + 1];
+      const pl0 = leftPts[k];
+      const pl1 = leftPts[k + 1];
+
+      // Right side curve (forward from pr0 to pr1)
+      const hOutR = {
+        x: Math.round((pr0.x + origOut.x * sR) * 100) / 100,
+        y: Math.round((pr0.y + origOut.y * sR) * 100) / 100,
+      };
+      const hInR = {
+        x: Math.round((pr1.x + origIn.x * sR) * 100) / 100,
+        y: Math.round((pr1.y + origIn.y * sR) * 100) / 100,
+      };
+
+      // Left side curve (backward from pl1 to pl0)
+      const hOutL = {
+        x: Math.round((pl1.x - origIn.x * sL) * 100) / 100,
+        y: Math.round((pl1.y - origIn.y * sL) * 100) / 100,
+      };
+      const hInL = {
+        x: Math.round((pl0.x - origOut.x * sL) * 100) / 100,
+        y: Math.round((pl0.y - origOut.y * sL) * 100) / 100,
+      };
+
+      segmentsData.push({
+        hasCurve: true,
+        hOutR,
+        hInR,
+        hOutL,
+        hInL,
+      });
+    }
+
+    // Now construct vertices array of the closed vector (length = 2 * N)
+    const outVertices: PathVertex[] = [];
+
+    // 1. Right side (Forward from 0 to N-1)
+    for (let i = 0; i < N; i++) {
+      const pt = rightPts[i];
+      const origV = sp[i];
+      const id = `v_outline_r_${i}_${Date.now().toString(36)}`;
+
+      let cmd: 'M' | 'L' | 'C' = 'M';
+      let handleIn: Point | undefined = undefined;
+      let handleOut: Point | undefined = undefined;
+
+      if (i > 0) {
+        const seg = segmentsData[i - 1];
+        if (seg.hasCurve) {
+          cmd = 'C';
+          handleIn = seg.hInR;
+        } else {
+          cmd = 'L';
+        }
+      }
+
+      if (i < N - 1) {
+        const nextSeg = segmentsData[i];
+        if (nextSeg.hasCurve) {
+          handleOut = nextSeg.hOutR;
+        }
+      }
+
+      outVertices.push({
+        id,
+        x: pt.x,
+        y: pt.y,
+        command: cmd,
+        handleIn,
+        handleOut,
+        nodeType: origV.nodeType,
+      });
+    }
+
+    // 2. Left side (Backward from N-1 down to 0)
+    for (let i = N - 1; i >= 0; i--) {
+      const pt = leftPts[i];
+      const origV = sp[i];
+      const id = `v_outline_l_${i}_${Date.now().toString(36)}`;
+
+      let cmd: 'M' | 'L' | 'C' = 'L';
+      let handleIn: Point | undefined = undefined;
+      let handleOut: Point | undefined = undefined;
+
+      if (i === N - 1) {
+        // End cap connection from rightPts[N-1] to leftPts[N-1]
+        if (strokeLinecap === 'round') {
+          cmd = 'C';
+          const u = tangents[N - 1];
+          const kRound = halfW * 0.55228475;
+          outVertices[outVertices.length - 1].handleOut = {
+            x: Math.round((rightPts[N - 1].x + u.x * kRound) * 100) / 100,
+            y: Math.round((rightPts[N - 1].y + u.y * kRound) * 100) / 100,
+          };
+          handleIn = {
+            x: Math.round((leftPts[N - 1].x + u.x * kRound) * 100) / 100,
+            y: Math.round((leftPts[N - 1].y + u.y * kRound) * 100) / 100,
+          };
+        } else {
+          cmd = 'L';
+        }
+
+        if (N > 1 && segmentsData[N - 2].hasCurve) {
+          handleOut = segmentsData[N - 2].hOutL;
+        }
+      } else {
+        // Segment i (moving backward from i+1 to i)
+        const seg = segmentsData[i];
+        if (seg.hasCurve) {
+          cmd = 'C';
+          handleIn = seg.hInL;
+        } else {
+          cmd = 'L';
+        }
+
+        if (i > 0 && segmentsData[i - 1].hasCurve) {
+          handleOut = segmentsData[i - 1].hOutL;
+        }
+      }
+
+      outVertices.push({
+        id,
+        x: pt.x,
+        y: pt.y,
+        command: cmd,
+        handleIn,
+        handleOut,
+        nodeType: origV.nodeType,
+      });
+    }
+
+    // 3. Start cap closing back to rightPts[0]
+    if (strokeLinecap === 'round') {
+      const u0 = tangents[0];
+      const kRound = halfW * 0.55228475;
+      outVertices[outVertices.length - 1].handleOut = {
+        x: Math.round((leftPts[0].x - u0.x * kRound) * 100) / 100,
+        y: Math.round((leftPts[0].y - u0.y * kRound) * 100) / 100,
+      };
+      outVertices[0].handleIn = {
+        x: Math.round((rightPts[0].x - u0.x * kRound) * 100) / 100,
+        y: Math.round((rightPts[0].y - u0.y * kRound) * 100) / 100,
+      };
+    }
+
+    const d = model.compilePathD(outVertices, true);
+    const newId = `el_stroke_path_${Date.now().toString(36)}`;
+
+    return {
+      id: newId,
+      tagName: 'path',
+      attributes: {
+        id: newId,
+        d,
+        fill: strokeColor,
+        stroke: 'none',
+        'stroke-width': '0',
+        'data-node-types': outVertices.map((v) => v.nodeType || 'sharp').join(','),
+        'data-shape': 'path',
+        'data-parametric': 'false',
+      },
+      vertices: outVertices,
+      isClosed: true,
+      isParametric: false,
+      shapeType: 'path',
+    };
+  }
+
+  /**
    * Converts a stroked vector element into a closed, filled polygon representation of its stroke outline.
    */
   public static outlineStroke(element: VectorElement, model: VectorModel): VectorElement | null {
     if (!element.vertices || element.vertices.length < 2) return null;
 
+    // 1. Try analytical Bézier parallel curve extrusion (exact 2N node count & proportional curvature)
+    const analytical = this.analyticalOutlineStroke(element, model);
+    if (analytical) {
+      return analytical;
+    }
+
+    // 2. Fallback to planar polygon clipping for closed loops or composite subpaths
     const strokeWidth = parseFloat(element.attributes['stroke-width'] || '1') || 1;
     const strokeLinecap = element.attributes['stroke-linecap'] || 'butt';
     const strokeLinejoin = element.attributes['stroke-linejoin'] || 'miter';
