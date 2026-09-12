@@ -81,13 +81,17 @@ export class TransformInteraction {
             const hSize = 8 / z;
             const cx = elBox.x + (grad.cx ?? 0.5) * elBox.width;
             const cy = elBox.y + (grad.cy ?? 0.5) * elBox.height;
-            const rx = (grad.rx ?? grad.r ?? 0.5) * elBox.width;
-            const ry = (grad.ry ?? grad.r ?? 0.5) * elBox.height;
             const rotRad = ((grad.rotation ?? 0) * Math.PI) / 180;
-            const hx1 = cx + rx * Math.cos(rotRad);
-            const hy1 = cy + rx * Math.sin(rotRad);
-            const hx2 = cx - ry * Math.sin(rotRad);
-            const hy2 = cy + ry * Math.cos(rotRad);
+            const cosRot = Math.cos(rotRad);
+            const sinRot = Math.sin(rotRad);
+            const spanU = Math.hypot(elBox.width * cosRot, elBox.height * sinRot);
+            const spanV = Math.hypot(elBox.width * sinRot, elBox.height * cosRot);
+            const rx = (grad.rx ?? grad.r ?? 0.5) * spanU;
+            const ry = (grad.ry ?? grad.r ?? 0.5) * spanV;
+            const hx1 = cx + rx * cosRot;
+            const hy1 = cy + rx * sinRot;
+            const hx2 = cx - ry * sinRot;
+            const hy2 = cy + ry * cosRot;
             const fx = elBox.x + (grad.fx ?? grad.cx ?? 0.5) * elBox.width;
             const fy = elBox.y + (grad.fy ?? grad.cy ?? 0.5) * elBox.height;
             const isCoincident = Math.hypot(fx - cx, fy - cy) < 4 / z;
@@ -213,10 +217,13 @@ export class TransformInteraction {
               const cx = box.x + (grad.cx ?? 0.5) * box.width;
               const cy = box.y + (grad.cy ?? 0.5) * box.height;
               const rotRad = ((grad.rotation ?? 0) * Math.PI) / 180;
+              const cosRot = Math.cos(rotRad);
+              const sinRot = Math.sin(rotRad);
               const gdx = pt.x - cx;
               const gdy = pt.y - cy;
-              const projX = gdx * Math.cos(rotRad) + gdy * Math.sin(rotRad);
-              const newRx = Math.max(0.01, Math.abs(projX) / box.width);
+              const projX = gdx * cosRot + gdy * sinRot;
+              const spanU = Math.hypot(box.width * cosRot, box.height * sinRot);
+              const newRx = Math.max(0.01, Math.abs(projX) / (spanU || 1));
               grad.rx = Math.round(newRx * 1000) / 1000;
               grad.r = grad.rx;
 
@@ -229,10 +236,13 @@ export class TransformInteraction {
               const cx = box.x + (grad.cx ?? 0.5) * box.width;
               const cy = box.y + (grad.cy ?? 0.5) * box.height;
               const rotRad = ((grad.rotation ?? 0) * Math.PI) / 180;
+              const cosRot = Math.cos(rotRad);
+              const sinRot = Math.sin(rotRad);
               const gdx = pt.x - cx;
               const gdy = pt.y - cy;
-              const projY = -gdx * Math.sin(rotRad) + gdy * Math.cos(rotRad);
-              const newRy = Math.max(0.01, Math.abs(projY) / box.height);
+              const projY = -gdx * sinRot + gdy * cosRot;
+              const spanV = Math.hypot(box.width * sinRot, box.height * cosRot);
+              const newRy = Math.max(0.01, Math.abs(projY) / (spanV || 1));
               grad.ry = Math.round(newRy * 1000) / 1000;
             } else if (activeHandle === 'grad-radial-focus') {
               callbacks.setCursor?.('crosshair');
@@ -657,19 +667,23 @@ export class TransformInteraction {
             } else if (grad.type === 'radial') {
               const cx = box.x + (grad.cx ?? 0.5) * box.width;
               const cy = box.y + (grad.cy ?? 0.5) * box.height;
-              const rx = (grad.rx ?? grad.r ?? 0.5) * box.width;
-              const ry = (grad.ry ?? grad.r ?? 0.5) * box.height;
               const rot = grad.rotation ?? 0;
               const rotRad = (rot * Math.PI) / 180;
+              const cosRot = Math.cos(rotRad);
+              const sinRot = Math.sin(rotRad);
+              const spanU = Math.hypot(box.width * cosRot, box.height * sinRot);
+              const spanV = Math.hypot(box.width * sinRot, box.height * cosRot);
+              const rx = (grad.rx ?? grad.r ?? 0.5) * spanU;
+              const ry = (grad.ry ?? grad.r ?? 0.5) * spanV;
               const fx = box.x + (grad.fx ?? grad.cx ?? 0.5) * box.width;
               const fy = box.y + (grad.fy ?? grad.cy ?? 0.5) * box.height;
               const hSize = 7 / z;
               const isCoincident = Math.hypot(fx - cx, fy - cy) < 4 / z;
 
-              const hx1 = cx + rx * Math.cos(rotRad);
-              const hy1 = cy + rx * Math.sin(rotRad);
-              const hx2 = cx - ry * Math.sin(rotRad);
-              const hy2 = cy + ry * Math.cos(rotRad);
+              const hx1 = cx + rx * cosRot;
+              const hy1 = cy + rx * sinRot;
+              const hx2 = cx - ry * sinRot;
+              const hy2 = cy + ry * cosRot;
 
               html += `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" transform="rotate(${rot}, ${cx}, ${cy})" fill="none" stroke="#ec4899" stroke-width="1.2" stroke-dasharray="3 2" opacity="0.85" vector-effect="non-scaling-stroke" />`;
               html += `<line x1="${cx}" y1="${cy}" x2="${hx1}" y2="${hy1}" stroke="#3b82f6" stroke-width="1.2" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;

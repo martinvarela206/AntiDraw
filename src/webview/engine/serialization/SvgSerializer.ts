@@ -509,40 +509,51 @@ export class SvgSerializer {
    * 3. For radial gradients, default cx=0.5, cy=0.5, r=0.5 produces a centered circular/elliptical glow conforming to the bounding box.
    */
   /**
-   * ARCHITECTURAL RATIONALE: Anisotropic Aspect-Compensated Radial Gradient Matrix (FIX-21)
+   * ARCHITECTURAL RATIONALE: Directional Span-Aware Radial Gradient Matrix (FIX-RadialScaleLock)
    *
-   * 1. The Naive gradientTransform Fallacy in objectBoundingBox:
-   *    In SVG, `gradientUnits="objectBoundingBox"` defines a normalized coordinate space [0, 1] x [0, 1].
-   *    When a vector element is non-square (W != H), rotating by an angle theta inside this normalized space
-   *    via `rotate(theta) scale(1, sy)` applies the rotation before the bounding box stretch S(W, H).
-   *    Because S(W, H) and R(theta) do NOT commute when W != H, the resulting projection on screen suffers
-   *    from severe non-orthogonal shear (skewing) and quadratic aspect distortion (e.g. a 2:1 horizontal
-   *    ellipse rotated 90° collapses into an 8:1 razor-thin slit instead of a 2:1 vertical ellipse).
+   * 1. The Anisotropic Aspect & Rotation Coupling Defect:
+   *    In SVG, `gradientUnits="objectBoundingBox"` maps coordinates [0, 1] x [0, 1] to the element's
+   *    bounding box (W, H). Previously, FIX-21 defined physical radii as Rx = grad.rx * W and Ry = grad.ry * H
+   *    and then rotated by angle theta. While this ensured axis orthogonality, it introduced a catastrophic
+   *    directional inversion when theta != 0:
+   *    At theta = 90° (vertical axis), Axis 1 had radius Rx = grad.rx * W (proportional strictly to WIDTH).
+   *    When the vector was scaled vertically (H changed while W remained constant), Axis 1 radius remained
+   *    completely frozen in screen space ("el relleno radial se mantiene fijo en el sentido vertical").
+   *    Simultaneously, Axis 2 (horizontal at theta = 90°) had radius Ry = grad.ry * H, causing the horizontal
+   *    extent of the gradient to explode when resizing vertically.
    *
-   * 2. Rigorous Mathematical Formulation & Aspect Ratio Compensation:
-   *    We map the unit circle from gradient space (u', v') to canvas pixels (X, Y) via:
-   *      [X - Cx]   [cos(theta)  -sin(theta)] [Rx   0] [u']
-   *      [Y - Cy] = [sin(theta)   cos(theta)] [ 0  Ry] [v']
-   *    where Rx = grad.rx * W, Ry = grad.ry * H, and (W, H) are the bounding box dimensions.
-   *    To express this in SVG objectBoundingBox units (u, v) where X = x0 + u*W and Y = y0 + v*H:
-   *      u - cx = (Rx * cos(theta) / W) * u' - (Ry * sin(theta) / W) * v'
-   *      v - cy = (Rx * sin(theta) / H) * u' + (Ry * cos(theta) / H) * v'
-   *    Substituting Rx = grad.rx * W and Ry = grad.ry * H yields:
-   *      a = grad.rx * cos(theta)
-   *      b = grad.rx * (W / H) * sin(theta)
-   *      c = -grad.ry * (H / W) * sin(theta)
-   *      d = grad.ry * cos(theta)
+   * 2. Directional Bounding Box Span Formulation:
+   *    The characteristic span of a bounding box (W, H) along a direction vector u = (cos(theta), sin(theta))
+   *    is given by:
+   *      spanU = sqrt((W * cos(theta))^2 + (H * sin(theta))^2)
+   *    and along the orthogonal direction v = (-sin(theta), cos(theta)):
+   *      spanV = sqrt((W * sin(theta))^2 + (H * cos(theta))^2)
+   *    When theta = 0°:  spanU = W, spanV = H (natural horizontal and vertical box bounds).
+   *    When theta = 90°: spanU = H, spanV = W (correctly binds the vertical axis to H and horizontal axis to W).
+   *    Physical radii on screen are therefore:
+   *      R1 = grad.rx * spanU
+   *      R2 = grad.ry * spanV
+   *    Mapping the unit circle in gradient space (u', v') to canvas pixels (X, Y):
+   *      [X - Cx] = R1 * cos(theta) * u' - R2 * sin(theta) * v'
+   *      [Y - Cy] = R1 * sin(theta) * u' + R2 * cos(theta) * v'
+   *    Expressing in SVG objectBoundingBox units where X = x0 + u*W and Y = y0 + v*H yields:
+   *      a = (R1 * cos(theta)) / W
+   *      b = (R1 * sin(theta)) / H
+   *      c = -(R2 * sin(theta)) / W
+   *      d = (R2 * cos(theta)) / H
    *      e = cx
    *      f = cy
-   *    This guarantees that the axes on screen are STRICTLY ORTHOGONAL (dot product = 0)
-   *    and have EXACT physical lengths Rx and Ry at angle theta across all angles and aspect ratios.
+   *    This guarantees:
+   *    - Strict axis orthogonality (dot product a*c*W^2 + b*d*H^2 = -R1*R2*cos*sin + R1*R2*sin*cos = 0).
+   *    - Natural solidary scaling: when scaling along any axis, the gradient radius along that axis
+   *      scales proportionally with the vector geometry, eliminating vertical freezing and horizontal distortion.
+   *    - In-code stability: determinant det = ad - bc = (R1 * R2) / (W * H) > 0 at all angles.
    *
-   * 3. Focal Point Inverse Mapping:
-   *    The determinant det = ad - bc = grad.rx * grad.ry.
-   *    The focal point (fx, fy) is mapped into the local gradient space via:
-   *      u'_f = (d * (fx - cx) - c * (fy - cy)) / det
-   *      v'_f = (-b * (fx - cx) + a * (fy - cy)) / det
-   *    and clamped within length <= 0.98 to prevent W3C boundary singularities.
+   * 3. Exact Focal Point Inverse Mapping:
+   *    Focal offset (dfx = fx - cx, dfy = fy - cy) is mapped to local gradient space via the inverse matrix:
+   *      u'_f = (d * dfx - c * dfy) / det
+   *      v'_f = (-b * dfx + a * dfy) / det
+   *    clamped to length <= 0.98 to avoid W3C boundary singularities.
    */
   public static computeRadialGradientMatrix(
     grad: GradientConfig,
@@ -561,18 +572,24 @@ export class SvgSerializer {
 
     const cos = Math.cos(rad);
     const sin = Math.sin(rad);
-    const aspect = W / H;
 
-    const a = rx * cos;
-    const b = rx * aspect * sin;
-    const c = -ry * (1 / aspect) * sin;
-    const d = ry * cos;
+    // Characteristic bounding box spans along rotated axes
+    const spanU = Math.hypot(W * cos, H * sin);
+    const spanV = Math.hypot(W * sin, H * cos);
+
+    const R1 = rx * spanU;
+    const R2 = ry * spanV;
+
+    const a = (R1 * cos) / W;
+    const b = (R1 * sin) / H;
+    const c = -(R2 * sin) / W;
+    const d = (R2 * cos) / H;
     const e = cx;
     const f = cy;
 
     let uF = 0;
     let vF = 0;
-    const det = rx * ry;
+    const det = a * d - b * c; // Equivalent to (R1 * R2) / (W * H)
     if (det > 0.000001) {
       const dfx = fx - cx;
       const dfy = fy - cy;

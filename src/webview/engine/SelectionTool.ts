@@ -779,18 +779,26 @@ export class SelectionTool {
         }
 
         // 3. Preserve physical canvas radii (Rx, Ry) to avoid aspect ratio mutation
-        const rxAbs = (grad.rx ?? grad.r ?? 0.5) * oldBox.width;
-        const ryAbs = (grad.ry ?? grad.r ?? 0.5) * oldBox.height;
-        grad.rx = Math.round((rxAbs / newBox.width) * 1000) / 1000;
-        grad.ry = Math.round((ryAbs / newBox.height) * 1000) / 1000;
-        grad.r = grad.rx;
+        const oldRad = ((grad.rotation ?? 0) * Math.PI) / 180;
+        const oldSpanU = Math.hypot(oldBox.width * Math.cos(oldRad), oldBox.height * Math.sin(oldRad));
+        const oldSpanV = Math.hypot(oldBox.width * Math.sin(oldRad), oldBox.height * Math.cos(oldRad));
+        const rxAbs = (grad.rx ?? grad.r ?? 0.5) * oldSpanU;
+        const ryAbs = (grad.ry ?? grad.r ?? 0.5) * oldSpanV;
 
         // 4. Update gradient rotation angle only if lockRotation !== false
+        let newRad = oldRad;
         if (shouldRotateAngle) {
           let rot = (grad.rotation ?? 0) + deltaDeg;
           rot = ((rot % 360) + 360) % 360;
           grad.rotation = Math.round(rot);
+          newRad = (grad.rotation * Math.PI) / 180;
         }
+
+        const newSpanU = Math.hypot(newBox.width * Math.cos(newRad), newBox.height * Math.sin(newRad));
+        const newSpanV = Math.hypot(newBox.width * Math.sin(newRad), newBox.height * Math.cos(newRad));
+        grad.rx = Math.round((rxAbs / (newSpanU || 1)) * 1000) / 1000;
+        grad.ry = Math.round((ryAbs / (newSpanV || 1)) * 1000) / 1000;
+        grad.r = grad.rx;
 
         el.attributes['data-gradient'] = JSON.stringify(grad);
       }
@@ -844,10 +852,11 @@ export class SelectionTool {
    * stretches the gradient along with the element. To keep the gradient's physical dimensions
    * in screen pixels strictly unchanged:
    * 1. Radial gradients:
-   *    Horizontal physical radius Rx = rx_old * oldBox.width.
-   *    In new box: rx_new = Rx / newBox.width = rx_old * (oldBox.width / newBox.width) = rx_old / scaleX.
-   *    Vertical physical radius Ry = ry_old * oldBox.height.
-   *    In new box: ry_new = Ry / newBox.height = ry_old * (oldBox.height / newBox.height) = ry_old / scaleY.
+   *    Physical radius along Axis 1: R1 = rx_old * spanU_old.
+   *    In new box: rx_new = R1 / spanU_new.
+   *    Physical radius along Axis 2: R2 = ry_old * spanV_old.
+   *    In new box: ry_new = R2 / spanV_new.
+   *    This guarantees that when unlocked, screen radii remain strictly constant across all angles.
    * 2. Linear gradients:
    *    Compensates half-length span inversely by average dimension change.
    * 3. Position interaction:
@@ -869,10 +878,18 @@ export class SelectionTool {
       const scaleY = newBox.height / oldBox.height;
 
       if (grad.type === 'radial') {
-        const rx = grad.rx ?? grad.r ?? 0.5;
-        const ry = grad.ry ?? grad.rx ?? grad.r ?? 0.5;
-        grad.rx = Math.round((rx / scaleX) * 1000) / 1000;
-        grad.ry = Math.round((ry / scaleY) * 1000) / 1000;
+        const rad = ((grad.rotation ?? 0) * Math.PI) / 180;
+        const cosRad = Math.cos(rad);
+        const sinRad = Math.sin(rad);
+        const oldSpanU = Math.hypot(oldBox.width * cosRad, oldBox.height * sinRad);
+        const oldSpanV = Math.hypot(oldBox.width * sinRad, oldBox.height * cosRad);
+        const rxAbs = (grad.rx ?? grad.r ?? 0.5) * oldSpanU;
+        const ryAbs = (grad.ry ?? grad.rx ?? grad.r ?? 0.5) * oldSpanV;
+
+        const newSpanU = Math.hypot(newBox.width * cosRad, newBox.height * sinRad);
+        const newSpanV = Math.hypot(newBox.width * sinRad, newBox.height * cosRad);
+        grad.rx = Math.round((rxAbs / (newSpanU || 1)) * 1000) / 1000;
+        grad.ry = Math.round((ryAbs / (newSpanV || 1)) * 1000) / 1000;
         grad.r = grad.rx;
       } else if (grad.type === 'linear') {
         const r = grad.r ?? 0.5;
