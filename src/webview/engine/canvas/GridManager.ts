@@ -145,18 +145,33 @@ export class GridManager {
         pathD = `M 0 0 L ${tileW} ${tileH} M 0 ${tileH} L ${tileW} 0 M 0 0 L 0 ${tileH}`;
       } else {
         // Orthogonal
-        const S = Math.max(2, grid.spacing || 20);
+        const S = Math.max(1, grid.spacing ?? 20);
         tileW = S;
         tileH = S;
         pathD = `M ${tileW} 0 L 0 0 0 ${tileH}`;
       }
 
-      let patX = originX;
-      let patY = originY;
-      if (grid.alignmentMode === 'cell-center') {
-        patX += tileW / 2;
-        patY += tileH / 2;
-      }
+      /**
+       * ARCHITECTURAL RATIONALE: Fixed Visual Grid Anchoring & Decoupled Cell Center Snapping
+       *
+       * 1. Grid Line Definition:
+       *    Grid lines strictly define the geometric matrix and boundaries of the canvas cells,
+       *    originating cleanly at the ruler/viewBox reference point (originX, originY).
+       *
+       * 2. Elimination of Visual Drift ('corrimiento'):
+       *    Previously, shifting the SVG pattern (patX += tileW / 2) physically displaced the rendered
+       *    grid lines away from the artboard boundary (0, 0), which broke the visual alignment
+       *    with the viewBox and produced visual confusion. The visual grid lines must NEVER shift.
+       *
+       * 3. Pixel Precision in Vector Construction:
+       *    When 'cell-center' alignment is enabled, the visual grid lines remain firmly fixed at cell
+       *    boundaries [0, S], [S, 2S]..., while SnappingEngine shifts its magnetic attraction target
+       *    to the barycenter of each cell: (originX + (k + 0.5) * S, originY + (m + 0.5) * S).
+       *    For a 1px x 1px grid, cell (0, 0) occupies [0, 1] x [0, 1] with its center at (0.5, 0.5).
+       *    A 1px vector stroke placed at (0.5, 0.5) renders crisply from 0 to 1 without anti-aliasing blur.
+       */
+      const patX = originX;
+      const patY = originY;
 
       defsHtml += `
         <pattern id="${patternId}" x="${patX}" y="${patY}" width="${tileW}" height="${tileH}" patternUnits="userSpaceOnUse">

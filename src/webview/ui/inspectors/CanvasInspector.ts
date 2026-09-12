@@ -125,7 +125,7 @@ export class CanvasInspector {
           <button class="prop-input ${gridAlignmentMode === 'origin' ? 'active' : ''}" id="btn-canvas-grid-align-origin" style="cursor:pointer; text-align:center; flex:1; padding:6px 4px; font-size:11px;" title="Modo A: Línea o cruce de grilla coincidente con (0, 0)">
             ┼ Línea en (0, 0)
           </button>
-          <button class="prop-input ${gridAlignmentMode === 'cell-center' ? 'active' : ''}" id="btn-canvas-grid-align-center" style="cursor:pointer; text-align:center; flex:1; padding:6px 4px; font-size:11px;" title="Modo B: Centro de la celda virtual coincidente con (0, 0)">
+          <button class="prop-input ${gridAlignmentMode === 'cell-center' ? 'active' : ''}" id="btn-canvas-grid-align-center" style="cursor:pointer; text-align:center; flex:1; padding:6px 4px; font-size:11px;" title="Modo B: Snap al centro de cada celda de la grilla (sin desplazar la cuadrícula)">
             ◫ Celda en (0, 0)
           </button>
         </div>

@@ -81,7 +81,7 @@ export class RulerGuideInspector {
           <button class="prop-input ${gridAlignmentMode === 'origin' ? 'active' : ''}" id="btn-grid-align-origin" style="cursor:pointer; text-align:center; flex:1; padding:6px 4px; font-size:11px;" title="Modo A: Línea o cruce de grilla coincidente con (0, 0)">
             ┼ Línea en (0, 0)
           </button>
-          <button class="prop-input ${gridAlignmentMode === 'cell-center' ? 'active' : ''}" id="btn-grid-align-center" style="cursor:pointer; text-align:center; flex:1; padding:6px 4px; font-size:11px;" title="Modo B: Centro de la celda virtual coincidente con (0, 0)">
+          <button class="prop-input ${gridAlignmentMode === 'cell-center' ? 'active' : ''}" id="btn-grid-align-center" style="cursor:pointer; text-align:center; flex:1; padding:6px 4px; font-size:11px;" title="Modo B: Snap al centro de cada celda de la grilla (sin desplazar la cuadrícula)">
             ◫ Celda en (0, 0)
           </button>
         </div>
@@ -116,7 +116,7 @@ export class RulerGuideInspector {
               </div>
               <div style="display:flex; align-items:center; gap:8px;">
                 <span class="prop-label" style="width:50px;">Paso (px)</span>
-                <input type="number" class="prop-input" id="grid-spacing-${g.id}" value="${g.spacing}" min="2" step="5" style="flex:1; height:22px;" />
+                <input type="number" class="prop-input" id="grid-spacing-${g.id}" value="${g.spacing}" min="1" step="1" style="flex:1; height:22px;" />
                 <input type="color" class="color-swatch" id="grid-color-${g.id}" value="${g.color?.startsWith('#') ? g.color : '#4f566b'}" style="width:22px; height:22px;" title="Color de trazo de grilla" />
               </div>
             </div>

@@ -444,6 +444,7 @@ class AntiDrawApp {
         if (payload.metadata.showGrid !== undefined) this.canvasMgr.showGrid = payload.metadata.showGrid;
         if (payload.metadata.showGuides !== undefined) this.canvasMgr.showGuides = payload.metadata.showGuides;
         if (payload.metadata.gridSpacing !== undefined) this.canvasMgr.gridSpacing = payload.metadata.gridSpacing;
+        if (payload.metadata.gridAlignmentMode !== undefined) this.canvasMgr.gridAlignmentMode = payload.metadata.gridAlignmentMode;
         if (payload.metadata.snapToGrid !== undefined) this.canvasMgr.snapToGrid = payload.metadata.snapToGrid;
         if (payload.metadata.snapToGuides !== undefined) this.canvasMgr.snapToGuides = payload.metadata.snapToGuides;
         if (payload.metadata.snapToVertices !== undefined) this.canvasMgr.snapToVertices = payload.metadata.snapToVertices;
@@ -926,6 +927,7 @@ class AntiDrawApp {
       showGrid: this.canvasMgr.showGrid,
       showGuides: this.canvasMgr.showGuides,
       gridSpacing: this.canvasMgr.gridSpacing,
+      gridAlignmentMode: this.canvasMgr.gridAlignmentMode,
       snapToGrid: this.canvasMgr.snapToGrid,
       snapToGuides: this.canvasMgr.snapToGuides,
       snapToVertices: this.canvasMgr.snapToVertices,

@@ -338,7 +338,15 @@ export class SnappingEngine {
             xSnapped = true;
           }
         } else {
-          // Orthogonal
+          // ARCHITECTURAL RATIONALE: Orthogonal Grid Barycentric / Cell-Center Snapping
+          // Why phase shift (+S/2, +S/2) is applied strictly to snapping targets:
+          // 1. Decoupled Snapping Coordinates: The visual grid lines remain anchored at (origX, origY)
+          //    defining boundary segments [k*S, (k+1)*S]. Cell centers are geometrically at (k + 0.5) * S.
+          // 2. Pixel Precision Alignment:
+          //    For a 1px x 1px grid (S = 1), vertices snap to 0.5, 1.5, 2.5... which places 1px vector
+          //    strokes dead-center inside the pixel cell, rendering cleanly between integer boundaries
+          //    without fuzzy subpixel anti-aliasing.
+          // 3. Coordinate Symmetry: Works identically across positive and negative quadrants.
           if (grid.alignmentMode === 'cell-center') {
             phaseX += S / 2;
             phaseY += S / 2;
