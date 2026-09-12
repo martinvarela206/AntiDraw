@@ -1581,12 +1581,13 @@ class AntiDrawApp {
     const selectedEl = this.model.elements.find((el) => this.selectionTool.isSelected(el.id));
     if (!selectedEl) return;
     this.pushUndo();
-    const outlined = BooleanOperations.outlineStroke(selectedEl, this.model);
-    if (outlined) {
+    const newElements = BooleanOperations.outlineStrokeElements(selectedEl, this.model);
+    if (newElements.length > 0) {
       const idx = this.model.elements.findIndex((el) => el.id === selectedEl.id);
       if (idx >= 0) {
-        this.model.elements[idx] = outlined;
-        this.selectionTool.select(outlined.id);
+        this.model.elements.splice(idx, 1, ...newElements);
+        this.selectionTool.deselectAll();
+        newElements.forEach((el) => this.selectionTool.select(el.id));
         this.propertyPanel.resetPanelMode();
         this.render();
         this.syncToHost();

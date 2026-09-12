@@ -117,4 +117,11 @@ export class BooleanOperations {
   public static outlineStroke(element: VectorElement, model: VectorModel): VectorElement | null {
     return StrokeOutlineGenerator.outlineStroke(element, model);
   }
+
+  /**
+   * Converts a stroked path and its markers into independent outline vector elements.
+   */
+  public static outlineStrokeElements(element: VectorElement, model: VectorModel): VectorElement[] {
+    return StrokeOutlineGenerator.outlineStrokeElements(element, model);
+  }
 }

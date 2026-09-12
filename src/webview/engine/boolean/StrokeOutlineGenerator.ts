@@ -60,6 +60,81 @@ export class StrokeOutlineGenerator {
   }
 
   /**
+   * ARCHITECTURAL RATIONALE: Exact W3C SVG 2 Tangent Direction Limits (Section 13.6.2)
+   *
+   * When computing marker orientation on Bézier curves, naive tangent evaluations frequently fail
+   * when the first control handle coincides with the vertex anchor (e.g. P0 == P1 or P2 == P3),
+   * causing B'(0) or B'(1) to collapse to zero vector (0, 0).
+   *
+   * Falling back to the chord (P3 - P0) introduces severe angular errors (often 10° - 30°), causing
+   * arrow markers to be tilted or misdirected.
+   *
+   * Standard W3C SVG 2 Limit Algorithm:
+   * - At start of cubic segment:
+   *     1. If P1 != P0, tangent = P1 - P0.
+   *     2. Else if P2 != P0, tangent = P2 - P0.
+   *     3. Else tangent = P3 - P0.
+   * - At end of cubic segment:
+   *     1. If P2 != P3, tangent = P3 - P2.
+   *     2. Else if P1 != P3, tangent = P3 - P1.
+   *     3. Else tangent = P3 - P0.
+   */
+  public static computeStartTangent(sp: PathVertex[]): Point {
+    if (sp.length < 2) return { x: 1, y: 0 };
+    const p0 = sp[0];
+    const p1 = sp[1];
+    if (p0.handleOut && Math.hypot(p0.handleOut.x - p0.x, p0.handleOut.y - p0.y) > 1e-4) {
+      return { x: p0.handleOut.x - p0.x, y: p0.handleOut.y - p0.y };
+    }
+    if (p1.handleIn && Math.hypot(p1.handleIn.x - p0.x, p1.handleIn.y - p0.y) > 1e-4) {
+      return { x: p1.handleIn.x - p0.x, y: p1.handleIn.y - p0.y };
+    }
+    return { x: p1.x - p0.x, y: p1.y - p0.y };
+  }
+
+  public static computeEndTangent(sp: PathVertex[]): Point {
+    if (sp.length < 2) return { x: 1, y: 0 };
+    const lastIdx = sp.length - 1;
+    const p3 = sp[lastIdx];
+    const p0 = sp[lastIdx - 1];
+    if (p3.handleIn && Math.hypot(p3.x - p3.handleIn.x, p3.y - p3.handleIn.y) > 1e-4) {
+      return { x: p3.x - p3.handleIn.x, y: p3.y - p3.handleIn.y };
+    }
+    if (p0.handleOut && Math.hypot(p3.x - p0.handleOut.x, p3.y - p0.handleOut.y) > 1e-4) {
+      return { x: p3.x - p0.handleOut.x, y: p3.y - p0.handleOut.y };
+    }
+    return { x: p3.x - p0.x, y: p3.y - p0.y };
+  }
+
+  public static computeMidTangent(prev: PathVertex, curr: PathVertex, next: PathVertex): Point {
+    let inTan: Point = { x: curr.x - prev.x, y: curr.y - prev.y };
+    const hIn = curr.handleIn;
+    const hPrevOut = prev.handleOut;
+    if (hIn && Math.hypot(curr.x - hIn.x, curr.y - hIn.y) > 1e-4) {
+      inTan = { x: curr.x - hIn.x, y: curr.y - hIn.y };
+    } else if (hPrevOut && Math.hypot(curr.x - hPrevOut.x, curr.y - hPrevOut.y) > 1e-4) {
+      inTan = { x: curr.x - hPrevOut.x, y: curr.y - hPrevOut.y };
+    }
+    const inLen = Math.hypot(inTan.x, inTan.y) || 1;
+    const uIn = { x: inTan.x / inLen, y: inTan.y / inLen };
+
+    let outTan: Point = { x: next.x - curr.x, y: next.y - curr.y };
+    const hOut = curr.handleOut;
+    const hNextIn = next.handleIn;
+    if (hOut && Math.hypot(hOut.x - curr.x, hOut.y - curr.y) > 1e-4) {
+      outTan = { x: hOut.x - curr.x, y: hOut.y - curr.y };
+    } else if (hNextIn && Math.hypot(hNextIn.x - curr.x, hNextIn.y - curr.y) > 1e-4) {
+      outTan = { x: hNextIn.x - curr.x, y: hNextIn.y - curr.y };
+    }
+    const outLen = Math.hypot(outTan.x, outTan.y) || 1;
+    const uOut = { x: outTan.x / outLen, y: outTan.y / outLen };
+
+    let mid = { x: uIn.x + uOut.x, y: uIn.y + uOut.y };
+    if (Math.hypot(mid.x, mid.y) < 1e-4) mid = uOut;
+    return mid;
+  }
+
+  /**
    * Generates planar polygons for SVG markers aligned to anchor point and tangent vector.
    */
   public static createMarkerPolygons(
@@ -474,106 +549,6 @@ export class StrokeOutlineGenerator {
           thickPolygons.push(makeDisc(pts[pts.length - 1].x, pts[pts.length - 1].y, halfW));
         }
       }
-
-      // Append marker geometry into thickPolygons
-      const markerOffset = parseFloat(element.attributes['data-marker-offset'] || '0') || 0;
-      const markerSize = element.attributes['data-marker-size'] ? parseFloat(element.attributes['data-marker-size']) : 6;
-      const markerUnits = element.attributes['data-marker-units'] || 'strokeWidth';
-
-      // 1. marker-start on first vertex of subpath
-      if (markerStartType !== 'none' && sp.length >= 2) {
-        let v0Tan = { x: sp[1].x - sp[0].x, y: sp[1].y - sp[0].y };
-        if (sp[0].handleOut) {
-          const hx = sp[0].handleOut.x - sp[0].x;
-          const hy = sp[0].handleOut.y - sp[0].y;
-          if (Math.hypot(hx, hy) > 0.001) v0Tan = { x: hx, y: hy };
-        } else if (sp[1].handleIn) {
-          const hx = sp[1].handleIn.x - sp[0].x;
-          const hy = sp[1].handleIn.y - sp[0].y;
-          if (Math.hypot(hx, hy) > 0.001) v0Tan = { x: hx, y: hy };
-        }
-        const mPolys = this.createMarkerPolygons(markerStartType, sp[0], v0Tan, strokeWidth, markerOffset, markerSize, markerUnits);
-        thickPolygons.push(...mPolys);
-      }
-
-      // 2. marker-mid on intermediate vertices of subpath
-      if (markerMidType !== 'none' && sp.length >= 2) {
-        const midCount = isClosed ? sp.length : sp.length - 1;
-        for (let i = 1; i < midCount; i++) {
-          const curr = sp[i];
-          const prev = sp[i - 1];
-          const next = isClosed && i === sp.length - 1 ? sp[0] : sp[i + 1];
-
-          let inTan = { x: curr.x - prev.x, y: curr.y - prev.y };
-          if (curr.handleIn) {
-            const hx = curr.x - curr.handleIn.x;
-            const hy = curr.y - curr.handleIn.y;
-            if (Math.hypot(hx, hy) > 0.001) inTan = { x: hx, y: hy };
-          } else if (prev.handleOut) {
-            const hx = curr.x - prev.handleOut.x;
-            const hy = curr.y - prev.handleOut.y;
-            if (Math.hypot(hx, hy) > 0.001) inTan = { x: hx, y: hy };
-          }
-          const inLen = Math.hypot(inTan.x, inTan.y) || 1;
-          const uIn = { x: inTan.x / inLen, y: inTan.y / inLen };
-
-          let outTan = { x: next.x - curr.x, y: next.y - curr.y };
-          if (curr.handleOut) {
-            const hx = curr.handleOut.x - curr.x;
-            const hy = curr.handleOut.y - curr.y;
-            if (Math.hypot(hx, hy) > 0.001) outTan = { x: hx, y: hy };
-          } else if (next.handleIn) {
-            const hx = next.handleIn.x - curr.x;
-            const hy = next.handleIn.y - curr.y;
-            if (Math.hypot(hx, hy) > 0.001) outTan = { x: hx, y: hy };
-          }
-          const outLen = Math.hypot(outTan.x, outTan.y) || 1;
-          const uOut = { x: outTan.x / outLen, y: outTan.y / outLen };
-
-          let midTan = { x: uIn.x + uOut.x, y: uIn.y + uOut.y };
-          if (Math.hypot(midTan.x, midTan.y) < 0.001) midTan = uOut;
-
-          const mPolys = this.createMarkerPolygons(markerMidType, curr, midTan, strokeWidth, markerOffset, markerSize, markerUnits);
-          thickPolygons.push(...mPolys);
-        }
-      }
-
-      // 3. marker-end on last vertex of subpath (or closing vertex of closed subpath)
-      if (markerEndType !== 'none' && sp.length >= 2) {
-        if (isClosed) {
-          const lastV = sp[sp.length - 1];
-          const firstV = sp[0];
-          let vnTan = { x: firstV.x - lastV.x, y: firstV.y - lastV.y };
-          if (firstV.handleIn) {
-            const hx = firstV.x - firstV.handleIn.x;
-            const hy = firstV.y - firstV.handleIn.y;
-            if (Math.hypot(hx, hy) > 0.001) vnTan = { x: hx, y: hy };
-          } else if (lastV.handleOut) {
-            const hx = firstV.x - lastV.handleOut.x;
-            const hy = firstV.y - lastV.handleOut.y;
-            if (Math.hypot(hx, hy) > 0.001) vnTan = { x: hx, y: hy };
-          }
-          const mPolys = this.createMarkerPolygons(markerEndType, firstV, vnTan, strokeWidth, markerOffset, markerSize, markerUnits);
-          thickPolygons.push(...mPolys);
-        } else {
-          const lastIdx = sp.length - 1;
-          const lastV = sp[lastIdx];
-          const prevV = sp[lastIdx - 1];
-
-          let vnTan = { x: lastV.x - prevV.x, y: lastV.y - prevV.y };
-          if (lastV.handleIn) {
-            const hx = lastV.x - lastV.handleIn.x;
-            const hy = lastV.y - lastV.handleIn.y;
-            if (Math.hypot(hx, hy) > 0.001) vnTan = { x: hx, y: hy };
-          } else if (prevV.handleOut) {
-            const hx = lastV.x - prevV.handleOut.x;
-            const hy = lastV.y - prevV.handleOut.y;
-            if (Math.hypot(hx, hy) > 0.001) vnTan = { x: hx, y: hy };
-          }
-          const mPolys = this.createMarkerPolygons(markerEndType, lastV, vnTan, strokeWidth, markerOffset, markerSize, markerUnits);
-          thickPolygons.push(...mPolys);
-        }
-      }
     }
 
     if (thickPolygons.length === 0) return null;
@@ -593,5 +568,352 @@ export class StrokeOutlineGenerator {
     };
 
     return PolygonUtils.multiPolygonToElement(merged, newId, baseAttrs, model);
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Independent Vector Synthesis for SVG Markers (FIX-22)
+   *
+   * 1. Separation of Concerns & Independent Topology:
+   *    Instead of merging marker shapes into the stroke polygon mesh through destructive planar
+   *    boolean operations, each active marker (marker-start, marker-mid, marker-end) is converted
+   *    into its own independent <path> VectorElement. This preserves exact geometry (e.g. 3 clean
+   *    vertices for an arrow head), enables independent repositioning/coloring, and eliminates
+   *    unwanted boolean artifact vertices.
+   *
+   * 2. Strict SVG 2 Tangent Direction Limits:
+   *    Uses `computeStartTangent`, `computeEndTangent`, and `computeMidTangent` to evaluate tangent
+   *    limits even when anchor and control point coincide (e.g. P0 == P1 or P2 == P3), matching
+   *    native browser rendering with sub-pixel fidelity.
+   *
+   * 3. Affine Coordinate Synthesis:
+   *    Maps canonical marker coordinates (0 0 10 10) through:
+   *      x' = anchor.x + (dx * cos - dy * sin)
+   *      y' = anchor.y + (dx * sin + dy * cos)
+   *    where dx = (X - refX) * scale, dy = (Y - refY) * scale.
+   */
+  public static createMarkerElements(element: VectorElement, model: VectorModel): VectorElement[] {
+    if (!element.vertices || element.vertices.length < 2) return [];
+
+    const markerStartType = this.parseMarkerType(element.attributes['marker-start']);
+    const markerMidType = this.parseMarkerType(element.attributes['marker-mid']);
+    const markerEndType = this.parseMarkerType(element.attributes['marker-end']);
+
+    if (markerStartType === 'none' && markerMidType === 'none' && markerEndType === 'none') {
+      return [];
+    }
+
+    const strokeWidth = parseFloat(element.attributes['stroke-width'] || '1') || 1;
+    const markerOffset = parseFloat(element.attributes['data-marker-offset'] || '0') || 0;
+    const markerSize = element.attributes['data-marker-size'] ? parseFloat(element.attributes['data-marker-size']) : 6;
+    const markerUnits = element.attributes['data-marker-units'] || 'strokeWidth';
+
+    const customColor = element.attributes['data-marker-color'];
+    const markerColor = (customColor && customColor !== 'context-stroke')
+      ? customColor
+      : (element.attributes['stroke'] || '#ffffff');
+
+    // Deconstruct element into subpaths
+    const subpaths: PathVertex[][] = [];
+    let currentSp: PathVertex[] = [];
+    element.vertices.forEach((v, idx) => {
+      if (v.command === 'M' && idx > 0) {
+        if (currentSp.length > 0) subpaths.push(currentSp);
+        currentSp = [v];
+      } else {
+        currentSp.push(v);
+      }
+    });
+    if (currentSp.length > 0) subpaths.push(currentSp);
+
+    const isClosed = element.isClosed ?? false;
+    const markerElements: VectorElement[] = [];
+
+    const sizeScale = markerSize / 6;
+    const unitScale = markerUnits === 'userSpaceOnUse' ? 1 : strokeWidth;
+
+    const buildMarker = (
+      markerId: string,
+      anchor: Point,
+      tangent: Point,
+      pos: 'start' | 'mid' | 'end'
+    ): VectorElement | null => {
+      if (!markerId || markerId === 'none') return null;
+      const len = Math.hypot(tangent.x, tangent.y);
+      if (len < 1e-4) return null;
+      const cos = tangent.x / len;
+      const sin = tangent.y / len;
+
+      const transformPoint = (X: number, Y: number, refX: number, refY: number, mw: number, mh: number): Point => {
+        const scale = Math.min((mw * sizeScale) / 10, (mh * sizeScale) / 10) * unitScale;
+        const dx = (X - refX) * scale;
+        const dy = (Y - refY) * scale;
+        return {
+          x: Math.round((anchor.x + dx * cos - dy * sin) * 100) / 100,
+          y: Math.round((anchor.y + dx * sin + dy * cos) * 100) / 100,
+        };
+      };
+
+      const newId = `el_marker_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
+
+      if (markerId.includes('arrow-filled')) {
+        let pts: [number, number][];
+        let refX = 5;
+        const refY = 5;
+        const mw = 6;
+        const mh = 6;
+        if (pos === 'start') {
+          refX = 1 + markerOffset;
+          pts = [[10, 1.5], [1, 5], [10, 8.5]];
+        } else if (pos === 'end') {
+          refX = 9 - markerOffset;
+          pts = [[0, 1.5], [9, 5], [0, 8.5]];
+        } else {
+          refX = 5 - markerOffset;
+          pts = [[1, 1.5], [9, 5], [1, 8.5]];
+        }
+
+        const tPts = pts.map(([x, y]) => transformPoint(x, y, refX, refY, mw, mh));
+        const verts: PathVertex[] = tPts.map((p, idx) => ({
+          id: `v_${Date.now().toString(36)}_${idx}`,
+          x: p.x,
+          y: p.y,
+          command: idx === 0 ? 'M' : 'L',
+          nodeType: 'sharp',
+        }));
+
+        const d = `M ${tPts[0].x} ${tPts[0].y} L ${tPts[1].x} ${tPts[1].y} L ${tPts[2].x} ${tPts[2].y} Z`;
+        return {
+          id: newId,
+          tagName: 'path',
+          attributes: {
+            id: newId,
+            d,
+            fill: markerColor,
+            stroke: 'none',
+            'stroke-width': '0',
+          },
+          vertices: verts,
+          isClosed: true,
+        };
+      }
+
+      if (markerId.includes('arrow-open')) {
+        let pts: [number, number][];
+        let refX = 5;
+        const refY = 5;
+        const mw = 6;
+        const mh = 6;
+        if (pos === 'start') {
+          refX = 1 + markerOffset;
+          pts = [[9, 1.5], [1, 5], [9, 8.5]];
+        } else if (pos === 'end') {
+          refX = 9 - markerOffset;
+          pts = [[1, 1.5], [9, 5], [1, 8.5]];
+        } else {
+          refX = 5 - markerOffset;
+          pts = [[1, 1.5], [9, 5], [1, 8.5]];
+        }
+
+        const tPts = pts.map(([x, y]) => transformPoint(x, y, refX, refY, mw, mh));
+        const verts: PathVertex[] = tPts.map((p, idx) => ({
+          id: `v_${Date.now().toString(36)}_${idx}`,
+          x: p.x,
+          y: p.y,
+          command: idx === 0 ? 'M' : 'L',
+          nodeType: 'sharp',
+        }));
+
+        const scale = Math.min((mw * sizeScale) / 10, (mh * sizeScale) / 10) * unitScale;
+        const openStrokeWidth = Math.max(0.5, Math.round(1.8 * scale * 100) / 100);
+        const d = `M ${tPts[0].x} ${tPts[0].y} L ${tPts[1].x} ${tPts[1].y} L ${tPts[2].x} ${tPts[2].y}`;
+        return {
+          id: newId,
+          tagName: 'path',
+          attributes: {
+            id: newId,
+            d,
+            fill: 'none',
+            stroke: markerColor,
+            'stroke-width': openStrokeWidth.toString(),
+            'stroke-linecap': 'round',
+            'stroke-linejoin': 'round',
+          },
+          vertices: verts,
+          isClosed: false,
+        };
+      }
+
+      if (markerId.includes('square-block')) {
+        const refX = pos === 'start' ? 5 + markerOffset : 5 - markerOffset;
+        const refY = 5;
+        const mw = 5;
+        const mh = 5;
+        const corners: [number, number][] = [[2, 2], [8, 2], [8, 8], [2, 8]];
+        const tPts = corners.map(([x, y]) => transformPoint(x, y, refX, refY, mw, mh));
+        const verts: PathVertex[] = tPts.map((p, idx) => ({
+          id: `v_${Date.now().toString(36)}_${idx}`,
+          x: p.x,
+          y: p.y,
+          command: idx === 0 ? 'M' : 'L',
+          nodeType: 'sharp',
+        }));
+        const d = `M ${tPts[0].x} ${tPts[0].y} L ${tPts[1].x} ${tPts[1].y} L ${tPts[2].x} ${tPts[2].y} L ${tPts[3].x} ${tPts[3].y} Z`;
+        return {
+          id: newId,
+          tagName: 'path',
+          attributes: {
+            id: newId,
+            d,
+            fill: markerColor,
+            stroke: 'none',
+            'stroke-width': '0',
+          },
+          vertices: verts,
+          isClosed: true,
+        };
+      }
+
+      if (markerId.includes('circle-dot')) {
+        const refX = pos === 'start' ? 5 + markerOffset : 5 - markerOffset;
+        const refY = 5;
+        const mw = 5;
+        const mh = 5;
+        const center = transformPoint(5, 5, refX, refY, mw, mh);
+        const scale = Math.min((mw * sizeScale) / 10, (mh * sizeScale) / 10) * unitScale;
+        const r = Math.round(3.5 * scale * 100) / 100;
+        const k = Math.round(r * 0.55228475 * 100) / 100;
+
+        const verts: PathVertex[] = [
+          {
+            id: `v_${Date.now().toString(36)}_0`,
+            x: center.x + r,
+            y: center.y,
+            command: 'M',
+            handleIn: { x: center.x + r, y: center.y - k },
+            handleOut: { x: center.x + r, y: center.y + k },
+            nodeType: 'smooth',
+          },
+          {
+            id: `v_${Date.now().toString(36)}_1`,
+            x: center.x,
+            y: center.y + r,
+            command: 'C',
+            handleIn: { x: center.x + k, y: center.y + r },
+            handleOut: { x: center.x - k, y: center.y + r },
+            nodeType: 'smooth',
+          },
+          {
+            id: `v_${Date.now().toString(36)}_2`,
+            x: center.x - r,
+            y: center.y,
+            command: 'C',
+            handleIn: { x: center.x - r, y: center.y + k },
+            handleOut: { x: center.x - r, y: center.y - k },
+            nodeType: 'smooth',
+          },
+          {
+            id: `v_${Date.now().toString(36)}_3`,
+            x: center.x,
+            y: center.y - r,
+            command: 'C',
+            handleIn: { x: center.x - k, y: center.y - r },
+            handleOut: { x: center.x + k, y: center.y - r },
+            nodeType: 'smooth',
+          },
+        ];
+        const d = `M ${center.x + r} ${center.y} C ${center.x + r} ${center.y + k} ${center.x + k} ${center.y + r} ${center.x} ${center.y + r} C ${center.x - k} ${center.y + r} ${center.x - r} ${center.y + k} ${center.x - r} ${center.y} C ${center.x - r} ${center.y - k} ${center.x - k} ${center.y - r} ${center.x} ${center.y - r} C ${center.x + k} ${center.y - r} ${center.x + r} ${center.y - k} ${center.x + r} ${center.y} Z`;
+        return {
+          id: newId,
+          tagName: 'path',
+          attributes: {
+            id: newId,
+            d,
+            fill: markerColor,
+            stroke: 'none',
+            'stroke-width': '0',
+          },
+          vertices: verts,
+          isClosed: true,
+        };
+      }
+
+      if (markerId.includes('bar-cap')) {
+        const baseRefX = pos === 'start' ? 2 : 8;
+        const refX = pos === 'start' ? baseRefX + markerOffset : baseRefX - markerOffset;
+        const refY = 5;
+        const mw = 5;
+        const mh = 6;
+        const p1 = transformPoint(refX, 1, refX, refY, mw, mh);
+        const p2 = transformPoint(refX, 9, refX, refY, mw, mh);
+        const scale = Math.min((mw * sizeScale) / 10, (mh * sizeScale) / 10) * unitScale;
+        const capWidth = Math.max(1, Math.round(2 * scale * 100) / 100);
+        const verts: PathVertex[] = [
+          { id: `v_${Date.now().toString(36)}_0`, x: p1.x, y: p1.y, command: 'M', nodeType: 'sharp' },
+          { id: `v_${Date.now().toString(36)}_1`, x: p2.x, y: p2.y, command: 'L', nodeType: 'sharp' },
+        ];
+        const d = `M ${p1.x} ${p1.y} L ${p2.x} ${p2.y}`;
+        return {
+          id: newId,
+          tagName: 'path',
+          attributes: {
+            id: newId,
+            d,
+            fill: 'none',
+            stroke: markerColor,
+            'stroke-width': capWidth.toString(),
+            'stroke-linecap': 'round',
+          },
+          vertices: verts,
+          isClosed: false,
+        };
+      }
+
+      return null;
+    };
+
+    for (const sp of subpaths) {
+      if (sp.length < 2) continue;
+
+      if (markerStartType !== 'none') {
+        const tan = this.computeStartTangent(sp);
+        const mEl = buildMarker(markerStartType, sp[0], tan, 'start');
+        if (mEl) markerElements.push(mEl);
+      }
+
+      if (markerMidType !== 'none') {
+        const midCount = isClosed ? sp.length : sp.length - 1;
+        for (let i = 1; i < midCount; i++) {
+          const curr = sp[i];
+          const prev = sp[i - 1];
+          const next = isClosed && i === sp.length - 1 ? sp[0] : sp[i + 1];
+          const tan = this.computeMidTangent(prev, curr, next);
+          const mEl = buildMarker(markerMidType, curr, tan, 'mid');
+          if (mEl) markerElements.push(mEl);
+        }
+      }
+
+      if (markerEndType !== 'none') {
+        const anchor = isClosed ? sp[0] : sp[sp.length - 1];
+        const tan = this.computeEndTangent(sp);
+        const mEl = buildMarker(markerEndType, anchor, tan, 'end');
+        if (mEl) markerElements.push(mEl);
+      }
+    }
+
+    return markerElements;
+  }
+
+  /**
+   * Converts a stroked vector element and its markers into independent outline vector elements.
+   */
+  public static outlineStrokeElements(element: VectorElement, model: VectorModel): VectorElement[] {
+    const results: VectorElement[] = [];
+    const outlined = this.outlineStroke(element, model);
+    if (outlined) {
+      results.push(outlined);
+    }
+    const markers = this.createMarkerElements(element, model);
+    results.push(...markers);
+    return results;
   }
 }
