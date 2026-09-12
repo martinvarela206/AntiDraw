@@ -41,13 +41,15 @@ export class BooleanOperations {
 
   /**
    * Combines multiple vector shapes into a single unified outline (Union).
+   * Employs analytical Bézier curve preservation for minimal node count.
    */
   public static union(elements: VectorElement[], model: VectorModel): VectorElement | null {
-    return PolygonBooleanService.union(elements, model);
+    return BezierCurveTrimmer.union(elements, model);
   }
 
   /**
-   * Subtracts (trims) the target shape with the cutter shape.
+   * Subtracts (trims) the target shape with the cutter shape(s).
+   * Supports 2 or more elements with analytical Bézier curve preservation.
    */
   public static subtract(elements: VectorElement[], model: VectorModel): TrimResult | null {
     return BezierCurveTrimmer.subtract(elements, model);
@@ -55,16 +57,18 @@ export class BooleanOperations {
 
   /**
    * Retains only the overlapping region between vector shapes (Intersection).
+   * Employs analytical Bézier curve preservation for minimal node count.
    */
   public static intersect(elements: VectorElement[], model: VectorModel): VectorElement | null {
-    return PolygonBooleanService.intersect(elements, model);
+    return BezierCurveTrimmer.intersect(elements, model);
   }
 
   /**
    * Retains only non-overlapping regions between vector shapes (Exclusion / XOR).
+   * Employs analytical Bézier curve preservation.
    */
   public static exclude(elements: VectorElement[], model: VectorModel): VectorElement | null {
-    return PolygonBooleanService.exclude(elements, model);
+    return BezierCurveTrimmer.exclude(elements, model);
   }
 
   /**

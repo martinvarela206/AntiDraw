@@ -312,22 +312,58 @@ export class BezierCurveTrimmer {
   }
 
   /**
-   * Analytical Bezier-Preserving Vector Trimming Engine.
-   * Implements exact Weiler-Atherton style topological subtraction retaining Bezier nodes and handles.
+   * Computes the signed area of a polygon ring using the shoelace formula.
+   * Positive = clockwise in screen space (Y down), Negative = counter-clockwise.
    */
-  public static trimWithBezierCurves(
+  public static getSignedArea(ring: Array<{ x: number; y: number }>): number {
+    let area = 0;
+    for (let i = 0; i < ring.length; i++) {
+      const j = (i + 1) % ring.length;
+      area += ring[i].x * ring[j].y - ring[j].x * ring[i].y;
+    }
+    return area / 2;
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Generalized Analytical Bézier Boolean Operator (booleanOpPair)
+   *
+   * 1. The Challenge of Polygonal Discretization vs Analytical Preservation:
+   *    Traditional polygon clipping libraries convert Bézier curves into discrete straight lines (24+ vertices per curve),
+   *    destroying control handles and producing heavily faceted polylines.
+   *    `booleanOpPair` evaluates exact curve-curve and curve-line intersections via De Casteljau subdivision,
+   *    retaining original Bézier control handles and producing mathematically minimal vertex sets.
+   *
+   * 2. Topological Subsegment Classification:
+   *    - Union (A ∪ B): Retains subsegments of A outside B, and subsegments of B outside A.
+   *    - Subtract (A \ B): Retains subsegments of A outside B, and subsegments of B inside A (reversed).
+   *    - Intersect (A ∩ B): Retains subsegments of A inside B, and subsegments of B inside A.
+   *
+   * 3. Winding Orientation Normalization & Bidirectional Chaining:
+   *    Detects relative winding via signed shoelace area and normalizes orientation. Chaining loop performs
+   *    bidirectional connection snapping, reversing segments if needed to ensure closed continuous contours.
+   */
+  public static booleanOpPair(
     targetEl: VectorElement,
     cutterEl: VectorElement,
+    op: 'union' | 'subtract' | 'intersect',
     model: VectorModel
   ): VectorElement | null {
     if (!targetEl.vertices || targetEl.vertices.length < 3 || !cutterEl.vertices || cutterEl.vertices.length < 3) {
       return null;
     }
 
-    const targetSegs = this.elementToSegments(targetEl);
-    const cutterSegs = this.elementToSegments(cutterEl);
-    const targetRing = this.elementToPolygonRing(targetEl);
-    const cutterRing = this.elementToPolygonRing(cutterEl);
+    let targetSegs = this.elementToSegments(targetEl);
+    let cutterSegs = this.elementToSegments(cutterEl);
+    let targetRing = this.elementToPolygonRing(targetEl);
+    let cutterRing = this.elementToPolygonRing(cutterEl);
+
+    // Normalize winding orientation
+    const areaA = this.getSignedArea(targetRing);
+    const areaB = this.getSignedArea(cutterRing);
+    if (Math.sign(areaA) !== 0 && Math.sign(areaB) !== 0 && Math.sign(areaA) !== Math.sign(areaB)) {
+      cutterSegs = cutterSegs.map((seg) => this.reverseSegment(seg)).reverse();
+      cutterRing = [...cutterRing].reverse();
+    }
 
     // 1. Find all intersections between target and cutter segments
     const targetCuts: Map<number, number[]> = new Map();
@@ -349,7 +385,7 @@ export class BezierCurveTrimmer {
       }
     }
 
-    // If shapes do not intersect
+    // Handle non-intersecting shapes
     if (totalIntersections === 0) {
       const sampleTargetPt = { x: targetEl.vertices[0].x, y: targetEl.vertices[0].y };
       const sampleCutterPt = { x: cutterEl.vertices[0].x, y: cutterEl.vertices[0].y };
@@ -357,77 +393,75 @@ export class BezierCurveTrimmer {
       const isTargetInCutter = this.isPointInPolygonRing(sampleTargetPt, cutterRing);
       const isCutterInTarget = this.isPointInPolygonRing(sampleCutterPt, targetRing);
 
-      if (isTargetInCutter) {
-        // Target completely submerged in cutter -> entirely erased
-        return null;
-      }
-      if (isCutterInTarget) {
-        // Cutter inside target -> create a hole preserving both shapes' original vertices
-        const id = `trimmed_${Date.now().toString(36)}`;
-        const holeVerts: PathVertex[] = cutterEl.vertices.map((v, idx) => ({
-          ...v,
-          id: `v_hole_${Date.now().toString(36)}_${idx}`,
-          command: idx === 0 ? 'M' : v.command,
-        }));
-        const combinedVertices = [...targetEl.vertices, ...holeVerts];
-        const d = model.compilePathD(combinedVertices, true);
+      if (op === 'union') {
+        if (isTargetInCutter) return cutterEl;
+        if (isCutterInTarget) return targetEl;
+        // Disjoint union: compound path with both contours
+        const id = `union_${Date.now().toString(36)}`;
+        const combinedVerts: PathVertex[] = [
+          ...targetEl.vertices,
+          ...cutterEl.vertices.map((v, idx) => ({ ...v, command: idx === 0 ? 'M' : v.command })),
+        ];
+        const d = model.compilePathD(combinedVerts, true);
         const attrs: Record<string, string> = {
           ...targetEl.attributes,
           id,
           d,
           'fill-rule': 'evenodd',
-          'data-node-types': combinedVertices.map((v) => v.nodeType).join(','),
+          'data-node-types': combinedVerts.map((v) => v.nodeType).join(','),
           'data-shape': 'path',
           'data-parametric': 'false',
         };
         const shapeAttrs = ['x', 'y', 'width', 'height', 'cx', 'cy', 'r', 'rx', 'ry', 'x1', 'y1', 'x2', 'y2', 'points'];
         shapeAttrs.forEach((attr) => delete attrs[attr]);
-        if (attrs['fill'] && attrs['fill'].includes('ad-grad-')) {
-          attrs['fill'] = `url(#ad-grad-${id})`;
-        }
-        if (attrs['filter'] && attrs['filter'].includes('ad-filter-shadow-')) {
-          attrs['filter'] = `url(#ad-filter-shadow-${id})`;
-        }
         return {
           id,
           tagName: 'path',
           shapeType: 'path',
           isParametric: false,
           attributes: attrs,
-          vertices: combinedVertices,
+          vertices: combinedVerts,
           isClosed: true,
         };
+      } else if (op === 'intersect') {
+        if (isTargetInCutter) return targetEl;
+        if (isCutterInTarget) return cutterEl;
+        return null; // Disjoint: empty intersection
+      } else if (op === 'subtract') {
+        if (isTargetInCutter) return null; // Target completely submerged
+        if (isCutterInTarget) {
+          // Cutter inside target -> create a hole
+          const id = `trimmed_${Date.now().toString(36)}`;
+          const holeVerts: PathVertex[] = cutterEl.vertices.map((v, idx) => ({
+            ...v,
+            id: `v_hole_${Date.now().toString(36)}_${idx}`,
+            command: idx === 0 ? 'M' : v.command,
+          }));
+          const combinedVertices = [...targetEl.vertices, ...holeVerts];
+          const d = model.compilePathD(combinedVertices, true);
+          const attrs: Record<string, string> = {
+            ...targetEl.attributes,
+            id,
+            d,
+            'fill-rule': 'evenodd',
+            'data-node-types': combinedVertices.map((v) => v.nodeType).join(','),
+            'data-shape': 'path',
+            'data-parametric': 'false',
+          };
+          const shapeAttrs = ['x', 'y', 'width', 'height', 'cx', 'cy', 'r', 'rx', 'ry', 'x1', 'y1', 'x2', 'y2', 'points'];
+          shapeAttrs.forEach((attr) => delete attrs[attr]);
+          return {
+            id,
+            tagName: 'path',
+            shapeType: 'path',
+            isParametric: false,
+            attributes: attrs,
+            vertices: combinedVertices,
+            isClosed: true,
+          };
+        }
+        return targetEl; // Disjoint: target unchanged
       }
-
-      // Disjoint: cutter is completely outside target -> target is de-structured to freeform curves (FIX-07)
-      const disjointId = `trimmed_${Date.now().toString(36)}`;
-      const disjointD = targetEl.attributes.d || model.compilePathD(targetEl.vertices || [], true);
-      const disjointAttrs: Record<string, string> = {
-        ...targetEl.attributes,
-        id: disjointId,
-        d: disjointD,
-        'fill-rule': 'evenodd',
-        'data-node-types': (targetEl.vertices || []).map((v) => v.nodeType).join(','),
-        'data-shape': 'path',
-        'data-parametric': 'false',
-      };
-      const shapeAttrs = ['x', 'y', 'width', 'height', 'cx', 'cy', 'r', 'rx', 'ry', 'x1', 'y1', 'x2', 'y2', 'points'];
-      shapeAttrs.forEach((attr) => delete disjointAttrs[attr]);
-      if (disjointAttrs['fill'] && disjointAttrs['fill'].includes('ad-grad-')) {
-        disjointAttrs['fill'] = `url(#ad-grad-${disjointId})`;
-      }
-      if (disjointAttrs['filter'] && disjointAttrs['filter'].includes('ad-filter-shadow-')) {
-        disjointAttrs['filter'] = `url(#ad-filter-shadow-${disjointId})`;
-      }
-      return {
-        ...targetEl,
-        id: disjointId,
-        tagName: 'path',
-        shapeType: 'path',
-        isParametric: false,
-        attributes: disjointAttrs,
-        isClosed: true,
-      };
     }
 
     // 2. Subdivide target and cutter segments at intersection parameters
@@ -457,32 +491,49 @@ export class BezierCurveTrimmer {
       }
     }
 
-    // 3. Classify subsegments
-    // Kept target subsegments: midpoints lie OUTSIDE cutter
-    const keptTargetSegs = targetSubsegs.filter((seg) => {
-      const mid = this.evalSegment(seg, 0.5);
-      return !this.isPointInPolygonRing(mid, cutterRing);
-    });
+    // 3. Classify subsegments according to the boolean operation
+    let keptTargetSegs: CurveSegment[] = [];
+    let keptCutterSegs: CurveSegment[] = [];
 
-    // Kept cutter subsegments: midpoints lie INSIDE target.
-    // They are reversed so they follow the perimeter of the cut seamlessly
-    const keptCutterSegs = cutterSubsegs
-      .filter((seg) => {
+    if (op === 'union') {
+      keptTargetSegs = targetSubsegs.filter((seg) => {
+        const mid = this.evalSegment(seg, 0.5);
+        return !this.isPointInPolygonRing(mid, cutterRing);
+      });
+      keptCutterSegs = cutterSubsegs.filter((seg) => {
+        const mid = this.evalSegment(seg, 0.5);
+        return !this.isPointInPolygonRing(mid, targetRing);
+      });
+    } else if (op === 'subtract') {
+      keptTargetSegs = targetSubsegs.filter((seg) => {
+        const mid = this.evalSegment(seg, 0.5);
+        return !this.isPointInPolygonRing(mid, cutterRing);
+      });
+      keptCutterSegs = cutterSubsegs
+        .filter((seg) => {
+          const mid = this.evalSegment(seg, 0.5);
+          return this.isPointInPolygonRing(mid, targetRing);
+        })
+        .map((seg) => this.reverseSegment(seg));
+    } else if (op === 'intersect') {
+      keptTargetSegs = targetSubsegs.filter((seg) => {
+        const mid = this.evalSegment(seg, 0.5);
+        return this.isPointInPolygonRing(mid, cutterRing);
+      });
+      keptCutterSegs = cutterSubsegs.filter((seg) => {
         const mid = this.evalSegment(seg, 0.5);
         return this.isPointInPolygonRing(mid, targetRing);
-      })
-      .map((seg) => this.reverseSegment(seg));
+      });
+    }
 
-    // Combine all kept segments into a pool
     const pool: CurveSegment[] = [...keptTargetSegs, ...keptCutterSegs];
     if (pool.length < 3) return null;
 
-    // 4. Assemble chained continuous closed loops
+    // 4. Assemble chained continuous closed loops with bidirectional snap
     const used = new Array(pool.length).fill(false);
     const chains: CurveSegment[][] = [];
 
     while (true) {
-      // Find first unused segment
       const startIdx = used.findIndex((u) => !u);
       if (startIdx === -1) break;
 
@@ -493,30 +544,36 @@ export class BezierCurveTrimmer {
         const lastSeg = currentChain[currentChain.length - 1];
         const endPt = lastSeg.p3;
 
-        // Check if loop has closed back to chain start
         const distToStart = Math.hypot(endPt.x - currentChain[0].p0.x, endPt.y - currentChain[0].p0.y);
         if (currentChain.length >= 3 && distToStart < 1.0) {
           break;
         }
 
-        // Find next segment starting near endPt
         let bestDist = 2.0;
         let bestIdx = -1;
+        let needReverse = false;
 
         for (let i = 0; i < pool.length; i++) {
           if (used[i]) continue;
-          const d = Math.hypot(pool[i].p0.x - endPt.x, pool[i].p0.y - endPt.y);
-          if (d < bestDist) {
-            bestDist = d;
+          const dForward = Math.hypot(pool[i].p0.x - endPt.x, pool[i].p0.y - endPt.y);
+          if (dForward < bestDist) {
+            bestDist = dForward;
             bestIdx = i;
+            needReverse = false;
+          }
+          const dBackward = Math.hypot(pool[i].p3.x - endPt.x, pool[i].p3.y - endPt.y);
+          if (dBackward < bestDist) {
+            bestDist = dBackward;
+            bestIdx = i;
+            needReverse = true;
           }
         }
 
         if (bestIdx !== -1) {
           used[bestIdx] = true;
-          currentChain.push(pool[bestIdx]);
+          const nextSeg = needReverse ? this.reverseSegment(pool[bestIdx]) : pool[bestIdx];
+          currentChain.push(nextSeg);
         } else {
-          // Closed by proximity or dead-end reached
           break;
         }
       }
@@ -536,14 +593,16 @@ export class BezierCurveTrimmer {
         const prevSeg = chain[(idx - 1 + chain.length) % chain.length];
         const isStart = idx === 0;
 
-        const handleIn = prevSeg.isBezier
-          ? { x: Math.round(prevSeg.p2.x * 100) / 100, y: Math.round(prevSeg.p2.y * 100) / 100 }
-          : undefined;
-        const handleOut = seg.isBezier
-          ? { x: Math.round(seg.p1.x * 100) / 100, y: Math.round(seg.p1.y * 100) / 100 }
-          : undefined;
+        const handleIn =
+          prevSeg.isBezier && Math.hypot(prevSeg.p2.x - prevSeg.p3.x, prevSeg.p2.y - prevSeg.p3.y) > 0.05
+            ? { x: Math.round(prevSeg.p2.x * 100) / 100, y: Math.round(prevSeg.p2.y * 100) / 100 }
+            : undefined;
+        const handleOut =
+          seg.isBezier && Math.hypot(seg.p1.x - seg.p0.x, seg.p1.y - seg.p0.y) > 0.05
+            ? { x: Math.round(seg.p1.x * 100) / 100, y: Math.round(seg.p1.y * 100) / 100 }
+            : undefined;
 
-        const nodeType = (handleIn || handleOut) ? 'smooth' : 'sharp';
+        const nodeType = handleIn && handleOut ? 'asymmetric' : handleIn || handleOut ? 'smooth' : 'sharp';
 
         finalVertices.push({
           id: `v_${Date.now().toString(36)}_${finalVertices.length}`,
@@ -552,14 +611,15 @@ export class BezierCurveTrimmer {
           handleIn,
           handleOut,
           nodeType,
-          command: isStart ? 'M' : 'C',
+          command: isStart ? 'M' : handleIn || handleOut ? 'C' : 'L',
         });
       });
     });
 
     if (finalVertices.length === 0) return null;
 
-    const id = `trimmed_${Date.now().toString(36)}`;
+    const prefix = op === 'union' ? 'union' : op === 'intersect' ? 'intersect' : 'trimmed';
+    const id = `${prefix}_${Date.now().toString(36)}`;
     const d = model.compilePathD(finalVertices, true);
     const attrs: Record<string, string> = {
       ...targetEl.attributes,
@@ -574,14 +634,6 @@ export class BezierCurveTrimmer {
     const shapeAttrs = ['x', 'y', 'width', 'height', 'cx', 'cy', 'r', 'rx', 'ry', 'x1', 'y1', 'x2', 'y2', 'points'];
     shapeAttrs.forEach((attr) => delete attrs[attr]);
 
-    /**
-     * ARCHITECTURAL RATIONALE: Preserving Gradient Fill and Filter Links After Bezier Trim
-     * When Bezier trimming subtracts intersecting curves, targetEl.attributes carries
-     * 'data-gradient' and fill="url(#ad-grad-${targetEl.id})".
-     * Because VectorModel compiles gradients dynamically using the element's active id,
-     * failure to re-bind fill="url(#ad-grad-${id})" causes the SVG renderer to look for
-     * a non-existent gradient ID, rendering the newly trimmed vector as transparent.
-     */
     if (attrs['fill'] && attrs['fill'].includes('ad-grad-')) {
       attrs['fill'] = `url(#ad-grad-${id})`;
     }
@@ -601,37 +653,116 @@ export class BezierCurveTrimmer {
   }
 
   /**
-   * Minus (Trim / Resta): The first selected vector (cutter) trims the last selected vector (target).
-   * Cutter is retained in document, target is replaced with trimmed shape.
+   * Preserved backward compatibility method for subtract trimming.
+   */
+  public static trimWithBezierCurves(
+    targetEl: VectorElement,
+    cutterEl: VectorElement,
+    model: VectorModel
+  ): VectorElement | null {
+    return this.booleanOpPair(targetEl, cutterEl, 'subtract', model);
+  }
+
+  /**
+   * Union / Soldar: Combines 2 or more shapes into a single unified outline,
+   * preserving exact Bézier curves and minimal node counts.
+   */
+  public static union(elements: VectorElement[], model: VectorModel): VectorElement | null {
+    if (!elements || elements.length === 0) return null;
+    if (elements.length === 1) return elements[0];
+
+    try {
+      let current = elements[0];
+      for (let i = 1; i < elements.length; i++) {
+        const next = this.booleanOpPair(current, elements[i], 'union', model);
+        if (!next) throw new Error('Analytical union step failed');
+        current = next;
+      }
+      return current;
+    } catch (_err) {
+      // Graceful fallback to polygonClipping on complex or non-manifold topology
+      return PolygonBooleanService.union(elements, model);
+    }
+  }
+
+  /**
+   * Intersect: Retains only overlapping regions across 2 or more shapes,
+   * preserving exact Bézier curves and minimal node counts.
+   */
+  public static intersect(elements: VectorElement[], model: VectorModel): VectorElement | null {
+    if (!elements || elements.length < 2) return null;
+
+    try {
+      let current = elements[0];
+      for (let i = 1; i < elements.length; i++) {
+        const next = this.booleanOpPair(current, elements[i], 'intersect', model);
+        if (!next) throw new Error('Analytical intersect step failed');
+        current = next;
+      }
+      return current;
+    } catch (_err) {
+      return PolygonBooleanService.intersect(elements, model);
+    }
+  }
+
+  /**
+   * Minus / Trim / Resta: Cutters trim the target shape.
+   * Supports 2 or more elements: elements[0..N-2] are cutters, elements[N-1] is target.
+   * Preserves exact Bézier curves and minimal node counts.
    */
   public static subtract(elements: VectorElement[], model: VectorModel): TrimResult | null {
     if (!elements || elements.length < 2) return null;
 
-    const cutterEl = elements[0];
     const targetEl = elements[elements.length - 1];
+    const cutterEls = elements.slice(0, elements.length - 1);
 
-    // Attempt high-fidelity Bezier curve vector trimming first
     try {
-      const bezierTrimmed = this.trimWithBezierCurves(targetEl, cutterEl, model);
-      if (bezierTrimmed) {
-        return {
-          trimmed: bezierTrimmed,
-          targetId: targetEl.id,
-          cutterId: cutterEl.id,
-        };
+      let current = targetEl;
+      for (const cutter of cutterEls) {
+        const next = this.booleanOpPair(current, cutter, 'subtract', model);
+        if (!next) throw new Error('Analytical subtract step failed');
+        current = next;
+      }
+      return {
+        trimmed: current,
+        targetId: targetEl.id,
+        cutterId: cutterEls[0].id,
+      };
+    } catch (_err) {
+      // Fallback: polygon-clipping difference
+      let current = targetEl;
+      for (const cutter of cutterEls) {
+        const next = PolygonBooleanService.difference(current, cutter, model);
+        if (!next) return null;
+        current = next;
+      }
+      return {
+        trimmed: current,
+        targetId: targetEl.id,
+        cutterId: cutterEls[0].id,
+      };
+    }
+  }
+
+  /**
+   * Exclusion (XOR): Retains non-overlapping regions between 2 shapes,
+   * preserving exact Bézier curves.
+   */
+  public static exclude(elements: VectorElement[], model: VectorModel): VectorElement | null {
+    if (!elements || elements.length < 2) return null;
+
+    try {
+      const aMinusB = this.booleanOpPair(elements[0], elements[1], 'subtract', model);
+      const bMinusA = this.booleanOpPair(elements[1], elements[0], 'subtract', model);
+      if (aMinusB && bMinusA) {
+        const xor = this.booleanOpPair(aMinusB, bMinusA, 'union', model);
+        if (xor) return xor;
       }
     } catch (_err) {
-      // Graceful fallback to polygonClipping on complex or non-manifold topology
+      // Graceful fallback
     }
 
-    // Fallback: polygon-clipping difference
-    const fallbackTrimmed = PolygonBooleanService.difference(targetEl, cutterEl, model);
-    if (!fallbackTrimmed) return null;
-
-    return {
-      trimmed: fallbackTrimmed,
-      targetId: targetEl.id,
-      cutterId: cutterEl.id,
-    };
+    return PolygonBooleanService.exclude(elements, model);
   }
 }
+
