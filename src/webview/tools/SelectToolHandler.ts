@@ -120,7 +120,7 @@ export class SelectToolHandler implements IToolHandler {
     // 3. Check hit on Arbitrary Rotation Pivot marker (ONLY in 'rotate' mode)
     if (selectedEls.length > 0 && this.ctx.selectionTool.selectionMode === 'rotate') {
       const z = this.ctx.canvasMgr.zoom || 1;
-      const groupBox = this.ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 6 / z);
+      const groupBox = this.ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 16 / z);
       if (groupBox && this.ctx.selectionTool.hitTestPivot(groupBox, pt, 8 / z)) {
         this.activeHandle = 'selection-pivot';
         this.transformInteraction.initialPivot = this.ctx.selectionTool.customPivot ? { ...this.ctx.selectionTool.customPivot } : null;
@@ -186,7 +186,7 @@ export class SelectToolHandler implements IToolHandler {
     // 5. Check hit on bounding box handles (scale vs rotate)
     if (selectedEls.length > 0) {
       const z = this.ctx.canvasMgr.zoom || 1;
-      const groupBox = this.ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 6 / z);
+      const groupBox = this.ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 16 / z);
       if (groupBox) {
         const handle = this.ctx.selectionTool.hitTestHandle(
           groupBox,
@@ -202,7 +202,7 @@ export class SelectToolHandler implements IToolHandler {
             this.transformInteraction.startRotate(pivot, pt, selectedEls);
             this.callbacks.setCursor?.('grabbing');
           } else {
-            this.transformInteraction.startScale(handle, groupBox, selectedEls);
+            this.transformInteraction.startScale(handle, groupBox, selectedEls, 16 / z);
           }
           this.ctx.render();
           return true;
@@ -222,7 +222,7 @@ export class SelectToolHandler implements IToolHandler {
       if (nowSelected.length > 0) {
         this.activeHandle = 'move';
         const z = this.ctx.canvasMgr.zoom || 1;
-        const groupBox = this.ctx.selectionTool.getGroupSelectionBoundingBox(nowSelected, 6 / z);
+        const groupBox = this.ctx.selectionTool.getGroupSelectionBoundingBox(nowSelected, 16 / z);
         this.translateInteraction.start(this.ctx, pt, nowSelected, groupBox);
       }
       this.callbacks.onClearPanelMode?.();
@@ -234,7 +234,7 @@ export class SelectToolHandler implements IToolHandler {
     // or within proximity threshold allows translation (FIX-23)
     if (selectedEls.length > 0) {
       const z = this.ctx.canvasMgr.zoom || 1;
-      const groupBox = this.ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 6 / z);
+      const groupBox = this.ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 16 / z);
       const isHitSelected = hit && this.ctx.selectionTool.isSelected(hit.element.id);
       const isNearAnchor = this.translateInteraction.isNearSelectionAnchor(this.ctx, selectedEls, pt, groupBox, z);
       const isInsideBox =

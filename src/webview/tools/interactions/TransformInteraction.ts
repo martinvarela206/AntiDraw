@@ -36,12 +36,22 @@ export class TransformInteraction {
 
   public initialElementsMap: Map<string, PathVertex[]> = new Map();
   public initialBox: any = null;
+  public initialBoxPadding: number = 16;
   public ghostTransformMap: Map<string, PathVertex[]> = new Map();
 
+  /**
+   * ARCHITECTURAL RATIONALE: 16px Screen-Invariant Selection Box Clearance
+   * 1. Hit-Testing & Cursor Disambiguation:
+   *    With small margins (6px), resize handles (12px hit radius) collided with vector anchor
+   *    vertices and stroke boundaries, confusing users when attempting to move or click vertices.
+   * 2. Zoom-Invariance:
+   *    Scaling document padding inversely with zoom (16 / z) guarantees that the visual distance
+   *    from the vector boundary to the handles stays strictly constant at 16 screen pixels across all zoom levels.
+   */
   public getHoverCursor(ctx: ToolContext, pt: Point, selectedEls: VectorElement[]): string | null {
     if (selectedEls.length === 0) return null;
     const z = ctx.canvasMgr.zoom || 1;
-    const box = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 6 / z);
+    const box = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 16 / z);
     if (!box) return null;
 
     if (ctx.selectionTool.selectionMode === 'rotate') {
@@ -97,9 +107,11 @@ export class TransformInteraction {
   public startScale(
     handle: HandleType,
     groupBox: any,
-    selectedEls: VectorElement[]
+    selectedEls: VectorElement[],
+    padding: number = 16
   ): void {
     this.initialBox = { ...groupBox };
+    this.initialBoxPadding = padding;
     this.initialElementsMap.clear();
     selectedEls.forEach((el) => {
       if (el.vertices) {
@@ -154,7 +166,7 @@ export class TransformInteraction {
       const selectedEls = ctx.model.elements.filter((el) => ctx.selectionTool.isSelected(el.id));
       if (selectedEls.length > 0) {
         const z = ctx.canvasMgr.zoom || 1;
-        const groupBox = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 6 / z);
+        const groupBox = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 16 / z);
         if (groupBox) {
           otherVertices.push({ x: groupBox.cx, y: groupBox.cy });
           otherVertices.push({ x: groupBox.x, y: groupBox.y });
@@ -306,7 +318,8 @@ export class TransformInteraction {
           this.initialBox,
           activeHandle as HandleType,
           dx,
-          dy
+          dy,
+          this.initialBoxPadding
         );
         this.ghostTransformMap.set(id, transformed);
       });
@@ -400,7 +413,7 @@ export class TransformInteraction {
         });
       } else if (this.initialBox) {
         const z = ctx.canvasMgr.zoom || 1;
-        const newBox = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 6 / z);
+        const newBox = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 16 / z);
         if (newBox) {
           ctx.selectionTool.updatePivotOnScale(this.initialBox, newBox, selectedEls);
         }
@@ -483,7 +496,7 @@ export class TransformInteraction {
     const z = ctx.canvasMgr.zoom || 1;
 
     if (selectedEls.length > 0) {
-      const groupBox = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 6 / z);
+      const groupBox = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 16 / z);
       if (groupBox && ctx.selectionTool.hitTestPivot(groupBox, pt, 10 / z)) {
         ctx.selectionTool.resetPivot(selectedEls.length === 1 ? selectedEls[0] : undefined);
         callbacks.onSelectionChanged?.();
@@ -520,7 +533,7 @@ export class TransformInteraction {
     const selectedEls = ctx.model.elements.filter((e) => ctx.selectionTool.isSelected(e.id));
 
     if (selectedEls.length > 0) {
-      const groupBox = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 6 / z);
+      const groupBox = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 16 / z);
       if (groupBox) {
         const mode = ctx.selectionTool.selectionMode;
         const boxStroke = mode === 'rotate' ? '#f59e0b' : '#38bdf8';
@@ -666,7 +679,7 @@ export class TransformInteraction {
 
       if (selectedEls.length > 1) {
         selectedEls.forEach((el) => {
-          const elBox = ctx.selectionTool.getSelectionBoundingBox(el, 6 / z);
+          const elBox = ctx.selectionTool.getSelectionBoundingBox(el, 16 / z);
           if (elBox) {
             html += `<rect x="${elBox.x}" y="${elBox.y}" width="${elBox.width}" height="${elBox.height}" fill="none" stroke="#60a5fa" stroke-width="0.75" stroke-dasharray="2 2" opacity="0.6" vector-effect="non-scaling-stroke" />`;
           }

@@ -240,8 +240,8 @@ export class SelectionTool {
     };
   }
 
-  // Calculate padded bounding box for selection mask & resize handles
-  public getSelectionBoundingBox(element: VectorElement, padding: number = 6): BoundingBox | null {
+  // Calculate padded bounding box for selection mask & resize handles (16px screen-invariant clearance)
+  public getSelectionBoundingBox(element: VectorElement, padding: number = 16): BoundingBox | null {
     const box = this.getBoundingBox(element);
     if (!box) return null;
     return {
@@ -287,8 +287,8 @@ export class SelectionTool {
     };
   }
 
-  // Calculate composite group selection bounding box with padding
-  public getGroupSelectionBoundingBox(elements: VectorElement[], padding: number = 6): BoundingBox | null {
+  // Calculate composite group selection bounding box with padding (16px screen-invariant clearance)
+  public getGroupSelectionBoundingBox(elements: VectorElement[], padding: number = 16): BoundingBox | null {
     const box = this.getGroupBoundingBox(elements);
     if (!box) return null;
     return {
@@ -552,7 +552,7 @@ export class SelectionTool {
     handle: HandleType,
     dx: number,
     dy: number,
-    padding: number = 6
+    padding: number = 16
   ): PathVertex[] {
     let newX = initialBox.x;
     let newY = initialBox.y;
