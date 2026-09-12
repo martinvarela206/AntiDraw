@@ -98,6 +98,110 @@ export const STANDARD_MARKERS_INNER_XML = `    <!-- AntiDraw Standard SVG Marker
       <line x1="8" y1="1" x2="8" y2="9" stroke="context-stroke" stroke-width="2" stroke-linecap="round" />
     </marker>\n`;
 
+export interface MarkerTemplate {
+  key: string;
+  viewBox: string;
+  baseRefX: number;
+  baseRefY: number;
+  markerWidth: number;
+  markerHeight: number;
+  pos: 'start' | 'mid' | 'end' | 'all';
+  innerXml: (color: string) => string;
+}
+
+export const MARKER_TEMPLATES: Record<string, MarkerTemplate> = {
+  'arrow-open-start': {
+    key: 'arrow-open-start',
+    viewBox: '0 0 10 10',
+    baseRefX: 1,
+    baseRefY: 5,
+    markerWidth: 6,
+    markerHeight: 6,
+    pos: 'start',
+    innerXml: (c) => `<path d="M 9 1.5 L 1 5 L 9 8.5" fill="none" stroke="${c}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />`,
+  },
+  'arrow-open-end': {
+    key: 'arrow-open-end',
+    viewBox: '0 0 10 10',
+    baseRefX: 9,
+    baseRefY: 5,
+    markerWidth: 6,
+    markerHeight: 6,
+    pos: 'end',
+    innerXml: (c) => `<path d="M 1 1.5 L 9 5 L 1 8.5" fill="none" stroke="${c}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />`,
+  },
+  'arrow-filled-start': {
+    key: 'arrow-filled-start',
+    viewBox: '0 0 10 10',
+    baseRefX: 1,
+    baseRefY: 5,
+    markerWidth: 6,
+    markerHeight: 6,
+    pos: 'start',
+    innerXml: (c) => `<path d="M 10 1.5 L 1 5 L 10 8.5 Z" fill="${c}" />`,
+  },
+  'arrow-filled-end': {
+    key: 'arrow-filled-end',
+    viewBox: '0 0 10 10',
+    baseRefX: 9,
+    baseRefY: 5,
+    markerWidth: 6,
+    markerHeight: 6,
+    pos: 'end',
+    innerXml: (c) => `<path d="M 0 1.5 L 9 5 L 0 8.5 Z" fill="${c}" />`,
+  },
+  'arrow-filled-mid': {
+    key: 'arrow-filled-mid',
+    viewBox: '0 0 10 10',
+    baseRefX: 5,
+    baseRefY: 5,
+    markerWidth: 6,
+    markerHeight: 6,
+    pos: 'mid',
+    innerXml: (c) => `<path d="M 1 1.5 L 9 5 L 1 8.5 Z" fill="${c}" />`,
+  },
+  'circle-dot': {
+    key: 'circle-dot',
+    viewBox: '0 0 10 10',
+    baseRefX: 5,
+    baseRefY: 5,
+    markerWidth: 5,
+    markerHeight: 5,
+    pos: 'all',
+    innerXml: (c) => `<circle cx="5" cy="5" r="3.5" fill="${c}" />`,
+  },
+  'square-block': {
+    key: 'square-block',
+    viewBox: '0 0 10 10',
+    baseRefX: 5,
+    baseRefY: 5,
+    markerWidth: 5,
+    markerHeight: 5,
+    pos: 'all',
+    innerXml: (c) => `<rect x="2" y="2" width="6" height="6" fill="${c}" />`,
+  },
+  'bar-cap-start': {
+    key: 'bar-cap-start',
+    viewBox: '0 0 10 10',
+    baseRefX: 2,
+    baseRefY: 5,
+    markerWidth: 5,
+    markerHeight: 6,
+    pos: 'start',
+    innerXml: (c) => `<line x1="2" y1="1" x2="2" y2="9" stroke="${c}" stroke-width="2" stroke-linecap="round" />`,
+  },
+  'bar-cap-end': {
+    key: 'bar-cap-end',
+    viewBox: '0 0 10 10',
+    baseRefX: 8,
+    baseRefY: 5,
+    markerWidth: 5,
+    markerHeight: 6,
+    pos: 'end',
+    innerXml: (c) => `<line x1="8" y1="1" x2="8" y2="9" stroke="${c}" stroke-width="2" stroke-linecap="round" />`,
+  },
+};
+
 /**
  * ARCHITECTURAL RATIONALE: Dedicated SVG Serialization & Deserialization Service (SvgSerializer)
  *
@@ -181,16 +285,7 @@ export class SvgSerializer {
       const defsEl = svgEl.querySelector('defs');
       if (defsEl) {
         const clone = defsEl.cloneNode(true) as HTMLElement;
-        const markerIds = [
-          'ad-marker-arrow-open-start', 'ad-marker-arrow-open-end',
-          'ad-marker-arrow-filled-start', 'ad-marker-arrow-filled-end',
-          'ad-marker-arrow-filled-mid', 'ad-marker-circle-dot',
-          'ad-marker-square-block', 'ad-marker-bar-cap-start', 'ad-marker-bar-cap-end'
-        ];
-        markerIds.forEach((id) => {
-          const m = clone.querySelector(`#${id}`);
-          if (m) m.remove();
-        });
+        clone.querySelectorAll('[id^="ad-marker-"]').forEach((m) => m.remove());
         clone.querySelectorAll('[id^="ad-filter-"]').forEach((f) => f.remove());
         clone.querySelectorAll('[id^="ad-grad-"]').forEach((g) => g.remove());
 
@@ -709,6 +804,68 @@ export class SvgSerializer {
   }
 
   /**
+   * ARCHITECTURAL RATIONALE: Dynamic & Parametric SVG Markers with Offset Support
+   *
+   * 1. Baseline Global Catalog:
+   *    Always emits STANDARD_MARKERS_INNER_XML for default marker IDs without offset.
+   *
+   * 2. Parametric Marker Offsets:
+   *    When a vector element configures an offset (`data-marker-offset`), terminal markers
+   *    shift outward away from the path endpoint (or inward if negative).
+   *    - For start markers: refX = baseRefX + offset (advances outward away from path start)
+   *    - For end markers:   refX = baseRefX - offset (advances outward away from path end)
+   *    - For mid markers:   refX = baseRefX - offset
+   *
+   * 3. Self-Healing Element-Scoped Marker IDs:
+   *    If an element has an active offset and uses markers, SvgSerializer compiles dedicated
+   *    <marker id="ad-marker-${tplKey}-${el.id}"> in <defs> and synchronizes
+   *    the element's marker-start/mid/end attributes to point to the customized definition.
+   */
+  public static compileElementMarkers(elements: VectorElement[]): string {
+    let out = STANDARD_MARKERS_INNER_XML;
+
+    elements.forEach((el) => {
+      const offset = parseFloat(el.attributes['data-marker-offset'] || '0') || 0;
+      if (offset === 0) return; // Standard markers handle offset 0
+
+      const checkMarker = (attrName: 'marker-start' | 'marker-mid' | 'marker-end', pos: 'start' | 'mid' | 'end') => {
+        const val = el.attributes[attrName];
+        if (!val || val === 'none') return;
+
+        let matchKey: string | null = null;
+        for (const k of Object.keys(MARKER_TEMPLATES)) {
+          if (val.includes(k)) {
+            matchKey = k;
+            break;
+          }
+        }
+        if (!matchKey) return;
+
+        const tpl = MARKER_TEMPLATES[matchKey];
+        let refX = tpl.baseRefX;
+        if (pos === 'start') {
+          refX = Math.round((tpl.baseRefX + offset) * 100) / 100;
+        } else {
+          refX = Math.round((tpl.baseRefX - offset) * 100) / 100;
+        }
+
+        const customId = `ad-marker-${matchKey}-${el.id}`;
+        el.attributes[attrName] = `url(#${customId})`;
+
+        out += `    <marker id="${customId}" viewBox="${tpl.viewBox}" refX="${refX}" refY="${tpl.baseRefY}" markerWidth="${tpl.markerWidth}" markerHeight="${tpl.markerHeight}" orient="auto">\n`;
+        out += `      ${tpl.innerXml('context-stroke')}\n`;
+        out += `    </marker>\n`;
+      };
+
+      checkMarker('marker-start', 'start');
+      checkMarker('marker-mid', 'mid');
+      checkMarker('marker-end', 'end');
+    });
+
+    return out;
+  }
+
+  /**
    * Serializes the model canvas and elements into an XML-compliant SVG string.
    */
   public static toSvgString(ctx: IVectorModelSerializerContext): string {
@@ -726,7 +883,7 @@ export class SvgSerializer {
     if (hasMarkers || filterDefs.length > 0 || gradientDefs.length > 0 || hasCustomDefs) {
       svg += `  <defs id="antidraw-defs">\n`;
       if (hasMarkers) {
-        svg += STANDARD_MARKERS_INNER_XML;
+        svg += this.compileElementMarkers(ctx.elements);
       }
       if (filterDefs.length > 0) {
         svg += filterDefs;

@@ -635,6 +635,7 @@ export class PropertyPanel {
     const markerStart = parseMarkerId(el.attributes['marker-start']);
     const markerMid = parseMarkerId(el.attributes['marker-mid']);
     const markerEnd = parseMarkerId(el.attributes['marker-end']);
+    const markerOffset = parseFloat(el.attributes['data-marker-offset'] || '0') || 0;
 
     this.container.innerHTML = StrokeInspector.renderHtml(el, {
       stroke,
@@ -646,6 +647,7 @@ export class PropertyPanel {
       markerStart,
       markerMid,
       markerEnd,
+      markerOffset,
     });
 
     StrokeInspector.bindEvents(

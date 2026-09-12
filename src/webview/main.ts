@@ -1774,6 +1774,12 @@ class AntiDrawApp {
           el.attributes['fill'] = `url(#ad-grad-${el.id})`;
         }
 
+        ['marker-start', 'marker-mid', 'marker-end'].forEach((attr) => {
+          if (el.attributes[attr] && el.attributes[attr].includes('ad-marker-')) {
+            el.attributes[attr] = el.attributes[attr].replace(/(ad-marker-[^)]+)-[a-zA-Z0-9_-]+(\))/, `$1-${el.id}$2`);
+          }
+        });
+
         return el;
       });
 

@@ -66,7 +66,8 @@ export class StrokeOutlineGenerator {
     markerId: string,
     anchor: Point,
     tangent: Point,
-    strokeWidth: number
+    strokeWidth: number,
+    offset: number = 0
   ): Polygon[] {
     if (!markerId || markerId === 'none') return [];
 
@@ -106,16 +107,16 @@ export class StrokeOutlineGenerator {
       const mw = 6;
       const mh = 6;
       if (markerId.includes('start')) {
-        refX = 1;
+        refX = 1 + offset;
         refY = 5;
         pts = [[10, 1.5], [1, 5], [10, 8.5]];
       } else if (markerId.includes('end')) {
-        refX = 9;
+        refX = 9 - offset;
         refY = 5;
         pts = [[0, 1.5], [9, 5], [0, 8.5]];
       } else {
         // mid
-        refX = 5;
+        refX = 5 - offset;
         refY = 5;
         pts = [[1, 1.5], [9, 5], [1, 8.5]];
       }
@@ -124,10 +125,14 @@ export class StrokeOutlineGenerator {
       polys.push([ring]);
     } else if (markerId.includes('circle-dot')) {
       // 32-step smooth circle matching cx=5, cy=5, r=3.5 in 10x10 viewBox with mw=5, mh=5
+      const isStart = markerId.includes('start');
+      const refX = isStart ? 5 + offset : 5 - offset;
+      const center = transform(5, 5, refX, 5, 5, 5);
       const r = 3.5 * 0.5 * strokeWidth;
-      polys.push(makeCircle(anchor.x, anchor.y, r, 32));
+      polys.push(makeCircle(center[0], center[1], r, 32));
     } else if (markerId.includes('square-block')) {
-      const refX = 5;
+      const isStart = markerId.includes('start');
+      const refX = isStart ? 5 + offset : 5 - offset;
       const refY = 5;
       const mw = 5;
       const mh = 5;
@@ -137,7 +142,8 @@ export class StrokeOutlineGenerator {
       polys.push([ring]);
     } else if (markerId.includes('bar-cap')) {
       const isStart = markerId.includes('start');
-      const refX = isStart ? 2 : 8;
+      const baseRefX = isStart ? 2 : 8;
+      const refX = isStart ? baseRefX + offset : baseRefX - offset;
       const refY = 5;
       const mw = 5;
       const mh = 6;
@@ -167,19 +173,19 @@ export class StrokeOutlineGenerator {
       const mw = 6;
       const mh = 6;
       if (markerId.includes('start')) {
-        refX = 1;
+        refX = 1 + offset;
         refY = 5;
         p0 = [9, 1.5];
         p1 = [1, 5];
         p2 = [9, 8.5];
       } else if (markerId.includes('end')) {
-        refX = 9;
+        refX = 9 - offset;
         refY = 5;
         p0 = [1, 1.5];
         p1 = [9, 5];
         p2 = [1, 8.5];
       } else {
-        refX = 5;
+        refX = 5 - offset;
         refY = 5;
         p0 = [1, 1.5];
         p1 = [9, 5];
@@ -465,6 +471,8 @@ export class StrokeOutlineGenerator {
       }
 
       // Append marker geometry into thickPolygons
+      const markerOffset = parseFloat(element.attributes['data-marker-offset'] || '0') || 0;
+
       // 1. marker-start on first vertex of subpath
       if (markerStartType !== 'none' && sp.length >= 2) {
         let v0Tan = { x: sp[1].x - sp[0].x, y: sp[1].y - sp[0].y };
@@ -477,7 +485,7 @@ export class StrokeOutlineGenerator {
           const hy = sp[1].handleIn.y - sp[0].y;
           if (Math.hypot(hx, hy) > 0.001) v0Tan = { x: hx, y: hy };
         }
-        const mPolys = this.createMarkerPolygons(markerStartType, sp[0], v0Tan, strokeWidth);
+        const mPolys = this.createMarkerPolygons(markerStartType, sp[0], v0Tan, strokeWidth, markerOffset);
         thickPolygons.push(...mPolys);
       }
 
@@ -518,7 +526,7 @@ export class StrokeOutlineGenerator {
           let midTan = { x: uIn.x + uOut.x, y: uIn.y + uOut.y };
           if (Math.hypot(midTan.x, midTan.y) < 0.001) midTan = uOut;
 
-          const mPolys = this.createMarkerPolygons(markerMidType, curr, midTan, strokeWidth);
+          const mPolys = this.createMarkerPolygons(markerMidType, curr, midTan, strokeWidth, markerOffset);
           thickPolygons.push(...mPolys);
         }
       }
@@ -538,7 +546,7 @@ export class StrokeOutlineGenerator {
             const hy = firstV.y - lastV.handleOut.y;
             if (Math.hypot(hx, hy) > 0.001) vnTan = { x: hx, y: hy };
           }
-          const mPolys = this.createMarkerPolygons(markerEndType, firstV, vnTan, strokeWidth);
+          const mPolys = this.createMarkerPolygons(markerEndType, firstV, vnTan, strokeWidth, markerOffset);
           thickPolygons.push(...mPolys);
         } else {
           const lastIdx = sp.length - 1;
@@ -555,7 +563,7 @@ export class StrokeOutlineGenerator {
             const hy = lastV.y - prevV.handleOut.y;
             if (Math.hypot(hx, hy) > 0.001) vnTan = { x: hx, y: hy };
           }
-          const mPolys = this.createMarkerPolygons(markerEndType, lastV, vnTan, strokeWidth);
+          const mPolys = this.createMarkerPolygons(markerEndType, lastV, vnTan, strokeWidth, markerOffset);
           thickPolygons.push(...mPolys);
         }
       }

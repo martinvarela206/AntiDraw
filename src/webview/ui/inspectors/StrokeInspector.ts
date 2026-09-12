@@ -13,6 +13,7 @@ export interface StrokeInspectorProps {
   markerStart: string;
   markerMid: string;
   markerEnd: string;
+  markerOffset: number;
 }
 
 /**
@@ -28,6 +29,10 @@ export interface StrokeInspectorProps {
  *
  * 3. Bidirectional Miter Angle Conversion:
  *    Uses human-intuitive degrees [1°, 170°] instead of opaque dimensionless SVG miterlimit ratios.
+ *
+ * 4. Parametric Marker Offsets:
+ *    Allows adjusting refX dynamically to push terminal markers forward/backward along curve tangents,
+ *    eliminating unsightly blunt stroke caps protruding through arrow heads.
  */
 export class StrokeInspector {
   public static renderHtml(
@@ -44,6 +49,7 @@ export class StrokeInspector {
       markerStart,
       markerMid,
       markerEnd,
+      markerOffset,
     } = props;
 
     return `
@@ -116,6 +122,10 @@ export class StrokeInspector {
             <option value="square-block" ${markerEnd === 'square-block' ? 'selected' : ''}>Square</option>
             <option value="bar-cap" ${markerEnd === 'bar-cap' ? 'selected' : ''}>Bar Cap</option>
           </select>
+        </div>
+        <div class="prop-row">
+          <span class="prop-label">Offset</span>
+          <input type="number" class="prop-input" id="el-marker-offset" value="${markerOffset}" step="0.5" title="Desfase paramétrico del marcador respecto al nodo: valores positivos desplazan el marcador hacia afuera del trazo para evitar que el remate del trazo sobresalga" />
         </div>
         <div class="prop-row" style="margin-top: 8px;">
           <button class="prop-input" id="btn-stroke-to-path" style="cursor:pointer; background:var(--bg-active); text-align:center; font-weight:600; color:var(--text-main); padding:6px;" title="Convertir geométricamente el trazo en un contorno cerrado independiente con relleno (Outline Stroke)">
@@ -212,46 +222,71 @@ export class StrokeInspector {
     const elMarkerStart = container.querySelector<HTMLSelectElement>('#el-marker-start');
     const elMarkerMid = container.querySelector<HTMLSelectElement>('#el-marker-mid');
     const elMarkerEnd = container.querySelector<HTMLSelectElement>('#el-marker-end');
+    const elMarkerOffset = container.querySelector<HTMLInputElement>('#el-marker-offset');
+
+    const setMarker = (attr: 'marker-start' | 'marker-mid' | 'marker-end', baseVal: string) => {
+      if (baseVal === 'none') {
+        delete el.attributes[attr];
+      } else {
+        const offset = parseFloat(el.attributes['data-marker-offset'] || '0') || 0;
+        let keyWithPos = baseVal;
+        if (attr === 'marker-start' && (baseVal === 'arrow-open' || baseVal === 'arrow-filled' || baseVal === 'bar-cap')) {
+          keyWithPos = `${baseVal}-start`;
+        } else if (attr === 'marker-end' && (baseVal === 'arrow-open' || baseVal === 'arrow-filled' || baseVal === 'bar-cap')) {
+          keyWithPos = `${baseVal}-end`;
+        } else if (attr === 'marker-mid' && baseVal === 'arrow-filled') {
+          keyWithPos = 'arrow-filled-mid';
+        }
+
+        if (offset !== 0) {
+          el.attributes[attr] = `url(#ad-marker-${keyWithPos}-${el.id})`;
+        } else {
+          el.attributes[attr] = `url(#ad-marker-${keyWithPos})`;
+        }
+      }
+      callbacks.onUpdateElement(el);
+    };
 
     if (elMarkerStart) {
       elMarkerStart.addEventListener('change', () => {
-        const val = elMarkerStart.value;
-        if (val === 'none') {
-          delete el.attributes['marker-start'];
-        } else if (val === 'circle-dot' || val === 'square-block') {
-          el.attributes['marker-start'] = `url(#ad-marker-${val})`;
-        } else {
-          el.attributes['marker-start'] = `url(#ad-marker-${val}-start)`;
-        }
-        callbacks.onUpdateElement(el);
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        setMarker('marker-start', elMarkerStart.value);
       });
     }
 
     if (elMarkerMid) {
       elMarkerMid.addEventListener('change', () => {
-        const val = elMarkerMid.value;
-        if (val === 'none') {
-          delete el.attributes['marker-mid'];
-        } else if (val === 'arrow-filled') {
-          el.attributes['marker-mid'] = 'url(#ad-marker-arrow-filled-mid)';
-        } else {
-          el.attributes['marker-mid'] = `url(#ad-marker-${val})`;
-        }
-        callbacks.onUpdateElement(el);
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        setMarker('marker-mid', elMarkerMid.value);
       });
     }
 
     if (elMarkerEnd) {
       elMarkerEnd.addEventListener('change', () => {
-        const val = elMarkerEnd.value;
-        if (val === 'none') {
-          delete el.attributes['marker-end'];
-        } else if (val === 'circle-dot' || val === 'square-block') {
-          el.attributes['marker-end'] = `url(#ad-marker-${val})`;
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        setMarker('marker-end', elMarkerEnd.value);
+      });
+    }
+
+    if (elMarkerOffset) {
+      const applyOffset = () => {
+        const val = parseFloat(elMarkerOffset.value || '0') || 0;
+        if (val === 0) {
+          delete el.attributes['data-marker-offset'];
         } else {
-          el.attributes['marker-end'] = `url(#ad-marker-${val}-end)`;
+          el.attributes['data-marker-offset'] = val.toString();
         }
+        // Refresh active marker IDs so they acquire element-scoped definition when offset is nonzero
+        if (elMarkerStart && elMarkerStart.value !== 'none') setMarker('marker-start', elMarkerStart.value);
+        if (elMarkerMid && elMarkerMid.value !== 'none') setMarker('marker-mid', elMarkerMid.value);
+        if (elMarkerEnd && elMarkerEnd.value !== 'none') setMarker('marker-end', elMarkerEnd.value);
         callbacks.onUpdateElement(el);
+      };
+
+      elMarkerOffset.addEventListener('input', applyOffset);
+      elMarkerOffset.addEventListener('change', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        applyOffset();
       });
     }
 
