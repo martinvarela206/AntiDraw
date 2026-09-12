@@ -230,42 +230,39 @@ export class SelectToolHandler implements IToolHandler {
       return true;
     }
 
-    // Case 2: In 'rotate' mode, clicking on selected vector blocks general translation
-    if (selectedEls.length > 0 && this.ctx.selectionTool.selectionMode === 'rotate') {
+    // Case 2: In both 'transform' and 'rotate' modes, clicking on a selected vector element
+    // or within proximity threshold allows translation (FIX-23)
+    if (selectedEls.length > 0) {
       const z = this.ctx.canvasMgr.zoom || 1;
       const groupBox = this.ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 6 / z);
+      const isHitSelected = hit && this.ctx.selectionTool.isSelected(hit.element.id);
+      const isNearAnchor = this.translateInteraction.isNearSelectionAnchor(this.ctx, selectedEls, pt, groupBox, z);
       const isInsideBox =
         groupBox &&
+        selectedEls.some((el) => el.attributes['fill'] && el.attributes['fill'] !== 'none') &&
         pt.x >= groupBox.x &&
         pt.x <= groupBox.x + groupBox.width &&
         pt.y >= groupBox.y &&
         pt.y <= groupBox.y + groupBox.height;
 
-      if ((hit && this.ctx.selectionTool.isSelected(hit.element.id)) || isInsideBox) {
-        this.isDragging = false;
-        this.activeHandle = null;
-        const now = Date.now();
-        const z = this.ctx.canvasMgr.zoom || 1;
-        const dist = Math.hypot(pt.x - this.lastClickPt.x, pt.y - this.lastClickPt.y);
-        if (now - this.lastClickTime < 350 && dist < 8 / z) {
-          this.transformInteraction.toggleSelectionMode(this.ctx, this.callbacks);
-          this.lastClickTime = 0;
-        } else {
-          this.lastClickTime = now;
-          this.lastClickPt = { x: pt.x, y: pt.y };
-        }
-        return true;
-      }
-    }
-
-    // Case 3: In 'transform' mode, click on selected element or within proximity threshold (20 / zoom)
-    if (selectedEls.length > 0 && this.ctx.selectionTool.selectionMode === 'transform') {
-      const z = this.ctx.canvasMgr.zoom || 1;
-      const groupBox = this.ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 6 / z);
-      const isHitSelected = hit && this.ctx.selectionTool.isSelected(hit.element.id);
-      const isNearAnchor = this.translateInteraction.isNearSelectionAnchor(this.ctx, selectedEls, pt, groupBox, z);
-
-      if (isHitSelected || isNearAnchor) {
+      /**
+       * ARCHITECTURAL RATIONALE: Unified Vector Body Translation Across Selection Modes (FIX-23)
+       *
+       * 1. Single Responsibility & Symmetry:
+       *    Selection modes ('transform' vs 'rotate') define the behavior of bounding box PERIMETER handles:
+       *    - 'transform': perimeter handles scale the vector (nw, ne, se, sw, n, s, e, w).
+       *    - 'rotate': perimeter handles rotate the vector around the pivot.
+       *    The interior BODY of the vector represents the object itself. In professional graphics suites
+       *    (CorelDraw, Illustrator, Figma), dragging the body of a selected vector must ALWAYS translate
+       *    the object regardless of whether scale handles or rotation handles are active on the perimeter.
+       *
+       * 2. Eliminating Artificial Modal Barriers:
+       *    Previously, clicking the selected vector in 'rotate' mode explicitly blocked translation
+       *    (`this.isDragging = false; this.activeHandle = null; return true;`), forcing users to switch modes
+       *    just to move an object. Unifying the move trigger here eliminates this barrier while preserving
+       *    synthetic double-click alternation when clicking without dragging (handled in onPointerUp).
+       */
+      if (isHitSelected || isNearAnchor || isInsideBox) {
         this.activeHandle = 'move';
         this.translateInteraction.start(this.ctx, pt, selectedEls, groupBox);
         this.callbacks.onClearPanelMode?.();
@@ -317,9 +314,7 @@ export class SelectToolHandler implements IToolHandler {
         const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt);
         this.ctx.selectionTool.hoveredElementId = hit ? hit.element.id : null;
         if (hit) {
-          cursor = (this.ctx.selectionTool.selectionMode === 'rotate' && this.ctx.selectionTool.isSelected(hit.element.id))
-            ? 'default'
-            : 'move';
+          cursor = 'move';
         }
       }
 
