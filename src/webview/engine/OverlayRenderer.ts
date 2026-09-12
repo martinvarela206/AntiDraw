@@ -120,20 +120,21 @@ export class OverlayRenderer {
             <line x1="${geom.pivot.x}" y1="${geom.pivot.y - 9}" x2="${geom.pivot.x}" y2="${geom.pivot.y + 9}" stroke="${guideColor}" stroke-width="1" vector-effect="non-scaling-stroke" />
           `;
 
-          // ARCHITECTURAL RATIONALE: High-Fidelity Guide Line Rotation Indicators
-          // Replaces the legacy wireframe path with the user-crafted SVG vector indicators:
-          // - `double_arrow_vertical_right_rotate.svg` at Arrow 1 (curves concentrically towards pivot)
-          // - `double_arrow_vertical_left_rotate.svg` at Arrow 2 (curves concentrically towards pivot)
-          // Both indicators are centered at (-16, -16) to align their 32x32 bounding box origin with
-          // the geometric arrow points along the guide axis, rotated by `g.angle` to maintain
-          // exact tangential steering perpendicular to the guideline at any orientation.
+          // ARCHITECTURAL RATIONALE: Concave Guide Line Rotation Indicators
+          // Assigns user-crafted SVG vector indicators with concave curvature facing the center pivot:
+          // - Arrow 1 (Negative offset along guideline axis) uses `GUIDE_ROTATE_LEFT_PATH`
+          //   (hollow/concave arc faces towards positive direction / center pivot).
+          // - Arrow 2 (Positive offset along guideline axis) uses `GUIDE_ROTATE_RIGHT_PATH`
+          //   (hollow/concave arc faces towards negative direction / center pivot).
+          // This eliminates the previous convex bulge inversion, ensuring both rotation indicators
+          // wrap concavely around the center of rotation like a circular steering caliper.
           const arrowRot = g.angle || 0;
 
           // Arrow 1 (Negative offset along guideline axis)
           html += `
             <g transform="translate(${geom.arrow1.x}, ${geom.arrow1.y}) rotate(${arrowRot})">
               <g transform="translate(-16, -16)">
-                <path d="${GUIDE_ROTATE_RIGHT_PATH}" fill="${guideColor}" stroke="#1e293b" stroke-width="0.8" vector-effect="non-scaling-stroke" fill-rule="evenodd" />
+                <path d="${GUIDE_ROTATE_LEFT_PATH}" fill="${guideColor}" stroke="#1e293b" stroke-width="0.8" vector-effect="non-scaling-stroke" fill-rule="evenodd" />
               </g>
               <circle cx="0" cy="0" r="16" fill="transparent" />
             </g>
@@ -143,7 +144,7 @@ export class OverlayRenderer {
           html += `
             <g transform="translate(${geom.arrow2.x}, ${geom.arrow2.y}) rotate(${arrowRot})">
               <g transform="translate(-16, -16)">
-                <path d="${GUIDE_ROTATE_LEFT_PATH}" fill="${guideColor}" stroke="#1e293b" stroke-width="0.8" vector-effect="non-scaling-stroke" fill-rule="evenodd" />
+                <path d="${GUIDE_ROTATE_RIGHT_PATH}" fill="${guideColor}" stroke="#1e293b" stroke-width="0.8" vector-effect="non-scaling-stroke" fill-rule="evenodd" />
               </g>
               <circle cx="0" cy="0" r="16" fill="transparent" />
             </g>
