@@ -210,15 +210,42 @@ export class GuideInteraction {
     if (activeHandle === 'guide-pivot' && ctx.canvasMgr.selectedGuideId) {
       const g = ctx.canvasMgr.getGuide(ctx.canvasMgr.selectedGuideId);
       if (g) {
-        const otherVertices = ctx.getOtherVertices();
-        const snapped = ctx.snapPoint(pt, otherVertices, g.id);
-        const isMagneticallySnapped = Math.hypot(snapped.x - pt.x, snapped.y - pt.y) > 0.001;
-        this.currentRotationSnappedPt = isMagneticallySnapped ? snapped : null;
+        if (!g.mode || g.mode === 'move') {
+          // ARCHITECTURAL RATIONALE: Move Mode Center Snapping
+          // Translating the guideline by its visual center snaps the guideline directly
+          // to any target element (grids, other vertices, viewBox bounds, guides) in both axes.
+          const otherVertices = ctx.getOtherVertices();
+          const snapped = ctx.snapPoint(pt, otherVertices, g.id);
+          const isMagneticallySnapped = Math.hypot(snapped.x - pt.x, snapped.y - pt.y) > 0.001;
+          this.currentRotationSnappedPt = isMagneticallySnapped ? snapped : null;
 
-        g.pivotX = Math.round(snapped.x);
-        g.pivotY = Math.round(snapped.y);
-        if (g.orientation === 'horizontal') g.position = g.pivotY;
-        if (g.orientation === 'vertical') g.position = g.pivotX;
+          g.pivotX = Math.round(snapped.x);
+          g.pivotY = Math.round(snapped.y);
+          if (g.orientation === 'horizontal') g.position = g.pivotY;
+          if (g.orientation === 'vertical') g.position = g.pivotX;
+        } else {
+          // ARCHITECTURAL RATIONALE: Rotate Mode Constrained Pivot Axis Dragging
+          // In Rotate mode, the center pivot handle defines the rotation pivot and has
+          // an enforced snap-to strictly along the guide line axis. It cannot shift or translate
+          // the guide line off-axis. Any cursor position is projected onto the infinite line P0 + t * u.
+          const rad = ((g.angle || 0) * Math.PI) / 180;
+          const cos = Math.cos(rad);
+          const sin = Math.sin(rad);
+
+          const px0 = g.orientation === 'vertical' ? g.position : (g.pivotX ?? ctx.model.canvas.width / 2);
+          const py0 = g.orientation === 'horizontal' ? g.position : (g.pivotY ?? ctx.model.canvas.height / 2);
+
+          const otherVertices = ctx.getOtherVertices();
+          const snapped = ctx.snapPoint(pt, otherVertices, g.id);
+          const isMagneticallySnapped = Math.hypot(snapped.x - pt.x, snapped.y - pt.y) > 0.001;
+          this.currentRotationSnappedPt = isMagneticallySnapped ? snapped : null;
+
+          const targetPt = isMagneticallySnapped ? snapped : pt;
+          const t = (targetPt.x - px0) * cos + (targetPt.y - py0) * sin;
+
+          g.pivotX = Math.round(px0 + t * cos);
+          g.pivotY = Math.round(py0 + t * sin);
+        }
       }
       ctx.render();
       return true;
@@ -241,7 +268,14 @@ export class GuideInteraction {
         let deg = Math.round((angleRad * 180) / Math.PI);
         if (deg < 0) deg += 360;
 
-        const shouldSnapAngular = e.shiftKey || (ctx.canvasMgr.snapAngular && !isMagneticallySnapped);
+        if (this.activeRotateArrowIdx === 1) {
+          deg = (deg + 180) % 360;
+        }
+
+        // ARCHITECTURAL RATIONALE: 15° Quantization with Ctrl modifier
+        // Supports continuous free rotation by default, or 15° discrete stepping when
+        // holding Ctrl (or Meta / Shift / angular snap active).
+        const shouldSnapAngular = e.ctrlKey || e.metaKey || e.shiftKey || (ctx.canvasMgr.snapAngular && !isMagneticallySnapped);
         if (shouldSnapAngular) {
           deg = Math.round(deg / 15) * 15;
           deg = deg % 360;
