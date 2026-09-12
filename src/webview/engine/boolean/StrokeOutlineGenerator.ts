@@ -67,7 +67,9 @@ export class StrokeOutlineGenerator {
     anchor: Point,
     tangent: Point,
     strokeWidth: number,
-    offset: number = 0
+    offset: number = 0,
+    markerSize: number = 6,
+    markerUnits: string = 'strokeWidth'
   ): Polygon[] {
     if (!markerId || markerId === 'none') return [];
 
@@ -76,10 +78,13 @@ export class StrokeOutlineGenerator {
     const cos = tangent.x / len;
     const sin = tangent.y / len;
 
+    const sizeScale = markerSize / 6;
+    const unitScale = markerUnits === 'userSpaceOnUse' ? 1 : strokeWidth;
+
     const transform = (X: number, Y: number, refX: number, refY: number, mw: number, mh: number): Pair => {
       // W3C SVG Specification: <marker> preserveAspectRatio defaults to 'xMidYMid meet'.
-      // Enforces uniform scale S = min(mw, mh) / 10 * strokeWidth, preventing aspect ratio distortion.
-      const scale = Math.min(mw / 10, mh / 10) * strokeWidth;
+      // Enforces uniform scale S = min(mw, mh) / 10 * unitScale, preventing aspect ratio distortion.
+      const scale = Math.min((mw * sizeScale) / 10, (mh * sizeScale) / 10) * unitScale;
       const dx = (X - refX) * scale;
       const dy = (Y - refY) * scale;
       return [
@@ -128,7 +133,7 @@ export class StrokeOutlineGenerator {
       const isStart = markerId.includes('start');
       const refX = isStart ? 5 + offset : 5 - offset;
       const center = transform(5, 5, refX, 5, 5, 5);
-      const r = 3.5 * 0.5 * strokeWidth;
+      const r = 3.5 * 0.5 * sizeScale * unitScale;
       polys.push(makeCircle(center[0], center[1], r, 32));
     } else if (markerId.includes('square-block')) {
       const isStart = markerId.includes('start');
@@ -159,7 +164,7 @@ export class StrokeOutlineGenerator {
       polys.push([ring]);
 
       // FIX-15B: Uniform aspect ratio calibration
-      const scale = Math.min(mw / 10, mh / 10) * strokeWidth;
+      const scale = Math.min((mw * sizeScale) / 10, (mh * sizeScale) / 10) * unitScale;
       const rCap = 1.0 * scale;
 
       const pTop = transform(refX, 1, refX, refY, mw, mh);
@@ -472,6 +477,8 @@ export class StrokeOutlineGenerator {
 
       // Append marker geometry into thickPolygons
       const markerOffset = parseFloat(element.attributes['data-marker-offset'] || '0') || 0;
+      const markerSize = element.attributes['data-marker-size'] ? parseFloat(element.attributes['data-marker-size']) : 6;
+      const markerUnits = element.attributes['data-marker-units'] || 'strokeWidth';
 
       // 1. marker-start on first vertex of subpath
       if (markerStartType !== 'none' && sp.length >= 2) {
@@ -485,7 +492,7 @@ export class StrokeOutlineGenerator {
           const hy = sp[1].handleIn.y - sp[0].y;
           if (Math.hypot(hx, hy) > 0.001) v0Tan = { x: hx, y: hy };
         }
-        const mPolys = this.createMarkerPolygons(markerStartType, sp[0], v0Tan, strokeWidth, markerOffset);
+        const mPolys = this.createMarkerPolygons(markerStartType, sp[0], v0Tan, strokeWidth, markerOffset, markerSize, markerUnits);
         thickPolygons.push(...mPolys);
       }
 
@@ -526,7 +533,7 @@ export class StrokeOutlineGenerator {
           let midTan = { x: uIn.x + uOut.x, y: uIn.y + uOut.y };
           if (Math.hypot(midTan.x, midTan.y) < 0.001) midTan = uOut;
 
-          const mPolys = this.createMarkerPolygons(markerMidType, curr, midTan, strokeWidth, markerOffset);
+          const mPolys = this.createMarkerPolygons(markerMidType, curr, midTan, strokeWidth, markerOffset, markerSize, markerUnits);
           thickPolygons.push(...mPolys);
         }
       }
@@ -546,7 +553,7 @@ export class StrokeOutlineGenerator {
             const hy = firstV.y - lastV.handleOut.y;
             if (Math.hypot(hx, hy) > 0.001) vnTan = { x: hx, y: hy };
           }
-          const mPolys = this.createMarkerPolygons(markerEndType, firstV, vnTan, strokeWidth, markerOffset);
+          const mPolys = this.createMarkerPolygons(markerEndType, firstV, vnTan, strokeWidth, markerOffset, markerSize, markerUnits);
           thickPolygons.push(...mPolys);
         } else {
           const lastIdx = sp.length - 1;
@@ -563,7 +570,7 @@ export class StrokeOutlineGenerator {
             const hy = lastV.y - prevV.handleOut.y;
             if (Math.hypot(hx, hy) > 0.001) vnTan = { x: hx, y: hy };
           }
-          const mPolys = this.createMarkerPolygons(markerEndType, lastV, vnTan, strokeWidth, markerOffset);
+          const mPolys = this.createMarkerPolygons(markerEndType, lastV, vnTan, strokeWidth, markerOffset, markerSize, markerUnits);
           thickPolygons.push(...mPolys);
         }
       }

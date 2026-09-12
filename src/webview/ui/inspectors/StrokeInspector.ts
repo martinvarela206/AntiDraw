@@ -14,6 +14,8 @@ export interface StrokeInspectorProps {
   markerMid: string;
   markerEnd: string;
   markerOffset: number;
+  markerSize: number;
+  markerUnits: 'strokeWidth' | 'userSpaceOnUse';
 }
 
 /**
@@ -33,6 +35,11 @@ export interface StrokeInspectorProps {
  * 4. Parametric Marker Offsets:
  *    Allows adjusting refX dynamically to push terminal markers forward/backward along curve tangents,
  *    eliminating unsightly blunt stroke caps protruding through arrow heads.
+ *
+ * 5. Independent Marker Sizing & Units (Relative vs Absolute):
+ *    Supports proportional scaling relative to stroke-width (markerUnits="strokeWidth", default)
+ *    as well as fixed absolute pixel dimensions (markerUnits="userSpaceOnUse") that remain constant
+ *    regardless of path thickness.
  */
 export class StrokeInspector {
   public static renderHtml(
@@ -50,6 +57,8 @@ export class StrokeInspector {
       markerMid,
       markerEnd,
       markerOffset,
+      markerSize,
+      markerUnits,
     } = props;
 
     return `
@@ -126,6 +135,16 @@ export class StrokeInspector {
         <div class="prop-row">
           <span class="prop-label">Offset</span>
           <input type="number" class="prop-input" id="el-marker-offset" value="${markerOffset}" step="0.5" title="Desfase paramétrico del marcador respecto al nodo: valores positivos desplazan el marcador hacia afuera del trazo para evitar que el remate del trazo sobresalga" />
+        </div>
+        <div class="prop-row">
+          <span class="prop-label">Mkr Size</span>
+          <div style="display:flex; gap:4px; flex:1; align-items:center;">
+            <input type="number" class="prop-input" id="el-marker-size" value="${markerSize}" min="0.5" step="0.5" style="width:55px;" title="Dimensionamiento del marcador (escala)" />
+            <select class="prop-input" id="el-marker-units" style="cursor:pointer; flex:1;" title="Unidades de escala del marcador: Relativo escala con el grosor del trazo (strokeWidth); Absoluto mantiene dimensiones fijas en píxeles (userSpaceOnUse)">
+              <option value="strokeWidth" ${markerUnits === 'strokeWidth' ? 'selected' : ''}>Relativo (trazo)</option>
+              <option value="userSpaceOnUse" ${markerUnits === 'userSpaceOnUse' ? 'selected' : ''}>Absoluto (px)</option>
+            </select>
+          </div>
         </div>
         <div class="prop-row" style="margin-top: 8px;">
           <button class="prop-input" id="btn-stroke-to-path" style="cursor:pointer; background:var(--bg-active); text-align:center; font-weight:600; color:var(--text-main); padding:6px;" title="Convertir geométricamente el trazo en un contorno cerrado independiente con relleno (Outline Stroke)">
@@ -223,12 +242,15 @@ export class StrokeInspector {
     const elMarkerMid = container.querySelector<HTMLSelectElement>('#el-marker-mid');
     const elMarkerEnd = container.querySelector<HTMLSelectElement>('#el-marker-end');
     const elMarkerOffset = container.querySelector<HTMLInputElement>('#el-marker-offset');
+    const elMarkerSize = container.querySelector<HTMLInputElement>('#el-marker-size');
+    const elMarkerUnits = container.querySelector<HTMLSelectElement>('#el-marker-units');
 
     const setMarker = (attr: 'marker-start' | 'marker-mid' | 'marker-end', baseVal: string) => {
       if (baseVal === 'none') {
         delete el.attributes[attr];
       } else {
         const offset = parseFloat(el.attributes['data-marker-offset'] || '0') || 0;
+        const isCustom = offset !== 0 || el.attributes['data-marker-size'] !== undefined || el.attributes['data-marker-units'] !== undefined;
         let keyWithPos = baseVal;
         if (attr === 'marker-start' && (baseVal === 'arrow-open' || baseVal === 'arrow-filled' || baseVal === 'bar-cap')) {
           keyWithPos = `${baseVal}-start`;
@@ -238,12 +260,19 @@ export class StrokeInspector {
           keyWithPos = 'arrow-filled-mid';
         }
 
-        if (offset !== 0) {
+        if (isCustom) {
           el.attributes[attr] = `url(#ad-marker-${keyWithPos}-${el.id})`;
         } else {
           el.attributes[attr] = `url(#ad-marker-${keyWithPos})`;
         }
       }
+      callbacks.onUpdateElement(el);
+    };
+
+    const refreshActiveMarkers = () => {
+      if (elMarkerStart && elMarkerStart.value !== 'none') setMarker('marker-start', elMarkerStart.value);
+      if (elMarkerMid && elMarkerMid.value !== 'none') setMarker('marker-mid', elMarkerMid.value);
+      if (elMarkerEnd && elMarkerEnd.value !== 'none') setMarker('marker-end', elMarkerEnd.value);
       callbacks.onUpdateElement(el);
     };
 
@@ -276,17 +305,44 @@ export class StrokeInspector {
         } else {
           el.attributes['data-marker-offset'] = val.toString();
         }
-        // Refresh active marker IDs so they acquire element-scoped definition when offset is nonzero
-        if (elMarkerStart && elMarkerStart.value !== 'none') setMarker('marker-start', elMarkerStart.value);
-        if (elMarkerMid && elMarkerMid.value !== 'none') setMarker('marker-mid', elMarkerMid.value);
-        if (elMarkerEnd && elMarkerEnd.value !== 'none') setMarker('marker-end', elMarkerEnd.value);
-        callbacks.onUpdateElement(el);
+        refreshActiveMarkers();
       };
 
       elMarkerOffset.addEventListener('input', applyOffset);
       elMarkerOffset.addEventListener('change', () => {
         if (callbacks.onPushUndo) callbacks.onPushUndo();
         applyOffset();
+      });
+    }
+
+    if (elMarkerSize) {
+      const applySize = () => {
+        const val = parseFloat(elMarkerSize.value || '6') || 6;
+        if (val === 6 && (!el.attributes['data-marker-units'] || el.attributes['data-marker-units'] === 'strokeWidth')) {
+          delete el.attributes['data-marker-size'];
+        } else {
+          el.attributes['data-marker-size'] = val.toString();
+        }
+        refreshActiveMarkers();
+      };
+
+      elMarkerSize.addEventListener('input', applySize);
+      elMarkerSize.addEventListener('change', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        applySize();
+      });
+    }
+
+    if (elMarkerUnits) {
+      elMarkerUnits.addEventListener('change', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        const units = elMarkerUnits.value;
+        if (units === 'strokeWidth') {
+          delete el.attributes['data-marker-units'];
+        } else {
+          el.attributes['data-marker-units'] = units;
+        }
+        refreshActiveMarkers();
       });
     }
 

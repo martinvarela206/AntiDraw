@@ -804,21 +804,19 @@ export class SvgSerializer {
   }
 
   /**
-   * ARCHITECTURAL RATIONALE: Dynamic & Parametric SVG Markers with Offset Support
+   * ARCHITECTURAL RATIONALE: Dynamic & Parametric SVG Markers with Offset & Sizing Support
    *
    * 1. Baseline Global Catalog:
-   *    Always emits STANDARD_MARKERS_INNER_XML for default marker IDs without offset.
+   *    Always emits STANDARD_MARKERS_INNER_XML for default marker IDs without customization.
    *
-   * 2. Parametric Marker Offsets:
-   *    When a vector element configures an offset (`data-marker-offset`), terminal markers
-   *    shift outward away from the path endpoint (or inward if negative).
-   *    - For start markers: refX = baseRefX + offset (advances outward away from path start)
-   *    - For end markers:   refX = baseRefX - offset (advances outward away from path end)
-   *    - For mid markers:   refX = baseRefX - offset
+   * 2. Parametric Marker Offsets & Sizing:
+   *    - Offsets: shifts refX along curve tangents to eliminate protruding stroke butt caps.
+   *    - Independent Sizing: scales markerWidth and markerHeight based on data-marker-size.
+   *    - Scaling Units: supports markerUnits="strokeWidth" (relative, default) or "userSpaceOnUse" (absolute px).
    *
    * 3. Self-Healing Element-Scoped Marker IDs:
-   *    If an element has an active offset and uses markers, SvgSerializer compiles dedicated
-   *    <marker id="ad-marker-${tplKey}-${el.id}"> in <defs> and synchronizes
+   *    If an element has customized markers (offset != 0, custom size, or absolute units), SvgSerializer compiles
+   *    dedicated <marker id="ad-marker-${tplKey}-${el.id}"> in <defs> and synchronizes
    *    the element's marker-start/mid/end attributes to point to the customized definition.
    */
   public static compileElementMarkers(elements: VectorElement[]): string {
@@ -826,7 +824,11 @@ export class SvgSerializer {
 
     elements.forEach((el) => {
       const offset = parseFloat(el.attributes['data-marker-offset'] || '0') || 0;
-      if (offset === 0) return; // Standard markers handle offset 0
+      const markerSize = el.attributes['data-marker-size'] ? parseFloat(el.attributes['data-marker-size']) : 6;
+      const markerUnits = el.attributes['data-marker-units'] || 'strokeWidth';
+
+      const isCustom = offset !== 0 || el.attributes['data-marker-size'] !== undefined || el.attributes['data-marker-units'] !== undefined;
+      if (!isCustom) return;
 
       const checkMarker = (attrName: 'marker-start' | 'marker-mid' | 'marker-end', pos: 'start' | 'mid' | 'end') => {
         const val = el.attributes[attrName];
@@ -849,10 +851,14 @@ export class SvgSerializer {
           refX = Math.round((tpl.baseRefX - offset) * 100) / 100;
         }
 
+        const sizeScale = markerSize / 6;
+        const mw = Math.round(tpl.markerWidth * sizeScale * 100) / 100;
+        const mh = Math.round(tpl.markerHeight * sizeScale * 100) / 100;
+
         const customId = `ad-marker-${matchKey}-${el.id}`;
         el.attributes[attrName] = `url(#${customId})`;
 
-        out += `    <marker id="${customId}" viewBox="${tpl.viewBox}" refX="${refX}" refY="${tpl.baseRefY}" markerWidth="${tpl.markerWidth}" markerHeight="${tpl.markerHeight}" orient="auto">\n`;
+        out += `    <marker id="${customId}" viewBox="${tpl.viewBox}" refX="${refX}" refY="${tpl.baseRefY}" markerWidth="${mw}" markerHeight="${mh}" markerUnits="${markerUnits}" orient="auto">\n`;
         out += `      ${tpl.innerXml('context-stroke')}\n`;
         out += `    </marker>\n`;
       };

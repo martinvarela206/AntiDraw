@@ -636,6 +636,8 @@ export class PropertyPanel {
     const markerMid = parseMarkerId(el.attributes['marker-mid']);
     const markerEnd = parseMarkerId(el.attributes['marker-end']);
     const markerOffset = parseFloat(el.attributes['data-marker-offset'] || '0') || 0;
+    const markerSize = el.attributes['data-marker-size'] ? parseFloat(el.attributes['data-marker-size']) : 6;
+    const markerUnits = (el.attributes['data-marker-units'] as 'strokeWidth' | 'userSpaceOnUse') || 'strokeWidth';
 
     this.container.innerHTML = StrokeInspector.renderHtml(el, {
       stroke,
@@ -648,6 +650,8 @@ export class PropertyPanel {
       markerMid,
       markerEnd,
       markerOffset,
+      markerSize,
+      markerUnits,
     });
 
     StrokeInspector.bindEvents(
