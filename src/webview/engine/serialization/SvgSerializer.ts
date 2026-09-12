@@ -826,8 +826,12 @@ export class SvgSerializer {
       const offset = parseFloat(el.attributes['data-marker-offset'] || '0') || 0;
       const markerSize = el.attributes['data-marker-size'] ? parseFloat(el.attributes['data-marker-size']) : 6;
       const markerUnits = el.attributes['data-marker-units'] || 'strokeWidth';
+      const markerColor = el.attributes['data-marker-color'] || 'context-stroke';
 
-      const isCustom = offset !== 0 || el.attributes['data-marker-size'] !== undefined || el.attributes['data-marker-units'] !== undefined;
+      const isCustom = offset !== 0 ||
+        el.attributes['data-marker-size'] !== undefined ||
+        el.attributes['data-marker-units'] !== undefined ||
+        (el.attributes['data-marker-color'] !== undefined && el.attributes['data-marker-color'] !== 'context-stroke');
       if (!isCustom) return;
 
       const checkMarker = (attrName: 'marker-start' | 'marker-mid' | 'marker-end', pos: 'start' | 'mid' | 'end') => {
@@ -859,7 +863,7 @@ export class SvgSerializer {
         el.attributes[attrName] = `url(#${customId})`;
 
         out += `    <marker id="${customId}" viewBox="${tpl.viewBox}" refX="${refX}" refY="${tpl.baseRefY}" markerWidth="${mw}" markerHeight="${mh}" markerUnits="${markerUnits}" orient="auto">\n`;
-        out += `      ${tpl.innerXml('context-stroke')}\n`;
+        out += `      ${tpl.innerXml(markerColor)}\n`;
         out += `    </marker>\n`;
       };
 

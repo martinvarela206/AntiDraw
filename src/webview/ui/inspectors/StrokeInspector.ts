@@ -16,6 +16,8 @@ export interface StrokeInspectorProps {
   markerOffset: number;
   markerSize: number;
   markerUnits: 'strokeWidth' | 'userSpaceOnUse';
+  markerLayer: 'over' | 'under';
+  markerColor: string;
 }
 
 /**
@@ -40,6 +42,11 @@ export interface StrokeInspectorProps {
  *    Supports proportional scaling relative to stroke-width (markerUnits="strokeWidth", default)
  *    as well as fixed absolute pixel dimensions (markerUnits="userSpaceOnUse") that remain constant
  *    regardless of path thickness.
+ *
+ * 6. Layer Ordering (paint-order) & Independent Marker Color:
+ *    Enables rendering markers either above (default: fill stroke markers) or beneath the path stroke
+ *    (fill markers stroke). Also decouples marker fill/stroke color from the path's stroke color,
+ *    supporting custom accent tints while preserving context-stroke inheritance by default.
  */
 export class StrokeInspector {
   public static renderHtml(
@@ -59,7 +66,12 @@ export class StrokeInspector {
       markerOffset,
       markerSize,
       markerUnits,
+      markerLayer,
+      markerColor,
     } = props;
+
+    const isCustomMarkerColor = markerColor && markerColor !== 'context-stroke';
+    const markerColorDisplay = isCustomMarkerColor ? markerColor : (stroke === 'none' ? '#ffffff' : stroke);
 
     return `
       <div class="panel-section">
@@ -144,6 +156,21 @@ export class StrokeInspector {
               <option value="strokeWidth" ${markerUnits === 'strokeWidth' ? 'selected' : ''}>Relativo (trazo)</option>
               <option value="userSpaceOnUse" ${markerUnits === 'userSpaceOnUse' ? 'selected' : ''}>Absoluto (px)</option>
             </select>
+          </div>
+        </div>
+        <div class="prop-row">
+          <span class="prop-label">Mkr Layer</span>
+          <select class="prop-input" id="el-marker-layer" style="cursor:pointer;" title="Orden de dibujo (paint-order): Sobre el trazo o Debajo del trazo">
+            <option value="over" ${markerLayer === 'over' ? 'selected' : ''}>Sobre el trazo (Over)</option>
+            <option value="under" ${markerLayer === 'under' ? 'selected' : ''}>Debajo del trazo (Under)</option>
+          </select>
+        </div>
+        <div class="prop-row">
+          <span class="prop-label">Mkr Color</span>
+          <div class="color-picker-row">
+            <input type="color" class="color-swatch" id="el-marker-color" value="${markerColorDisplay}" />
+            <input type="text" class="prop-input" id="el-marker-color-hex" value="${isCustomMarkerColor ? markerColor : 'Auto (trazo)'}" placeholder="Auto (trazo)" title="Color del marcador: escribe un código hexadecimal o usa el botón ⟲ para volver al color del trazo" />
+            <button class="prop-input" id="btn-reset-marker-color" style="width:26px; height:24px; padding:0; display:flex; align-items:center; justify-content:center; cursor:pointer;" title="Restablecer color al trazo (context-stroke)">⟲</button>
           </div>
         </div>
         <div class="prop-row" style="margin-top: 8px;">
@@ -244,13 +271,20 @@ export class StrokeInspector {
     const elMarkerOffset = container.querySelector<HTMLInputElement>('#el-marker-offset');
     const elMarkerSize = container.querySelector<HTMLInputElement>('#el-marker-size');
     const elMarkerUnits = container.querySelector<HTMLSelectElement>('#el-marker-units');
+    const elMarkerLayer = container.querySelector<HTMLSelectElement>('#el-marker-layer');
+    const elMarkerColor = container.querySelector<HTMLInputElement>('#el-marker-color');
+    const elMarkerColorHex = container.querySelector<HTMLInputElement>('#el-marker-color-hex');
+    const btnResetMarkerColor = container.querySelector<HTMLButtonElement>('#btn-reset-marker-color');
 
     const setMarker = (attr: 'marker-start' | 'marker-mid' | 'marker-end', baseVal: string) => {
       if (baseVal === 'none') {
         delete el.attributes[attr];
       } else {
         const offset = parseFloat(el.attributes['data-marker-offset'] || '0') || 0;
-        const isCustom = offset !== 0 || el.attributes['data-marker-size'] !== undefined || el.attributes['data-marker-units'] !== undefined;
+        const isCustom = offset !== 0 ||
+          el.attributes['data-marker-size'] !== undefined ||
+          el.attributes['data-marker-units'] !== undefined ||
+          (el.attributes['data-marker-color'] !== undefined && el.attributes['data-marker-color'] !== 'context-stroke');
         let keyWithPos = baseVal;
         if (attr === 'marker-start' && (baseVal === 'arrow-open' || baseVal === 'arrow-filled' || baseVal === 'bar-cap')) {
           keyWithPos = `${baseVal}-start`;
@@ -343,6 +377,52 @@ export class StrokeInspector {
           el.attributes['data-marker-units'] = units;
         }
         refreshActiveMarkers();
+      });
+    }
+
+    if (elMarkerLayer) {
+      elMarkerLayer.addEventListener('change', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        if (elMarkerLayer.value === 'under') {
+          el.attributes['paint-order'] = 'fill markers stroke';
+        } else {
+          delete el.attributes['paint-order'];
+        }
+        callbacks.onUpdateElement(el);
+      });
+    }
+
+    if (elMarkerColor) {
+      elMarkerColor.addEventListener('input', () => {
+        el.attributes['data-marker-color'] = elMarkerColor.value;
+        if (elMarkerColorHex) elMarkerColorHex.value = elMarkerColor.value;
+        refreshActiveMarkers();
+      });
+      elMarkerColor.addEventListener('change', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+      });
+    }
+
+    if (elMarkerColorHex) {
+      elMarkerColorHex.addEventListener('change', () => {
+        const val = elMarkerColorHex.value.trim();
+        if (!val || val.toLowerCase().includes('auto') || val === 'context-stroke') {
+          delete el.attributes['data-marker-color'];
+        } else {
+          el.attributes['data-marker-color'] = val.startsWith('#') ? val : `#${val}`;
+        }
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        refreshActiveMarkers();
+        onReRender();
+      });
+    }
+
+    if (btnResetMarkerColor) {
+      btnResetMarkerColor.addEventListener('click', () => {
+        delete el.attributes['data-marker-color'];
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        refreshActiveMarkers();
+        onReRender();
       });
     }
 

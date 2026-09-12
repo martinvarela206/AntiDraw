@@ -638,6 +638,9 @@ export class PropertyPanel {
     const markerOffset = parseFloat(el.attributes['data-marker-offset'] || '0') || 0;
     const markerSize = el.attributes['data-marker-size'] ? parseFloat(el.attributes['data-marker-size']) : 6;
     const markerUnits = (el.attributes['data-marker-units'] as 'strokeWidth' | 'userSpaceOnUse') || 'strokeWidth';
+    const paintOrder = el.attributes['paint-order'] || '';
+    const markerLayer: 'over' | 'under' = paintOrder.includes('markers stroke') ? 'under' : 'over';
+    const markerColor = el.attributes['data-marker-color'] || 'context-stroke';
 
     this.container.innerHTML = StrokeInspector.renderHtml(el, {
       stroke,
@@ -652,6 +655,8 @@ export class PropertyPanel {
       markerOffset,
       markerSize,
       markerUnits,
+      markerLayer,
+      markerColor,
     });
 
     StrokeInspector.bindEvents(
