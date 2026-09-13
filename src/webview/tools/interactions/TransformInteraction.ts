@@ -505,8 +505,13 @@ export class TransformInteraction {
    * to trigger clean, synchronized state transitions across UI inspectors and canvas overlays.
    */
   public toggleSelectionMode(ctx: ToolContext, callbacks: SelectToolCallbacks): void {
-    ctx.selectionTool.selectionMode =
-      ctx.selectionTool.selectionMode === 'transform' ? 'rotate' : 'transform';
+    if (ctx.selectionTool.selectionMode === 'move') {
+      ctx.selectionTool.selectionMode = 'scale';
+    } else if (ctx.selectionTool.selectionMode === 'scale') {
+      ctx.selectionTool.selectionMode = 'rotate';
+    } else {
+      ctx.selectionTool.selectionMode = 'move';
+    }
     this.lastToggleTime = Date.now();
     callbacks.onSelectionChanged?.();
     ctx.renderOverlay();
@@ -589,8 +594,6 @@ export class TransformInteraction {
             });
           } else if (mode === 'rotate') {
             const rotR = 4 / z;
-            html += `<line x1="${groupBox.cx}" y1="${groupBox.y}" x2="${groupBox.cx}" y2="${groupBox.y - rotOffset}" stroke="#f59e0b" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
-            html += `<circle cx="${groupBox.cx}" cy="${groupBox.y - rotOffset}" r="${rotR}" fill="#f59e0b" stroke="#ffffff" stroke-width="1.2" vector-effect="non-scaling-stroke" style="cursor: grab;" />`;
 
             const rotCorners = [
               { x: groupBox.x, y: groupBox.y },
@@ -741,7 +744,7 @@ export class TransformInteraction {
         if (el) {
           const isClosed = ctx.model.isElementClosed(el);
           const d = ctx.model.compilePathD(gVerts, isClosed);
-          html += `<path d="${d}" fill="rgba(99, 102, 241, 0.25)" stroke="#818cf8" stroke-width="2" stroke-dasharray="5 3" vector-effect="non-scaling-stroke" />`;
+          html += `<path d="${d}" fill="rgba(99, 102, 241, 0.45)" stroke="#6366f1" stroke-width="3" stroke-dasharray="5 3" vector-effect="non-scaling-stroke" />`;
           gVerts.forEach((gv) => {
             html += `<circle cx="${gv.x}" cy="${gv.y}" r="${3.5 / z}" fill="#a5b4fc" stroke="#4338ca" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
           });

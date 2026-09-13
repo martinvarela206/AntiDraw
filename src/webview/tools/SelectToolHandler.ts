@@ -89,19 +89,7 @@ export class SelectToolHandler implements IToolHandler {
     this.lastClickTime = now;
     this.lastClickPt = { ...pt };
 
-    // 2. Double-click mode toggle
-    if (isDoubleClick && selectedEls.length > 0) {
-      const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, this.ctx.canvasMgr.zoom);
-      if (hit && this.ctx.selectionTool.isSelected(hit.element.id)) {
-        const modes: ('move' | 'scale' | 'rotate')[] = ['move', 'scale', 'rotate'];
-        const idx = modes.indexOf(this.ctx.selectionTool.selectionMode);
-        this.ctx.selectionTool.selectionMode = modes[(idx + 1) % modes.length];
-        this.callbacks.onClearPanelMode?.();
-        this.ctx.renderOverlay();
-        this.ctx.render();
-        return true;
-      }
-    }
+
 
     // 3. Modifier-based selection (Ctrl: Toggle select/deselect; Shift: Deselect)
     if (e.ctrlKey || e.metaKey) {

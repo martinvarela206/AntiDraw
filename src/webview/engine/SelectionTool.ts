@@ -57,7 +57,7 @@ export class SelectionTool {
    *      exact SVG serialization, and seamless undo/redo snapshotting.
    */
   public customPivot: Point | null = null;
-  public selectionMode: 'move' | 'scale' | 'rotate' = 'scale';
+  public selectionMode: 'move' | 'scale' | 'rotate' = 'move';
   public isAspectRatioLocked: boolean = false;
 
   // Backward compatibility getter & setter
@@ -80,7 +80,7 @@ export class SelectionTool {
   public select(id: string, element?: VectorElement): void {
     if (this.selectedElementIds.size !== 1 || !this.selectedElementIds.has(id)) {
       this.customPivot = null;
-      this.selectionMode = 'scale';
+      this.selectionMode = 'move';
     }
     this.selectedElementIds.clear();
     this.selectedElementIds.add(id);
@@ -509,7 +509,6 @@ export class SelectionTool {
   ): HandleType | null {
     if (mode === 'rotate') {
       const rotHandles: { type: HandleType; x: number; y: number }[] = [
-        { type: 'rotate', x: box.cx, y: box.y - rotateOffset },
         { type: 'rotate', x: box.x, y: box.y },
         { type: 'rotate', x: box.cx, y: box.y },
         { type: 'rotate', x: box.x + box.width, y: box.y },
@@ -563,80 +562,71 @@ export class SelectionTool {
     let newW = initialBox.width;
     let newH = initialBox.height;
 
-    // Apply dx and dy based on handle, factoring in center-scaling (Shift)
+    // 1. Calculate new width and height
     switch (handle) {
       case 'e':
         newW += fromCenter ? dx * 2 : dx;
-        if (fromCenter) newX -= dx;
         break;
       case 'w':
         newW -= fromCenter ? dx * 2 : dx;
-        newX += dx;
-        if (fromCenter) newX -= dx;
+        if (!fromCenter) newX += dx;
         break;
       case 's':
         newH += fromCenter ? dy * 2 : dy;
-        if (fromCenter) newY -= dy;
         break;
       case 'n':
         newH -= fromCenter ? dy * 2 : dy;
-        newY += dy;
-        if (fromCenter) newY -= dy;
+        if (!fromCenter) newY += dy;
         break;
       case 'se':
         newW += fromCenter ? dx * 2 : dx;
         newH += fromCenter ? dy * 2 : dy;
-        if (fromCenter) { newX -= dx; newY -= dy; }
         break;
       case 'nw':
         newW -= fromCenter ? dx * 2 : dx;
         newH -= fromCenter ? dy * 2 : dy;
-        newX += dx;
-        newY += dy;
-        if (fromCenter) { newX -= dx; newY -= dy; }
+        if (!fromCenter) { newX += dx; newY += dy; }
         break;
       case 'ne':
         newW += fromCenter ? dx * 2 : dx;
         newH -= fromCenter ? dy * 2 : dy;
-        newY += dy;
-        if (fromCenter) { newX -= dx; newY -= dy; }
+        if (!fromCenter) newY += dy;
         break;
       case 'sw':
         newW -= fromCenter ? dx * 2 : dx;
         newH += fromCenter ? dy * 2 : dy;
-        newX += dx;
-        if (fromCenter) { newX -= dx; newY -= dy; }
+        if (!fromCenter) newX += dx;
         break;
     }
 
+    // 2. Adjust for proportional scaling (Ctrl)
     if (proportional) {
       const ratio = initialBox.width / initialBox.height;
       if (['n', 's'].includes(handle)) {
-        // Height drove the change, adjust width
         const diffW = (newH * ratio) - newW;
         newW = newH * ratio;
-        if (fromCenter) newX -= diffW / 2;
-        else if (handle === 's' || handle === 'n') newX -= diffW / 2; // For n/s, scaling proportionally should probably center the x expansion
+        if (!fromCenter) newX -= diffW / 2;
       } else if (['e', 'w'].includes(handle)) {
-        // Width drove the change, adjust height
         const diffH = (newW / ratio) - newH;
         newH = newW / ratio;
-        if (fromCenter) newY -= diffH / 2;
-        else if (handle === 'e' || handle === 'w') newY -= diffH / 2;
+        if (!fromCenter) newY -= diffH / 2;
       } else {
-        // Corner handles: pick the largest delta to preserve max bounds
         if (newW / ratio > newH) {
           const diffH = (newW / ratio) - newH;
           newH = newW / ratio;
-          if (handle === 'nw' || handle === 'ne') newY -= diffH;
-          if (fromCenter) newY -= diffH / 2;
+          if (!fromCenter && (handle === 'nw' || handle === 'ne')) newY -= diffH;
         } else {
           const diffW = (newH * ratio) - newW;
           newW = newH * ratio;
-          if (handle === 'nw' || handle === 'sw') newX -= diffW;
-          if (fromCenter) newX -= diffW / 2;
+          if (!fromCenter && (handle === 'nw' || handle === 'sw')) newX -= diffW;
         }
       }
+    }
+
+    // 3. Keep center fixed if scaling from center
+    if (fromCenter) {
+      newX = initialBox.x + initialBox.width / 2 - newW / 2;
+      newY = initialBox.y + initialBox.height / 2 - newH / 2;
     }
 
     const minDim = padding * 2 + 2;
