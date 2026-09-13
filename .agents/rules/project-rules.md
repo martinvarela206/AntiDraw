@@ -79,6 +79,9 @@ This file contains rules specific to the AntiDraw project. Rules are written in 
    - All historical, architectural, algorithmic, and optimization comments placed within code files MUST be preserved permanently across all future edits and refactorings.
    - These comments serve as living technical documentation and learning records for the repository. Never remove, strip, or truncate existing in-code rationale, performance diagnostics, or architectural comments unless the underlying subsystem itself is formally deprecated and removed.
 
-
-
-
+11. **Impersonal and Professional Comment Style (Third-Person Technical Voice)**:
+    - In-code comments, code documentation, and architectural rationale MUST NEVER be written in the second person (strictly avoid "you", "tu", "usted", "you can", "you should", etc.).
+    - Always use standard third-person technical engineering voice, passive construction, or concise descriptive imperative:
+      - *Allowed*: "Calculates visible bounds analytically to prevent layout reflows..."
+      - *Allowed*: "Avoids destroying GPU texture cache by validating lastGridCacheKey..."
+      - *Prohibited*: "Here you calculate...", "You should ensure that..."

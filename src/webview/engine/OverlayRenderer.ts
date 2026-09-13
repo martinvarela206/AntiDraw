@@ -97,6 +97,9 @@ export class OverlayRenderer {
 
     // 2. Guide Lines Overlay (Always 1px width, inverted highlight on select, transform controls on double click)
     if (ctx.canvasMgr.showGuides) {
+      // ARCHITECTURAL RATIONALE: Single-Pass Visible Bounds Retrieval
+      // Retrieves visible viewport bounds once per overlay render frame outside the guide loop.
+      // Passing `visibleBounds` to `getGuideGeometry` avoids redundant provider evaluations per guide line.
       const visibleBounds = ctx.canvasMgr.visibleBoundsProvider?.();
       ctx.canvasMgr.guides.forEach((g) => {
         if (g.visible === false) return;

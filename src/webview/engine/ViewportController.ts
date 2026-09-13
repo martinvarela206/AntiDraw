@@ -272,8 +272,21 @@ export class ViewportController {
   }
 
   /**
-   * Zoom at a specific screen coordinate by a multiplicative factor.
-   * Maintains the world coordinate beneath the cursor fixed on screen.
+   * ARCHITECTURAL RATIONALE: High-FPS Camera Zoom Pipeline Decoupling
+   *
+   * Problem:
+   * During zoom scaling, invoking a full document render (`this.onRender()`) repeatedly:
+   * 1. Wipes `svgCanvas.innerHTML = ''`, executes expensive string serialization via `toSvgString()`,
+   *    and re-parses and appends new DOM nodes on every animation frame.
+   * 2. Forces chromium to discard pre-rasterized vector layers and re-execute full layout passes.
+   * 3. Rebuilds the entire property panel DOM on every mouse wheel tick.
+   *
+   * Solution:
+   * 1. The SVG document vectors inside `#svg-canvas` do not mutate during camera transformations.
+   *    Hardware GPU compositing scales them natively at 60/120 FPS via CSS dimensions and camera transform.
+   * 2. Camera zoom only invokes `onApplyCanvasSize()` (container sizing) and `onRenderOverlay()`
+   *    (ephemeral UI handles, pivot markers, and guide indicators requiring `1 / z` scale invariance).
+   * 3. The persistent document vector DOM is completely preserved, eliminating frame drops.
    */
   public zoomAtClientPointByFactor(clientX: number, clientY: number, factor: number): void {
     const currentZoom = this.canvasMgr.zoom || 1.0;
