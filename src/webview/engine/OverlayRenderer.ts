@@ -62,13 +62,25 @@ export class OverlayRenderer {
     // 0. Artboard (ViewBox Guide Frame - transparent fill so vectors underneath are visible)
     html += `<rect x="${vb.minX}" y="${vb.minY}" width="${vb.width}" height="${vb.height}" fill="none" stroke="#6366f1" stroke-width="1.5" stroke-dasharray="6 3" opacity="0.85" vector-effect="non-scaling-stroke" />`;
 
-    // Artboard Badge Tag at top-left
+    /**
+     * ARCHITECTURAL RATIONALE: Scale-Invariant Artboard ViewBox Dimension Badge
+     *
+     * Problem:
+     * When defined in world SVG units, the dimension pill and text scale directly with camera zoom.
+     * At 3000% zoom, the badge was magnified 30x into a 4,800px rectangle with 300px typography,
+     * occluding the artwork and distorting the visual workspace.
+     *
+     * Solution:
+     * Anchored at (vb.minX, vb.minY) with a counter-scaling transform: `scale(1 / z)`.
+     * Child offsets, dimensions, corner radiuses, and font sizes operate in constant physical screen pixels.
+     * The badge remains exactly 160px wide by 16px high with 10px text across all zoom levels (5% to 3000%).
+     */
     const tagW = 160;
     const tagH = 16;
     html += `
-      <g opacity="0.95">
-        <rect x="${vb.minX}" y="${vb.minY - 20}" width="${tagW}" height="${tagH}" rx="3" fill="#1e1b4b" stroke="#6366f1" stroke-width="1" vector-effect="non-scaling-stroke" />
-        <text x="${vb.minX + 6}" y="${vb.minY - 8}" font-size="10" fill="#c7d2fe" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" font-weight="600">ViewBox: ${vb.width} × ${vb.height}</text>
+      <g transform="translate(${vb.minX}, ${vb.minY}) scale(${1 / z})" opacity="0.95">
+        <rect x="0" y="-20" width="${tagW}" height="${tagH}" rx="3" fill="#1e1b4b" stroke="#6366f1" stroke-width="1" />
+        <text x="6" y="-8" font-size="10" fill="#c7d2fe" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" font-weight="600">ViewBox: ${vb.width} × ${vb.height}</text>
       </g>
     `;
 
