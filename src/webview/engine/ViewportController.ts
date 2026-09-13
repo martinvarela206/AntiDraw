@@ -304,7 +304,7 @@ export class ViewportController {
 
   public setZoom(zoom: number): void {
     const oldZoom = this.canvasMgr.zoom || 1.0;
-    const newZoom = Math.round(Math.max(0.1, Math.min(10.0, zoom)) * 10) / 10;
+    const newZoom = Math.round(Math.max(CanvasManager.MIN_ZOOM, Math.min(CanvasManager.MAX_ZOOM, zoom)) * 1000) / 1000;
     if (newZoom !== oldZoom) {
       const areaW = this.canvasScrollArea.clientWidth;
       const areaH = this.canvasScrollArea.clientHeight;

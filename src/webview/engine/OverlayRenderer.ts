@@ -120,7 +120,7 @@ export class OverlayRenderer {
 
           // ARCHITECTURAL RATIONALE: Zoom-Invariant Guide Line Control Indicators
           // UI control handles, pivot markers, and rotation vector indicators must maintain a constant
-          // visual physical pixel size on screen across all canvas zoom levels (10% to 2000%).
+          // visual physical pixel size on screen across all canvas zoom levels (5% to 3000%).
           // By applying `transform="translate(...) scale(${1 / z})"`, the geometric dimensions remain fixed in screen space
           // without magnifying or shrinking as the user zooms in or out.
 
