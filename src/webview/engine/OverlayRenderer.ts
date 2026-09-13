@@ -113,10 +113,10 @@ export class OverlayRenderer {
 
         // ARCHITECTURAL RATIONALE: Independent Guide Line Move & Rotate Modes
         // Guide lines possess two discrete interaction modes analogous to vector objects:
-        // 1. Move mode (default on select): Displays strictly the central visual handle at 1/2 of visible span.
+        // 1. Move mode (default on select): Displays the center handle at geom.pivot (free 2D translation).
         // 2. Rotate mode (toggled via double-click): Displays both the pivot handle and the 1/4 & 3/4 rotation markers.
         if (isSelected) {
-          const centerPt = isRotateMode ? geom.pivot : geom.visualCenter;
+          const centerPt = geom.pivot;
 
           // Center Handle
           html += `

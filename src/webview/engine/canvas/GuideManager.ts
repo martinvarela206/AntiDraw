@@ -195,16 +195,20 @@ export class GuideManager {
     const cos = Math.cos(rad);
     const sin = Math.sin(rad);
 
-    const px = guide.pivotX ?? (guide.orientation === 'vertical' ? guide.position : canvasW / 2);
-    const py = guide.pivotY ?? (guide.orientation === 'horizontal' ? guide.position : canvasH / 2);
+    const bounds = visibleBounds || this.visibleBoundsProvider?.() || { minX: 0, minY: 0, maxX: canvasW, maxY: canvasH };
+    const pRef = {
+      x: guide.orientation === 'vertical' ? guide.position : (guide.pivotX ?? canvasW / 2),
+      y: guide.orientation === 'horizontal' ? guide.position : (guide.pivotY ?? canvasH / 2),
+    };
+    const clipped = this.clipInfiniteLineToRect(pRef, cos, sin, bounds);
+
+    const px = guide.pivotX ?? (clipped ? clipped.visualCenter.x : pRef.x);
+    const py = guide.pivotY ?? (clipped ? clipped.visualCenter.y : pRef.y);
     const p0 = { x: px, y: py };
 
     const span = 100000;
     const p1 = { x: px - cos * span, y: py - sin * span };
     const p2 = { x: px + cos * span, y: py + sin * span };
-
-    const bounds = visibleBounds || this.visibleBoundsProvider?.() || { minX: 0, minY: 0, maxX: canvasW, maxY: canvasH };
-    const clipped = this.clipInfiniteLineToRect(p0, cos, sin, bounds);
 
     let arrow1: Point;
     let arrow2: Point;

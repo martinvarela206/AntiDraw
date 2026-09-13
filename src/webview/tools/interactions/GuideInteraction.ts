@@ -35,7 +35,7 @@ export class GuideInteraction {
       if (activeG) {
         const geom = ctx.canvasMgr.getGuideGeometry(activeG, ctx.model.canvas.width, ctx.model.canvas.height);
         const isRotateMode = activeG.mode === 'rotate';
-        const centerPt = isRotateMode ? geom.pivot : geom.visualCenter;
+        const centerPt = geom.pivot;
 
         if (Math.hypot(pt.x - centerPt.x, pt.y - centerPt.y) <= 14) {
           return 'move';
@@ -77,10 +77,10 @@ export class GuideInteraction {
       if (activeG) {
         const geom = ctx.canvasMgr.getGuideGeometry(activeG, ctx.model.canvas.width, ctx.model.canvas.height);
         const isRotateMode = activeG.mode === 'rotate';
-        const centerPt = isRotateMode ? geom.pivot : geom.visualCenter;
+        const centerPt = geom.pivot;
 
         // ARCHITECTURAL RATIONALE: Magnetic Cursor Snap to Guide Center Handle
-        // In Move mode, if the cursor is in close proximity to the visual center handle,
+        // In Move mode, if the cursor is in close proximity to the center handle,
         // snap the cursor directly to the center coordinate for flawless single-click acquisition.
         const centerDist = Math.hypot(pt.x - centerPt.x, pt.y - centerPt.y);
         const centerSnapRadius = 18 / (ctx.canvasMgr.zoom || 1);
@@ -130,8 +130,7 @@ export class GuideInteraction {
       callbacks.onGuideSelected?.(hitGuide);
 
       const geom = ctx.canvasMgr.getGuideGeometry(hitGuide, ctx.model.canvas.width, ctx.model.canvas.height);
-      const isRotateMode = hitGuide.mode === 'rotate';
-      const centerPt = isRotateMode ? geom.pivot : geom.visualCenter;
+      const centerPt = geom.pivot;
       let activeHandle: GuideHandleType = 'guide-move';
       const centerDist = Math.hypot(pt.x - centerPt.x, pt.y - centerPt.y);
       const centerSnapRadius = 18 / (ctx.canvasMgr.zoom || 1);
@@ -172,16 +171,24 @@ export class GuideInteraction {
       if (g) {
         const otherVertices = ctx.getOtherVertices();
         if (g.orientation === 'horizontal') {
-          const rawTarget: Point = { x: pt.x, y: this.guideInitialState.position + dy };
+          const rawTarget: Point = {
+            x: (this.guideInitialState.pivotX ?? pt.x) + dx,
+            y: this.guideInitialState.position + dy,
+          };
           const snapped = ctx.snapPoint(rawTarget, otherVertices, g.id);
           g.position = Math.round(snapped.y);
           g.pivotY = g.position;
+          g.pivotX = Math.round((this.guideInitialState.pivotX ?? pt.x) + dx);
           this.currentRotationSnappedPt = Math.abs(snapped.y - rawTarget.y) > 0.001 ? snapped : null;
         } else if (g.orientation === 'vertical') {
-          const rawTarget: Point = { x: this.guideInitialState.position + dx, y: pt.y };
+          const rawTarget: Point = {
+            x: this.guideInitialState.position + dx,
+            y: (this.guideInitialState.pivotY ?? pt.y) + dy,
+          };
           const snapped = ctx.snapPoint(rawTarget, otherVertices, g.id);
           g.position = Math.round(snapped.x);
           g.pivotX = g.position;
+          g.pivotY = Math.round((this.guideInitialState.pivotY ?? pt.y) + dy);
           this.currentRotationSnappedPt = Math.abs(snapped.x - rawTarget.x) > 0.001 ? snapped : null;
         } else {
           const vb = ctx.model.getViewBoxBounds();
