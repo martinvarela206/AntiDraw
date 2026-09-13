@@ -266,6 +266,20 @@ body {
   user-select: none;
 }
 
+/*
+ * ARCHITECTURAL RATIONALE: High-Zoom GPU Layer Promotion & Shadow Restraint
+ *
+ * 1. will-change: transform
+ *    Promotes .canvas-wrapper and its nested SVG canvases to a dedicated hardware compositing layer.
+ *    Camera pan and zoom mutations apply directly via GPU transform matrices without triggering
+ *    layout reflows on parent scroll areas.
+ *
+ * 2. Shadow Restraint
+ *    At zoom levels > 500% (up to 3000%), the canvas perimeter scales up to 120,000 physical pixels.
+ *    Heavy gaussian blur box-shadows (e.g. 40px blur) force Skia into massive GPU/CPU convolution
+ *    passes whenever layout dimensions update. A restrained shadow (4px blur, 16px spread) prevents
+ *    GPU texture bandwidth exhaustion while maintaining visual depth.
+ */
 .canvas-wrapper {
   position: absolute;
   top: 0;

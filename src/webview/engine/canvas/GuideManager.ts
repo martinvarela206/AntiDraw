@@ -29,9 +29,18 @@ export interface GuideGeometry {
  *    Isolates creation, hit-testing, deletion, and geometric projection of horizontal,
  *    vertical, and angled guide lines from CanvasManager.
  *
- * 2. Infinite Line Spanning & Zoom-Invariant Proximity:
- *    Calculates unbounded span lines (spanning +/- 100,000 units) to visually cover arbitrary
- *    viewports. Hit testing scales tolerance inversely with zoom factor (`tolerance / zoom`)
+ * 2. Viewport-Bounded Geometric Clipping vs Infinite Spanning:
+ *    Guide lines are mathematically infinite lines. However, for visual rendering, their endpoints
+ *    MUST NEVER be projected to arbitrary massive spans (+/- 100,000 units).
+ *    At zoom levels > 500% (up to 3000%), a 200,000 unit line expands to 6,000,000 physical screen pixels.
+ *    With SVG `stroke-dasharray="4 2"` and `vector-effect="non-scaling-stroke"`, an unclipped span generates
+ *    over 1,000,000 individual dash intervals per guideline on every animation frame, saturating Skia's
+ *    software/GPU dash tessellator and collapsing framerates below 10 FPS.
+ *    Instead, `clipInfiniteLineToRect()` calculates the exact analytical intersection segment [tMin, tMax]
+ *    with the visible viewport window, restricting rendering strictly to visible pixels (< 400 dashes total).
+ *
+ * 3. Zoom-Invariant Proximity Hit-Testing:
+ *    Hit testing scales tolerance inversely with zoom factor (`tolerance / zoom`),
  *    ensuring pixel-accurate cursor picking under any camera magnification.
  */
 export class GuideManager {

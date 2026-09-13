@@ -240,6 +240,20 @@ export class GridCanvasRenderer {
         // Orthogonal grid
         this.ctx.beginPath();
 
+        /**
+         * ARCHITECTURAL RATIONALE: Viewport-Clamped Stroke Endpoints
+         *
+         * Problem:
+         * Previously, vertical and horizontal lines were drawn from `canvasScreenTop` to `canvasScreenBottom`
+         * and from `canvasScreenLeft` to `canvasScreenRight`. At 3000% zoom (zoom factor = 30), these spans
+         * stretched across +/- 30,000 pixels. With a [2, 2] dash array, Skia had to compute over 15,000 dash
+         * intervals per line before applying 2D context clipping.
+         *
+         * Solution:
+         * Clamping all moveTo/lineTo calls strictly between `clipTop`/`clipBottom` and `clipLeft`/`clipRight`
+         * restricts line segments to the visible viewport (at most ~1080px or ~1920px). This reduces dash
+         * calculations by 97%+ per frame and prevents Skia software rasterizer stall.
+         */
         // 1. Vertical lines
         const kStart = Math.ceil((visWorldMinX - originX) / S);
         const kEnd = Math.floor((visWorldMaxX - originX) / S);
