@@ -81,7 +81,7 @@ class AntiDrawApp {
   // Undo / Redo history
   private undoStack: string[] = [];
   private redoStack: string[] = [];
-  private maxHistory: number = 50;
+  private maxHistory: number = 20;
 
   constructor() {
     this.initTools();
@@ -465,6 +465,12 @@ class AntiDrawApp {
         if (payload.metadata.snapAngular !== undefined) this.canvasMgr.snapAngular = payload.metadata.snapAngular;
         if (payload.metadata.shapeConfig) {
           this.canvasMgr.shapeConfig = { ...this.canvasMgr.shapeConfig, ...payload.metadata.shapeConfig };
+        }
+        if (Array.isArray(payload.metadata.undoStack)) {
+          this.undoStack = payload.metadata.undoStack.slice(-this.maxHistory);
+        }
+        if (Array.isArray(payload.metadata.redoStack)) {
+          this.redoStack = payload.metadata.redoStack.slice(-this.maxHistory);
         }
         this.canvasContainer.classList.toggle('no-rulers', !this.canvasMgr.showRulers);
         this.topBar.update();
@@ -948,6 +954,8 @@ class AntiDrawApp {
       snapToViewBox: this.canvasMgr.snapToViewBox,
       snapAngular: this.canvasMgr.snapAngular,
       shapeConfig: this.canvasMgr.shapeConfig,
+      undoStack: this.undoStack,
+      redoStack: this.redoStack,
     });
   }
 
