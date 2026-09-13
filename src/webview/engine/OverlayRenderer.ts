@@ -118,21 +118,29 @@ export class OverlayRenderer {
         if (isSelected) {
           const centerPt = geom.pivot;
 
-          // Center Handle
+          // ARCHITECTURAL RATIONALE: Zoom-Invariant Guide Line Control Indicators
+          // UI control handles, pivot markers, and rotation vector indicators must maintain a constant
+          // visual physical pixel size on screen across all canvas zoom levels (10% to 2000%).
+          // By applying `transform="translate(...) scale(${1 / z})"`, the geometric dimensions remain fixed in screen space
+          // without magnifying or shrinking as the user zooms in or out.
+
+          // Center Handle (Zoom-Invariant)
           html += `
-            <circle cx="${centerPt.x}" cy="${centerPt.y}" r="6" fill="#1e293b" stroke="${guideColor}" stroke-width="2" vector-effect="non-scaling-stroke" />
-            <circle cx="${centerPt.x}" cy="${centerPt.y}" r="2" fill="${guideColor}" />
-            <line x1="${centerPt.x - 9}" y1="${centerPt.y}" x2="${centerPt.x + 9}" y2="${centerPt.y}" stroke="${guideColor}" stroke-width="1" vector-effect="non-scaling-stroke" />
-            <line x1="${centerPt.x}" y1="${centerPt.y - 9}" x2="${centerPt.x}" y2="${centerPt.y + 9}" stroke="${guideColor}" stroke-width="1" vector-effect="non-scaling-stroke" />
+            <g transform="translate(${centerPt.x}, ${centerPt.y}) scale(${1 / z})">
+              <circle cx="0" cy="0" r="6" fill="#1e293b" stroke="${guideColor}" stroke-width="2" vector-effect="non-scaling-stroke" />
+              <circle cx="0" cy="0" r="2" fill="${guideColor}" />
+              <line x1="-9" y1="0" x2="9" y2="0" stroke="${guideColor}" stroke-width="1" vector-effect="non-scaling-stroke" />
+              <line x1="0" y1="-9" x2="0" y2="9" stroke="${guideColor}" stroke-width="1" vector-effect="non-scaling-stroke" />
+            </g>
           `;
 
           // Rotation indicators only appear in Rotate Mode
           if (isRotateMode) {
             const arrowRot = g.angle || 0;
 
-            // Arrow 1 (Negative offset along guideline axis - 1/4 visible span)
+            // Arrow 1 (Negative offset along guideline axis - 1/4 visible span, zoom-invariant)
             html += `
-              <g transform="translate(${geom.arrow1.x}, ${geom.arrow1.y}) rotate(${arrowRot})">
+              <g transform="translate(${geom.arrow1.x}, ${geom.arrow1.y}) rotate(${arrowRot}) scale(${1 / z})">
                 <g transform="translate(-16, -16)">
                   <path d="${GUIDE_ROTATE_LEFT_PATH}" fill="${guideColor}" stroke="#1e293b" stroke-width="0.8" vector-effect="non-scaling-stroke" fill-rule="evenodd" />
                 </g>
@@ -140,9 +148,9 @@ export class OverlayRenderer {
               </g>
             `;
 
-            // Arrow 2 (Positive offset along guideline axis - 3/4 visible span)
+            // Arrow 2 (Positive offset along guideline axis - 3/4 visible span, zoom-invariant)
             html += `
-              <g transform="translate(${geom.arrow2.x}, ${geom.arrow2.y}) rotate(${arrowRot})">
+              <g transform="translate(${geom.arrow2.x}, ${geom.arrow2.y}) rotate(${arrowRot}) scale(${1 / z})">
                 <g transform="translate(-16, -16)">
                   <path d="${GUIDE_ROTATE_RIGHT_PATH}" fill="${guideColor}" stroke="#1e293b" stroke-width="0.8" vector-effect="non-scaling-stroke" fill-rule="evenodd" />
                 </g>

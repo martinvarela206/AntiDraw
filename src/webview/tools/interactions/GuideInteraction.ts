@@ -37,13 +37,15 @@ export class GuideInteraction {
         const isRotateMode = activeG.mode === 'rotate';
         const centerPt = geom.pivot;
 
-        if (Math.hypot(pt.x - centerPt.x, pt.y - centerPt.y) <= 14) {
+        const z = ctx.canvasMgr.zoom || 1;
+
+        if (Math.hypot(pt.x - centerPt.x, pt.y - centerPt.y) <= 14 / z) {
           return 'move';
         }
         if (isRotateMode) {
           if (
-            Math.hypot(pt.x - geom.arrow1.x, pt.y - geom.arrow1.y) <= 16 ||
-            Math.hypot(pt.x - geom.arrow2.x, pt.y - geom.arrow2.y) <= 16
+            Math.hypot(pt.x - geom.arrow1.x, pt.y - geom.arrow1.y) <= 16 / z ||
+            Math.hypot(pt.x - geom.arrow2.x, pt.y - geom.arrow2.y) <= 16 / z
           ) {
             return 'grab';
           }
@@ -78,12 +80,13 @@ export class GuideInteraction {
         const geom = ctx.canvasMgr.getGuideGeometry(activeG, ctx.model.canvas.width, ctx.model.canvas.height);
         const isRotateMode = activeG.mode === 'rotate';
         const centerPt = geom.pivot;
+        const z = ctx.canvasMgr.zoom || 1;
 
         // ARCHITECTURAL RATIONALE: Magnetic Cursor Snap to Guide Center Handle
         // In Move mode, if the cursor is in close proximity to the center handle,
         // snap the cursor directly to the center coordinate for flawless single-click acquisition.
         const centerDist = Math.hypot(pt.x - centerPt.x, pt.y - centerPt.y);
-        const centerSnapRadius = 18 / (ctx.canvasMgr.zoom || 1);
+        const centerSnapRadius = 18 / z;
         if (centerDist <= centerSnapRadius) {
           pt = { ...centerPt };
           this.guideInitialState = { ...activeG };
@@ -93,13 +96,13 @@ export class GuideInteraction {
 
         // In rotate mode, check arrows click
         if (isRotateMode) {
-          if (Math.hypot(pt.x - geom.arrow1.x, pt.y - geom.arrow1.y) <= 16) {
+          if (Math.hypot(pt.x - geom.arrow1.x, pt.y - geom.arrow1.y) <= 16 / z) {
             this.activeRotateArrowIdx = 1;
             this.guideInitialState = { ...activeG };
             ctx.render();
             return { handled: true, activeHandle: 'guide-rotate' };
           }
-          if (Math.hypot(pt.x - geom.arrow2.x, pt.y - geom.arrow2.y) <= 16) {
+          if (Math.hypot(pt.x - geom.arrow2.x, pt.y - geom.arrow2.y) <= 16 / z) {
             this.activeRotateArrowIdx = 2;
             this.guideInitialState = { ...activeG };
             ctx.render();
@@ -383,6 +386,26 @@ export class GuideInteraction {
    * This matches the bimodal paradigm of vector selection (transform vs rotate).
    */
   public onDoubleClick(ctx: ToolContext, pt: Point, callbacks: SelectToolCallbacks): boolean {
+    const z = ctx.canvasMgr.zoom || 1;
+    if (ctx.canvasMgr.selectedGuideId) {
+      const activeG = ctx.canvasMgr.getGuide(ctx.canvasMgr.selectedGuideId);
+      if (activeG) {
+        const geom = ctx.canvasMgr.getGuideGeometry(activeG, ctx.model.canvas.width, ctx.model.canvas.height);
+        const onCenter = Math.hypot(pt.x - geom.pivot.x, pt.y - geom.pivot.y) <= 14 / z;
+        const onArrow = activeG.mode === 'rotate' && (
+          Math.hypot(pt.x - geom.arrow1.x, pt.y - geom.arrow1.y) <= 16 / z ||
+          Math.hypot(pt.x - geom.arrow2.x, pt.y - geom.arrow2.y) <= 16 / z
+        );
+        if (onCenter || onArrow) {
+          activeG.mode = activeG.mode === 'rotate' ? 'move' : 'rotate';
+          ctx.canvasMgr.activeGuideTransformId = activeG.mode === 'rotate' ? activeG.id : null;
+          callbacks.onGuideSelected?.(activeG);
+          ctx.render();
+          return true;
+        }
+      }
+    }
+
     const hitGuide = ctx.canvasMgr.hitTestGuide(pt, ctx.model.canvas.width, ctx.model.canvas.height, 8);
     if (hitGuide) {
       ctx.selectionTool.deselectAll();
