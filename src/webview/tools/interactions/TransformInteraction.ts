@@ -33,25 +33,25 @@ export class TransformInteraction {
   public initialPivot: Point | null = null;
   public lastDeltaAngle: number = 0;
   public currentRotationSnappedPt: Point | null = null;
+  public currentScaleSnappedPt: Point | null = null;
 
   public initialElementsMap: Map<string, PathVertex[]> = new Map();
   public initialBox: any = null;
-  public initialBoxPadding: number = 16;
+  public initialBoxPadding: number = 0;
   public ghostTransformMap: Map<string, PathVertex[]> = new Map();
 
   /**
-   * ARCHITECTURAL RATIONALE: 16px Screen-Invariant Selection Box Clearance
-   * 1. Hit-Testing & Cursor Disambiguation:
-   *    With small margins (6px), resize handles (12px hit radius) collided with vector anchor
-   *    vertices and stroke boundaries, confusing users when attempting to move or click vertices.
-   * 2. Zoom-Invariance:
-   *    Scaling document padding inversely with zoom (16 / z) guarantees that the visual distance
-   *    from the vector boundary to the handles stays strictly constant at 16 screen pixels across all zoom levels.
+   * ARCHITECTURAL RATIONALE: Zero-Clearance Tight Selection Box Hit-Testing
+   * 1. Exact Alignment with Geometry Extents:
+   *    Selection boxes and handles are positioned flush against the true geometric bounds (padding = 0).
+   * 2. Hit-Testing:
+   *    Handle radius (12 / z) provides comfortable grab target tolerance without requiring
+   *    artificial bounding box expansion.
    */
   public getHoverCursor(ctx: ToolContext, pt: Point, selectedEls: VectorElement[]): string | null {
     if (selectedEls.length === 0) return null;
     const z = ctx.canvasMgr.zoom || 1;
-    const box = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 16 / z);
+    const box = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 0);
     if (!box) return null;
 
     if (ctx.selectionTool.selectionMode === 'rotate') {
@@ -112,7 +112,7 @@ export class TransformInteraction {
     handle: HandleType,
     groupBox: any,
     selectedEls: VectorElement[],
-    padding: number = 16
+    padding: number = 0
   ): void {
     this.initialBox = { ...groupBox };
     this.initialBoxPadding = padding;
@@ -126,6 +126,7 @@ export class TransformInteraction {
       }
     });
     this.ghostTransformMap.clear();
+    this.currentScaleSnappedPt = null;
   }
 
   public startRotate(
@@ -184,8 +185,7 @@ export class TransformInteraction {
       });
       const selectedEls = ctx.model.elements.filter((el) => ctx.selectionTool.isSelected(el.id));
       if (selectedEls.length > 0) {
-        const z = ctx.canvasMgr.zoom || 1;
-        const groupBox = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 16 / z);
+        const groupBox = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 0);
         if (groupBox) {
           otherVertices.push({ x: groupBox.cx, y: groupBox.cy });
           otherVertices.push({ x: groupBox.x, y: groupBox.y });
@@ -334,19 +334,95 @@ export class TransformInteraction {
       return true;
     }
 
-    // Scaling
+    // Scaling with directional handle Snap To (Snapping to grid, guidelines, artboard bounds, and unselected vertices)
     if (this.initialBox && activeHandle !== 'move' && this.initialElementsMap.size > 0) {
+      const b = this.initialBox;
+      let handleInitialX = b.x;
+      let handleInitialY = b.y;
+
+      switch (activeHandle) {
+        case 'nw':
+          handleInitialX = b.x;
+          handleInitialY = b.y;
+          break;
+        case 'n':
+          handleInitialX = b.cx;
+          handleInitialY = b.y;
+          break;
+        case 'ne':
+          handleInitialX = b.x + b.width;
+          handleInitialY = b.y;
+          break;
+        case 'w':
+          handleInitialX = b.x;
+          handleInitialY = b.cy;
+          break;
+        case 'e':
+          handleInitialX = b.x + b.width;
+          handleInitialY = b.cy;
+          break;
+        case 'sw':
+          handleInitialX = b.x;
+          handleInitialY = b.y + b.height;
+          break;
+        case 's':
+          handleInitialX = b.cx;
+          handleInitialY = b.y + b.height;
+          break;
+        case 'se':
+          handleInitialX = b.x + b.width;
+          handleInitialY = b.y + b.height;
+          break;
+      }
+
+      // Collect unselected vertices for magnetic vertex snapping
+      const otherVertices: Point[] = [];
+      ctx.model.elements.forEach((el) => {
+        if (!ctx.selectionTool.isSelected(el.id) && el.vertices) {
+          el.vertices.forEach((v) => otherVertices.push({ x: v.x, y: v.y }));
+        }
+      });
+
+      const rawDx = pt.x - dragStartPt.x;
+      const rawDy = pt.y - dragStartPt.y;
+
+      const isXHandle = ['nw', 'ne', 'w', 'e', 'sw', 'se'].includes(activeHandle);
+      const isYHandle = ['nw', 'n', 'ne', 'sw', 's', 'se'].includes(activeHandle);
+
+      const targetHandlePt: Point = {
+        x: handleInitialX + (isXHandle ? rawDx : 0),
+        y: handleInitialY + (isYHandle ? rawDy : 0),
+      };
+
+      const snappedHandlePt = ctx.snapPoint(targetHandlePt, otherVertices);
+
+      let effectiveDx = 0;
+      let effectiveDy = 0;
+
+      if (isXHandle) {
+        effectiveDx = snappedHandlePt.x - handleInitialX;
+      }
+      if (isYHandle) {
+        effectiveDy = snappedHandlePt.y - handleInitialY;
+      }
+
+      const didSnap =
+        Math.hypot(snappedHandlePt.x - targetHandlePt.x, snappedHandlePt.y - targetHandlePt.y) > 0.001;
+      this.currentScaleSnappedPt = didSnap ? snappedHandlePt : null;
+
+      const isProportional = ctx.selectionTool.isAspectRatioLocked || e.ctrlKey;
+
       this.ghostTransformMap.clear();
       this.initialElementsMap.forEach((origVerts, id) => {
         const transformed = ctx.selectionTool.transformVertices(
           origVerts,
           this.initialBox,
           activeHandle as HandleType,
-          dx,
-          dy,
+          effectiveDx,
+          effectiveDy,
           this.initialBoxPadding,
           e.shiftKey,
-          e.ctrlKey
+          isProportional
         );
         this.ghostTransformMap.set(id, transformed);
       });
@@ -439,8 +515,7 @@ export class TransformInteraction {
           }
         });
       } else if (this.initialBox) {
-        const z = ctx.canvasMgr.zoom || 1;
-        const newBox = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 16 / z);
+        const newBox = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 0);
         if (newBox) {
           ctx.selectionTool.updatePivotOnScale(this.initialBox, newBox, selectedEls);
         }
@@ -465,6 +540,7 @@ export class TransformInteraction {
       this.initialBox = null;
       this.rotationPivot = null;
       this.currentRotationSnappedPt = null;
+      this.currentScaleSnappedPt = null;
       callbacks.onSelectionChanged?.();
       ctx.syncToHost();
       ctx.render();
@@ -476,6 +552,7 @@ export class TransformInteraction {
     this.initialBox = null;
     this.rotationPivot = null;
     this.currentRotationSnappedPt = null;
+    this.currentScaleSnappedPt = null;
     return false;
   }
 
@@ -487,6 +564,7 @@ export class TransformInteraction {
       this.initialBox = null;
       this.rotationPivot = null;
       this.currentRotationSnappedPt = null;
+      this.currentScaleSnappedPt = null;
       handled = true;
     }
 
@@ -542,7 +620,7 @@ export class TransformInteraction {
     const z = ctx.canvasMgr.zoom || 1;
 
     if (selectedEls.length > 0) {
-      const groupBox = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 16 / z);
+      const groupBox = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 0);
       if (groupBox && ctx.selectionTool.hitTestPivot(groupBox, pt, 10 / z)) {
         ctx.selectionTool.resetPivot(selectedEls.length === 1 ? selectedEls[0] : undefined);
         callbacks.onSelectionChanged?.();
@@ -579,7 +657,7 @@ export class TransformInteraction {
     const selectedEls = ctx.model.elements.filter((e) => ctx.selectionTool.isSelected(e.id));
 
     if (selectedEls.length > 0) {
-      const groupBox = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 16 / z);
+      const groupBox = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 0);
       if (groupBox) {
         const mode = ctx.selectionTool.selectionMode;
         const boxStroke = mode === 'rotate' ? '#f59e0b' : '#38bdf8';
@@ -745,7 +823,7 @@ export class TransformInteraction {
 
       if (selectedEls.length > 1) {
         selectedEls.forEach((el) => {
-          const elBox = ctx.selectionTool.getSelectionBoundingBox(el, 16 / z);
+          const elBox = ctx.selectionTool.getSelectionBoundingBox(el, 0);
           if (elBox) {
             html += `<rect x="${elBox.x}" y="${elBox.y}" width="${elBox.width}" height="${elBox.height}" fill="none" stroke="#60a5fa" stroke-width="0.75" stroke-dasharray="2 2" opacity="0.6" vector-effect="non-scaling-stroke" />`;
           }
@@ -768,8 +846,24 @@ export class TransformInteraction {
       });
     }
 
+    // Ghost dashed bounding box during interactive scaling
+    if (activeHandle && activeHandle !== 'move' && activeHandle !== 'rotate' && this.ghostTransformMap.size > 0) {
+      let gMinX = Infinity, gMinY = Infinity, gMaxX = -Infinity, gMaxY = -Infinity;
+      this.ghostTransformMap.forEach((gVerts) => {
+        gVerts.forEach((v) => {
+          if (v.x < gMinX) gMinX = v.x;
+          if (v.x > gMaxX) gMaxX = v.x;
+          if (v.y < gMinY) gMinY = v.y;
+          if (v.y > gMaxY) gMaxY = v.y;
+        });
+      });
+      if (gMinX !== Infinity) {
+        html += `<rect x="${gMinX}" y="${gMinY}" width="${Math.max(gMaxX - gMinX, 1)}" height="${Math.max(gMaxY - gMinY, 1)}" fill="none" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="4 4" vector-effect="non-scaling-stroke" />`;
+      }
+    }
+
     if (activeHandle === 'rotate' && this.rotationPivot && selectedEls.length > 0) {
-      const gBox = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 16 / z);
+      const gBox = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 0);
       if (gBox) {
         const deg = (this.lastDeltaAngle * 180) / Math.PI;
         html += `<rect x="${gBox.x}" y="${gBox.y}" width="${gBox.width}" height="${gBox.height}" transform="rotate(${deg}, ${this.rotationPivot.x}, ${this.rotationPivot.y})" fill="none" stroke="#6366f1" stroke-width="1.5" stroke-dasharray="4 4" vector-effect="non-scaling-stroke" />`;
@@ -787,6 +881,21 @@ export class TransformInteraction {
           <line x1="${sp.x - sCross}" y1="${sp.y}" x2="${sp.x + sCross}" y2="${sp.y}" stroke="#f59e0b" stroke-width="1" vector-effect="non-scaling-stroke" />
           <line x1="${sp.x}" y1="${sp.y - sCross}" x2="${sp.x}" y2="${sp.y + sCross}" stroke="#f59e0b" stroke-width="1" vector-effect="non-scaling-stroke" />
           <circle cx="${sp.x}" cy="${sp.y}" r="${1.8 / z}" fill="#f59e0b" />
+        </g>
+      `;
+    }
+
+    // Magnetic Snap Target Indicator during Vector Scaling (Snapping to grid, guides, artboard, vertices)
+    if (this.currentScaleSnappedPt) {
+      const sp = this.currentScaleSnappedPt;
+      const sR = 6 / z;
+      const sCross = 9 / z;
+      html += `
+        <g class="scale-snap-indicator" pointer-events="none">
+          <circle cx="${sp.x}" cy="${sp.y}" r="${sR}" fill="none" stroke="#38bdf8" stroke-width="1.5" vector-effect="non-scaling-stroke" />
+          <line x1="${sp.x - sCross}" y1="${sp.y}" x2="${sp.x + sCross}" y2="${sp.y}" stroke="#38bdf8" stroke-width="1" vector-effect="non-scaling-stroke" />
+          <line x1="${sp.x}" y1="${sp.y - sCross}" x2="${sp.x}" y2="${sp.y + sCross}" stroke="#38bdf8" stroke-width="1" vector-effect="non-scaling-stroke" />
+          <circle cx="${sp.x}" cy="${sp.y}" r="${1.8 / z}" fill="#38bdf8" />
         </g>
       `;
     }

@@ -367,8 +367,21 @@ export class SelectionTool {
     };
   }
 
-  // Calculate padded bounding box for selection mask & resize handles (16px screen-invariant clearance)
-  public getSelectionBoundingBox(element: VectorElement, padding: number = 16): BoundingBox | null {
+  /**
+   * ARCHITECTURAL RATIONALE: Zero-Clearance Tight Selection Bounding Box
+   * 1. Exact Alignment with Physical Geometry & Inspector Metrics:
+   *    Previous iterations utilized an artificial padding (16 / z) around the vector boundary.
+   *    While this separated handles from vector nodes, it introduced a visual floating gap,
+   *    disconnected the handles from the real physical extents of the vector, and caused the selection
+   *    box dimensions to diverge from the exact W and H metrics reported in the properties panel.
+   *    Configuring padding = 0 aligns the selection outline and 8 scale handles flush against the
+   *    analytical bounds (stroke limits and marker polygons) of the vector, enabling precise CAD-like
+   *    visual inspection and alignment.
+   * 2. Snapping Accuracy:
+   *    Tight bounding boxes allow scale handles to snap directly to grid intersections, guidelines,
+   *    artboard edges, and other vector vertices without requiring offset compensation.
+   */
+  public getSelectionBoundingBox(element: VectorElement, padding: number = 0): BoundingBox | null {
     const box = this.getBoundingBox(element);
     if (!box) return null;
     return {
@@ -414,8 +427,8 @@ export class SelectionTool {
     };
   }
 
-  // Calculate composite group selection bounding box with padding (16px screen-invariant clearance)
-  public getGroupSelectionBoundingBox(elements: VectorElement[], padding: number = 16): BoundingBox | null {
+  // Calculate composite group selection bounding box with padding (tight zero-clearance by default)
+  public getGroupSelectionBoundingBox(elements: VectorElement[], padding: number = 0): BoundingBox | null {
     const box = this.getGroupBoundingBox(elements);
     if (!box) return null;
     return {
@@ -682,7 +695,7 @@ export class SelectionTool {
     handle: HandleType,
     dx: number,
     dy: number,
-    padding: number = 16,
+    padding: number = 0,
     fromCenter: boolean = false,
     proportional: boolean = false
   ): PathVertex[] {
@@ -728,7 +741,7 @@ export class SelectionTool {
         break;
     }
 
-    // 2. Adjust for proportional scaling (Ctrl)
+    // 2. Adjust for proportional scaling (Ctrl or aspect ratio lock)
     if (proportional) {
       const ratio = initialBox.width / initialBox.height;
       if (['n', 's'].includes(handle)) {
@@ -758,7 +771,7 @@ export class SelectionTool {
       newY = initialBox.y + initialBox.height / 2 - newH / 2;
     }
 
-    const minDim = padding * 2 + 2;
+    const minDim = Math.max(padding * 2 + 2, 2);
     if (newW < minDim) newW = minDim;
     if (newH < minDim) newH = minDim;
 
