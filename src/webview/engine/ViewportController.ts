@@ -363,14 +363,23 @@ export class ViewportController {
     }
   }
 
+  /**
+   * ARCHITECTURAL RATIONALE: Zero-Reflow Ruler Coordinate Synchronization
+   *
+   * Problem:
+   * Calling `this.canvasWrapper.getBoundingClientRect()` and `this.canvasScrollArea.getBoundingClientRect()`
+   * during zoom and pan forced synchronous layout recalculations (Layout Thrashing) in Chromium,
+   * stalling the main thread on every mouse wheel tick.
+   *
+   * Solution:
+   * Since `canvasWrapper` is positioned at (0, 0) and translated via `translate(${cameraOffset.x}px, ${cameraOffset.y}px)`,
+   * the relative offset inside `canvasScrollArea` is analytically and identically equal to `cameraOffset.x` and `cameraOffset.y`.
+   * Passing `cameraOffset` directly eliminates 100% of synchronous DOM layout queries.
+   */
   public syncRulerScroll(): void {
     const ruler = this.getRulerView();
     if (!ruler || !this.canvasWrapper || !this.canvasScrollArea) return;
-    const wrapRect = this.canvasWrapper.getBoundingClientRect();
-    const scrollRect = this.canvasScrollArea.getBoundingClientRect();
-    const offsetX = wrapRect.left - scrollRect.left;
-    const offsetY = wrapRect.top - scrollRect.top;
-    ruler.renderRulers(offsetX, offsetY);
+    ruler.renderRulers(this.cameraOffset.x, this.cameraOffset.y);
   }
 
   public updateStatusZoom(): void {

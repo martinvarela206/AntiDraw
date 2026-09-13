@@ -271,6 +271,12 @@ body {
   top: 0;
   left: 0;
   transform-origin: 0 0;
+  background-color: #12131c;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  border: 1px solid #2b2d3d;
+  flex-shrink: 0;
+  box-sizing: content-box;
+  overflow: visible;
 }
 
 #svg-canvas,
