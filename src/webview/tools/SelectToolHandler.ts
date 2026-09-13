@@ -362,7 +362,7 @@ export class SelectToolHandler implements IToolHandler {
       currentHandle === 'guide-pivot' ||
       currentHandle === 'guide-rotate'
     ) {
-      return this.guideInteraction.onPointerUp(this.ctx, e, currentHandle, this.callbacks);
+      return this.guideInteraction.onPointerUp(this.ctx, e, pt, currentHandle, this.callbacks);
     }
 
     if (currentHandle === 'marquee') {

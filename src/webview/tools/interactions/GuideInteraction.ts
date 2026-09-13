@@ -26,6 +26,12 @@ export class GuideInteraction {
   public activeRotateArrowIdx: 1 | 2 = 1;
   public currentRotationSnappedPt: Point | null = null;
 
+  private lastGuideClickTime: number = 0;
+  private lastGuideClickPt: Point = { x: 0, y: 0 };
+  private guideDragStartPt: Point = { x: 0, y: 0 };
+  private guideHasMoved: boolean = false;
+  private lastToggleTime: number = 0;
+
   /**
    * Hover cursor evaluation for active guide transformation controls and guide lines.
    */
@@ -73,6 +79,9 @@ export class GuideInteraction {
     pt: Point,
     callbacks: SelectToolCallbacks
   ): { handled: boolean; activeHandle?: GuideHandleType } {
+    this.guideDragStartPt = { ...pt };
+    this.guideHasMoved = false;
+
     // 1. Check controls on already selected Guide Line
     if (ctx.canvasMgr.selectedGuideId) {
       const activeG = ctx.canvasMgr.getGuide(ctx.canvasMgr.selectedGuideId);
@@ -166,6 +175,11 @@ export class GuideInteraction {
     e: PointerEvent,
     callbacks: SelectToolCallbacks
   ): boolean {
+    const moveDist = Math.hypot(pt.x - this.guideDragStartPt.x, pt.y - this.guideDragStartPt.y);
+    if (moveDist > 3 / (ctx.canvasMgr.zoom || 1)) {
+      this.guideHasMoved = true;
+    }
+
     const dx = pt.x - dragStartPt.x;
     const dy = pt.y - dragStartPt.y;
 
@@ -319,13 +333,18 @@ export class GuideInteraction {
 
   /**
    * Finalizes guide dragging or checks for deletion upon dropping onto physical rulers.
+   * Also implements synthetic double-click detection for guideline bimodal toggle (move vs rotate).
    */
   public onPointerUp(
     ctx: ToolContext,
     e: PointerEvent,
+    pt: Point,
     activeHandle: GuideHandleType,
     callbacks: SelectToolCallbacks
   ): boolean {
+    const moved = this.guideHasMoved;
+    this.guideHasMoved = false;
+
     if (activeHandle === 'guide-move' && ctx.canvasMgr.selectedGuideId) {
       const g = ctx.canvasMgr.getGuide(ctx.canvasMgr.selectedGuideId);
       if (g) {
@@ -357,25 +376,68 @@ export class GuideInteraction {
           callbacks.syncMetadataToHost?.();
           this.guideInitialState = null;
           this.currentRotationSnappedPt = null;
+          this.lastGuideClickTime = 0;
           return true;
         }
       }
-      this.guideInitialState = null;
-      this.currentRotationSnappedPt = null;
-      ctx.render();
-      callbacks.syncMetadataToHost?.();
-      return true;
     }
 
-    if (activeHandle === 'guide-pivot' || activeHandle === 'guide-rotate') {
-      this.guideInitialState = null;
-      this.currentRotationSnappedPt = null;
-      ctx.render();
-      callbacks.syncMetadataToHost?.();
-      return true;
+    this.guideInitialState = null;
+    this.currentRotationSnappedPt = null;
+
+    if (!moved) {
+      /**
+       * ARCHITECTURAL RATIONALE: Synthetic Double-Click Detection on Guidelines
+       * Browsers drop native DOM `dblclick` events when `overlaySvg.innerHTML` is re-rendered
+       * during pointerdown/pointerup cycles, as the clicked SVG nodes are unmounted.
+       * Tracking click timestamps and coordinates here guarantees 100% reliable double-click
+       * detection to alternate guidelines between 'move' and 'rotate' modes.
+       */
+      const now = Date.now();
+      const z = ctx.canvasMgr.zoom || 1;
+      const clickDist = Math.hypot(pt.x - this.lastGuideClickPt.x, pt.y - this.lastGuideClickPt.y);
+      if (now - this.lastGuideClickTime < 350 && clickDist < 10 / z) {
+        this.lastGuideClickTime = 0;
+        if (ctx.canvasMgr.selectedGuideId) {
+          const g = ctx.canvasMgr.getGuide(ctx.canvasMgr.selectedGuideId);
+          if (g) {
+            return this.toggleGuideMode(ctx, g, callbacks);
+          }
+        }
+      } else {
+        this.lastGuideClickTime = now;
+        this.lastGuideClickPt = { x: pt.x, y: pt.y };
+      }
+    } else {
+      this.lastGuideClickTime = 0;
     }
 
-    return false;
+    ctx.render();
+    callbacks.syncMetadataToHost?.();
+    return true;
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Bimodal Guide Mode Alternation
+   * Alternates between 'move' mode (single center reticle handle with universal 2D translation and snapping)
+   * and 'rotate' mode (pivot positioning + rotation arrow indicators at 1/4 and 3/4 visible span).
+   * Incorporates a debouncing guard to prevent dual invocation if native DOM `dblclick` fires
+   * in tandem with synthetic double-click detection.
+   */
+  public toggleGuideMode(ctx: ToolContext, guide: GuideLine, callbacks: SelectToolCallbacks): boolean {
+    const now = Date.now();
+    if (now - this.lastToggleTime < 150) {
+      return true;
+    }
+    this.lastToggleTime = now;
+    this.lastGuideClickTime = 0;
+
+    guide.mode = guide.mode === 'rotate' ? 'move' : 'rotate';
+    ctx.canvasMgr.activeGuideTransformId = guide.mode === 'rotate' ? guide.id : null;
+    callbacks.onGuideSelected?.(guide);
+    ctx.render();
+    callbacks.syncMetadataToHost?.();
+    return true;
   }
 
   /**
@@ -391,17 +453,15 @@ export class GuideInteraction {
       const activeG = ctx.canvasMgr.getGuide(ctx.canvasMgr.selectedGuideId);
       if (activeG) {
         const geom = ctx.canvasMgr.getGuideGeometry(activeG, ctx.model.canvas.width, ctx.model.canvas.height);
-        const onCenter = Math.hypot(pt.x - geom.pivot.x, pt.y - geom.pivot.y) <= 14 / z;
+        const onCenter = Math.hypot(pt.x - geom.pivot.x, pt.y - geom.pivot.y) <= 18 / z;
         const onArrow = activeG.mode === 'rotate' && (
-          Math.hypot(pt.x - geom.arrow1.x, pt.y - geom.arrow1.y) <= 16 / z ||
-          Math.hypot(pt.x - geom.arrow2.x, pt.y - geom.arrow2.y) <= 16 / z
+          Math.hypot(pt.x - geom.arrow1.x, pt.y - geom.arrow1.y) <= 18 / z ||
+          Math.hypot(pt.x - geom.arrow2.x, pt.y - geom.arrow2.y) <= 18 / z
         );
-        if (onCenter || onArrow) {
-          activeG.mode = activeG.mode === 'rotate' ? 'move' : 'rotate';
-          ctx.canvasMgr.activeGuideTransformId = activeG.mode === 'rotate' ? activeG.id : null;
-          callbacks.onGuideSelected?.(activeG);
-          ctx.render();
-          return true;
+        const hitActive = ctx.canvasMgr.hitTestGuide(pt, ctx.model.canvas.width, ctx.model.canvas.height, 8);
+        const onLine = hitActive && hitActive.id === activeG.id;
+        if (onCenter || onArrow || onLine) {
+          return this.toggleGuideMode(ctx, activeG, callbacks);
         }
       }
     }
@@ -410,12 +470,7 @@ export class GuideInteraction {
     if (hitGuide) {
       ctx.selectionTool.deselectAll();
       ctx.canvasMgr.selectedGuideId = hitGuide.id;
-      // Toggle between 'move' and 'rotate' mode
-      hitGuide.mode = hitGuide.mode === 'rotate' ? 'move' : 'rotate';
-      ctx.canvasMgr.activeGuideTransformId = hitGuide.mode === 'rotate' ? hitGuide.id : null;
-      callbacks.onGuideSelected?.(hitGuide);
-      ctx.render();
-      return true;
+      return this.toggleGuideMode(ctx, hitGuide, callbacks);
     }
     return false;
   }
