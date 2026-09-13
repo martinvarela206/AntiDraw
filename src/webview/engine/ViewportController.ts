@@ -239,13 +239,14 @@ export class ViewportController {
       });
     }
 
-    // Window resize handler to update rulers
+    // Window resize handler to update rulers and viewport-bounded overlay/grid renderers
     window.addEventListener('resize', () => {
       const ruler = this.getRulerView();
       if (ruler) {
         ruler.updateSize(this.model.canvas.width, this.model.canvas.height);
       }
       this.syncRulerScroll();
+      this.onRenderOverlay?.();
     });
   }
 

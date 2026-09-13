@@ -274,11 +274,23 @@ body {
 }
 
 #svg-canvas,
-#grid-svg,
 #overlay-svg {
   /* Positioned via JS — all at position:absolute; top:0; left:0 */
   display: block;
   overflow: visible;
+}
+
+#grid-svg {
+  display: none !important;
+}
+
+#grid-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 
 /* RIGHT PROPERTY INSPECTOR */
