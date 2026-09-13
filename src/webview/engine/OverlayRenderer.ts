@@ -4,6 +4,7 @@ import { CanvasManager } from './CanvasManager.js';
 import { NodeEditorTool } from './NodeEditorTool.js';
 import { IToolHandler } from '../tools/IToolHandler.js';
 import { ToolType } from '../ui/Toolbar.js';
+import { MarkerHelper, GuideHelper, NodeHelper, GUIDE_ROTATE_LEFT_PATH, GUIDE_ROTATE_RIGHT_PATH } from '../ui/helpers/index.js';
 
 export interface OverlayRenderContext {
   model: VectorModel;
@@ -20,16 +21,7 @@ export interface OverlayRenderContext {
   tools: IToolHandler[];
 }
 
-/**
- * Exact rotation indicator path data from user-created SVGs:
- * - GUIDE_ROTATE_LEFT_PATH from double_arrow_vertical_left_rotate.svg
- * - GUIDE_ROTATE_RIGHT_PATH from double_arrow_vertical_right_rotate.svg
- */
-export const GUIDE_ROTATE_LEFT_PATH =
-  'M 17 24.83 C 16.02 22.57 14.98 19.61 14.87 17.06 C 14.76 14.21 16.08 10.22 17.23 7.29 L 18.75 8.03 L 19.46 0 L 13.48 5.45 L 15.33 6.36 C 14.05 9.53 12.55 14 12.68 17.15 C 12.79 20.05 14.03 23.4 15.17 25.9 L 13.31 26.99 L 19.67 32 L 18.39 24.03 Z';
-
-export const GUIDE_ROTATE_RIGHT_PATH =
-  'M 15.34 7.17 C 16.32 9.43 17.36 12.39 17.47 14.94 C 17.58 17.79 16.26 21.78 15.11 24.71 L 13.59 23.97 L 12.88 32 L 18.86 26.55 L 17.01 25.64 C 18.29 22.47 19.79 18 19.66 14.85 C 19.55 11.95 18.31 8.6 17.17 6.1 L 19.03 5.01 L 12.67 0 L 13.95 7.97 Z';
+export { GUIDE_ROTATE_LEFT_PATH, GUIDE_ROTATE_RIGHT_PATH };
 
 /**
  * ARCHITECTURAL RATIONALE: Dedicated Overlay Rendering Engine (OverlayRenderer)
@@ -62,27 +54,8 @@ export class OverlayRenderer {
     // 0. Artboard (ViewBox Guide Frame - transparent fill so vectors underneath are visible)
     html += `<rect x="${vb.minX}" y="${vb.minY}" width="${vb.width}" height="${vb.height}" fill="none" stroke="#6366f1" stroke-width="1.5" stroke-dasharray="6 3" opacity="0.85" vector-effect="non-scaling-stroke" />`;
 
-    /**
-     * ARCHITECTURAL RATIONALE: Scale-Invariant Artboard ViewBox Dimension Badge
-     *
-     * Problem:
-     * When defined in world SVG units, the dimension pill and text scale directly with camera zoom.
-     * At 3000% zoom, the badge was magnified 30x into a 4,800px rectangle with 300px typography,
-     * occluding the artwork and distorting the visual workspace.
-     *
-     * Solution:
-     * Anchored at (vb.minX, vb.minY) with a counter-scaling transform: `scale(1 / z)`.
-     * Child offsets, dimensions, corner radiuses, and font sizes operate in constant physical screen pixels.
-     * The badge remains exactly 160px wide by 16px high with 10px text across all zoom levels (5% to 3000%).
-     */
-    const tagW = 160;
-    const tagH = 16;
-    html += `
-      <g transform="translate(${vb.minX}, ${vb.minY}) scale(${1 / z})" opacity="0.95">
-        <rect x="0" y="-20" width="${tagW}" height="${tagH}" rx="3" fill="#1e1b4b" stroke="#6366f1" stroke-width="1" />
-        <text x="6" y="-8" font-size="10" fill="#c7d2fe" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" font-weight="600">ViewBox: ${vb.width} × ${vb.height}</text>
-      </g>
-    `;
+    // Artboard Badge Tag at top-left (Scale-invariant via MarkerHelper)
+    html += MarkerHelper.renderViewBoxBadge(vb.minX, vb.minY, vb.width, vb.height, z);
 
     /**
      * HISTORICAL PERFORMANCE ARCHITECTURE (FIX-12):
@@ -140,58 +113,24 @@ export class OverlayRenderer {
           // By applying `transform="translate(...) scale(${1 / z})"`, the geometric dimensions remain fixed in screen space
           // without magnifying or shrinking as the user zooms in or out.
 
-          // Center Handle (Zoom-Invariant)
-          html += `
-            <g transform="translate(${centerPt.x}, ${centerPt.y}) scale(${1 / z})">
-              <circle cx="0" cy="0" r="6" fill="#1e293b" stroke="${guideColor}" stroke-width="2" vector-effect="non-scaling-stroke" />
-              <circle cx="0" cy="0" r="2" fill="${guideColor}" />
-              <line x1="-9" y1="0" x2="9" y2="0" stroke="${guideColor}" stroke-width="1" vector-effect="non-scaling-stroke" />
-              <line x1="0" y1="-9" x2="0" y2="9" stroke="${guideColor}" stroke-width="1" vector-effect="non-scaling-stroke" />
-            </g>
-          `;
+          // Center Handle (Zoom-Invariant via GuideHelper)
+          html += GuideHelper.renderCenterHandle(centerPt.x, centerPt.y, guideColor, z);
 
-          // Rotation indicators only appear in Rotate Mode
+          // Rotation indicators only appear in Rotate Mode (Zoom-Invariant via GuideHelper)
           if (isRotateMode) {
             const arrowRot = g.angle || 0;
-
-            // Arrow 1 (Negative offset along guideline axis - 1/4 visible span, zoom-invariant)
-            html += `
-              <g transform="translate(${geom.arrow1.x}, ${geom.arrow1.y}) rotate(${arrowRot}) scale(${1 / z})">
-                <g transform="translate(-16, -16)">
-                  <path d="${GUIDE_ROTATE_LEFT_PATH}" fill="${guideColor}" stroke="#1e293b" stroke-width="0.8" vector-effect="non-scaling-stroke" fill-rule="evenodd" />
-                </g>
-                <circle cx="0" cy="0" r="16" fill="transparent" />
-              </g>
-            `;
-
-            // Arrow 2 (Positive offset along guideline axis - 3/4 visible span, zoom-invariant)
-            html += `
-              <g transform="translate(${geom.arrow2.x}, ${geom.arrow2.y}) rotate(${arrowRot}) scale(${1 / z})">
-                <g transform="translate(-16, -16)">
-                  <path d="${GUIDE_ROTATE_RIGHT_PATH}" fill="${guideColor}" stroke="#1e293b" stroke-width="0.8" vector-effect="non-scaling-stroke" fill-rule="evenodd" />
-                </g>
-                <circle cx="0" cy="0" r="16" fill="transparent" />
-              </g>
-            `;
+            html += GuideHelper.renderRotationArrow(geom.arrow1.x, geom.arrow1.y, arrowRot, false, guideColor, z);
+            html += GuideHelper.renderRotationArrow(geom.arrow2.x, geom.arrow2.y, arrowRot, true, guideColor, z);
           }
         }
       });
     }
 
-    // 3. Dynamic Origin Drag Preview
+    // 3. Dynamic Origin Drag Preview (Zoom-Invariant via MarkerHelper)
     if (ctx.isDraggingOrigin && ctx.dragOriginPt) {
       const ox = ctx.dragOriginPt.x;
       const oy = ctx.dragOriginPt.y;
-      html += `
-        <g opacity="0.9">
-          <line x1="${workBounds.minX - 500}" y1="${oy}" x2="${workBounds.maxX + 500}" y2="${oy}" stroke="#6366f1" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke" />
-          <line x1="${ox}" y1="${workBounds.minY - 500}" x2="${ox}" y2="${workBounds.maxY + 500}" stroke="#6366f1" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke" />
-          <circle cx="${ox}" cy="${oy}" r="8" fill="none" stroke="#6366f1" stroke-width="1.5" vector-effect="non-scaling-stroke" />
-          <circle cx="${ox}" cy="${oy}" r="2" fill="#6366f1" />
-          <rect x="${ox + 10}" y="${oy - 22}" width="72" height="18" rx="3" fill="#1e1b4b" stroke="#6366f1" stroke-width="1" vector-effect="non-scaling-stroke" />
-          <text x="${ox + 15}" y="${oy - 9}" font-size="10" fill="#c7d2fe" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" font-weight="600">Origin (0,0)</text>
-        </g>
-      `;
+      html += MarkerHelper.renderOriginPreview(ox, oy, workBounds.minX - 500, workBounds.maxX + 500, workBounds.minY - 500, workBounds.maxY + 500, z);
     }
 
     // 4. Dynamic Guide Drag Creation Preview
@@ -215,14 +154,13 @@ export class OverlayRenderer {
 
           el.vertices.forEach((v) => {
             const isSelectedVertex = isNodeMode && v.id === selectedVertexId;
-            const vR = (isSelectedVertex ? 4.5 : 3.5) / z;
-            if (isNodeMode && isParametric) {
-              // Distinctive square node handles for parametric primitives
-              const side = (isSelectedVertex ? 8 : 6) / z;
-              html += `<rect x="${v.x - side / 2}" y="${v.y - side / 2}" width="${side}" height="${side}" rx="1" fill="${isSelectedVertex ? '#6366f1' : '#ffffff'}" stroke="#4338ca" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
-            } else {
-              html += `<circle cx="${v.x}" cy="${v.y}" r="${vR}" fill="${isSelectedVertex ? '#38bdf8' : '#ffffff'}" stroke="#0284c7" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
-            }
+            html += NodeHelper.renderVertex({
+              x: v.x,
+              y: v.y,
+              isSelected: isSelectedVertex,
+              isParametric: isNodeMode && isParametric,
+              zoom: z,
+            });
           });
         }
       });
