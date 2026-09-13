@@ -23,6 +23,9 @@ async function main() {
     platform: 'browser',
     outfile: 'dist/webview.js',
     logLevel: 'info',
+    loader: {
+      '.svg': 'text',
+    },
   });
 
   if (isWatch) {
