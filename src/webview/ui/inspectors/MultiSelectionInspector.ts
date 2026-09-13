@@ -47,8 +47,9 @@ export class MultiSelectionInspector {
         <div class="prop-row">
           <span class="prop-label">Modo</span>
           <div style="display:flex; gap:4px; flex:1;">
-            <button class="prop-input" id="btn-multi-mode-transform" style="flex:1; cursor:pointer; font-weight:600; ${selectionTool.selectionMode === 'transform' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Modo Mover y Redimensionar: muestra tiradores de escala y anclaje magnético por proximidad">⤢ Escalar</button>
-            <button class="prop-input" id="btn-multi-mode-rotate" style="flex:1; cursor:pointer; font-weight:600; ${selectionTool.selectionMode === 'rotate' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Modo Rotación: muestra tiradores de giro y permite reubicar libremente el centro de rotación">↻ Rotar</button>
+            <button class="prop-input" id="btn-multi-mode-move" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'move' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Modo Mover: Mover elementos y anclar vértices">✛ Mover</button>
+            <button class="prop-input" id="btn-multi-mode-scale" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'scale' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Modo Escalar: Redimensionar con 8 tiradores">⤡ Escalar</button>
+            <button class="prop-input" id="btn-multi-mode-rotate" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'rotate' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Modo Rotación: muestra tiradores de giro y permite reubicar libremente el centro de rotación">↻ Rotar</button>
           </div>
         </div>
         <div class="prop-row">
@@ -225,10 +226,16 @@ export class MultiSelectionInspector {
       });
     }
 
-    const btnMultiModeTransform = container.querySelector<HTMLButtonElement>('#btn-multi-mode-transform');
+    const btnMultiModeMove = container.querySelector<HTMLButtonElement>('#btn-multi-mode-move');
+    const btnMultiModeScale = container.querySelector<HTMLButtonElement>('#btn-multi-mode-scale');
     const btnMultiModeRotate = container.querySelector<HTMLButtonElement>('#btn-multi-mode-rotate');
-    btnMultiModeTransform?.addEventListener('click', () => {
-      selectionTool.selectionMode = 'transform';
+    btnMultiModeMove?.addEventListener('click', () => {
+      selectionTool.selectionMode = 'move';
+      callbacks.onRenderOverlay?.();
+      onReRender();
+    });
+    btnMultiModeScale?.addEventListener('click', () => {
+      selectionTool.selectionMode = 'scale';
       callbacks.onRenderOverlay?.();
       onReRender();
     });

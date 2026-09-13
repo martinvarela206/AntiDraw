@@ -103,14 +103,14 @@ export class SelectionTool {
     this.customPivot = null;
     this.selectedElementIds.delete(id);
     if (this.selectedElementIds.size === 0) {
-      this.selectionMode = 'transform';
+      this.selectionMode = 'move';
     }
   }
 
   public deselectAll(): void {
     this.customPivot = null;
     this.selectedElementIds.clear();
-    this.selectionMode = 'transform';
+    this.selectionMode = 'move';
   }
 
   public getPivot(box: BoundingBox): Point {
@@ -505,7 +505,7 @@ export class SelectionTool {
     pt: Point,
     handleRadius: number = 12,
     rotateOffset: number = 20,
-    mode: 'transform' | 'rotate' = 'transform'
+    mode: 'move' | 'scale' | 'rotate' | 'transform' = 'scale'
   ): HandleType | null {
     if (mode === 'rotate') {
       const rotHandles: { type: HandleType; x: number; y: number }[] = [

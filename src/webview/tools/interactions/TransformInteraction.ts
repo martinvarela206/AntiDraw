@@ -146,6 +146,21 @@ export class TransformInteraction {
       }
     });
     this.ghostTransformMap.clear();
+    /**
+     * ARCHITECTURAL RATIONALE: Instant Ghost Pre-Allocation on Drag Start
+     * Populating ghostTransformMap at rotation initiation guarantees immediate visual feedback
+     * upon handle press without waiting for the first mouse movement delta.
+     */
+    this.initialElementsMap.forEach((origVerts, id) => {
+      this.ghostTransformMap.set(
+        id,
+        origVerts.map((v) => ({
+          ...v,
+          handleIn: v.handleIn ? { ...v.handleIn } : undefined,
+          handleOut: v.handleOut ? { ...v.handleOut } : undefined,
+        }))
+      );
+    });
   }
 
   public onPointerMove(
@@ -635,24 +650,25 @@ export class TransformInteraction {
           html += `<line x1="${groupBox.cx}" y1="${groupBox.cy}" x2="${pivot.x}" y2="${pivot.y}" stroke="${leverColor}" stroke-width="1" stroke-dasharray="2 2" opacity="0.75" vector-effect="non-scaling-stroke" />`;
         }
 
-        const pR = 5.5 / z;
-        const tick = 8.5 / z;
-        const pColor = mode === 'rotate' ? '#f59e0b' : '#0284c7';
-        const pCursor = 'move';
-        const pPointerEvents = mode !== 'scale' ? 'auto' : 'none';
-        const pOpacity = mode !== 'scale' ? '1.0' : '0.65';
+        if (mode !== 'scale') {
+          const pR = 5.5 / z;
+          const tick = 8.5 / z;
+          const pColor = mode === 'rotate' ? '#f59e0b' : '#0284c7';
+          const pCursor = 'move';
+          const pPointerEvents = 'auto';
+          const pOpacity = '1.0';
 
-        html += `
-          <g class="selection-pivot-marker" style="cursor: ${pCursor}; pointer-events: ${pPointerEvents};" opacity="${pOpacity}">
-            <circle cx="${pivot.x}" cy="${pivot.y}" r="${pR}" fill="#ffffff" stroke="${pColor}" stroke-width="1.5" vector-effect="non-scaling-stroke" />
-            <line x1="${pivot.x - tick}" y1="${pivot.y}" x2="${pivot.x + tick}" y2="${pivot.y}" stroke="${pColor}" stroke-width="1.2" vector-effect="non-scaling-stroke" />
-            <line x1="${pivot.x}" y1="${pivot.y - tick}" x2="${pivot.x}" y2="${pivot.y + tick}" stroke="${pColor}" stroke-width="1.2" vector-effect="non-scaling-stroke" />
-            <circle cx="${pivot.x}" cy="${pivot.y}" r="${1.6 / z}" fill="${pColor}" />
-          </g>
-        `;
+          html += `
+            <g class="selection-pivot-marker" style="cursor: ${pCursor}; pointer-events: ${pPointerEvents};" opacity="${pOpacity}">
+              <circle cx="${pivot.x}" cy="${pivot.y}" r="${pR}" fill="#ffffff" stroke="${pColor}" stroke-width="1.5" vector-effect="non-scaling-stroke" />
+              <line x1="${pivot.x - tick}" y1="${pivot.y}" x2="${pivot.x + tick}" y2="${pivot.y}" stroke="${pColor}" stroke-width="1.2" vector-effect="non-scaling-stroke" />
+              <line x1="${pivot.x}" y1="${pivot.y - tick}" x2="${pivot.x}" y2="${pivot.y + tick}" stroke="${pColor}" stroke-width="1.2" vector-effect="non-scaling-stroke" />
+              <circle cx="${pivot.x}" cy="${pivot.y}" r="${1.6 / z}" fill="${pColor}" />
+            </g>
+          `;
+        }
 
         if (activeHandle === 'rotate' && this.rotationPivot) {
-          html += `<line x1="${pivot.x}" y1="${pivot.y}" x2="${groupBox.cx}" y2="${groupBox.y - rotOffset}" stroke="#f59e0b" stroke-width="1" stroke-dasharray="3 2" opacity="0.8" vector-effect="non-scaling-stroke" />`;
           if (this.currentRotationSnappedPt) {
             html += `<line x1="${pivot.x}" y1="${pivot.y}" x2="${this.currentRotationSnappedPt.x}" y2="${this.currentRotationSnappedPt.y}" stroke="#10b981" stroke-width="1.2" stroke-dasharray="3 2" opacity="0.9" vector-effect="non-scaling-stroke" />`;
           }

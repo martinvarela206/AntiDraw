@@ -210,9 +210,13 @@ export class OverlayRenderer {
       }
     }
 
-    // 5. Always visible vertices for all selected elements (Selection mode & Node mode)
+    // 5. Always visible vertices for all selected elements (Selection mode: 'move' & Node mode)
     const selectedEls = ctx.model.elements.filter((e) => ctx.selectionTool.isSelected(e.id));
-    if (selectedEls.length > 0 && !ctx.hasGhostNodeVertices) {
+    if (
+      selectedEls.length > 0 &&
+      !ctx.hasGhostNodeVertices &&
+      (ctx.activeTool === 'node' || ctx.selectionTool.selectionMode === 'move')
+    ) {
       selectedEls.forEach((el) => {
         if (el.vertices) {
           const isNodeMode = ctx.activeTool === 'node' && selectedEls.length === 1;
