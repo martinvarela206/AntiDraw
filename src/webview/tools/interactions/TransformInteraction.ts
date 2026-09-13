@@ -752,6 +752,14 @@ export class TransformInteraction {
       });
     }
 
+    if (activeHandle === 'rotate' && this.rotationPivot && selectedEls.length > 0) {
+      const gBox = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 16 / z);
+      if (gBox) {
+        const deg = (this.lastDeltaAngle * 180) / Math.PI;
+        html += `<rect x="${gBox.x}" y="${gBox.y}" width="${gBox.width}" height="${gBox.height}" transform="rotate(${deg}, ${this.rotationPivot.x}, ${this.rotationPivot.y})" fill="none" stroke="#6366f1" stroke-width="1.5" stroke-dasharray="4 4" vector-effect="non-scaling-stroke" />`;
+      }
+    }
+
     // Magnetic Snap Target Indicator during Vector or Guideline Rotation (FIX-08)
     if (this.currentRotationSnappedPt) {
       const sp = this.currentRotationSnappedPt;

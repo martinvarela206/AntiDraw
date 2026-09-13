@@ -85,9 +85,27 @@ export class SelectToolHandler implements IToolHandler {
     );
 
     const now = Date.now();
-    const isDoubleClick = now - this.lastClickTime < 300 && Math.hypot(pt.x - this.lastClickPt.x, pt.y - this.lastClickPt.y) < 5 / (this.ctx.canvasMgr.zoom || 1);
+    const timeSinceLast = now - this.lastClickTime;
+    const isDoubleClick = timeSinceLast < 350 && timeSinceLast > 40 && Math.hypot(pt.x - this.lastClickPt.x, pt.y - this.lastClickPt.y) < 5 / (this.ctx.canvasMgr.zoom || 1);
     this.lastClickTime = now;
     this.lastClickPt = { ...pt };
+
+    if (isDoubleClick && selectedEls.length > 0) {
+      const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, this.ctx.canvasMgr.zoom);
+      const z = this.ctx.canvasMgr.zoom || 1;
+      const groupBox = this.ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 16 / z);
+      const isInsideBox =
+        groupBox &&
+        pt.x >= groupBox.x &&
+        pt.x <= groupBox.x + groupBox.width &&
+        pt.y >= groupBox.y &&
+        pt.y <= groupBox.y + groupBox.height;
+
+      if ((hit && this.ctx.selectionTool.isSelected(hit.element.id)) || isInsideBox) {
+        this.transformInteraction.toggleSelectionMode(this.ctx, this.callbacks);
+        return true;
+      }
+    }
 
 
 
@@ -379,26 +397,8 @@ export class SelectToolHandler implements IToolHandler {
     if (currentHandle === 'move') {
       const moved = this.translateInteraction.onPointerUp(this.ctx, this.callbacks);
       if (!moved) {
-        /**
-         * ARCHITECTURAL RATIONALE: Synthetic Double-Click Detection (FIX-22)
-         * In complex SVG webview editors, native DOM `dblclick` events are frequently dropped by browsers
-         * if the event target node is re-rendered or unmounted during mousedown/mouseup cycles,
-         * or if pointer capture is acquired.
-         * Tracking click timestamps and coordinates here guarantees 100% reliable double-click detection
-         * to alternate between 'transform' and 'rotate' modes without event loss.
-         */
-        const now = Date.now();
-        const z = this.ctx.canvasMgr.zoom || 1;
-        const dist = Math.hypot(pt.x - this.lastClickPt.x, pt.y - this.lastClickPt.y);
-        if (now - this.lastClickTime < 350 && dist < 8 / z) {
-          this.transformInteraction.toggleSelectionMode(this.ctx, this.callbacks);
-          this.lastClickTime = 0;
-        } else {
-          this.lastClickTime = now;
-          this.lastClickPt = { x: pt.x, y: pt.y };
-        }
-      } else {
-        this.lastClickTime = 0;
+        this.lastClickTime = Date.now();
+        this.lastClickPt = { x: pt.x, y: pt.y };
       }
       return true;
     }
