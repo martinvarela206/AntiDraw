@@ -97,6 +97,7 @@ export class OverlayRenderer {
 
     // 2. Guide Lines Overlay (Always 1px width, inverted highlight on select, transform controls on double click)
     if (ctx.canvasMgr.showGuides) {
+      const visibleBounds = ctx.canvasMgr.visibleBoundsProvider?.();
       ctx.canvasMgr.guides.forEach((g) => {
         if (g.visible === false) return;
         const isSelected = g.id === ctx.canvasMgr.selectedGuideId;
@@ -106,7 +107,7 @@ export class OverlayRenderer {
         // Inverted color on selection (default cyan #00f0ff -> bright inverse red #ff1a40)
         const guideColor = isSelected ? '#ff1a40' : (g.color || '#00f0ff');
         const dashArray = isSelected ? 'none' : '4 2';
-        const geom = ctx.canvasMgr.getGuideGeometry(g, ctx.model.canvas.width, ctx.model.canvas.height);
+        const geom = ctx.canvasMgr.getGuideGeometry(g, ctx.model.canvas.width, ctx.model.canvas.height, visibleBounds);
 
         // Render full guide line across visible canvas span
         html += `<line x1="${geom.p1.x}" y1="${geom.p1.y}" x2="${geom.p2.x}" y2="${geom.p2.y}" stroke="${guideColor}" stroke-width="1" stroke-dasharray="${dashArray}" vector-effect="non-scaling-stroke" />`;

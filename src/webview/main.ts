@@ -151,6 +151,7 @@ class AntiDrawApp {
       model: this.model,
       onRender: () => this.render(),
       onApplyCanvasSize: () => this.applyCanvasSize(),
+      onRenderOverlay: () => this.renderOverlay(),
     });
 
     this.canvasMgr.visibleBoundsProvider = () => this.viewportCtrl.getVisibleCanvasBounds();
@@ -979,39 +980,48 @@ class AntiDrawApp {
 
     this.updateGridLayer();
 
-    // Update ruler sizes
-    setTimeout(() => {
-      this.rulerView.updateSize(workBounds.width, workBounds.height);
-      this.syncRulerScroll();
-    }, 0);
+    // Update ruler sizes synchronously without deferred setTimeout macrotasks
+    this.rulerView.updateSize(workBounds.width, workBounds.height);
+    this.syncRulerScroll();
   }
+
+  private lastGridCacheKey: string = '';
 
   /**
    * HISTORICAL PERFORMANCE ARCHITECTURE (FIX-12):
-   * Dedicated Isolated Grid Layer Update.
+   * Dedicated Isolated Grid Layer Update & Texture Cache.
    *
    * Previous Implementation:
    * Grid patterns (<defs><pattern>) and the large background <rect fill="url(...)"> were wiped
-   * and recreated inside `overlaySvg.innerHTML` during every pointer movement or hover.
-   * At zoom > 200%, destroying and re-rasterizing the pattern caused massive GPU pipeline stalls.
+   * and recreated inside `overlaySvg.innerHTML` or `gridSvg.innerHTML` during every zoom tick.
+   * At zoom > 200% (and up to 3000%), destroying and re-rasterizing the pattern caused massive GPU pipeline stalls.
    *
    * Solution:
-   * The grid SVG lives in its own dedicated `#grid-svg` container. `updateGridLayer()` is ONLY
-   * called when grid configuration (showGrid, spacing, color, alignment, type), ruler origin,
-   * zoom, or viewBox / working canvas boundaries are modified.
-   * During pointer movements, node dragging, and tool interactions, `#grid-svg` is NEVER touched,
-   * preserving 100% of GPU texture cache.
+   * The grid SVG lives in its own dedicated `#grid-svg` container.
+   * A cache key evaluates whether grid dimensions, ruler origin, or grid definitions have actually changed.
+   * During zoom scaling and panning, `userSpaceOnUse` SVG patterns remain fully valid in the GPU texture cache.
+   * `this.gridSvg.innerHTML` is strictly untouched, preserving 100% of GPU texture cache at steady 60/120fps.
    */
-  public updateGridLayer(): void {
+  public updateGridLayer(force: boolean = false): void {
     if (!this.gridSvg) return;
     if (!this.canvasMgr.showGrid) {
-      this.gridSvg.innerHTML = '';
+      if (this.lastGridCacheKey !== '__hidden__') {
+        this.gridSvg.innerHTML = '';
+        this.lastGridCacheKey = '__hidden__';
+      }
       return;
     }
     const vb = this.model.getViewBoxBounds();
     const workBounds = this.model.getWorkingCanvasBounds(80);
     const originX = vb.minX + (this.canvasMgr.rulerConfig.originX || 0);
     const originY = vb.minY + (this.canvasMgr.rulerConfig.originY || 0);
+
+    const cacheKey = `${workBounds.minX},${workBounds.minY},${workBounds.width},${workBounds.height},${originX},${originY},${this.canvasMgr.showGrid},${JSON.stringify(this.canvasMgr.grids)}`;
+    if (!force && this.lastGridCacheKey === cacheKey) {
+      return;
+    }
+    this.lastGridCacheKey = cacheKey;
+
     const gridData = this.canvasMgr.generateGridDefsAndLayers(workBounds, originX, originY);
 
     let html = '';

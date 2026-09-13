@@ -292,7 +292,12 @@ export class CanvasManager {
     this.guideManager.visibleBoundsProvider = val;
   }
 
-  public getGuideGeometry(guide: GuideLine, canvasW: number, canvasH: number): GuideGeometry {
-    return this.guideManager.getGuideGeometry(guide, canvasW, canvasH);
+  public getGuideGeometry(
+    guide: GuideLine,
+    canvasW: number,
+    canvasH: number,
+    visibleBounds?: { minX: number; minY: number; maxX: number; maxY: number }
+  ): GuideGeometry {
+    return this.guideManager.getGuideGeometry(guide, canvasW, canvasH, visibleBounds);
   }
 }
