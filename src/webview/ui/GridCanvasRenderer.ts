@@ -131,8 +131,8 @@ export class GridCanvasRenderer {
         for (let k = kStart; k <= kEnd; k++) {
           const wx = originX + k * S;
           const sx = Math.floor((wx - workBounds.minX) * zoom + cameraOffset.x) + 0.5;
-          this.ctx.moveTo(sx, canvasScreenTop);
-          this.ctx.lineTo(sx, canvasScreenBottom);
+          this.ctx.moveTo(sx, clipTop);
+          this.ctx.lineTo(sx, clipBottom);
         }
 
         // 2. Diagonal +45° lines: (Y - originY) - (X - originX) = k * S
@@ -191,8 +191,8 @@ export class GridCanvasRenderer {
         for (let k = kStart; k <= kEnd; k++) {
           const wx = originX + k * halfW;
           const sx = Math.floor((wx - workBounds.minX) * zoom + cameraOffset.x) + 0.5;
-          this.ctx.moveTo(sx, canvasScreenTop);
-          this.ctx.lineTo(sx, canvasScreenBottom);
+          this.ctx.moveTo(sx, clipTop);
+          this.ctx.lineTo(sx, clipBottom);
         }
 
         // 2. Positive 30° diagonals
@@ -246,8 +246,8 @@ export class GridCanvasRenderer {
         for (let k = kStart; k <= kEnd; k++) {
           const wx = originX + k * S;
           const sx = Math.floor((wx - workBounds.minX) * zoom + cameraOffset.x) + 0.5;
-          this.ctx.moveTo(sx, canvasScreenTop);
-          this.ctx.lineTo(sx, canvasScreenBottom);
+          this.ctx.moveTo(sx, clipTop);
+          this.ctx.lineTo(sx, clipBottom);
         }
 
         // 2. Horizontal lines
@@ -256,8 +256,8 @@ export class GridCanvasRenderer {
         for (let m = mStart; m <= mEnd; m++) {
           const wy = originY + m * S;
           const sy = Math.floor((wy - workBounds.minY) * zoom + cameraOffset.y) + 0.5;
-          this.ctx.moveTo(canvasScreenLeft, sy);
-          this.ctx.lineTo(canvasScreenRight, sy);
+          this.ctx.moveTo(clipLeft, sy);
+          this.ctx.lineTo(clipRight, sy);
         }
 
         this.ctx.stroke();
@@ -272,14 +272,14 @@ export class GridCanvasRenderer {
 
     const origSx = Math.floor((originX - workBounds.minX) * zoom + cameraOffset.x) + 0.5;
     if (origSx >= clipLeft && origSx <= clipRight) {
-      this.ctx.moveTo(origSx, canvasScreenTop);
-      this.ctx.lineTo(origSx, canvasScreenBottom);
+      this.ctx.moveTo(origSx, clipTop);
+      this.ctx.lineTo(origSx, clipBottom);
     }
 
     const origSy = Math.floor((originY - workBounds.minY) * zoom + cameraOffset.y) + 0.5;
     if (origSy >= clipTop && origSy <= clipBottom) {
-      this.ctx.moveTo(canvasScreenLeft, origSy);
-      this.ctx.lineTo(canvasScreenRight, origSy);
+      this.ctx.moveTo(clipLeft, origSy);
+      this.ctx.lineTo(clipRight, origSy);
     }
 
     this.ctx.stroke();

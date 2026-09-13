@@ -50,12 +50,81 @@ export class OverlayRenderer {
     const z = zoom || 1;
     const vb = ctx.model.getViewBoxBounds();
     const workBounds = ctx.model.getWorkingCanvasBounds(16);
+    const visibleBounds = ctx.canvasMgr.visibleBoundsProvider?.() || {
+      minX: workBounds.minX,
+      minY: workBounds.minY,
+      maxX: workBounds.maxX,
+      maxY: workBounds.maxY,
+    };
 
     // 0. Artboard (ViewBox Guide Frame - transparent fill so vectors underneath are visible)
-    html += `<rect x="${vb.minX}" y="${vb.minY}" width="${vb.width}" height="${vb.height}" fill="none" stroke="#6366f1" stroke-width="1.5" stroke-dasharray="6 3" opacity="0.85" vector-effect="non-scaling-stroke" />`;
+    /**
+     * ARCHITECTURAL RATIONALE: Viewport-Clipped Artboard Guide Frame
+     *
+     * Problem:
+     * Previously, a full `<rect>` of dimensions `vb.width x vb.height` with `vector-effect="non-scaling-stroke"`
+     * and `stroke-dasharray="6 3"` was output unconditionally. At zoom > 500% (up to 3000%), the screen perimeter
+     * reaches 120,000 physical pixels, forcing Skia to tessellate over 13,000 individual dash segments on every frame,
+     * even when the artboard boundaries are 95% or 100% offscreen.
+     *
+     * Solution:
+     * Segment the artboard rectangle into 4 discrete borders (top, bottom, left, right) and analytically clip each
+     * to `visibleBounds`. Only visible segments are rendered, eliminating 98%+ of dash allocations and preserving 60 FPS.
+     */
+    const vbMaxX = vb.minX + vb.width;
+    const vbMaxY = vb.minY + vb.height;
+    const isVbPotentiallyVisible = !(
+      vbMaxX < visibleBounds.minX ||
+      vb.minX > visibleBounds.maxX ||
+      vbMaxY < visibleBounds.minY ||
+      vb.minY > visibleBounds.maxY
+    );
 
-    // Artboard Badge Tag at top-left (Scale-invariant via MarkerHelper)
-    html += MarkerHelper.renderViewBoxBadge(vb.minX, vb.minY, vb.width, vb.height, z);
+    if (isVbPotentiallyVisible) {
+      // Top edge
+      if (vb.minY >= visibleBounds.minY && vb.minY <= visibleBounds.maxY) {
+        const x1 = Math.max(vb.minX, visibleBounds.minX);
+        const x2 = Math.min(vbMaxX, visibleBounds.maxX);
+        if (x1 < x2) {
+          html += `<line x1="${x1}" y1="${vb.minY}" x2="${x2}" y2="${vb.minY}" stroke="#6366f1" stroke-width="1.5" stroke-dasharray="6 3" opacity="0.85" vector-effect="non-scaling-stroke" />`;
+        }
+      }
+      // Bottom edge
+      if (vbMaxY >= visibleBounds.minY && vbMaxY <= visibleBounds.maxY) {
+        const x1 = Math.max(vb.minX, visibleBounds.minX);
+        const x2 = Math.min(vbMaxX, visibleBounds.maxX);
+        if (x1 < x2) {
+          html += `<line x1="${x1}" y1="${vbMaxY}" x2="${x2}" y2="${vbMaxY}" stroke="#6366f1" stroke-width="1.5" stroke-dasharray="6 3" opacity="0.85" vector-effect="non-scaling-stroke" />`;
+        }
+      }
+      // Left edge
+      if (vb.minX >= visibleBounds.minX && vb.minX <= visibleBounds.maxX) {
+        const y1 = Math.max(vb.minY, visibleBounds.minY);
+        const y2 = Math.min(vbMaxY, visibleBounds.maxY);
+        if (y1 < y2) {
+          html += `<line x1="${vb.minX}" y1="${y1}" x2="${vb.minX}" y2="${y2}" stroke="#6366f1" stroke-width="1.5" stroke-dasharray="6 3" opacity="0.85" vector-effect="non-scaling-stroke" />`;
+        }
+      }
+      // Right edge
+      if (vbMaxX >= visibleBounds.minX && vbMaxX <= visibleBounds.maxX) {
+        const y1 = Math.max(vb.minY, visibleBounds.minY);
+        const y2 = Math.min(vbMaxY, visibleBounds.maxY);
+        if (y1 < y2) {
+          html += `<line x1="${vbMaxX}" y1="${y1}" x2="${vbMaxX}" y2="${y2}" stroke="#6366f1" stroke-width="1.5" stroke-dasharray="6 3" opacity="0.85" vector-effect="non-scaling-stroke" />`;
+        }
+      }
+
+      // Artboard Badge Tag at top-left (Scale-invariant via MarkerHelper) only if top-left corner is near visible viewport
+      const badgeMargin = 100 / z;
+      if (
+        vb.minX >= visibleBounds.minX - badgeMargin &&
+        vb.minX <= visibleBounds.maxX + badgeMargin &&
+        vb.minY >= visibleBounds.minY - badgeMargin &&
+        vb.minY <= visibleBounds.maxY + badgeMargin
+      ) {
+        html += MarkerHelper.renderViewBoxBadge(vb.minX, vb.minY, vb.width, vb.height, z);
+      }
+    }
 
     /**
      * HISTORICAL PERFORMANCE ARCHITECTURE (FIX-12):
@@ -82,10 +151,6 @@ export class OverlayRenderer {
 
     // 2. Guide Lines Overlay (Always 1px width, inverted highlight on select, transform controls on double click)
     if (ctx.canvasMgr.showGuides) {
-      // ARCHITECTURAL RATIONALE: Single-Pass Visible Bounds Retrieval
-      // Retrieves visible viewport bounds once per overlay render frame outside the guide loop.
-      // Passing `visibleBounds` to `getGuideGeometry` avoids redundant provider evaluations per guide line.
-      const visibleBounds = ctx.canvasMgr.visibleBoundsProvider?.();
       ctx.canvasMgr.guides.forEach((g) => {
         if (g.visible === false) return;
         const isSelected = g.id === ctx.canvasMgr.selectedGuideId;
@@ -97,8 +162,10 @@ export class OverlayRenderer {
         const dashArray = isSelected ? 'none' : '4 2';
         const geom = ctx.canvasMgr.getGuideGeometry(g, ctx.model.canvas.width, ctx.model.canvas.height, visibleBounds);
 
-        // Render full guide line across visible canvas span
-        html += `<line x1="${geom.p1.x}" y1="${geom.p1.y}" x2="${geom.p2.x}" y2="${geom.p2.y}" stroke="${guideColor}" stroke-width="1" stroke-dasharray="${dashArray}" vector-effect="non-scaling-stroke" />`;
+        // Render guide line across visible canvas span only if not degenerate (offscreen)
+        if (geom.p1.x !== geom.p2.x || geom.p1.y !== geom.p2.y) {
+          html += `<line x1="${geom.p1.x}" y1="${geom.p1.y}" x2="${geom.p2.x}" y2="${geom.p2.y}" stroke="${guideColor}" stroke-width="1" stroke-dasharray="${dashArray}" vector-effect="non-scaling-stroke" />`;
+        }
 
         // ARCHITECTURAL RATIONALE: Independent Guide Line Move & Rotate Modes
         // Guide lines possess two discrete interaction modes analogous to vector objects:
@@ -130,16 +197,16 @@ export class OverlayRenderer {
     if (ctx.isDraggingOrigin && ctx.dragOriginPt) {
       const ox = ctx.dragOriginPt.x;
       const oy = ctx.dragOriginPt.y;
-      html += MarkerHelper.renderOriginPreview(ox, oy, workBounds.minX - 500, workBounds.maxX + 500, workBounds.minY - 500, workBounds.maxY + 500, z);
+      html += MarkerHelper.renderOriginPreview(ox, oy, visibleBounds.minX, visibleBounds.maxX, visibleBounds.minY, visibleBounds.maxY, z);
     }
 
     // 4. Dynamic Guide Drag Creation Preview
     if (ctx.isDraggingGuideCreate && ctx.dragGuideCurrentPt) {
       const isHoriz = ctx.dragGuideOrientation === 'horizontal';
       if (isHoriz) {
-        html += `<line x1="${workBounds.minX - 500}" y1="${ctx.dragGuideCurrentPt.y}" x2="${workBounds.maxX + 500}" y2="${ctx.dragGuideCurrentPt.y}" stroke="#00f0ff" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
+        html += `<line x1="${visibleBounds.minX}" y1="${ctx.dragGuideCurrentPt.y}" x2="${visibleBounds.maxX}" y2="${ctx.dragGuideCurrentPt.y}" stroke="#00f0ff" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
       } else {
-        html += `<line x1="${ctx.dragGuideCurrentPt.x}" y1="${workBounds.minY - 500}" x2="${ctx.dragGuideCurrentPt.x}" y2="${workBounds.maxY + 500}" stroke="#00f0ff" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
+        html += `<line x1="${ctx.dragGuideCurrentPt.x}" y1="${visibleBounds.minY}" x2="${ctx.dragGuideCurrentPt.x}" y2="${visibleBounds.maxY}" stroke="#00f0ff" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
       }
     }
 

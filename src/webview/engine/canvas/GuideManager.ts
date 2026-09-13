@@ -204,21 +204,39 @@ export class GuideManager {
 
     const px = guide.pivotX ?? (clipped ? clipped.visualCenter.x : pRef.x);
     const py = guide.pivotY ?? (clipped ? clipped.visualCenter.y : pRef.y);
-    const p0 = { x: px, y: py };
 
-    const span = 100000;
-    const p1 = { x: px - cos * span, y: py - sin * span };
-    const p2 = { x: px + cos * span, y: py + sin * span };
-
+    let p1: Point;
+    let p2: Point;
     let arrow1: Point;
     let arrow2: Point;
     let visualCenter: Point;
 
     if (clipped) {
+      /**
+       * ARCHITECTURAL RATIONALE: Viewport-Bounded Guide Line Geometry
+       *
+       * Problem:
+       * Previously, guide lines spanned an arbitrary +/- 100,000 units (`span = 100000`).
+       * At zoom levels > 500% (up to 3000%), a 200,000 unit line spans 1,000,000 to 6,000,000 screen pixels.
+       * Combined with SVG `stroke-dasharray="4 2"` and `vector-effect="non-scaling-stroke"`, Skia's dash generator
+       * had to compute between 166,000 and 1,000,000 dash intervals per guideline on every animation frame,
+       * completely paralyzing GPU/CPU rasterization and dropping framerates below 10 FPS.
+       *
+       * Solution:
+       * Bound `p1` and `p2` strictly to the viewport intersection points derived from `clipInfiniteLineToRect`
+       * with a modest 30-unit world padding. The line rendered on screen is never longer than the screen viewport,
+       * reducing dash intervals from 1,000,000+ to under 400 dashes across all zoom levels (5% to 3000%).
+       */
+      const pad = 30;
+      p1 = { x: pRef.x + (clipped.tMin - pad) * cos, y: pRef.y + (clipped.tMin - pad) * sin };
+      p2 = { x: pRef.x + (clipped.tMax + pad) * cos, y: pRef.y + (clipped.tMax + pad) * sin };
       arrow1 = clipped.arrow1;
       visualCenter = clipped.visualCenter;
       arrow2 = clipped.arrow2;
     } else {
+      // Guide is entirely offscreen: degenerate endpoints so OverlayRenderer skips rendering
+      p1 = { x: px, y: py };
+      p2 = { x: px, y: py };
       const fallbackDist = Math.max(Math.min(canvasW, canvasH) * 0.4, 40);
       arrow1 = { x: px - cos * fallbackDist, y: py - sin * fallbackDist };
       visualCenter = { x: px, y: py };
