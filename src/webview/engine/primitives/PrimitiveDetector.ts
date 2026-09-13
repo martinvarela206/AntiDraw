@@ -169,7 +169,16 @@ export class PrimitiveDetector {
       element.attributes.cx = formatNum(cx);
       element.attributes.cy = formatNum(cy);
       if (tag === 'circle') {
-        element.attributes.r = formatNum((rx + ry) / 2);
+        if (Math.abs(rx - ry) > 0.5) {
+          element.tagName = 'ellipse';
+          element.shapeType = 'ellipse';
+          element.attributes['data-shape'] = 'ellipse';
+          delete element.attributes.r;
+          element.attributes.rx = formatNum(rx);
+          element.attributes.ry = formatNum(ry);
+        } else {
+          element.attributes.r = formatNum((rx + ry) / 2);
+        }
       } else {
         element.attributes.rx = formatNum(rx);
         element.attributes.ry = formatNum(ry);

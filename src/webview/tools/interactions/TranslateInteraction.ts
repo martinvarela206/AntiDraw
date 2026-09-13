@@ -175,7 +175,14 @@ export class TranslateInteraction {
           const isClosed = ctx.model.isElementClosed(el);
           el.attributes.d = ctx.model.compilePathD(el.vertices, isClosed);
           if (ctx.model.isParametricElement(el)) {
-            ctx.model.syncParametricAttributes(el);
+            if (el.attributes['data-ellipse-type'] === 'pie' || el.attributes['data-ellipse-type'] === 'arc') {
+              const oldCx = parseFloat(el.attributes.cx || '0');
+              const oldCy = parseFloat(el.attributes.cy || '0');
+              el.attributes.cx = (oldCx + this.ghostDragOffset!.x).toString();
+              el.attributes.cy = (oldCy + this.ghostDragOffset!.y).toString();
+            } else {
+              ctx.model.syncParametricAttributes(el);
+            }
           }
         }
       });

@@ -481,6 +481,21 @@ export class TransformInteraction {
       this.ghostTransformMap.forEach((transformedVerts, id) => {
         const el = ctx.model.elements.find((e) => e.id === id);
         if (el) {
+          /**
+           * ARCHITECTURAL RATIONALE: Automatic Parametric De-Structuring on Rotation / Asymmetric Scale
+           * Standard SVG primitives (<rect>, <circle>, <ellipse>) and parametric arc/pie wedges are
+           * canonically axis-aligned. When rotated or transformed non-affinely, their geometry can no
+           * longer be represented by canonical SVG scalar attributes without introducing severe rendering divergence.
+           * De-structuring to freeform curves (`convertToCurves`) guarantees exact Bézier path rendering,
+           * faithful visual rotation matching the ghost preview, and flawless hit-testing without phantom displacement.
+           */
+          const isRotate = activeHandle === 'rotate';
+          const isPieOrArc = el.attributes['data-ellipse-type'] === 'pie' || el.attributes['data-ellipse-type'] === 'arc';
+
+          if (ctx.model.isParametricElement(el) && (isRotate || isPieOrArc)) {
+            ctx.model.convertToCurves(el);
+          }
+
           el.vertices = transformedVerts;
           const isClosed = ctx.model.isElementClosed(el);
           el.attributes.d = ctx.model.compilePathD(el.vertices, isClosed);
