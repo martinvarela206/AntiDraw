@@ -154,6 +154,9 @@ class AntiDrawApp {
       onRender: () => this.render(),
       onApplyCanvasSize: () => this.applyCanvasSize(),
       onRenderOverlay: () => this.renderOverlay(),
+      onZoomChanged: () => {
+        this.syncMetadataToHost();
+      }
     });
 
     this.canvasMgr.visibleBoundsProvider = () => this.viewportCtrl.getVisibleCanvasBounds();
@@ -471,6 +474,9 @@ class AntiDrawApp {
         }
         if (Array.isArray(payload.metadata.redoStack)) {
           this.redoStack = payload.metadata.redoStack.slice(-this.maxHistory);
+        }
+        if (payload.metadata.zoom !== undefined) {
+          this.canvasMgr.zoom = payload.metadata.zoom;
         }
         this.canvasContainer.classList.toggle('no-rulers', !this.canvasMgr.showRulers);
         this.topBar.update();
@@ -956,6 +962,7 @@ class AntiDrawApp {
       shapeConfig: this.canvasMgr.shapeConfig,
       undoStack: this.undoStack,
       redoStack: this.redoStack,
+      zoom: this.canvasMgr.zoom,
     });
   }
 
