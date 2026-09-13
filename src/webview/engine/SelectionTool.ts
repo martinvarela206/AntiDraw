@@ -213,146 +213,44 @@ export class SelectionTool {
   }
 
   /**
-   * ARCHITECTURAL RATIONALE: Exact Analytical Bounding Box with Markers & Stroke (FIX-24)
+   * ARCHITECTURAL RATIONALE: Pure Outermost Anchor Node Bounding Box
    *
-   * 1. The Core Problem:
-   *    Previously, `getBoundingBox` added a naive isotropic margin of `strokeWidth * 3.5` in all four
-   *    directions whenever any marker attribute was present. For a vector with stroke width 3-4 in a
-   *    32x32 ViewBox, this added 21-28 units of artificial width/height regardless of the actual
-   *    geometry, orientation, size, or tangent offset of the markers. Furthermore, vectors with
-   *    different marker offsets (e.g., offset 0 vs offset 4) yielded identical bounding boxes because
-   *    `data-marker-offset` was completely ignored.
+   * 1. Evolution from Complex Stroke/Marker Heuristics (FIX-24) to Pure Anchor Frame:
+   *    In previous iterations, `getBoundingBox` attempted to synthesize analytical bounding envelopes
+   *    encompassing all SVG rendering heuristics (stroke width half-thickness, miter joins at sharp angles,
+   *    marker polygons, and cubic Bézier curve extrema).
+   *    However, across heterogeneous geometries (e.g. stars with acute miter vertices, polylines with
+   *    different join types, and strokes with variable marker offsets), stroke and marker synthesis
+   *    frequently diverged from the user's intended anchor frame, making precise CAD alignment and
+   *    snapping to grid/guidelines highly unpredictable.
    *
-   * 2. The Analytical Solution:
-   *    - Path Extrema: Computes exact cubic Bézier curve extrema via `PathGeometryCompiler.computeVerticesBoundingBox`.
-   *    - Stroke Clearance: Expands the centerline bounds strictly by `strokeWidth / 2`.
-   *    - Marker Geometry Extraction: When `marker-start`, `marker-mid`, or `marker-end` are present,
-   *      evaluates the W3C SVG 2 limit tangents and synthesizes the exact 2D planar polygon vertices of
-   *      each marker using `StrokeOutlineGenerator.createMarkerPolygons(...)`.
-   *    - Full Modifiers Awareness: Evaluates `data-marker-offset`, `data-marker-size`, and `data-marker-units`
-   *      per marker, ensuring that shifting an arrowhead along its tangent expands or contracts the
-   *      bounding box to match the true physical extents of the drawn graphic.
-   *    - Mathematical Performance: Pure 2D affine projections executed in memory (< 0.01 ms) with zero
-   *      DOM reflows, preserving 60-120 FPS during continuous canvas interactions.
+   * 2. Designer-Centric Predictability:
+   *    The bounding box and selection handles adapt strictly to the outermost anchor vertices of the
+   *    vector (min/max X and Y of element.vertices). Visual decorations (stroke thickness, joins,
+   *    caps, and markers) are treated as stylistic properties that do not distort the underlying
+   *    geometric anchor frame.
+   *
+   * 3. Exact Snap-To Alignment:
+   *    When dragging scale handles, the outer anchor nodes of the vector land with sub-pixel
+   *    precision directly on grid intersections, guidelines, and other vector vertices.
    */
   public getBoundingBox(element: VectorElement): BoundingBox | null {
     if (!element.vertices || element.vertices.length === 0) return null;
-    const isClosed = element.isClosed ?? (element.attributes.d ? /z/i.test(element.attributes.d) : true);
-    const bounds = PathGeometryCompiler.computeVerticesBoundingBox(element.vertices, isClosed);
-    if (!bounds) return null;
 
-    let minX = bounds.minX;
-    let minY = bounds.minY;
-    let maxX = bounds.maxX;
-    let maxY = bounds.maxY;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
 
-    // 1. Exact stroke width expansion
-    const stroke = element.attributes['stroke'];
-    const strokeWidth = parseFloat(element.attributes['stroke-width'] || '1');
-    if (stroke && stroke !== 'none' && !isNaN(strokeWidth) && strokeWidth > 0) {
-      const halfW = strokeWidth / 2;
-      minX -= halfW;
-      minY -= halfW;
-      maxX += halfW;
-      maxY += halfW;
+    for (let i = 0; i < element.vertices.length; i++) {
+      const v = element.vertices[i];
+      if (v.x < minX) minX = v.x;
+      if (v.x > maxX) maxX = v.x;
+      if (v.y < minY) minY = v.y;
+      if (v.y > maxY) maxY = v.y;
     }
 
-    // 2. Exact planar marker polygons expansion
-    const markerStart = element.attributes['marker-start'];
-    const markerMid = element.attributes['marker-mid'];
-    const markerEnd = element.attributes['marker-end'];
-
-    if (markerStart || markerMid || markerEnd) {
-      const markerStartType = StrokeOutlineGenerator.parseMarkerType(markerStart);
-      const markerMidType = StrokeOutlineGenerator.parseMarkerType(markerMid);
-      const markerEndType = StrokeOutlineGenerator.parseMarkerType(markerEnd);
-
-      if (markerStartType !== 'none' || markerMidType !== 'none' || markerEndType !== 'none') {
-        const sw = !isNaN(strokeWidth) && strokeWidth > 0 ? strokeWidth : 1;
-        const markerOffset = parseFloat(element.attributes['data-marker-offset'] || '0') || 0;
-        const markerSize = element.attributes['data-marker-size'] ? parseFloat(element.attributes['data-marker-size']) : 6;
-        const markerUnits = element.attributes['data-marker-units'] || 'strokeWidth';
-
-        // Deconstruct element into subpaths
-        const subpaths: PathVertex[][] = [];
-        let currentSp: PathVertex[] = [];
-        element.vertices.forEach((v, idx) => {
-          if (v.command === 'M' && idx > 0) {
-            if (currentSp.length > 0) subpaths.push(currentSp);
-            currentSp = [v];
-          } else {
-            currentSp.push(v);
-          }
-        });
-        if (currentSp.length > 0) subpaths.push(currentSp);
-
-        const expandWithPolys = (polys: Polygon[]) => {
-          for (const poly of polys) {
-            for (const ring of poly) {
-              for (const pt of ring) {
-                if (pt[0] < minX) minX = pt[0];
-                if (pt[0] > maxX) maxX = pt[0];
-                if (pt[1] < minY) minY = pt[1];
-                if (pt[1] > maxY) maxY = pt[1];
-              }
-            }
-          }
-        };
-
-        for (const sp of subpaths) {
-          if (sp.length < 2) continue;
-
-          if (markerStartType !== 'none') {
-            const tan = StrokeOutlineGenerator.computeStartTangent(sp);
-            const polys = StrokeOutlineGenerator.createMarkerPolygons(
-              markerStartType,
-              sp[0],
-              tan,
-              sw,
-              markerOffset,
-              markerSize,
-              markerUnits
-            );
-            expandWithPolys(polys);
-          }
-
-          if (markerMidType !== 'none') {
-            const midCount = isClosed ? sp.length : sp.length - 1;
-            for (let i = 1; i < midCount; i++) {
-              const curr = sp[i];
-              const prev = sp[i - 1];
-              const next = isClosed && i === sp.length - 1 ? sp[0] : sp[i + 1];
-              const tan = StrokeOutlineGenerator.computeMidTangent(prev, curr, next);
-              const polys = StrokeOutlineGenerator.createMarkerPolygons(
-                markerMidType,
-                curr,
-                tan,
-                sw,
-                markerOffset,
-                markerSize,
-                markerUnits
-              );
-              expandWithPolys(polys);
-            }
-          }
-
-          if (markerEndType !== 'none') {
-            const anchor = isClosed ? sp[0] : sp[sp.length - 1];
-            const tan = StrokeOutlineGenerator.computeEndTangent(sp);
-            const polys = StrokeOutlineGenerator.createMarkerPolygons(
-              markerEndType,
-              anchor,
-              tan,
-              sw,
-              markerOffset,
-              markerSize,
-              markerUnits
-            );
-            expandWithPolys(polys);
-          }
-        }
-      }
-    }
+    if (minX === Infinity) return null;
 
     const width = Math.max(maxX - minX, 1);
     const height = Math.max(maxY - minY, 1);
