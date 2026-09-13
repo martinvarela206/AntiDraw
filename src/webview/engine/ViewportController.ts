@@ -13,6 +13,7 @@ export interface ViewportControllerOptions {
   onApplyCanvasSize: () => void;
   onRenderOverlay?: () => void;
   onZoomChanged?: (zoom: number) => void;
+  onCameraOffsetChanged?: (offset: Point) => void;
 }
 
 /**
@@ -56,6 +57,7 @@ export class ViewportController {
   private onApplyCanvasSize: () => void;
   private onRenderOverlay?: () => void;
   private onZoomChanged?: (zoom: number) => void;
+  private onCameraOffsetChanged?: (offset: Point) => void;
 
   public cameraOffset: Point = { x: 0, y: 0 };
   public isMiddlePanning: boolean = false;
@@ -73,6 +75,7 @@ export class ViewportController {
     this.onApplyCanvasSize = options.onApplyCanvasSize;
     this.onRenderOverlay = options.onRenderOverlay;
     this.onZoomChanged = options.onZoomChanged;
+    this.onCameraOffsetChanged = options.onCameraOffsetChanged;
 
     this.initEvents();
   }
@@ -360,6 +363,9 @@ export class ViewportController {
   public applyCameraTransform(): void {
     if (this.canvasWrapper) {
       this.canvasWrapper.style.transform = `translate(${this.cameraOffset.x}px, ${this.cameraOffset.y}px)`;
+    }
+    if (this.onCameraOffsetChanged) {
+      this.onCameraOffsetChanged(this.cameraOffset);
     }
   }
 

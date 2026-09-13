@@ -155,7 +155,10 @@ class AntiDrawApp {
       onApplyCanvasSize: () => this.applyCanvasSize(),
       onRenderOverlay: () => this.renderOverlay(),
       onZoomChanged: () => {
-        this.syncMetadataToHost();
+        this.syncMetadataToHostDebounced();
+      },
+      onCameraOffsetChanged: () => {
+        this.syncMetadataToHostDebounced();
       }
     });
 
@@ -490,7 +493,13 @@ class AntiDrawApp {
       if (!this.hasInitialCentered) {
         this.hasInitialCentered = true;
         setTimeout(() => {
-          this.recenterViewBox();
+          if (payload.metadata?.cameraOffset) {
+            this.viewportCtrl.cameraOffset = { ...payload.metadata.cameraOffset };
+            this.viewportCtrl.applyCameraTransform();
+            this.viewportCtrl.syncRulerScroll();
+          } else {
+            this.recenterViewBox();
+          }
         }, 40);
       }
     });
@@ -963,7 +972,19 @@ class AntiDrawApp {
       undoStack: this.undoStack,
       redoStack: this.redoStack,
       zoom: this.canvasMgr.zoom,
+      cameraOffset: this.viewportCtrl ? { x: this.viewportCtrl.cameraOffset.x, y: this.viewportCtrl.cameraOffset.y } : undefined,
     });
+  }
+
+  private metadataSyncTimeout: any = null;
+  private syncMetadataToHostDebounced(): void {
+    if (this.metadataSyncTimeout !== null) {
+      clearTimeout(this.metadataSyncTimeout);
+    }
+    this.metadataSyncTimeout = setTimeout(() => {
+      this.syncMetadataToHost();
+      this.metadataSyncTimeout = null;
+    }, 300);
   }
 
   private lastAppliedVb: string = '';
