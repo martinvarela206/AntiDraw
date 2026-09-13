@@ -953,7 +953,7 @@ class AntiDrawApp {
 
   private applyCanvasSize(): void {
     const zoom = this.canvasMgr.zoom || 1.0;
-    const workBounds = this.model.getWorkingCanvasBounds(80);
+    const workBounds = this.model.getWorkingCanvasBounds(16);
     const displayW = Math.round(workBounds.width * zoom);
     const displayH = Math.round(workBounds.height * zoom);
     const vb = `${workBounds.minX} ${workBounds.minY} ${workBounds.width} ${workBounds.height}`;
@@ -1010,7 +1010,7 @@ class AntiDrawApp {
     if (!this.gridCanvasRenderer || !this.canvasScrollArea) return;
 
     const vb = this.model.getViewBoxBounds();
-    const workBounds = this.model.getWorkingCanvasBounds(80);
+    const workBounds = this.model.getWorkingCanvasBounds(16);
     const originX = vb.minX + (this.canvasMgr.rulerConfig.originX || 0);
     const originY = vb.minY + (this.canvasMgr.rulerConfig.originY || 0);
     const zoom = this.canvasMgr.zoom || 1.0;

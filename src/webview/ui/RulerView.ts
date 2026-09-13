@@ -224,7 +224,7 @@ export class RulerView {
 
   private updateCursorMarkers(): void {
     const zoom = this.canvasMgr.zoom;
-    const workBounds = this.model.getWorkingCanvasBounds(80);
+    const workBounds = this.model.getWorkingCanvasBounds(16);
 
     if (this.currentCursorX !== null && this.topCursorMarker) {
       const curScreenX = Math.round(this.currentOffsetX + (this.currentCursorX - workBounds.minX) * zoom);
@@ -254,7 +254,7 @@ export class RulerView {
     const cfg = this.canvasMgr.rulerConfig;
     const zoom = this.canvasMgr.zoom;
     const vb = this.model.getViewBoxBounds();
-    const workBounds = this.model.getWorkingCanvasBounds(80);
+    const workBounds = this.model.getWorkingCanvasBounds(16);
 
     // Calculate ruler zero origin relative to ViewBox (default at top-left of ViewBox)
     const originCanvasX = vb.minX + (cfg.originX || 0);

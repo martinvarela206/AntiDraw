@@ -260,7 +260,7 @@ export class ViewportController {
 
     const zoom = this.canvasMgr.zoom || 1.0;
     const vb = this.model.getViewBoxBounds();
-    const workBounds = this.model.getWorkingCanvasBounds(80);
+    const workBounds = this.model.getWorkingCanvasBounds(16);
 
     const vbCenterX = (vb.minX + vb.width / 2 - workBounds.minX) * zoom;
     const vbCenterY = (vb.minY + vb.height / 2 - workBounds.minY) * zoom;
@@ -433,7 +433,7 @@ export class ViewportController {
     const areaW = this.canvasScrollArea?.clientWidth || 800;
     const areaH = this.canvasScrollArea?.clientHeight || 600;
     const zoom = this.canvasMgr.zoom || 1.0;
-    const workBounds = this.model.getWorkingCanvasBounds(80);
+    const workBounds = this.model.getWorkingCanvasBounds(16);
 
     const minX = (0 - this.cameraOffset.x) / zoom + workBounds.minX;
     const minY = (0 - this.cameraOffset.y) / zoom + workBounds.minY;

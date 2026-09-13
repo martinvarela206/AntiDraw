@@ -168,8 +168,18 @@ export class VectorModel {
     this.canvas.viewBox = `${minX} ${minY} ${width} ${height}`;
   }
 
-  // Calculate canvas bounds encompassing the ViewBox frame AND all vector elements
-  public getWorkingCanvasBounds(padding: number = 80): {
+  /**
+   * ARCHITECTURAL RATIONALE: Working Canvas Dynamic Bounds Expansion
+   *
+   * Calculates the minimum enclosing bounding box covering the artboard ViewBox frame
+   * and dynamically expands only to a tightly bounded 16px margin beyond any vector node
+   * extending outside the ViewBox in the workspace.
+   *
+   * Padding Rationale:
+   * A 16px margin provides comfortable clearance for selection outlines and transform handles
+   * without creating excessive dead space or inflating GPU rasterization textures.
+   */
+  public getWorkingCanvasBounds(padding: number = 16): {
     minX: number;
     minY: number;
     maxX: number;

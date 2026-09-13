@@ -57,7 +57,7 @@ export class OverlayRenderer {
     let html = '';
     const z = zoom || 1;
     const vb = ctx.model.getViewBoxBounds();
-    const workBounds = ctx.model.getWorkingCanvasBounds(80);
+    const workBounds = ctx.model.getWorkingCanvasBounds(16);
 
     // 0. Artboard (ViewBox Guide Frame - transparent fill so vectors underneath are visible)
     html += `<rect x="${vb.minX}" y="${vb.minY}" width="${vb.width}" height="${vb.height}" fill="none" stroke="#6366f1" stroke-width="1.5" stroke-dasharray="6 3" opacity="0.85" vector-effect="non-scaling-stroke" />`;
