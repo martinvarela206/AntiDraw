@@ -329,7 +329,9 @@ export class TransformInteraction {
           activeHandle as HandleType,
           dx,
           dy,
-          this.initialBoxPadding
+          this.initialBoxPadding,
+          e.shiftKey,
+          e.ctrlKey
         );
         this.ghostTransformMap.set(id, transformed);
       });
@@ -561,45 +563,62 @@ export class TransformInteraction {
       if (groupBox) {
         const mode = ctx.selectionTool.selectionMode;
         const boxStroke = mode === 'rotate' ? '#f59e0b' : '#38bdf8';
-        html += `<rect x="${groupBox.x}" y="${groupBox.y}" width="${groupBox.width}" height="${groupBox.height}" fill="none" stroke="${boxStroke}" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke" />`;
+        
+        if (mode !== 'move') {
+          html += `<rect x="${groupBox.x}" y="${groupBox.y}" width="${groupBox.width}" height="${groupBox.height}" fill="none" stroke="${boxStroke}" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke" />`;
 
-        const rotOffset = 18 / z;
+          const rotOffset = 18 / z;
 
-        if (mode === 'transform') {
-          const handles = [
-            { x: groupBox.x, y: groupBox.y },
-            { x: groupBox.cx, y: groupBox.y },
-            { x: groupBox.x + groupBox.width, y: groupBox.y },
-            { x: groupBox.x, y: groupBox.cy },
-            { x: groupBox.x + groupBox.width, y: groupBox.cy },
-            { x: groupBox.x, y: groupBox.y + groupBox.height },
-            { x: groupBox.cx, y: groupBox.y + groupBox.height },
-            { x: groupBox.x + groupBox.width, y: groupBox.y + groupBox.height },
-          ];
+          if (mode === 'scale') {
+            const handles = [
+              { x: groupBox.x, y: groupBox.y },
+              { x: groupBox.cx, y: groupBox.y },
+              { x: groupBox.x + groupBox.width, y: groupBox.y },
+              { x: groupBox.x, y: groupBox.cy },
+              { x: groupBox.x + groupBox.width, y: groupBox.cy },
+              { x: groupBox.x, y: groupBox.y + groupBox.height },
+              { x: groupBox.cx, y: groupBox.y + groupBox.height },
+              { x: groupBox.x + groupBox.width, y: groupBox.y + groupBox.height },
+            ];
 
-          const hSize = 7 / z;
-          const hHalf = hSize / 2;
-          const hRx = 1 / z;
-          handles.forEach((hPos) => {
-            html += `<rect x="${hPos.x - hHalf}" y="${hPos.y - hHalf}" width="${hSize}" height="${hSize}" fill="#ffffff" stroke="#0284c7" stroke-width="1" rx="${hRx}" vector-effect="non-scaling-stroke" />`;
-          });
+            const hSize = 7 / z;
+            const hHalf = hSize / 2;
+            const hRx = 1 / z;
+            handles.forEach((hPos) => {
+              html += `<rect x="${hPos.x - hHalf}" y="${hPos.y - hHalf}" width="${hSize}" height="${hSize}" fill="#ffffff" stroke="#0284c7" stroke-width="1" rx="${hRx}" vector-effect="non-scaling-stroke" />`;
+            });
+          } else if (mode === 'rotate') {
+            const rotR = 4 / z;
+            html += `<line x1="${groupBox.cx}" y1="${groupBox.y}" x2="${groupBox.cx}" y2="${groupBox.y - rotOffset}" stroke="#f59e0b" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
+            html += `<circle cx="${groupBox.cx}" cy="${groupBox.y - rotOffset}" r="${rotR}" fill="#f59e0b" stroke="#ffffff" stroke-width="1.2" vector-effect="non-scaling-stroke" style="cursor: grab;" />`;
+
+            const rotCorners = [
+              { x: groupBox.x, y: groupBox.y },
+              { x: groupBox.cx, y: groupBox.y },
+              { x: groupBox.x + groupBox.width, y: groupBox.y },
+              { x: groupBox.x, y: groupBox.cy },
+              { x: groupBox.x + groupBox.width, y: groupBox.cy },
+              { x: groupBox.x, y: groupBox.y + groupBox.height },
+              { x: groupBox.cx, y: groupBox.y + groupBox.height },
+              { x: groupBox.x + groupBox.width, y: groupBox.y + groupBox.height },
+            ];
+            rotCorners.forEach((c) => {
+              html += `<circle cx="${c.x}" cy="${c.y}" r="${rotR}" fill="#f59e0b" stroke="#ffffff" stroke-width="1.2" vector-effect="non-scaling-stroke" style="cursor: grab;" />`;
+            });
+          }
         } else {
-          const rotR = 4 / z;
-          html += `<line x1="${groupBox.cx}" y1="${groupBox.y}" x2="${groupBox.cx}" y2="${groupBox.y - rotOffset}" stroke="#f59e0b" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
-          html += `<circle cx="${groupBox.cx}" cy="${groupBox.y - rotOffset}" r="${rotR}" fill="#f59e0b" stroke="#ffffff" stroke-width="1.2" vector-effect="non-scaling-stroke" style="cursor: grab;" />`;
-
-          const rotCorners = [
-            { x: groupBox.x, y: groupBox.y },
-            { x: groupBox.x + groupBox.width, y: groupBox.y },
-            { x: groupBox.x, y: groupBox.y + groupBox.height },
-            { x: groupBox.x + groupBox.width, y: groupBox.y + groupBox.height },
-          ];
-          rotCorners.forEach((c) => {
-            html += `<circle cx="${c.x}" cy="${c.y}" r="${rotR}" fill="#f59e0b" stroke="#ffffff" stroke-width="1.2" vector-effect="non-scaling-stroke" style="cursor: grab;" />`;
+          // Mode: Move - Render vertices for visualization and snapping reference
+          const hSize = 5 / z;
+          selectedEls.forEach((el) => {
+            if (el.vertices) {
+              el.vertices.forEach((v) => {
+                html += `<circle cx="${v.x}" cy="${v.y}" r="${hSize}" fill="#ffffff" stroke="#38bdf8" stroke-width="1.5" vector-effect="non-scaling-stroke" style="pointer-events: none;" />`;
+              });
+            }
           });
         }
 
-        if (selectedEls.length === 1 && !ctx.selectionTool.customPivot && selectedEls[0].attributes['data-pivot']) {
+        if (selectedEls.length === 1 && !ctx.selectionTool.customPivot && ctx.selectionTool.elementPivots.has(selectedEls[0].id)) {
           ctx.selectionTool.restorePivotForElement(selectedEls[0]);
         }
         let pivot = ctx.selectionTool.getPivot(groupBox);
@@ -616,9 +635,9 @@ export class TransformInteraction {
         const pR = 5.5 / z;
         const tick = 8.5 / z;
         const pColor = mode === 'rotate' ? '#f59e0b' : '#0284c7';
-        const pCursor = mode === 'rotate' ? 'move' : 'default';
-        const pPointerEvents = mode === 'rotate' ? 'auto' : 'none';
-        const pOpacity = mode === 'rotate' ? '1.0' : '0.65';
+        const pCursor = 'move';
+        const pPointerEvents = mode !== 'scale' ? 'auto' : 'none';
+        const pOpacity = mode !== 'scale' ? '1.0' : '0.65';
 
         html += `
           <g class="selection-pivot-marker" style="cursor: ${pCursor}; pointer-events: ${pPointerEvents};" opacity="${pOpacity}">

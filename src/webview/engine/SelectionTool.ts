@@ -57,7 +57,8 @@ export class SelectionTool {
    *      exact SVG serialization, and seamless undo/redo snapshotting.
    */
   public customPivot: Point | null = null;
-  public selectionMode: 'transform' | 'rotate' = 'transform';
+  public selectionMode: 'move' | 'scale' | 'rotate' = 'scale';
+  public isAspectRatioLocked: boolean = false;
 
   // Backward compatibility getter & setter
   public get selectedElementId(): string | null {
@@ -79,7 +80,7 @@ export class SelectionTool {
   public select(id: string, element?: VectorElement): void {
     if (this.selectedElementIds.size !== 1 || !this.selectedElementIds.has(id)) {
       this.customPivot = null;
-      this.selectionMode = 'transform';
+      this.selectionMode = 'scale';
     }
     this.selectedElementIds.clear();
     this.selectedElementIds.add(id);
@@ -90,7 +91,7 @@ export class SelectionTool {
 
   public toggleSelect(id: string): void {
     this.customPivot = null;
-    this.selectionMode = 'transform';
+    this.selectionMode = 'scale';
     if (this.selectedElementIds.has(id)) {
       this.selectedElementIds.delete(id);
     } else {
@@ -116,13 +117,15 @@ export class SelectionTool {
     return this.customPivot ? { ...this.customPivot } : { x: box.cx, y: box.cy };
   }
 
+  public elementPivots: Map<string, Point> = new Map();
+
   /**
-   * Sets custom pivot and persists coordinates on element attributes when single element is selected.
+   * Sets custom pivot and persists coordinates for the element when single element is selected.
    */
   public setCustomPivotForElement(element: VectorElement | undefined, pt: Point): void {
     this.customPivot = { x: pt.x, y: pt.y };
     if (element) {
-      element.attributes['data-pivot'] = JSON.stringify({
+      this.elementPivots.set(element.id, {
         x: Math.round(pt.x * 100) / 100,
         y: Math.round(pt.y * 100) / 100,
       });
@@ -130,26 +133,22 @@ export class SelectionTool {
   }
 
   /**
-   * Restores custom pivot from element `data-pivot` attribute if present.
+   * Restores custom pivot for element if present in elementPivots.
    */
   public restorePivotForElement(element: VectorElement): void {
-    if (element.attributes && element.attributes['data-pivot']) {
-      try {
-        const parsed = JSON.parse(element.attributes['data-pivot']);
-        if (typeof parsed.x === 'number' && typeof parsed.y === 'number') {
-          this.customPivot = { x: parsed.x, y: parsed.y };
-        }
-      } catch {}
+    const pivot = this.elementPivots.get(element.id);
+    if (pivot) {
+      this.customPivot = { x: pivot.x, y: pivot.y };
     }
   }
 
   /**
-   * Resets custom pivot to null and cleans attribute from element if provided.
+   * Resets custom pivot to null and cleans it from elementPivots if provided.
    */
   public resetPivot(element?: VectorElement): void {
     this.customPivot = null;
-    if (element && element.attributes && element.attributes['data-pivot']) {
-      delete element.attributes['data-pivot'];
+    if (element) {
+      this.elementPivots.delete(element.id);
     }
   }
 
@@ -217,11 +216,23 @@ export class SelectionTool {
     const isClosed = element.isClosed ?? (element.attributes.d ? /z/i.test(element.attributes.d) : true);
     const bounds = PathGeometryCompiler.computeVerticesBoundingBox(element.vertices, isClosed);
     if (!bounds) return null;
+
+    let padding = 0;
+    const strokeWidth = parseFloat(element.attributes['stroke-width'] || '1');
+    if (!isNaN(strokeWidth)) {
+      padding += strokeWidth / 2;
+    }
+    
+    // Add extra padding if markers are used (e.g. arrow heads usually extend beyond path ends)
+    if (element.attributes['marker-start'] || element.attributes['marker-end']) {
+      padding += strokeWidth * 3; // Approx clearance for standard markers
+    }
+
     return {
-      x: bounds.minX,
-      y: bounds.minY,
-      width: bounds.width,
-      height: bounds.height,
+      x: bounds.minX - padding,
+      y: bounds.minY - padding,
+      width: bounds.width + padding * 2,
+      height: bounds.height + padding * 2,
       cx: bounds.cx,
       cy: bounds.cy,
     };
@@ -500,8 +511,12 @@ export class SelectionTool {
       const rotHandles: { type: HandleType; x: number; y: number }[] = [
         { type: 'rotate', x: box.cx, y: box.y - rotateOffset },
         { type: 'rotate', x: box.x, y: box.y },
+        { type: 'rotate', x: box.cx, y: box.y },
         { type: 'rotate', x: box.x + box.width, y: box.y },
+        { type: 'rotate', x: box.x, y: box.cy },
+        { type: 'rotate', x: box.x + box.width, y: box.cy },
         { type: 'rotate', x: box.x, y: box.y + box.height },
+        { type: 'rotate', x: box.cx, y: box.y + box.height },
         { type: 'rotate', x: box.x + box.width, y: box.y + box.height },
       ];
       for (const h of rotHandles) {
@@ -539,48 +554,89 @@ export class SelectionTool {
     handle: HandleType,
     dx: number,
     dy: number,
-    padding: number = 16
+    padding: number = 16,
+    fromCenter: boolean = false,
+    proportional: boolean = false
   ): PathVertex[] {
     let newX = initialBox.x;
     let newY = initialBox.y;
     let newW = initialBox.width;
     let newH = initialBox.height;
 
+    // Apply dx and dy based on handle, factoring in center-scaling (Shift)
     switch (handle) {
       case 'e':
-        newW += dx;
+        newW += fromCenter ? dx * 2 : dx;
+        if (fromCenter) newX -= dx;
         break;
       case 'w':
+        newW -= fromCenter ? dx * 2 : dx;
         newX += dx;
-        newW -= dx;
+        if (fromCenter) newX -= dx;
         break;
       case 's':
-        newH += dy;
+        newH += fromCenter ? dy * 2 : dy;
+        if (fromCenter) newY -= dy;
         break;
       case 'n':
+        newH -= fromCenter ? dy * 2 : dy;
         newY += dy;
-        newH -= dy;
+        if (fromCenter) newY -= dy;
         break;
       case 'se':
-        newW += dx;
-        newH += dy;
+        newW += fromCenter ? dx * 2 : dx;
+        newH += fromCenter ? dy * 2 : dy;
+        if (fromCenter) { newX -= dx; newY -= dy; }
         break;
       case 'nw':
+        newW -= fromCenter ? dx * 2 : dx;
+        newH -= fromCenter ? dy * 2 : dy;
         newX += dx;
-        newW -= dx;
         newY += dy;
-        newH -= dy;
+        if (fromCenter) { newX -= dx; newY -= dy; }
         break;
       case 'ne':
-        newW += dx;
+        newW += fromCenter ? dx * 2 : dx;
+        newH -= fromCenter ? dy * 2 : dy;
         newY += dy;
-        newH -= dy;
+        if (fromCenter) { newX -= dx; newY -= dy; }
         break;
       case 'sw':
+        newW -= fromCenter ? dx * 2 : dx;
+        newH += fromCenter ? dy * 2 : dy;
         newX += dx;
-        newW -= dx;
-        newH += dy;
+        if (fromCenter) { newX -= dx; newY -= dy; }
         break;
+    }
+
+    if (proportional) {
+      const ratio = initialBox.width / initialBox.height;
+      if (['n', 's'].includes(handle)) {
+        // Height drove the change, adjust width
+        const diffW = (newH * ratio) - newW;
+        newW = newH * ratio;
+        if (fromCenter) newX -= diffW / 2;
+        else if (handle === 's' || handle === 'n') newX -= diffW / 2; // For n/s, scaling proportionally should probably center the x expansion
+      } else if (['e', 'w'].includes(handle)) {
+        // Width drove the change, adjust height
+        const diffH = (newW / ratio) - newH;
+        newH = newW / ratio;
+        if (fromCenter) newY -= diffH / 2;
+        else if (handle === 'e' || handle === 'w') newY -= diffH / 2;
+      } else {
+        // Corner handles: pick the largest delta to preserve max bounds
+        if (newW / ratio > newH) {
+          const diffH = (newW / ratio) - newH;
+          newH = newW / ratio;
+          if (handle === 'nw' || handle === 'ne') newY -= diffH;
+          if (fromCenter) newY -= diffH / 2;
+        } else {
+          const diffW = (newH * ratio) - newW;
+          newW = newH * ratio;
+          if (handle === 'nw' || handle === 'sw') newX -= diffW;
+          if (fromCenter) newX -= diffW / 2;
+        }
+      }
     }
 
     const minDim = padding * 2 + 2;

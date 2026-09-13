@@ -24,8 +24,8 @@ export class GeometryInspector {
   ): string {
     const x = box ? Math.round(box.x) : 0;
     const y = box ? Math.round(box.y) : 0;
-    const w = box ? Math.round(box.width) : 0;
-    const h = box ? Math.round(box.height) : 0;
+    const w = box ? (Math.round(box.width * 100) / 100) : 0;
+    const h = box ? (Math.round(box.height * 100) / 100) : 0;
 
     return `
       <div class="panel-section">
@@ -33,21 +33,23 @@ export class GeometryInspector {
         <div class="prop-row">
           <span class="prop-label">Modo</span>
           <div style="display:flex; gap:4px; flex:1;">
-            <button class="prop-input" id="btn-mode-transform" style="flex:1; cursor:pointer; font-weight:600; ${selectionTool.selectionMode === 'transform' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Modo Mover y Redimensionar: muestra tiradores de escala y anclaje magnético por proximidad">⤢ Escalar</button>
-            <button class="prop-input" id="btn-mode-rotate" style="flex:1; cursor:pointer; font-weight:600; ${selectionTool.selectionMode === 'rotate' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Modo Rotación: muestra tiradores de giro y permite reubicar libremente el centro de rotación">↻ Rotar</button>
+            <button class="prop-input" id="btn-mode-move" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'move' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Modo Mover: Mover elementos y anclar vértices">✛</button>
+            <button class="prop-input" id="btn-mode-scale" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'scale' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Modo Escalar: Redimensionar con 8 tiradores">⤡</button>
+            <button class="prop-input" id="btn-mode-rotate" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'rotate' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Modo Rotar: Girar elementos interactivamente">↻</button>
           </div>
         </div>
         <div class="prop-row">
           <span class="prop-label">X</span>
-          <input type="number" class="prop-input" id="el-x" value="${x}" />
+          <input type="number" step="any" class="prop-input" id="el-x" value="${x}" />
           <span class="prop-label" style="width:20px; text-align:right;">Y</span>
-          <input type="number" class="prop-input" id="el-y" value="${y}" />
+          <input type="number" step="any" class="prop-input" id="el-y" value="${y}" />
         </div>
         <div class="prop-row">
           <span class="prop-label">W</span>
-          <input type="number" class="prop-input" id="el-w" value="${w}" />
+          <input type="number" step="any" class="prop-input" id="el-w" value="${w}" />
+          <button class="prop-input" id="btn-lock-aspect" style="width:30px; padding:2px; display:flex; justify-content:center; align-items:center; cursor:pointer; font-size:14px; background:${selectionTool.isAspectRatioLocked ? 'var(--accent-color)' : 'transparent'}; border:1px solid var(--border-color);" title="Bloquear proporción (W/H)">${selectionTool.isAspectRatioLocked ? '🔒' : '🔓'}</button>
           <span class="prop-label" style="width:20px; text-align:right;">H</span>
-          <input type="number" class="prop-input" id="el-h" value="${h}" />
+          <input type="number" step="any" class="prop-input" id="el-h" value="${h}" />
         </div>
         <div class="prop-row">
           <span class="prop-label">Pivot</span>
@@ -117,9 +119,31 @@ export class GeometryInspector {
     }
 
     if (elW && elH && box && el.vertices) {
-      const applySize = () => {
-        const targetW = Math.max(parseFloat(elW.value) || 1, 1);
-        const targetH = Math.max(parseFloat(elH.value) || 1, 1);
+      const lockBtn = container.querySelector<HTMLButtonElement>('#btn-lock-aspect');
+      if (lockBtn) {
+        lockBtn.addEventListener('click', () => {
+          selectionTool.isAspectRatioLocked = !selectionTool.isAspectRatioLocked;
+          callbacks.onRenderOverlay?.(); // Trigger save and UI update via main event loop
+          onReRender();
+        });
+      }
+
+      const aspectRatio = box.width && box.height ? box.width / box.height : 1;
+
+      const applySize = (changedAttr: 'w' | 'h') => {
+        let targetW = Math.max(parseFloat(elW.value) || 1, 1);
+        let targetH = Math.max(parseFloat(elH.value) || 1, 1);
+
+        if (selectionTool.isAspectRatioLocked) {
+          if (changedAttr === 'w') {
+            targetH = targetW / aspectRatio;
+            elH.value = targetH.toFixed(2);
+          } else {
+            targetW = targetH * aspectRatio;
+            elW.value = targetW.toFixed(2);
+          }
+        }
+
         const sx = targetW / (box.width || 1);
         const sy = targetH / (box.height || 1);
         el.vertices = el.vertices!.map((v) => ({
@@ -132,8 +156,8 @@ export class GeometryInspector {
         selectionTool.updatePivotOnScale(box, { ...box, width: targetW, height: targetH }, [el]);
         callbacks.onUpdateElement(el);
       };
-      elW.addEventListener('change', applySize);
-      elH.addEventListener('change', applySize);
+      elW.addEventListener('change', () => applySize('w'));
+      elH.addEventListener('change', () => applySize('h'));
     }
 
     const elPivotX = container.querySelector<HTMLInputElement>('#el-pivot-x');
@@ -164,10 +188,17 @@ export class GeometryInspector {
       });
     }
 
-    const btnModeTransform = container.querySelector<HTMLButtonElement>('#btn-mode-transform');
+    const btnModeMove = container.querySelector<HTMLButtonElement>('#btn-mode-move');
+    const btnModeScale = container.querySelector<HTMLButtonElement>('#btn-mode-scale');
     const btnModeRotate = container.querySelector<HTMLButtonElement>('#btn-mode-rotate');
-    btnModeTransform?.addEventListener('click', () => {
-      selectionTool.selectionMode = 'transform';
+    
+    btnModeMove?.addEventListener('click', () => {
+      selectionTool.selectionMode = 'move';
+      callbacks.onRenderOverlay?.();
+      onReRender();
+    });
+    btnModeScale?.addEventListener('click', () => {
+      selectionTool.selectionMode = 'scale';
       callbacks.onRenderOverlay?.();
       onReRender();
     });

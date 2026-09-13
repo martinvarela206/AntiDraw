@@ -481,6 +481,12 @@ class AntiDrawApp {
         if (payload.metadata.zoom !== undefined) {
           this.canvasMgr.zoom = payload.metadata.zoom;
         }
+        if (payload.metadata.isAspectRatioLocked !== undefined) {
+          this.selectionTool.isAspectRatioLocked = payload.metadata.isAspectRatioLocked;
+        }
+        if (payload.metadata.elementPivots) {
+          this.selectionTool.elementPivots = new Map(Object.entries(payload.metadata.elementPivots));
+        }
         this.canvasContainer.classList.toggle('no-rulers', !this.canvasMgr.showRulers);
         this.topBar.update();
       } else {
@@ -973,6 +979,8 @@ class AntiDrawApp {
       redoStack: this.redoStack,
       zoom: this.canvasMgr.zoom,
       cameraOffset: this.viewportCtrl ? { x: this.viewportCtrl.cameraOffset.x, y: this.viewportCtrl.cameraOffset.y } : undefined,
+      isAspectRatioLocked: this.selectionTool.isAspectRatioLocked,
+      elementPivots: Object.fromEntries(this.selectionTool.elementPivots),
     });
   }
 

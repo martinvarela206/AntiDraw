@@ -84,7 +84,26 @@ export class SelectToolHandler implements IToolHandler {
       this.ctx.selectionTool.isSelected(el.id)
     );
 
-    // 2. Modifier-based selection (Ctrl: Toggle select/deselect; Shift: Deselect)
+    const now = Date.now();
+    const isDoubleClick = now - this.lastClickTime < 300 && Math.hypot(pt.x - this.lastClickPt.x, pt.y - this.lastClickPt.y) < 5 / (this.ctx.canvasMgr.zoom || 1);
+    this.lastClickTime = now;
+    this.lastClickPt = { ...pt };
+
+    // 2. Double-click mode toggle
+    if (isDoubleClick && selectedEls.length > 0) {
+      const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, this.ctx.canvasMgr.zoom);
+      if (hit && this.ctx.selectionTool.isSelected(hit.element.id)) {
+        const modes: ('move' | 'scale' | 'rotate')[] = ['move', 'scale', 'rotate'];
+        const idx = modes.indexOf(this.ctx.selectionTool.selectionMode);
+        this.ctx.selectionTool.selectionMode = modes[(idx + 1) % modes.length];
+        this.callbacks.onClearPanelMode?.();
+        this.ctx.renderOverlay();
+        this.ctx.render();
+        return true;
+      }
+    }
+
+    // 3. Modifier-based selection (Ctrl: Toggle select/deselect; Shift: Deselect)
     if (e.ctrlKey || e.metaKey) {
       const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, this.ctx.canvasMgr.zoom);
       if (hit) {
@@ -117,7 +136,7 @@ export class SelectToolHandler implements IToolHandler {
       }
     }
 
-    // 3. Check hit on Arbitrary Rotation Pivot marker (ONLY in 'rotate' mode)
+    // 4. Check hit on Arbitrary Rotation Pivot marker (ONLY in 'rotate' mode)
     if (selectedEls.length > 0 && this.ctx.selectionTool.selectionMode === 'rotate') {
       const z = this.ctx.canvasMgr.zoom || 1;
       const groupBox = this.ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 16 / z);
@@ -130,7 +149,7 @@ export class SelectToolHandler implements IToolHandler {
       }
     }
 
-    // 4. Check hit on interactive radial gradient handles
+    // 5. Check hit on interactive radial gradient handles
     if (selectedEls.length === 1 && selectedEls[0].attributes['data-gradient']) {
       const el = selectedEls[0];
       try {
@@ -187,11 +206,11 @@ export class SelectToolHandler implements IToolHandler {
       } catch {}
     }
 
-    // 5. Check hit on bounding box handles (scale vs rotate)
+    // 6. Check hit on bounding box handles (scale vs rotate)
     if (selectedEls.length > 0) {
       const z = this.ctx.canvasMgr.zoom || 1;
       const groupBox = this.ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 16 / z);
-      if (groupBox) {
+      if (groupBox && this.ctx.selectionTool.selectionMode !== 'move') {
         const handle = this.ctx.selectionTool.hitTestHandle(
           groupBox,
           pt,
@@ -214,7 +233,7 @@ export class SelectToolHandler implements IToolHandler {
       }
     }
 
-    // 6. Hit test vector elements under cursor
+    // 7. Hit test vector elements under cursor
     const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, this.ctx.canvasMgr.zoom);
 
     // Case 1: Clicked on a different, unselected vector element -> switch selection
