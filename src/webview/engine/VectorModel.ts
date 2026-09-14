@@ -356,6 +356,10 @@ export class VectorModel {
     return PrimitiveDetector.isPolygon(el);
   }
 
+  public isStar(el: VectorElement): boolean {
+    return PrimitiveDetector.isStar(el);
+  }
+
   /**
    * Extracts corner curvature settings from an element's attributes.
    * Delegated to RectPrimitive.

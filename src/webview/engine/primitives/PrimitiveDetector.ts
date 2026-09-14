@@ -54,8 +54,13 @@ export class PrimitiveDetector {
     return el.tagName === 'polygon' || el.attributes?.['data-shape'] === 'polygon';
   }
 
+  public static isStar(el: VectorElement): boolean {
+    if (el.attributes?.['data-shape'] === 'path' || el.attributes?.['data-parametric'] === 'false') return false;
+    return el.tagName === 'star' || el.shapeType === 'star' || el.attributes?.['data-shape'] === 'star';
+  }
+
   /**
-   * ARCHITECTURAL RATIONALE: Hybrid Model Primitives & Parametric State Identification (FEAT-01)
+   * ARCHITECTURAL RATIONALE: Hybrid Model Primitives & Parametric State Identification (FEAT-01 & FEAT-07)
    */
   public static isParametricElement(el: VectorElement): boolean {
     if (el.isParametric === false) return false;
@@ -64,9 +69,9 @@ export class PrimitiveDetector {
       return false;
     }
     if (el.isParametric === true) return true;
-    if (el.shapeType && el.shapeType !== 'star') return true;
-    if (['rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon'].includes(el.tagName)) return true;
-    if (el.attributes && ['rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon'].includes(el.attributes['data-shape'])) {
+    if (el.shapeType) return true;
+    if (['rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'star'].includes(el.tagName)) return true;
+    if (el.attributes && ['rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'star'].includes(el.attributes['data-shape'])) {
       return true;
     }
     return false;
@@ -105,6 +110,18 @@ export class PrimitiveDetector {
       element.isClosed = true;
     }
 
+    if (this.isStar(element)) {
+      element.isParametric = false;
+      element.shapeType = 'path';
+      element.tagName = 'path';
+      element.attributes['data-shape'] = 'path';
+      element.attributes['data-parametric'] = 'false';
+      delete element.attributes['data-star-points'];
+      delete element.attributes['data-star-inner-ratio'];
+      delete element.attributes['points'];
+      delete element.attributes['innerRatio'];
+    }
+
     element.isParametric = false;
     element.shapeType = 'path';
     element.tagName = 'path';
@@ -117,7 +134,8 @@ export class PrimitiveDetector {
       element.attributes['data-node-types'] = element.vertices.map((v) => v.nodeType).join(',');
     }
     const shapeAttrs = [
-      'x', 'y', 'width', 'height', 'cx', 'cy', 'r', 'rx', 'ry', 'x1', 'y1', 'x2', 'y2', 'points',
+      'x', 'y', 'width', 'height', 'cx', 'cy', 'r', 'rx', 'ry', 'x1', 'y1', 'x2', 'y2', 'points', 'innerRatio',
+      'data-star-points', 'data-star-inner-ratio',
       'data-corner-mode', 'data-corner-unit', 'data-corner-radius', 'data-corner-tl', 'data-corner-tr', 'data-corner-br', 'data-corner-bl'
     ];
     shapeAttrs.forEach((attr) => delete element.attributes[attr]);
@@ -192,6 +210,22 @@ export class PrimitiveDetector {
       }
     } else if (tag === 'polygon' || tag === 'polyline') {
       element.attributes.points = element.vertices.map((v) => `${formatNum(v.x)},${formatNum(v.y)}`).join(' ');
+    } else if (tag === 'star' || element.attributes?.['data-shape'] === 'star') {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      element.vertices.forEach((v) => {
+        minX = Math.min(minX, v.x);
+        minY = Math.min(minY, v.y);
+        maxX = Math.max(maxX, v.x);
+        maxY = Math.max(maxY, v.y);
+      });
+      const cx = (minX + maxX) / 2;
+      const cy = (minY + maxY) / 2;
+      const rx = Math.max(1, (maxX - minX) / 2);
+      const ry = Math.max(1, (maxY - minY) / 2);
+      element.attributes.cx = formatNum(cx);
+      element.attributes.cy = formatNum(cy);
+      element.attributes.rx = formatNum(rx);
+      element.attributes.ry = formatNum(ry);
     }
   }
 
@@ -246,8 +280,8 @@ export class PrimitiveDetector {
       const cy = parseFloat(attrs.cy || '50');
       const rx = parseFloat(attrs.rx || attrs.r || '50');
       const ry = parseFloat(attrs.ry || attrs.r || '50');
-      const points = parseInt(attrs.points || '5', 10);
-      const innerRatio = parseFloat(attrs.innerRatio || '0.4');
+      const points = Math.max(3, Math.min(64, parseInt(attrs['data-star-points'] || attrs.points || '5', 10)));
+      const innerRatio = Math.max(0.05, Math.min(0.95, parseFloat(attrs['data-star-inner-ratio'] || attrs.innerRatio || '0.4')));
 
       for (let k = 0; k < points * 2; k++) {
         const angle = -Math.PI / 2 + (k * Math.PI) / points;

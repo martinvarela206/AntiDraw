@@ -352,7 +352,7 @@ export class ShapeToolHandler implements IToolHandler {
       'data-shape': tool,
     };
 
-    const isParametric = tool === 'rect' || tool === 'circle' || tool === 'ellipse' || tool === 'polygon';
+    const isParametric = tool === 'rect' || tool === 'circle' || tool === 'ellipse' || tool === 'polygon' || tool === 'star';
 
     if (tool === 'circle') {
       attributes['cx'] = formatNum(bounds.cx);
@@ -369,6 +369,17 @@ export class ShapeToolHandler implements IToolHandler {
       attributes['data-ellipse-type'] = 'ellipse';
       attributes['data-start-angle'] = '0';
       attributes['data-end-angle'] = '360';
+    } else if (tool === 'star') {
+      const starPts = (this.ctx.canvasMgr.shapeConfig?.starPoints || 5).toString();
+      const starRatio = (this.ctx.canvasMgr.shapeConfig?.starInnerRatio || 0.4).toString();
+      attributes['cx'] = formatNum(bounds.cx);
+      attributes['cy'] = formatNum(bounds.cy);
+      attributes['rx'] = formatNum(bounds.rx);
+      attributes['ry'] = formatNum(bounds.ry);
+      attributes['data-star-points'] = starPts;
+      attributes['data-star-inner-ratio'] = starRatio;
+      attributes['points'] = starPts;
+      attributes['innerRatio'] = starRatio;
     } else if (tool === 'polygon') {
       const pointsStr = vertices.map((v) => `${formatNum(v.x)},${formatNum(v.y)}`).join(' ');
       attributes['points'] = pointsStr;
@@ -393,7 +404,7 @@ export class ShapeToolHandler implements IToolHandler {
 
     return {
       id,
-      tagName: isParametric ? (tool as any) : 'path',
+      tagName: isParametric ? (tool === 'star' ? 'path' : (tool as any)) : 'path',
       attributes,
       vertices,
       isClosed,

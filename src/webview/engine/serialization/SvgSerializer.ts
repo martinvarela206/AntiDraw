@@ -472,13 +472,13 @@ export class SvgSerializer {
              */
             const isParametricPath =
               attrs['data-shape'] &&
-              ['rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon'].includes(attrs['data-shape']) &&
+              ['rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'star'].includes(attrs['data-shape']) &&
               attrs['data-parametric'] === 'true';
 
             if (isParametricPath) {
               elem.isParametric = true;
-              elem.shapeType = attrs['data-shape'] as ParametricShapeType;
-              elem.tagName = attrs['data-shape'];
+              elem.shapeType = attrs['data-shape'] as ParametricShapeType | 'star';
+              elem.tagName = attrs['data-shape'] === 'star' ? 'path' : attrs['data-shape'];
             } else {
               shapeAttrs.forEach((sa) => delete elem.attributes[sa]);
               elem.isParametric = false;
@@ -1001,6 +1001,22 @@ export class SvgSerializer {
             }
             svg += ` />\n`;
           }
+        } else if (cleanAttrs['data-shape'] === 'star') {
+          /**
+           * ARCHITECTURAL RATIONALE: Native Parametric Star Serialization (FEAT-07)
+           * Native SVG lacks a <star> element; serialize as compliant <path> carrying parametric metadata
+           * (data-shape="star", data-parametric="true", data-star-points, data-star-inner-ratio, cx, cy, rx, ry),
+           * guaranteeing standard SVG renderers display the exact polygon without losing re-editability in AntiDraw.
+           */
+          cleanAttrs.d = ctx.compilePathD(el.vertices || [], true);
+          cleanAttrs['data-shape'] = 'star';
+          cleanAttrs['data-parametric'] = 'true';
+          delete cleanAttrs['data-node-types'];
+          svg += `  <path`;
+          for (const [key, val] of Object.entries(cleanAttrs)) {
+            svg += ` ${key}="${escapeXml(val)}"`;
+          }
+          svg += ` />\n`;
         } else {
           delete cleanAttrs.d;
           delete cleanAttrs['data-node-types'];
