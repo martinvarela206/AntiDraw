@@ -49,7 +49,7 @@ import { EffectsInspector } from './inspectors/EffectsInspector.js';
 import { PrimitiveInspector } from './inspectors/PrimitiveInspector.js';
 import { NodeInspector } from './inspectors/NodeInspector.js';
 import { MultiSelectionInspector } from './inspectors/MultiSelectionInspector.js';
-import { StrokeInspector } from './inspectors/StrokeInspector.js';
+import { StrokeInspector, StrokeInspectorProps } from './inspectors/StrokeInspector.js';
 
 export class PropertyPanel {
   private container: HTMLElement;
@@ -203,8 +203,13 @@ export class PropertyPanel {
           this.currentPanelMode = 'node';
         }
       } else if (this.activeTool === 'stroke') {
-        this.currentPanelMode = 'stroke';
-        this.renderStrokeProperties(selectedEls[0]);
+        if (selectedEls.length === 1) {
+          this.currentPanelMode = 'stroke';
+          this.renderStrokeProperties(selectedEls[0]);
+        } else {
+          this.currentPanelMode = 'multi';
+          this.renderMultiElementProperties(selectedEls);
+        }
       } else if (selectedEls.length === 1) {
         this.currentPanelMode = 'element';
         this.renderElementProperties(selectedEls[0]);
@@ -551,6 +556,8 @@ export class PropertyPanel {
         gradientCss
       )}
 
+      ${StrokeInspector.renderHtml(el, this.getStrokeProps(el))}
+
       ${EffectsInspector.renderHtml(ds, is)}
 
       <div class="panel-section">
@@ -598,6 +605,14 @@ export class PropertyPanel {
       () => this.renderElementProperties(el)
     );
 
+    StrokeInspector.bindEvents(
+      this.container,
+      el,
+      this.model,
+      this.callbacks,
+      () => this.renderElementProperties(el)
+    );
+
     this.bindMouseDown('btn-prop-bool-union-single', () => this.callbacks.onBoolean && this.callbacks.onBoolean('union'));
     this.bindMouseDown('btn-prop-bool-subtract-single', () => this.callbacks.onBoolean && this.callbacks.onBoolean('subtract'));
     this.bindMouseDown('btn-prop-bool-intersect-single', () => this.callbacks.onBoolean && this.callbacks.onBoolean('intersect'));
@@ -620,8 +635,7 @@ export class PropertyPanel {
     `;
   }
 
-  // Render Dedicated Stroke Tool Properties for single selected vector
-  private renderStrokeProperties(el: VectorElement): void {
+  private getStrokeProps(el: VectorElement): StrokeInspectorProps {
     const stroke = el.attributes['stroke'] || '#ffffff';
     const strokeWidth = el.attributes['stroke-width'] || '1';
     const strokeDash = el.attributes['stroke-dasharray'] || '';
@@ -650,7 +664,7 @@ export class PropertyPanel {
     const markerLayer: 'over' | 'under' = paintOrder.includes('markers stroke') ? 'under' : 'over';
     const markerColor = el.attributes['data-marker-color'] || 'context-stroke';
 
-    this.container.innerHTML = StrokeInspector.renderHtml(el, {
+    return {
       stroke,
       strokeWidth,
       strokeDash,
@@ -665,7 +679,62 @@ export class PropertyPanel {
       markerUnits,
       markerLayer,
       markerColor,
-    });
+    };
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Modal Synchronization of Primitive & Geometry Inspectors (FEAT-08)
+   * Why Geometry and Primitive Inspectors must be integrated in Stroke tool mode:
+   * 1. When the user switches to the dedicated Stroke Tool (T) to fine-tune outline thickness, capping,
+   *    dashing, or markers on a parametric primitive (such as a star, rect, ellipse, polygon, or line),
+   *    the primitive controls (e.g., star points, inner ratio, corner radii, slice angles) and
+   *    bounding box geometry controls (X, Y, W, H, rotation, flip) must NOT be suppressed or hidden.
+   * 2. Naive modal isolation previously replaced the entire property panel with stroke-only controls,
+   *    forcing cumbersome back-and-forth tool switching and obscuring shape-defining parameters.
+   * 3. Unifying the presentation ensures full interactive continuity: the user can adjust both the
+   *    parametric primitive shape and its stroke attributes simultaneously in real time.
+   */
+  private renderStrokeProperties(el: VectorElement): void {
+    const isClosed = this.model.isElementClosed(el);
+    const box = this.selectionTool.getBoundingBox(el);
+    if (el.attributes['data-pivot'] && !this.selectionTool.customPivot) {
+      this.selectionTool.restorePivotForElement(el);
+    }
+    const pivot = box ? this.selectionTool.getPivot(box) : { x: 0, y: 0 };
+    const detectedPrimitive = !this.model.isParametricElement(el) && el.tagName === 'path'
+      ? this.model.detectPrimitiveFromPath(el)
+      : null;
+
+    const strokeProps = this.getStrokeProps(el);
+
+    this.container.innerHTML = `
+      ${GeometryInspector.renderHtml(el, this.model, this.selectionTool, box, pivot, isClosed, detectedPrimitive)}
+
+      ${PrimitiveInspector.renderElementPrimitives(el, this.model, box)}
+
+      ${StrokeInspector.renderHtml(el, strokeProps)}
+    `;
+
+    GeometryInspector.bindEvents(
+      this.container,
+      el,
+      this.model,
+      this.selectionTool,
+      box,
+      this.callbacks,
+      () => this.renderStrokeProperties(el),
+      detectedPrimitive
+    );
+
+    PrimitiveInspector.bindElementPrimitives(
+      this.container,
+      el,
+      this.model,
+      this.selectionTool,
+      box,
+      this.callbacks,
+      () => this.renderStrokeProperties(el)
+    );
 
     StrokeInspector.bindEvents(
       this.container,
