@@ -262,13 +262,14 @@ export class VectorModel {
     ry: number,
     type: 'ellipse' | 'pie' | 'arc' = 'ellipse',
     startAngleDeg: number = 0,
-    endAngleDeg: number = 360
+    endAngleDeg: number = 360,
+    innerRatio: number = 0
   ): string {
-    return EllipsePrimitive.compileEllipseD(cx, cy, rx, ry, type, startAngleDeg, endAngleDeg);
+    return EllipsePrimitive.compileEllipseD(cx, cy, rx, ry, type, startAngleDeg, endAngleDeg, innerRatio);
   }
 
   /**
-   * Generates unified PathVertex[] representation for ellipse, pie, or arc.
+   * Generates unified PathVertex[] representation for ellipse, pie, arc, or donut.
    * Delegated to EllipsePrimitive.
    */
   public convertEllipseToVertices(
@@ -278,9 +279,10 @@ export class VectorModel {
     ry: number,
     type: 'ellipse' | 'pie' | 'arc' = 'ellipse',
     startAngleDeg: number = 0,
-    endAngleDeg: number = 360
+    endAngleDeg: number = 360,
+    innerRatio: number = 0
   ): PathVertex[] {
-    return EllipsePrimitive.convertEllipseToVertices(cx, cy, rx, ry, type, startAngleDeg, endAngleDeg);
+    return EllipsePrimitive.convertEllipseToVertices(cx, cy, rx, ry, type, startAngleDeg, endAngleDeg, innerRatio);
   }
 
   /**

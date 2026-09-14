@@ -46,6 +46,7 @@ export class NodeToolHandler implements IToolHandler {
     | 'handleOut'
     | 'segment'
     | 'quadrant'
+    | 'ellipse-inner'
     | 'corner-tl'
     | 'corner-tr'
     | 'corner-br'
@@ -62,6 +63,9 @@ export class NodeToolHandler implements IToolHandler {
   public quadrantCenter: Point = { x: 0, y: 0 };
   public quadrantRadii: { rx: number; ry: number } = { rx: 1, ry: 1 };
   public quadrantGhostD: string = '';
+
+  // FEAT-10: Parametric Ellipse Inner Ratio (Donut/Ring) State
+  public ellipseInnerGhostRatio: number = 0;
 
   // FEAT-03: Parametric Rect Corner Radius Drag State
   public rectGhostD: string = '';
@@ -101,6 +105,38 @@ export class NodeToolHandler implements IToolHandler {
     return {
       x: cx + rx * Math.cos(rad),
       y: cy + ry * Math.sin(rad),
+    };
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Interactive Ellipse Inner Radius Control Handle (FEAT-10)
+   *
+   * Computes the canvas coordinate of the inner hole (donut/ring/annular sector) control handle.
+   * Positioned along the bisector angle of the arc/pie, or 0° for full ellipse/circle,
+   * at distance = innerRatio * radius from center (cx, cy).
+   * When innerRatio is 0 (solid circle), the handle sits at the center (cx, cy).
+   */
+  public getEllipseInnerHandlePoint(el: VectorElement): Point | null {
+    if (!this.ctx.model.isParametricElement(el) || !this.ctx.model.isEllipse(el)) return null;
+    const cx = parseFloat(el.attributes.cx || '0');
+    const cy = parseFloat(el.attributes.cy || '0');
+    const rx = parseFloat(el.attributes.rx || el.attributes.r || '1');
+    const ry = parseFloat(el.attributes.ry || el.attributes.r || '1');
+    const innerRatio = parseFloat(el.attributes['data-inner-ratio'] || '0');
+    const type = (el.attributes['data-ellipse-type'] as 'ellipse' | 'pie' | 'arc') || 'ellipse';
+    const startAngle = parseFloat(el.attributes['data-start-angle'] || '0');
+    const endAngle = parseFloat(el.attributes['data-end-angle'] || '360');
+
+    if (innerRatio <= 0) {
+      return { x: cx, y: cy };
+    }
+
+    const isFull = type === 'ellipse' || Math.abs(endAngle - startAngle) >= 360;
+    const midAngle = isFull ? 0 : (startAngle + endAngle) / 2;
+    const rad = (midAngle * Math.PI) / 180;
+    return {
+      x: cx + rx * innerRatio * Math.cos(rad),
+      y: cy + ry * innerRatio * Math.sin(rad),
     };
   }
 
@@ -294,22 +330,42 @@ export class NodeToolHandler implements IToolHandler {
     }
 
     if (selectedEl && selectedEl.vertices && selectedEl.vertices.length > 0) {
-      // 0. Check if clicking on parametric ellipse quadrant control handle (FEAT-02)
+      // 0. Check if clicking on parametric ellipse handles (FEAT-02 & FEAT-10)
       if (this.ctx.model.isParametricElement(selectedEl) && this.ctx.model.isEllipse(selectedEl)) {
+        const innerPt = this.getEllipseInnerHandlePoint(selectedEl);
         const qPt = this.getQuadrantHandlePoint(selectedEl);
-        if (qPt && Math.hypot(pt.x - qPt.x, pt.y - qPt.y) <= 12 / z) {
-          this.activeHandle = 'quadrant';
+        const cx = parseFloat(selectedEl.attributes.cx || '0');
+        const cy = parseFloat(selectedEl.attributes.cy || '0');
+        const rx = parseFloat(selectedEl.attributes.rx || selectedEl.attributes.r || '1');
+        const ry = parseFloat(selectedEl.attributes.ry || selectedEl.attributes.r || '1');
+        const currentInnerRatio = parseFloat(selectedEl.attributes['data-inner-ratio'] || '0');
+
+        if (innerPt && Math.hypot(pt.x - innerPt.x, pt.y - innerPt.y) <= 12 / z) {
+          this.activeHandle = 'ellipse-inner';
           this.dragStartPt = { x: pt.x, y: pt.y };
           this.initialVertices = JSON.parse(JSON.stringify(selectedEl.vertices));
-          const cx = parseFloat(selectedEl.attributes.cx || '0');
-          const cy = parseFloat(selectedEl.attributes.cy || '0');
-          const rx = parseFloat(selectedEl.attributes.rx || selectedEl.attributes.r || '1');
-          const ry = parseFloat(selectedEl.attributes.ry || selectedEl.attributes.r || '1');
           this.quadrantCenter = { x: cx, y: cy };
           this.quadrantRadii = { rx, ry };
           this.quadrantGhostMode = (selectedEl.attributes['data-ellipse-type'] as 'ellipse' | 'pie' | 'arc') || 'ellipse';
           this.quadrantGhostStartAngle = parseFloat(selectedEl.attributes['data-start-angle'] || '0');
           this.quadrantGhostEndAngle = parseFloat(selectedEl.attributes['data-end-angle'] || '360');
+          this.ellipseInnerGhostRatio = currentInnerRatio;
+          this.quadrantGhostD = selectedEl.attributes.d || '';
+          this.isDragging = true;
+          this.ctx.renderOverlay();
+          return true;
+        }
+
+        if (qPt && Math.hypot(pt.x - qPt.x, pt.y - qPt.y) <= 12 / z) {
+          this.activeHandle = 'quadrant';
+          this.dragStartPt = { x: pt.x, y: pt.y };
+          this.initialVertices = JSON.parse(JSON.stringify(selectedEl.vertices));
+          this.quadrantCenter = { x: cx, y: cy };
+          this.quadrantRadii = { rx, ry };
+          this.quadrantGhostMode = (selectedEl.attributes['data-ellipse-type'] as 'ellipse' | 'pie' | 'arc') || 'ellipse';
+          this.quadrantGhostStartAngle = parseFloat(selectedEl.attributes['data-start-angle'] || '0');
+          this.quadrantGhostEndAngle = parseFloat(selectedEl.attributes['data-end-angle'] || '360');
+          this.ellipseInnerGhostRatio = currentInnerRatio;
           this.quadrantGhostD = selectedEl.attributes.d || '';
           this.isDragging = true;
           this.ctx.renderOverlay();
@@ -511,7 +567,8 @@ export class NodeToolHandler implements IToolHandler {
           ry,
           mode,
           startAngle,
-          endAngle
+          endAngle,
+          this.ellipseInnerGhostRatio
         );
         this.quadrantGhostD = this.ctx.model.compileEllipseD(
           cx,
@@ -520,7 +577,57 @@ export class NodeToolHandler implements IToolHandler {
           ry,
           mode,
           startAngle,
-          endAngle
+          endAngle,
+          this.ellipseInnerGhostRatio
+        );
+
+        this.ctx.renderOverlay();
+        return true;
+      }
+
+      // FEAT-10: Interactive Inner Ratio (Donut/Ring) Dragging for Parametric Ellipse
+      if (this.activeHandle === 'ellipse-inner' && selectedEl) {
+        const cx = this.quadrantCenter.x;
+        const cy = this.quadrantCenter.y;
+        const rx = Math.max(1, this.quadrantRadii.rx);
+        const ry = Math.max(1, this.quadrantRadii.ry);
+
+        const dx = pt.x - cx;
+        const dy = pt.y - cy;
+        // Normalized radial distance from center
+        const D = Math.sqrt((dx / rx) ** 2 + (dy / ry) ** 2);
+        let ratio = Math.max(0, Math.min(0.95, D));
+
+        // Snap to solid circle (ratio = 0) if dragged close to center (< 0.05)
+        if (ratio < 0.05) {
+          ratio = 0;
+        } else if (isShift || isCtrl) {
+          ratio = Math.round(ratio * 20) / 20; // 5% step increments
+        } else {
+          ratio = Math.round(ratio * 100) / 100;
+        }
+
+        this.ellipseInnerGhostRatio = ratio;
+
+        this.ghostNodeVertices = this.ctx.model.convertEllipseToVertices(
+          cx,
+          cy,
+          rx,
+          ry,
+          this.quadrantGhostMode,
+          this.quadrantGhostStartAngle,
+          this.quadrantGhostEndAngle,
+          ratio
+        );
+        this.quadrantGhostD = this.ctx.model.compileEllipseD(
+          cx,
+          cy,
+          rx,
+          ry,
+          this.quadrantGhostMode,
+          this.quadrantGhostStartAngle,
+          this.quadrantGhostEndAngle,
+          ratio
         );
 
         this.ctx.renderOverlay();
@@ -771,6 +878,11 @@ export class NodeToolHandler implements IToolHandler {
           }
         }
 
+        const innerRatio = parseFloat(selectedEl.attributes['data-inner-ratio'] || '0');
+        if (innerRatio > 0) {
+          selectedEl.attributes['fill-rule'] = 'evenodd';
+        }
+
         selectedEl.vertices = this.ghostNodeVertices || this.initialVertices;
         selectedEl.attributes.d = this.quadrantGhostD || this.ctx.model.compileEllipseD(
           this.quadrantCenter.x,
@@ -779,7 +891,41 @@ export class NodeToolHandler implements IToolHandler {
           this.quadrantRadii.ry,
           this.quadrantGhostMode,
           this.quadrantGhostStartAngle,
-          this.quadrantGhostEndAngle
+          this.quadrantGhostEndAngle,
+          innerRatio
+        );
+        selectedEl.attributes['data-node-types'] = selectedEl.vertices.map((v) => v.nodeType).join(',');
+
+        this.activeHandle = null;
+        this.ghostNodeVertices = null;
+        this.quadrantGhostD = '';
+        this.initialVertices = [];
+        if (this.ctx.applyCanvasSize) this.ctx.applyCanvasSize();
+        this.ctx.render();
+        this.ctx.syncToHost();
+        return true;
+      }
+
+      // FEAT-10: Commit Interactive Inner Ratio for Parametric Ellipse
+      if (this.activeHandle === 'ellipse-inner' && selectedEl) {
+        this.ctx.pushUndo();
+        selectedEl.attributes['data-inner-ratio'] = this.ellipseInnerGhostRatio > 0 ? this.ellipseInnerGhostRatio.toString() : '0';
+        if (this.ellipseInnerGhostRatio > 0) {
+          selectedEl.attributes['fill-rule'] = 'evenodd';
+        } else {
+          delete selectedEl.attributes['fill-rule'];
+        }
+
+        selectedEl.vertices = this.ghostNodeVertices || this.initialVertices;
+        selectedEl.attributes.d = this.quadrantGhostD || this.ctx.model.compileEllipseD(
+          this.quadrantCenter.x,
+          this.quadrantCenter.y,
+          this.quadrantRadii.rx,
+          this.quadrantRadii.ry,
+          this.quadrantGhostMode,
+          this.quadrantGhostStartAngle,
+          this.quadrantGhostEndAngle,
+          this.ellipseInnerGhostRatio
         );
         selectedEl.attributes['data-node-types'] = selectedEl.vertices.map((v) => v.nodeType).join(',');
 
@@ -1164,6 +1310,41 @@ export class NodeToolHandler implements IToolHandler {
           <text x="${qx + 14}" y="${qy - 9}" font-size="10" fill="#fde68a" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" font-weight="600">${Math.round(this.quadrantGhostEndAngle)}° [${this.quadrantGhostMode.toUpperCase()}]</text>
         </g>
       `;
+    } else if (this.activeHandle === 'ellipse-inner') {
+      // 3c. Render Ellipse Inner Ratio Ghost during active inner handle dragging (FEAT-10)
+      const isArc = this.quadrantGhostMode === 'arc';
+      const fill = isArc ? 'none' : 'rgba(6, 182, 212, 0.2)';
+      const d = this.quadrantGhostD;
+      html += `<path d="${d}" fill="${fill}" fill-rule="evenodd" stroke="#06b6d4" stroke-width="2" stroke-dasharray="4 3" vector-effect="non-scaling-stroke" />`;
+      const cx = this.quadrantCenter.x;
+      const cy = this.quadrantCenter.y;
+      const rx = this.quadrantRadii.rx;
+      const ry = this.quadrantRadii.ry;
+      const ratio = this.ellipseInnerGhostRatio;
+
+      const isFull = this.quadrantGhostMode === 'ellipse' || Math.abs(this.quadrantGhostEndAngle - this.quadrantGhostStartAngle) >= 360;
+      const midAngle = isFull ? 0 : (this.quadrantGhostStartAngle + this.quadrantGhostEndAngle) / 2;
+      const midRad = (midAngle * Math.PI) / 180;
+      const inX = cx + rx * ratio * Math.cos(midRad);
+      const inY = cy + ry * ratio * Math.sin(midRad);
+
+      // Concentric inner ring/arc guide
+      if (ratio > 0) {
+        html += `<ellipse cx="${cx}" cy="${cy}" rx="${rx * ratio}" ry="${ry * ratio}" fill="none" stroke="#06b6d4" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
+      }
+      html += `<line x1="${cx}" y1="${cy}" x2="${inX}" y2="${inY}" stroke="#06b6d4" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
+      html += `<circle cx="${cx}" cy="${cy}" r="${3 / z}" fill="#06b6d4" />`;
+      html += `<circle cx="${inX}" cy="${inY}" r="${6 / z}" fill="#06b6d4" stroke="#ffffff" stroke-width="2" vector-effect="non-scaling-stroke" />`;
+
+      const badgeW = 92;
+      const badgeH = 18;
+      const pct = Math.round(ratio * 100);
+      html += `
+        <g opacity="0.95">
+          <rect x="${inX + 10}" y="${inY - 22}" width="${badgeW}" height="${badgeH}" rx="3" fill="#083344" stroke="#06b6d4" stroke-width="1" vector-effect="non-scaling-stroke" />
+          <text x="${inX + 14}" y="${inY - 9}" font-size="10" fill="#67e8f9" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" font-weight="600">Hueco: ${pct}%</text>
+        </g>
+      `;
     } else if (this.activeHandle && this.activeHandle.startsWith('corner-')) {
       // 3b. Render Rect Corner Ghost during active corner dragging (FEAT-03)
       const d = this.rectGhostD;
@@ -1219,14 +1400,24 @@ export class NodeToolHandler implements IToolHandler {
       }
     }
 
-    // 5. Quadrant handle on parametric ellipse when idle in Node Mode (FEAT-02)
+    // 5. Quadrant handle & Inner ratio handle on parametric ellipse when idle in Node Mode (FEAT-02 & FEAT-10)
     if (!this.ghostNodeVertices && !this.activeHandle && selectedEls.length === 1 && this.ctx.model.isParametricElement(selectedEls[0]) && this.ctx.model.isEllipse(selectedEls[0])) {
       const qPt = this.getQuadrantHandlePoint(selectedEls[0]);
       if (qPt) {
         html += `
-          <g style="cursor: crosshair;">
+          <g style="cursor: crosshair;" title="Tirador de Apertura Angular (Sweep / Arco)">
             <circle cx="${qPt.x}" cy="${qPt.y}" r="${6 / z}" fill="#f59e0b" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" />
             <circle cx="${qPt.x}" cy="${qPt.y}" r="${2.5 / z}" fill="#ffffff" />
+          </g>
+        `;
+      }
+
+      const innerPt = this.getEllipseInnerHandlePoint(selectedEls[0]);
+      if (innerPt) {
+        html += `
+          <g style="cursor: crosshair;" title="Tirador de Hueco Interior (Radio Interno / Rosca)">
+            <circle cx="${innerPt.x}" cy="${innerPt.y}" r="${5.5 / z}" fill="#06b6d4" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" />
+            <circle cx="${innerPt.x}" cy="${innerPt.y}" r="${2 / z}" fill="#ffffff" />
           </g>
         `;
       }

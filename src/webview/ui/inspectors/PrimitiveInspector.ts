@@ -175,6 +175,8 @@ export class PrimitiveInspector {
     const ellipseType = (el.attributes['data-ellipse-type'] as 'ellipse' | 'pie' | 'arc') || 'ellipse';
     const ellipseStartAngle = Math.round(parseFloat(el.attributes['data-start-angle'] || '0'));
     const ellipseEndAngle = Math.round(parseFloat(el.attributes['data-end-angle'] || '360'));
+    const ellipseInnerRatio = parseFloat(el.attributes['data-inner-ratio'] || '0');
+    const ellipseInnerPct = Math.round(ellipseInnerRatio * 100);
 
     const isRect = model.isRect(el);
     const w = box ? Math.round(box.width) : 0;
@@ -194,13 +196,17 @@ export class PrimitiveInspector {
     let html = '';
 
     if (isEllipse) {
+      const badgeText = ellipseInnerRatio > 0
+        ? (ellipseType === 'pie' ? '◔ Rosca parcial' : '🍩 Rosca')
+        : (ellipseType === 'pie' ? '◔ Tarta' : ellipseType === 'arc' ? '◜ Arco' : isCircle ? '● Círculo' : '⬭ Elipse');
+
       html += `
-      <!-- Ellipse / Circle Geometry Controls (FIX-19 & FEAT-02) -->
+      <!-- Ellipse / Circle Geometry Controls (FIX-19, FEAT-02 & FEAT-10) -->
       <div class="panel-section">
         <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
           <span>Elipse / Círculo</span>
           <span style="font-size:10px; color:var(--accent-color); font-weight:600; text-transform:none;">
-            ${ellipseType === 'pie' ? '◔ Tarta' : ellipseType === 'arc' ? '◜ Arco' : isCircle ? '● Círculo' : '⬭ Elipse'}
+            ${badgeText}
           </span>
         </div>
         <div class="prop-row" style="gap: 6px;">
@@ -254,6 +260,18 @@ export class PrimitiveInspector {
               </div>
             </div>
             <button class="prop-input" id="btn-ellipse-invert-angles" style="width: 26px; height: 26px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;" title="Invertir sector angular">⇄</button>
+          </div>
+        </div>
+        <!-- Donut / Ring Inner Ratio (FEAT-10) -->
+        <div class="prop-row" style="gap: 6px; margin-top: 6px;">
+          <span class="prop-label" style="width: 46px;" title="Radio interno para crear rosca/anillo o sector anular (0% a 95%)">Hueco</span>
+          <div style="display:flex; align-items:center; gap:6px; flex:1;">
+            <input type="range" id="ellipse-inner-ratio-slider" min="0" max="95" value="${ellipseInnerPct}" style="flex:1; cursor:pointer;" title="Deslizador de hueco interior" />
+            <div class="prop-coord-box" style="width:52px; flex-shrink:0;">
+              <input type="number" class="prop-coord-input" id="ellipse-inner-ratio-num" value="${ellipseInnerPct}" min="0" max="95" step="5" />
+              <span class="prop-coord-sublabel">%</span>
+            </div>
+            <button class="prop-input" id="btn-ellipse-inner-reset" style="width: 26px; height: 26px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;" title="Restablecer a círculo/sector sólido (0% hueco)">●</button>
           </div>
         </div>
         <div class="prop-row" style="gap: 6px; margin-top: 6px;">
@@ -467,6 +485,11 @@ export class PrimitiveInspector {
       const btnEllipseSwapRadii = container.querySelector<HTMLButtonElement>('#btn-ellipse-swap-radii');
       const btnEllipseToPath = container.querySelector<HTMLButtonElement>('#btn-ellipse-to-path');
 
+      const ellipseInnerRatio = parseFloat(el.attributes['data-inner-ratio'] || '0');
+      const innerSlider = container.querySelector<HTMLInputElement>('#ellipse-inner-ratio-slider');
+      const innerNum = container.querySelector<HTMLInputElement>('#ellipse-inner-ratio-num');
+      const btnInnerReset = container.querySelector<HTMLButtonElement>('#btn-ellipse-inner-reset');
+
       const applyEllipseGeometry = (
         newCx: number,
         newCy: number,
@@ -474,11 +497,13 @@ export class PrimitiveInspector {
         newRy: number,
         newType: 'ellipse' | 'pie' | 'arc' = ellipseType,
         newStart: number = ellipseStartAngle,
-        newEnd: number = ellipseEndAngle
+        newEnd: number = ellipseEndAngle,
+        newInnerRatio: number = ellipseInnerRatio
       ) => {
         if (callbacks.onPushUndo) callbacks.onPushUndo();
         const clampedRx = Math.max(1, newRx);
         const clampedRy = Math.max(1, newRy);
+        const clampedInner = Math.max(0, Math.min(0.95, newInnerRatio));
         el.attributes['data-shape'] = 'ellipse';
         el.attributes['cx'] = newCx.toString();
         el.attributes['cy'] = newCy.toString();
@@ -487,7 +512,14 @@ export class PrimitiveInspector {
         el.attributes['data-ellipse-type'] = newType;
         el.attributes['data-start-angle'] = newStart.toString();
         el.attributes['data-end-angle'] = newEnd.toString();
+        el.attributes['data-inner-ratio'] = clampedInner.toString();
         el.isClosed = newType !== 'arc';
+
+        if (clampedInner > 0) {
+          el.attributes['fill-rule'] = 'evenodd';
+        } else {
+          delete el.attributes['fill-rule'];
+        }
 
         if (newType === 'arc') {
           el.attributes.fill = 'none';
@@ -505,7 +537,8 @@ export class PrimitiveInspector {
           clampedRy,
           newType,
           newStart,
-          newEnd
+          newEnd,
+          clampedInner
         );
         el.attributes.d = model.compileEllipseD(
           newCx,
@@ -514,7 +547,8 @@ export class PrimitiveInspector {
           clampedRy,
           newType,
           newStart,
-          newEnd
+          newEnd,
+          clampedInner
         );
         el.attributes['data-node-types'] = el.vertices.map((v) => v.nodeType).join(',');
 
@@ -585,6 +619,29 @@ export class PrimitiveInspector {
       btnInvertAngles?.addEventListener('click', () => {
         applyEllipseGeometry(ellipseCx, ellipseCy, ellipseRx, ellipseRy, ellipseType === 'ellipse' ? 'pie' : ellipseType, ellipseEndAngle, ellipseStartAngle);
       });
+
+      if (innerSlider && innerNum) {
+        innerSlider.addEventListener('input', () => {
+          const valPct = parseFloat(innerSlider.value) || 0;
+          innerNum.value = valPct.toString();
+          applyEllipseGeometry(ellipseCx, ellipseCy, ellipseRx, ellipseRy, ellipseType, ellipseStartAngle, ellipseEndAngle, valPct / 100);
+        });
+
+        innerNum.addEventListener('change', () => {
+          let valPct = parseFloat(innerNum.value) || 0;
+          valPct = Math.max(0, Math.min(95, valPct));
+          innerSlider.value = valPct.toString();
+          applyEllipseGeometry(ellipseCx, ellipseCy, ellipseRx, ellipseRy, ellipseType, ellipseStartAngle, ellipseEndAngle, valPct / 100);
+        });
+      }
+
+      if (btnInnerReset) {
+        btnInnerReset.addEventListener('click', () => {
+          if (innerSlider) innerSlider.value = '0';
+          if (innerNum) innerNum.value = '0';
+          applyEllipseGeometry(ellipseCx, ellipseCy, ellipseRx, ellipseRy, ellipseType, ellipseStartAngle, ellipseEndAngle, 0);
+        });
+      }
 
       if (btnEllipseMakeCircle) {
         btnEllipseMakeCircle.addEventListener('click', () => {
