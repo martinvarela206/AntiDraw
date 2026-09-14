@@ -460,12 +460,27 @@ export class SvgSerializer {
             const nodeTypesStr = attrs['data-node-types'] || '';
             elem.vertices = ctx.parsePathD(attrs.d || '', nodeTypesStr);
             elem.isClosed = (attrs.d || '').toUpperCase().includes('Z');
-            shapeAttrs.forEach((sa) => delete elem.attributes[sa]);
-            if (attrs['data-shape'] && ['rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon'].includes(attrs['data-shape']) && attrs['data-parametric'] === 'true') {
+
+            /**
+             * ARCHITECTURAL RATIONALE: Parametric Path Attribute Preservation (FIX-22)
+             * Standard SVG 1.1 lacks native attributes for partial arcs, annular wedges, and custom corner radii
+             * on standard tags (<ellipse>, <rect>), so AntiDraw serializes them as compliant <path> elements with
+             * `data-shape="..."` and `data-parametric="true"`.
+             * Crucially, scalar geometric attributes (cx, cy, rx, ry, x, y, width, height) MUST NOT be deleted
+             * when ingesting parametric paths, otherwise all geometry inspector controls reset to 0 upon reload.
+             * Cleanup is strictly restricted to true freeform paths (`data-parametric !== 'true'`).
+             */
+            const isParametricPath =
+              attrs['data-shape'] &&
+              ['rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon'].includes(attrs['data-shape']) &&
+              attrs['data-parametric'] === 'true';
+
+            if (isParametricPath) {
               elem.isParametric = true;
               elem.shapeType = attrs['data-shape'] as ParametricShapeType;
               elem.tagName = attrs['data-shape'];
             } else {
+              shapeAttrs.forEach((sa) => delete elem.attributes[sa]);
               elem.isParametric = false;
               elem.shapeType = 'path';
             }
