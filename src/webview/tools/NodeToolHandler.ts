@@ -2,6 +2,7 @@ import { IToolHandler, ToolContext } from './IToolHandler.js';
 import { ToolType } from '../ui/Toolbar.js';
 import { Point, PathVertex, NodeType, VectorElement, RectCorners } from '../engine/VectorModel.js';
 import { NodeEditorTool } from '../engine/NodeEditorTool.js';
+import { ConfirmationModal } from '../ui/ConfirmationModal.js';
 
 export interface NodeToolCallbacks {
   onNodeSelected?: (vertex: PathVertex, element: VectorElement) => void;
@@ -178,6 +179,20 @@ export class NodeToolHandler implements IToolHandler {
     // keeping them as native <polyline>/<polygon> with their `points` attribute updated without Béziers.
     const isPoly = this.ctx.model.isPolyline(selectedEl) || this.ctx.model.isPolygon(selectedEl);
     if (this.ctx.model.isParametricElement(selectedEl) && !isPoly) {
+      ConfirmationModal.confirm({
+        title: 'Convertir Primitiva a Curvas',
+        message: `La figura <${selectedEl.shapeType || selectedEl.tagName}> es una primitiva paramétrica.`,
+        details: 'Para insertar, editar o eliminar vértices libres con la herramienta de Nodos, es necesario convertirla a curvas de Bézier. ¿Deseas convertirla ahora?',
+        confirmText: 'Convertir a Curvas',
+        cancelText: 'Cancelar',
+      }).then((confirmed) => {
+        if (confirmed) {
+          this.ctx.pushUndo();
+          this.ctx.model.convertToCurves(selectedEl);
+          this.ctx.render();
+          this.ctx.syncToHost();
+        }
+      });
       return true;
     }
 

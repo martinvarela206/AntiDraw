@@ -587,4 +587,121 @@ button.prop-input.active {
   margin: 4px 2px;
 }
 
+/* CONFIRMATION MODAL (FEAT-09) */
+.ad-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 11, 15, 0.75);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: adModalFadeIn 0.15s ease-out;
+}
+
+.ad-modal-container {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  width: 90%;
+  max-width: 420px;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  color: var(--text-main);
+  animation: adModalScaleIn 0.15s ease-out;
+}
+
+.ad-modal-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ad-modal-message {
+  font-size: 12px;
+  color: var(--text-main);
+  line-height: 1.5;
+}
+
+.ad-modal-details {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: rgba(0, 0, 0, 0.25);
+  border-left: 3px solid var(--accent-color);
+  padding: 8px 10px;
+  border-radius: 4px;
+  line-height: 1.4;
+}
+
+.ad-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.ad-modal-btn {
+  padding: 6px 14px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.12s ease;
+  user-select: none;
+}
+
+.ad-modal-btn:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 1px;
+}
+
+.ad-modal-btn-cancel {
+  background: transparent;
+  border-color: var(--border-color);
+  color: var(--text-muted);
+}
+
+.ad-modal-btn-cancel:hover {
+  background: var(--bg-panel-hover);
+  color: var(--text-main);
+}
+
+.ad-modal-btn-confirm.accent {
+  background: var(--accent-color);
+  color: #ffffff;
+}
+
+.ad-modal-btn-confirm.accent:hover {
+  background: var(--accent-hover);
+}
+
+.ad-modal-btn-confirm.danger {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.ad-modal-btn-confirm.danger:hover {
+  background: #b91c1c;
+}
+
+@keyframes adModalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes adModalScaleIn {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+
 

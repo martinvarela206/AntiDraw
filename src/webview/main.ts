@@ -17,6 +17,7 @@ import { TopBar } from './ui/TopBar.js';
 import { PropertyPanel } from './ui/PropertyPanel.js';
 import { RulerView } from './ui/RulerView.js';
 import { ContextMenu, ContextMenuItem } from './ui/ContextMenu.js';
+import { ConfirmationModal } from './ui/ConfirmationModal.js';
 import { GridCanvasRenderer } from './ui/GridCanvasRenderer.js';
 import './styles/main.css';
 
@@ -1667,14 +1668,26 @@ class AntiDrawApp {
    * Non-Accidental Invariant:
    * Conversion is NEVER performed automatically during selection, dragging, or handle manipulation.
    * It is triggered exclusively by explicit user intent via:
-   * 1. Keyboard shortcut `Ctrl + Q`
-   * 2. Right-click context menu "Convertir a Curvas"
-   * 3. Inspector property button "Convertir a Curvas"
+  /**
+   * ARCHITECTURAL RATIONALE: Explicit Modal Confirmation for Curve De-Structuring (FEAT-09)
+   * Primitives (<rect>, <circle>, <ellipse>, <line>, <polyline>, <polygon>) carry high-level
+   * parametric configuration and custom inspector interfaces. Converting to curves is destructive
+   * and irreversible. This handler blocks conversion until the designer explicitly confirms the modal dialog.
    */
-  private handleConvertToCurves(): void {
+  private async handleConvertToCurves(): Promise<void> {
     const selected = this.model.elements.filter((el) => this.selectionTool.isSelected(el.id));
     const parametricEls = selected.filter((el) => this.model.isParametricElement(el));
     if (parametricEls.length === 0) return;
+
+    const names = parametricEls.map((el) => `<${el.shapeType || el.tagName}>`).join(', ');
+    const confirmed = await ConfirmationModal.confirm({
+      title: 'Convertir Primitiva a Curvas',
+      message: `¿Deseas convertir ${parametricEls.length === 1 ? `la primitiva ${names}` : `las ${parametricEls.length} primitivas (${names})`} a trazado libre <path>?`,
+      details: 'Esta acción desestructurará la figura en nodos y curvas de Bézier libres. Se perderán los controles paramétricos de radios, esquinas o sectores.',
+      confirmText: 'Convertir a Curvas',
+      cancelText: 'Cancelar',
+    });
+    if (!confirmed) return;
 
     this.pushUndo();
     parametricEls.forEach((el) => {
