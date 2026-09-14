@@ -36,6 +36,7 @@ export class TransformInteraction {
   public currentScaleSnappedPt: Point | null = null;
 
   public initialElementsMap: Map<string, PathVertex[]> = new Map();
+  public initialAttributesMap: Map<string, Record<string, string>> = new Map();
   public initialBox: any = null;
   public initialBoxPadding: number = 0;
   public ghostTransformMap: Map<string, PathVertex[]> = new Map();
@@ -117,7 +118,9 @@ export class TransformInteraction {
     this.initialBox = { ...groupBox };
     this.initialBoxPadding = padding;
     this.initialElementsMap.clear();
+    this.initialAttributesMap.clear();
     selectedEls.forEach((el) => {
+      this.initialAttributesMap.set(el.id, { ...el.attributes });
       if (el.vertices) {
         this.initialElementsMap.set(
           el.id,
@@ -138,7 +141,9 @@ export class TransformInteraction {
     this.initialRotationAngle = Math.atan2(dragStartPt.y - pivot.y, dragStartPt.x - pivot.x);
     this.lastDeltaAngle = 0;
     this.initialElementsMap.clear();
+    this.initialAttributesMap.clear();
     selectedEls.forEach((el) => {
+      this.initialAttributesMap.set(el.id, { ...el.attributes });
       if (el.vertices) {
         this.initialElementsMap.set(
           el.id,
@@ -482,18 +487,88 @@ export class TransformInteraction {
         const el = ctx.model.elements.find((e) => e.id === id);
         if (el) {
           /**
-           * ARCHITECTURAL RATIONALE: Automatic Parametric De-Structuring on Rotation / Asymmetric Scale
-           * Standard SVG primitives (<rect>, <circle>, <ellipse>) and parametric arc/pie wedges are
-           * canonically axis-aligned. When rotated or transformed non-affinely, their geometry can no
-           * longer be represented by canonical SVG scalar attributes without introducing severe rendering divergence.
-           * De-structuring to freeform curves (`convertToCurves`) guarantees exact Bézier path rendering,
-           * faithful visual rotation matching the ghost preview, and flawless hit-testing without phantom displacement.
+           * ARCHITECTURAL RATIONALE: Non-Destructive Parametric Transformation (FIX-21)
+           *
+           * 1. Preserving Parametric Status on Scale:
+           *    Previously, any transformation of arc or pie primitives triggered `convertToCurves(el)`,
+           *    stripping all parametric metadata (cx, cy, rx, ry, angles, data-ellipse-type) and locking
+           *    the element into an irreversible freeform path.
+           *    Under non-rotational scale (`activeHandle !== 'rotate'`), the affine bounding box transform
+           *    is mapped directly to center and radii:
+           *      newCx = newBox.x + (oldCx - oldBox.x) * scaleX
+           *      newCy = newBox.y + (oldCy - oldBox.y) * scaleY
+           *      newRx = oldRx * |scaleX|
+           *      newRy = oldRy * |scaleY|
+           *    The exact SVG path is recompiled via `compileEllipseD` preserving native SVG arc commands ('A')
+           *    and maintaining full parametric inspector controls.
+           *
+           * 2. Circular Arc/Pie Rotation without De-Structuring:
+           *    For uniform circular arcs/pies (rx == ry), rotating around the element or selection pivot
+           *    simply shifts startAngle and endAngle by lastDeltaAngle, completely avoiding conversion to curves.
+           *
+           * 3. Fallback for Non-Uniform Tilted Primitives:
+           *    Standard SVG 1.1 lacks an intrinsic rotation angle attribute on <rect> and <ellipse> scalars.
+           *    Non-uniform ellipses rotated arbitrarily without a container transform attribute must de-structure
+           *    to Béziers to maintain visual fidelity without shearing.
            */
           const isRotate = activeHandle === 'rotate';
           const isPieOrArc = el.attributes['data-ellipse-type'] === 'pie' || el.attributes['data-ellipse-type'] === 'arc';
 
-          if (ctx.model.isParametricElement(el) && (isRotate || isPieOrArc)) {
-            ctx.model.convertToCurves(el);
+          if (isRotate && ctx.model.isParametricElement(el)) {
+            const rx = parseFloat(el.attributes.rx || el.attributes.r || '1');
+            const ry = parseFloat(el.attributes.ry || el.attributes.r || '1');
+            if (isPieOrArc && Math.abs(rx - ry) < 0.5) {
+              // Circular arc or pie: preserve parametric! Shift angular bounds by lastDeltaAngle
+              const sAngle = parseFloat(el.attributes['data-start-angle'] || '0');
+              const eAngle = parseFloat(el.attributes['data-end-angle'] || '360');
+              let newStart = Math.round((sAngle + this.lastDeltaAngle) * 10) / 10;
+              let newEnd = Math.round((eAngle + this.lastDeltaAngle) * 10) / 10;
+              newStart = ((newStart % 360) + 360) % 360;
+              newEnd = ((newEnd % 360) + 360) % 360;
+              if (newStart === newEnd) newEnd = newStart + 360;
+
+              el.attributes['data-start-angle'] = newStart.toString();
+              el.attributes['data-end-angle'] = newEnd.toString();
+              const cx = parseFloat(el.attributes.cx || '0');
+              const cy = parseFloat(el.attributes.cy || '0');
+              el.attributes.d = ctx.model.compileEllipseD(cx, cy, rx, ry, el.attributes['data-ellipse-type'] as any, newStart, newEnd);
+              el.vertices = ctx.model.convertEllipseToVertices(cx, cy, rx, ry, el.attributes['data-ellipse-type'] as any, newStart, newEnd);
+              el.attributes['data-node-types'] = el.vertices.map((v) => v.nodeType).join(',');
+              return;
+            } else {
+              ctx.model.convertToCurves(el);
+            }
+          }
+
+          if (!isRotate && isPieOrArc && ctx.model.isParametricElement(el) && this.initialBox) {
+            const initAttrs = this.initialAttributesMap.get(id);
+            const oldCx = parseFloat((initAttrs && initAttrs.cx) || el.attributes.cx || '0');
+            const oldCy = parseFloat((initAttrs && initAttrs.cy) || el.attributes.cy || '0');
+            const oldRx = parseFloat((initAttrs && (initAttrs.rx || initAttrs.r)) || el.attributes.rx || '1');
+            const oldRy = parseFloat((initAttrs && (initAttrs.ry || initAttrs.r)) || el.attributes.ry || '1');
+            const startAngle = parseFloat(el.attributes['data-start-angle'] || '0');
+            const endAngle = parseFloat(el.attributes['data-end-angle'] || '360');
+            const type = (el.attributes['data-ellipse-type'] as 'pie' | 'arc') || 'pie';
+
+            const newBox = ctx.selectionTool.getBoundingBox({ ...el, vertices: transformedVerts });
+            const oldBox = this.initialBox;
+            if (newBox && oldBox.width > 0 && oldBox.height > 0) {
+              const scaleX = newBox.width / oldBox.width;
+              const scaleY = newBox.height / oldBox.height;
+              const newCx = newBox.x + (oldCx - oldBox.x) * scaleX;
+              const newCy = newBox.y + (oldCy - oldBox.y) * scaleY;
+              const newRx = Math.max(0.1, oldRx * scaleX);
+              const newRy = Math.max(0.1, oldRy * scaleY);
+
+              el.attributes.cx = Math.round(newCx * 100) / 100 + '';
+              el.attributes.cy = Math.round(newCy * 100) / 100 + '';
+              el.attributes.rx = Math.round(newRx * 100) / 100 + '';
+              el.attributes.ry = Math.round(newRy * 100) / 100 + '';
+              el.attributes.d = ctx.model.compileEllipseD(newCx, newCy, newRx, newRy, type, startAngle, endAngle);
+              el.vertices = ctx.model.convertEllipseToVertices(newCx, newCy, newRx, newRy, type, startAngle, endAngle);
+              el.attributes['data-node-types'] = el.vertices.map((v) => v.nodeType).join(',');
+              return;
+            }
           }
 
           el.vertices = transformedVerts;
