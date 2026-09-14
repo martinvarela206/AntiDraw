@@ -33,14 +33,25 @@ export const ToolIcons = {
     <circle cx="11" cy="11" r="2"/>
   </svg>`,
 
+  line: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+    <line x1="5" y1="19" x2="19" y2="5"/>
+  </svg>`,
+
   rect: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
     <rect x="4" y="4" width="16" height="16" rx="2"/>
   </svg>`,
 
-  ellipse: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+  circle: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
     <circle cx="12" cy="12" r="8"/>
   </svg>`,
 
+  ellipse: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+    <ellipse cx="12" cy="12" rx="9" ry="5.5"/>
+  </svg>`,
+
+  polygon: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
+    <polygon points="12 3 21 8.5 21 17.5 12 21 3 17.5 3 8.5"/>
+  </svg>`,
 
   star: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
     <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>

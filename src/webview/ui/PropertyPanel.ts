@@ -71,6 +71,7 @@ export class PropertyPanel {
     starPoints: 5,
     starInnerRatio: 0.4,
     rectCornerRadius: 0,
+    polygonSides: 5,
   };
   private callbacks: PropertyPanelCallbacks;
 
@@ -248,7 +249,14 @@ export class PropertyPanel {
       return;
     }
 
-    // 5. Default Base State: Canvas & ViewBox Properties
+    // 5. Active Shape Tool Creation Settings (No vectors selected)
+    if (['rect', 'circle', 'ellipse', 'line', 'polygon', 'star'].includes(this.activeTool)) {
+      this.currentPanelMode = 'shape';
+      this.renderShapeToolProperties();
+      return;
+    }
+
+    // 6. Default Base State: Canvas & ViewBox Properties
     this.currentPanelMode = 'canvas';
     this.renderCanvasProperties();
   }

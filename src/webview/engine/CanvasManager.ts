@@ -30,6 +30,7 @@ export interface ShapeToolConfig {
   starPoints: number;   // default 5
   starInnerRatio: number; // default 0.4
   rectCornerRadius: number; // default 0
+  polygonSides: number; // default 5
 }
 
 export class CanvasManager {
@@ -141,6 +142,7 @@ export class CanvasManager {
     starPoints: 5,
     starInnerRatio: 0.4,
     rectCornerRadius: 0,
+    polygonSides: 5,
   };
 
   // Snap options disabled by default

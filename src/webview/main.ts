@@ -523,7 +523,11 @@ class AntiDrawApp {
       if (!e.ctrlKey && !e.metaKey && (e.key === 'y' || e.key === 'Y')) this.toolbar.setTool('polyline');
       if (e.key === 'p' || e.key === 'P') this.toolbar.setTool('pen');
       if (e.key === 'r' || e.key === 'R') this.toolbar.setTool('rect');
+      if (e.key === 'o' || e.key === 'O') this.toolbar.setTool('circle');
       if (e.key === 'e' || e.key === 'E') this.toolbar.setTool('ellipse');
+      if (e.key === 'l' || e.key === 'L') this.toolbar.setTool('line');
+      if (e.key === 'g' || e.key === 'G') this.toolbar.setTool('polygon');
+      if (e.key === 's' || e.key === 'S') this.toolbar.setTool('star');
       if (!e.ctrlKey && !e.metaKey && (e.key === 'z' || e.key === 'Z')) this.toolbar.setTool('zoom');
 
       const isCtrl = e.ctrlKey || e.metaKey;
@@ -1105,7 +1109,7 @@ class AntiDrawApp {
     if (tool !== 'polyline') {
       this.polylineToolHandler.deactivate();
     }
-    if (!['rect', 'ellipse', 'star'].includes(tool)) {
+    if (!['rect', 'circle', 'ellipse', 'line', 'polygon', 'star'].includes(tool)) {
       this.shapeToolHandler.cancel();
     }
     if (tool !== 'pen') {
@@ -1210,7 +1214,7 @@ class AntiDrawApp {
       if (this.nodeToolHandler.onPointerDown(e, pt)) {
         return;
       }
-    } else if (['rect', 'ellipse', 'star'].includes(activeTool)) {
+    } else if (['rect', 'circle', 'ellipse', 'line', 'polygon', 'star'].includes(activeTool)) {
       if (this.shapeToolHandler.onPointerDown(e, pt)) {
         this.activeHandle = 'shape';
         return;

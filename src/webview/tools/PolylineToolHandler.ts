@@ -1,6 +1,7 @@
 import { IToolHandler, ToolContext } from './IToolHandler.js';
 import { ToolType } from '../ui/Toolbar.js';
 import { Point, PathVertex, VectorElement } from '../engine/VectorModel.js';
+import { formatNum } from '../engine/geometry/PathGeometryCompiler.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Polyline & Orthogonal Polygon State Machine (PolylineToolHandler)
@@ -144,6 +145,11 @@ export class PolylineToolHandler implements IToolHandler {
    *    anchor point (`v0`), `unifyClosingVertices` fuses the closing vertex into `v0`, transferring
    *    incoming tangent handles and discarding the duplicate endpoint. The SVG 'Z' command then
    *    cleanly seals the contour to `v0` without producing double-stacked nodes.
+   *
+   * 3. Canonical SVG Native Primitive Preservation (FEAT-11):
+   *    - Closed straight-segment contours are preserved directly as native SVG `<polygon>` primitives.
+   *    - Open straight-segment sequences with >2 nodes are preserved as native SVG `<polyline>` primitives.
+   *    - Open 2-node straight segments are preserved as native SVG `<line>` primitives.
    */
   public finishPolylinePath(close: boolean = false): void {
     const z = this.ctx.canvasMgr.zoom || 1;
@@ -157,19 +163,39 @@ export class PolylineToolHandler implements IToolHandler {
       this.ctx.pushUndo();
       const id = `el_poly_${Date.now().toString(36)}`;
       const pathD = this.ctx.model.compilePathD(cleanVerts, close);
+      const pointsStr = cleanVerts.map((v) => `${formatNum(v.x)},${formatNum(v.y)}`).join(' ');
+      const tagName = close ? 'polygon' : (cleanVerts.length === 2 ? 'line' : 'polyline');
+      const shapeType = close ? 'polygon' : (cleanVerts.length === 2 ? 'line' : 'polyline');
+      const isParametric = true;
+
+      const attributes: Record<string, string> = {
+        id,
+        d: pathD,
+        fill: close ? '#6366f1' : 'none',
+        stroke: '#ffffff',
+        'stroke-width': '2',
+        'data-node-types': cleanVerts.map(() => 'asymmetric').join(','),
+        'data-shape': shapeType,
+        'data-parametric': 'true',
+      };
+
+      if (shapeType === 'line') {
+        attributes['x1'] = formatNum(cleanVerts[0].x);
+        attributes['y1'] = formatNum(cleanVerts[0].y);
+        attributes['x2'] = formatNum(cleanVerts[1].x);
+        attributes['y2'] = formatNum(cleanVerts[1].y);
+      } else {
+        attributes['points'] = pointsStr;
+      }
+
       const newEl: VectorElement = {
         id,
-        tagName: 'path',
-        attributes: {
-          id,
-          d: pathD,
-          fill: close ? '#4f46e5' : 'none',
-          stroke: '#ffffff',
-          'stroke-width': '2',
-          'data-node-types': cleanVerts.map(() => 'asymmetric').join(','),
-        },
+        tagName,
+        shapeType,
+        attributes,
         vertices: cleanVerts,
         isClosed: close,
+        isParametric,
       };
 
       this.ctx.model.elements.push(newEl);

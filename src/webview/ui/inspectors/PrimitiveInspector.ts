@@ -27,12 +27,19 @@ export class PrimitiveInspector {
   ): void {
     const toolName =
       activeTool === 'rect' ? 'Rectangle' :
-      activeTool === 'ellipse' ? 'Ellipse / Circle' : 'Star';
+      activeTool === 'circle' ? 'Circle' :
+      activeTool === 'ellipse' ? 'Ellipse' :
+      activeTool === 'line' ? 'Line' :
+      activeTool === 'polygon' ? 'Polygon' :
+      'Star';
+
+    const showAspectRatios = activeTool !== 'line' && activeTool !== 'circle';
 
     container.innerHTML = `
       <div class="panel-section">
         <div class="panel-title">${toolName} Tool Settings</div>
         
+        ${showAspectRatios ? `
         <div class="prop-row">
           <span class="prop-label">Proportion (Alt)</span>
           <select class="prop-input" id="shape-aspect-preset" style="cursor:pointer;">
@@ -53,6 +60,7 @@ export class PrimitiveInspector {
             <input type="number" class="prop-input" id="shape-ratio-h" value="${shapeConfig.aspectRatioH}" min="1" step="1" style="width:55px; text-align:center;" />
           </div>
         </div>
+        ` : ''}
 
         ${activeTool === 'star' ? `
           <div class="prop-row">
@@ -62,6 +70,13 @@ export class PrimitiveInspector {
           <div class="prop-row">
             <span class="prop-label">Inner Ratio</span>
             <input type="number" class="prop-input" id="star-inner-ratio" value="${shapeConfig.starInnerRatio}" min="0.1" max="0.9" step="0.05" />
+          </div>
+        ` : ''}
+
+        ${activeTool === 'polygon' ? `
+          <div class="prop-row">
+            <span class="prop-label">Sides</span>
+            <input type="number" class="prop-input" id="polygon-sides" value="${shapeConfig.polygonSides || 5}" min="3" max="32" step="1" />
           </div>
         ` : ''}
 
@@ -76,12 +91,20 @@ export class PrimitiveInspector {
       <div class="panel-section">
         <div class="panel-title">Creation Shortcuts</div>
         <div style="font-size:11px; color:var(--text-muted); line-height:1.6;">
-          • <b>Drag</b>: Free size from corner<br/>
-          • <b>Shift + Drag</b>: Expand from center<br/>
-          • <b>Ctrl + Drag</b>: 1:1 Aspect Ratio (Square/Circle)<br/>
-          • <b>Alt + Drag</b>: Fixed Aspect Ratio (${shapeConfig.aspectRatioW}:${shapeConfig.aspectRatioH})<br/>
-          • <b>Ctrl + Shift</b>: 1:1 Ratio from center<br/>
-          • <b>Alt + Shift</b>: Fixed ratio (${shapeConfig.aspectRatioW}:${shapeConfig.aspectRatioH}) from center
+          ${activeTool === 'line' ? `
+            • <b>Drag</b>: Draw straight line between points<br/>
+            • <b>Shift + Drag</b>: Constrain to 45° angular intervals
+          ` : activeTool === 'circle' ? `
+            • <b>Drag</b>: Free size circle from corner<br/>
+            • <b>Shift + Drag</b>: Expand circle outward from center
+          ` : `
+            • <b>Drag</b>: Free size from corner<br/>
+            • <b>Shift + Drag</b>: Expand from center<br/>
+            • <b>Ctrl + Drag</b>: 1:1 Aspect Ratio (Square/Regular)<br/>
+            • <b>Alt + Drag</b>: Fixed Aspect Ratio (${shapeConfig.aspectRatioW}:${shapeConfig.aspectRatioH})<br/>
+            • <b>Ctrl + Shift</b>: 1:1 Ratio from center<br/>
+            • <b>Alt + Shift</b>: Fixed ratio (${shapeConfig.aspectRatioW}:${shapeConfig.aspectRatioH}) from center
+          `}
         </div>
       </div>
     `;
@@ -91,6 +114,7 @@ export class PrimitiveInspector {
     const ratioHInput = container.querySelector<HTMLInputElement>('#shape-ratio-h');
     const starPointsInput = container.querySelector<HTMLInputElement>('#star-points');
     const starInnerRatioInput = container.querySelector<HTMLInputElement>('#star-inner-ratio');
+    const polygonSidesInput = container.querySelector<HTMLInputElement>('#polygon-sides');
     const rectRadiusInput = container.querySelector<HTMLInputElement>('#rect-corner-radius');
 
     if (presetSelect) {
@@ -142,6 +166,16 @@ export class PrimitiveInspector {
         const val = parseFloat(starInnerRatioInput.value);
         if (!isNaN(val) && val > 0 && val < 1) {
           shapeConfig.starInnerRatio = val;
+          if (callbacks.onUpdateShapeConfig) callbacks.onUpdateShapeConfig(shapeConfig);
+        }
+      });
+    }
+
+    if (polygonSidesInput) {
+      polygonSidesInput.addEventListener('input', () => {
+        const val = parseInt(polygonSidesInput.value, 10);
+        if (!isNaN(val) && val >= 3) {
+          shapeConfig.polygonSides = val;
           if (callbacks.onUpdateShapeConfig) callbacks.onUpdateShapeConfig(shapeConfig);
         }
       });
