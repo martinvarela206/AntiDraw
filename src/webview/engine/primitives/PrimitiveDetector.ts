@@ -455,6 +455,370 @@ export class PrimitiveDetector {
       }
     }
 
+    // 5. Pie Sector check (FEAT-06): closed, >= 3 vertices, 1 apex with straight spokes, curved arc contour
+    if (isClosed) {
+      const pie = this.detectPieSector(verts, tolerance);
+      if (pie) return pie;
+    }
+
+    // 6. Arc check (FEAT-06): open, >= 2 vertices, circular or elliptical Bézier curvature
+    if (!isClosed) {
+      const arc = this.detectArc(verts, tolerance);
+      if (arc) return arc;
+    }
+
+    return null;
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Inverse Geometric Analyzer for Elliptical & Circular Pie Sectors (FEAT-06)
+   *
+   * 1. Topological Signature of Pie Sectors (Wedges):
+   *    - The path must be closed (isClosed === true) with N >= 3 vertices.
+   *    - Exactly one apex vertex C = (cx, cy) connects the two straight radial boundary spokes:
+   *      an incoming straight spoke from the terminal arc perimeter vertex, and
+   *      an outgoing straight spoke toward the initial arc perimeter vertex.
+   *    - The apex node C itself possesses no Bézier control handles (|handleIn| <= tol and |handleOut| <= tol).
+   *    - The remaining N - 1 vertices form the curved perimeter arc. At least one perimeter segment
+   *      must have non-zero Bézier handles (distinguishing a pie wedge from a generic polygon).
+   *
+   * 2. Parameter Identification (Center, Radii, Angular Bounds):
+   *    - Center (cx, cy) is analytically identical to the coordinates of the apex vertex C.
+   *    - Arc start vertex V_start and arc end vertex V_end lie on the boundary perimeter.
+   *    - For circular sectors: radial distances r_start = hypot(V_start - C) and r_end = hypot(V_end - C)
+   *      are equal within tolerance, establishing r = (r_start + r_end) / 2.
+   *    - For axis-aligned elliptical sectors: solves the canonical ellipse equation
+   *      (x - cx)^2 / rx^2 + (y - cy)^2 / ry^2 = 1 across multiple non-collinear boundary points.
+   *    - Start angle and end angle are determined via atan2 relative to the center and normalized to [0, 360).
+   *    - Clockwise angular sweep is verified by sampling intermediate perimeter points.
+   *
+   * 3. Regenerative Verification:
+   *    - To guarantee zero false positives, candidate parameters (cx, cy, rx, ry, type='pie', start, end)
+   *      are synthesized into canonical vertices via EllipsePrimitive.convertEllipseToVertices and matched
+   *      against the path's actual vertices within tolerance.
+   */
+  private static detectPieSector(
+    verts: PathVertex[],
+    tolerance: number
+  ): { primitive: ParametricShapeType; attributes: Record<string, string> } | null {
+    const n = verts.length;
+    if (n < 3) return null;
+
+    const hasNoHandles = (v: PathVertex): boolean => {
+      const hInDist = v.handleIn ? Math.hypot(v.handleIn.x - v.x, v.handleIn.y - v.y) : 0;
+      const hOutDist = v.handleOut ? Math.hypot(v.handleOut.x - v.x, v.handleOut.y - v.y) : 0;
+      return hInDist <= tolerance && hOutDist <= tolerance;
+    };
+
+    // Identify candidate apex vertices C where:
+    // 1. C has no handles.
+    // 2. Incoming edge from prev has no handleOut.
+    // 3. Outgoing edge to next has no handleIn.
+    const apexIndices: number[] = [];
+    for (let i = 0; i < n; i++) {
+      const v = verts[i];
+      if (!hasNoHandles(v)) continue;
+
+      const prev = verts[(i - 1 + n) % n];
+      const next = verts[(i + 1) % n];
+
+      const prevHOut = prev.handleOut ? Math.hypot(prev.handleOut.x - prev.x, prev.handleOut.y - prev.y) : 0;
+      const nextHIn = next.handleIn ? Math.hypot(next.handleIn.x - next.x, next.handleIn.y - next.y) : 0;
+
+      if (prevHOut <= tolerance && nextHIn <= tolerance) {
+        apexIndices.push(i);
+      }
+    }
+
+    // A pie wedge has exactly 1 apex (the center of the circle/ellipse).
+    if (apexIndices.length !== 1) return null;
+
+    const apexIdx = apexIndices[0];
+    const C = verts[apexIdx];
+    const cx = C.x;
+    const cy = C.y;
+
+    const arcVerts: PathVertex[] = [];
+    for (let k = 1; k < n; k++) {
+      arcVerts.push(verts[(apexIdx + k) % n]);
+    }
+
+    // Ensure there is at least one curved segment along the arc
+    const hasCurvedSegment = arcVerts.some((v) => {
+      const hIn = v.handleIn ? Math.hypot(v.handleIn.x - v.x, v.handleIn.y - v.y) : 0;
+      const hOut = v.handleOut ? Math.hypot(v.handleOut.x - v.x, v.handleOut.y - v.y) : 0;
+      return hIn > tolerance || hOut > tolerance;
+    });
+    if (!hasCurvedSegment) return null;
+
+    const vStart = arcVerts[0];
+    const vEnd = arcVerts[arcVerts.length - 1];
+
+    const rStart = Math.hypot(vStart.x - cx, vStart.y - cy);
+    const rEnd = Math.hypot(vEnd.x - cx, vEnd.y - cy);
+    if (rStart <= tolerance || rEnd <= tolerance) return null;
+
+    const isCircularCandidate = Math.abs(rStart - rEnd) <= tolerance * 2;
+    const candidates: { rx: number; ry: number; isCircle: boolean }[] = [];
+
+    if (isCircularCandidate) {
+      const r = (rStart + rEnd) / 2;
+      candidates.push({ rx: r, ry: r, isCircle: true });
+    }
+
+    // Collect analytical sample points along the arc contour
+    const samplePts: Point[] = [vStart];
+    for (let i = 0; i < arcVerts.length - 1; i++) {
+      const p0 = arcVerts[i];
+      const p3 = arcVerts[i + 1];
+      const p1 = p0.handleOut || p0;
+      const p2 = p3.handleIn || p3;
+      samplePts.push({
+        x: 0.125 * p0.x + 0.375 * p1.x + 0.375 * p2.x + 0.125 * p3.x,
+        y: 0.125 * p0.y + 0.375 * p1.y + 0.375 * p2.y + 0.125 * p3.y,
+      });
+    }
+    samplePts.push(vEnd);
+
+    // Solve for axis-aligned elliptical candidates using pairs of non-collinear sample points
+    for (let i = 0; i < samplePts.length; i++) {
+      for (let j = i + 1; j < samplePts.length; j++) {
+        const pA = samplePts[i];
+        const pB = samplePts[j];
+        const u1 = Math.pow(pA.x - cx, 2);
+        const v1 = Math.pow(pA.y - cy, 2);
+        const u2 = Math.pow(pB.x - cx, 2);
+        const v2 = Math.pow(pB.y - cy, 2);
+        const det = u1 * v2 - u2 * v1;
+        if (Math.abs(det) > 1e-3) {
+          const X = (v2 - v1) / det;
+          const Y = (u1 - u2) / det;
+          if (X > 0 && Y > 0) {
+            const rx = 1 / Math.sqrt(X);
+            const ry = 1 / Math.sqrt(Y);
+            if (rx > tolerance && ry > tolerance && Math.abs(rx - ry) > tolerance) {
+              if (!candidates.some((c) => Math.abs(c.rx - rx) < 1 && Math.abs(c.ry - ry) < 1)) {
+                candidates.push({ rx, ry, isCircle: false });
+              }
+            }
+          }
+        }
+      }
+    }
+
+    const normAngle = (deg: number): number => {
+      const a = ((deg % 360) + 360) % 360;
+      return Math.abs(a - 360) < 0.01 ? 0 : a;
+    };
+
+    for (const cand of candidates) {
+      const { rx, ry, isCircle } = cand;
+
+      const aStart = normAngle((Math.atan2((vStart.y - cy) / ry, (vStart.x - cx) / rx) * 180) / Math.PI);
+      const aEnd = normAngle((Math.atan2((vEnd.y - cy) / ry, (vEnd.x - cx) / rx) * 180) / Math.PI);
+
+      let a1 = aStart;
+      let a2 = aEnd;
+
+      const midV = samplePts[Math.floor(samplePts.length / 2)];
+      const aMid = normAngle((Math.atan2((midV.y - cy) / ry, (midV.x - cx) / rx) * 180) / Math.PI);
+
+      const spanStartEnd = ((aEnd - aStart) % 360 + 360) % 360 || 360;
+      const spanStartMid = ((aMid - aStart) % 360 + 360) % 360;
+
+      if (!(spanStartMid > 0 && spanStartMid < spanStartEnd)) {
+        a1 = aEnd;
+        a2 = aStart;
+      }
+
+      const canonical = EllipsePrimitive.convertEllipseToVertices(cx, cy, rx, ry, 'pie', a1, a2);
+      if (canonical.length !== n) continue;
+
+      let matchedForward = true;
+      for (let j = 0; j < n; j++) {
+        const c = canonical[j];
+        const v = verts[(apexIdx + j) % n];
+        if (Math.hypot(v.x - c.x, v.y - c.y) > tolerance * 2) {
+          matchedForward = false;
+          break;
+        }
+      }
+
+      let matchedReverse = false;
+      if (!matchedForward) {
+        matchedReverse = true;
+        for (let j = 0; j < n; j++) {
+          const c = canonical[j];
+          const v = verts[(apexIdx - j + n) % n];
+          if (Math.hypot(v.x - c.x, v.y - c.y) > tolerance * 2) {
+            matchedReverse = false;
+            break;
+          }
+        }
+      }
+
+      if (matchedForward || matchedReverse) {
+        const attrs: Record<string, string> = {
+          cx: formatNum(cx),
+          cy: formatNum(cy),
+          rx: formatNum(rx),
+          ry: formatNum(ry),
+          'data-ellipse-type': 'pie',
+          'data-start-angle': formatNum(a1),
+          'data-end-angle': formatNum(a2),
+        };
+        if (isCircle) {
+          attrs.r = formatNum((rx + ry) / 2);
+          return { primitive: 'circle', attributes: attrs };
+        } else {
+          return { primitive: 'ellipse', attributes: attrs };
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Inverse Geometric Analyzer for Open Arcs (FEAT-06)
+   *
+   * 1. Topological Signature of Open Arcs:
+   *    - The path must be open (isClosed === false) with N >= 2 vertices.
+   *    - At least one vertex has non-zero Bézier handles (distinguishing from line/polyline).
+   *
+   * 2. Analytical Circumcenter Derivation:
+   *    - Samples the initial vertex V_0, terminal vertex V_m, and an intermediate point P_mid.
+   *    - Computes circumcenter (cx, cy) and radius r = hypot(P - (cx, cy)) via determinant geometry.
+   *    - Normalizes angles to [0, 360) and resolves sweep orientation using the intermediate sample point.
+   *
+   * 3. Regenerative Verification:
+   *    - Synthesizes canonical vertices with EllipsePrimitive.convertEllipseToVertices(cx, cy, rx, ry, 'arc', a1, a2).
+   *    - Validates points within tolerance in both forward and reverse orientations.
+   */
+  private static detectArc(
+    verts: PathVertex[],
+    tolerance: number
+  ): { primitive: ParametricShapeType; attributes: Record<string, string> } | null {
+    const n = verts.length;
+    if (n < 2) return null;
+
+    const hasAnyHandle = verts.some((v) => {
+      const hIn = v.handleIn ? Math.hypot(v.handleIn.x - v.x, v.handleIn.y - v.y) : 0;
+      const hOut = v.handleOut ? Math.hypot(v.handleOut.x - v.x, v.handleOut.y - v.y) : 0;
+      return hIn > tolerance || hOut > tolerance;
+    });
+    if (!hasAnyHandle) return null;
+
+    const p0 = verts[0];
+    const pm = verts[n - 1];
+
+    let pMid: Point;
+    if (n >= 3) {
+      const midIdx = Math.floor((n - 1) / 2);
+      pMid = { x: verts[midIdx].x, y: verts[midIdx].y };
+    } else {
+      const hOut = p0.handleOut || p0;
+      const hIn = pm.handleIn || pm;
+      pMid = {
+        x: 0.125 * p0.x + 0.375 * hOut.x + 0.375 * hIn.x + 0.125 * pm.x,
+        y: 0.125 * p0.y + 0.375 * hOut.y + 0.375 * hIn.y + 0.125 * pm.y,
+      };
+    }
+
+    const x1 = p0.x, y1 = p0.y;
+    const x2 = pMid.x, y2 = pMid.y;
+    const x3 = pm.x, y3 = pm.y;
+
+    const D = 2 * (x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2));
+    if (Math.abs(D) < 1e-4) return null;
+
+    const cx = ((x1 * x1 + y1 * y1) * (y2 - y3) + (x2 * x2 + y2 * y2) * (y3 - y1) + (x3 * x3 + y3 * y3) * (y1 - y2)) / D;
+    const cy = ((x1 * x1 + y1 * y1) * (x3 - x2) + (x2 * x2 + y2 * y2) * (x1 - x3) + (x3 * x3 + y3 * y3) * (x2 - x1)) / D;
+
+    const r1 = Math.hypot(x1 - cx, y1 - cy);
+    const r2 = Math.hypot(x2 - cx, y2 - cy);
+    const r3 = Math.hypot(x3 - cx, y3 - cy);
+
+    if (r1 <= tolerance || r2 <= tolerance || r3 <= tolerance) return null;
+
+    const normAngle = (deg: number): number => {
+      const a = ((deg % 360) + 360) % 360;
+      return Math.abs(a - 360) < 0.01 ? 0 : a;
+    };
+
+    const candidates: { rx: number; ry: number; isCircle: boolean }[] = [];
+
+    if (Math.abs(r1 - r2) <= tolerance * 2.5 && Math.abs(r1 - r3) <= tolerance * 2.5) {
+      const avgR = (r1 + r2 + r3) / 3;
+      const allVertsOnCircle = verts.every((v) => Math.abs(Math.hypot(v.x - cx, v.y - cy) - avgR) <= tolerance * 2.5);
+      if (allVertsOnCircle) {
+        candidates.push({ rx: avgR, ry: avgR, isCircle: true });
+      }
+    }
+
+    for (const cand of candidates) {
+      const { rx, ry, isCircle } = cand;
+
+      const a0 = normAngle((Math.atan2((p0.y - cy) / ry, (p0.x - cx) / rx) * 180) / Math.PI);
+      const am = normAngle((Math.atan2((pm.y - cy) / ry, (pm.x - cx) / rx) * 180) / Math.PI);
+      const aMid = normAngle((Math.atan2((pMid.y - cy) / ry, (pMid.x - cx) / rx) * 180) / Math.PI);
+
+      let a1 = a0;
+      let a2 = am;
+
+      const span0m = ((am - a0) % 360 + 360) % 360 || 360;
+      const span0mid = ((aMid - a0) % 360 + 360) % 360;
+
+      if (!(span0mid > 0 && span0mid < span0m)) {
+        a1 = am;
+        a2 = a0;
+      }
+
+      const canonical = EllipsePrimitive.convertEllipseToVertices(cx, cy, rx, ry, 'arc', a1, a2);
+      if (canonical.length !== n) continue;
+
+      let matchedForward = true;
+      for (let j = 0; j < n; j++) {
+        const c = canonical[j];
+        const v = verts[j];
+        if (Math.hypot(v.x - c.x, v.y - c.y) > tolerance * 2) {
+          matchedForward = false;
+          break;
+        }
+      }
+
+      let matchedReverse = false;
+      if (!matchedForward) {
+        matchedReverse = true;
+        for (let j = 0; j < n; j++) {
+          const c = canonical[j];
+          const v = verts[n - 1 - j];
+          if (Math.hypot(v.x - c.x, v.y - c.y) > tolerance * 2) {
+            matchedReverse = false;
+            break;
+          }
+        }
+      }
+
+      if (matchedForward || matchedReverse) {
+        const attrs: Record<string, string> = {
+          cx: formatNum(cx),
+          cy: formatNum(cy),
+          rx: formatNum(rx),
+          ry: formatNum(ry),
+          'data-ellipse-type': 'arc',
+          'data-start-angle': formatNum(a1),
+          'data-end-angle': formatNum(a2),
+        };
+        if (isCircle) {
+          attrs.r = formatNum((rx + ry) / 2);
+          return { primitive: 'circle', attributes: attrs };
+        } else {
+          return { primitive: 'ellipse', attributes: attrs };
+        }
+      }
+    }
+
     return null;
   }
 
@@ -483,7 +847,27 @@ export class PrimitiveDetector {
 
     // Re-generate canonical vertices for unified model bounds
     el.vertices = ctx.convertShapeToVertices(detected.primitive, el.attributes);
-    el.isClosed = detected.primitive !== 'line' && detected.primitive !== 'polyline';
+
+    const ellipseType = detected.attributes['data-ellipse-type'];
+    if (ellipseType === 'arc') {
+      el.isClosed = false;
+      el.attributes.fill = 'none';
+      delete el.attributes['data-gradient'];
+    } else if (ellipseType === 'pie') {
+      el.isClosed = true;
+    } else {
+      el.isClosed = detected.primitive !== 'line' && detected.primitive !== 'polyline';
+    }
+
+    if (ellipseType === 'pie' || ellipseType === 'arc') {
+      const cx = parseFloat(el.attributes.cx || '0');
+      const cy = parseFloat(el.attributes.cy || '0');
+      const rx = parseFloat(el.attributes.rx || el.attributes.r || '1');
+      const ry = parseFloat(el.attributes.ry || el.attributes.r || '1');
+      const startAngle = parseFloat(el.attributes['data-start-angle'] || '0');
+      const endAngle = parseFloat(el.attributes['data-end-angle'] || '360');
+      el.attributes.d = ctx.compileEllipseD(cx, cy, rx, ry, ellipseType as 'pie' | 'arc', startAngle, endAngle);
+    }
 
     if (!el.isClosed) {
       el.attributes.fill = 'none';

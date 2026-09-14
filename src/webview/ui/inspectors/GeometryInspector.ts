@@ -20,7 +20,7 @@ export class GeometryInspector {
     box: BoundingBox | null,
     pivot: { x: number; y: number },
     isClosed: boolean,
-    detectedPrimitive: { primitive: string } | null
+    detectedPrimitive: { primitive: string; attributes?: Record<string, string> } | null
   ): string {
     const x = box ? Math.round(box.x) : 0;
     const y = box ? Math.round(box.y) : 0;
@@ -72,11 +72,11 @@ export class GeometryInspector {
         <div class="prop-row" style="margin-top: 6px; flex-direction: column; gap: 4px; background: rgba(16, 185, 129, 0.08); border: 1px dashed #10b981; border-radius: 4px; padding: 6px;">
           <div style="font-size: 10px; color: #10b981; font-weight: 600; display: flex; align-items: center; justify-content: space-between;">
             <span>⚡ Primitiva detectada</span>
-            <span style="text-transform: uppercase; font-family: monospace;">&lt;${detectedPrimitive.primitive}&gt;</span>
+            <span style="text-transform: uppercase; font-family: monospace;">&lt;${detectedPrimitive.primitive}${detectedPrimitive.attributes?.['data-ellipse-type'] ? ` (${detectedPrimitive.attributes['data-ellipse-type']})` : ''}&gt;</span>
           </div>
           <button class="prop-input" id="btn-simplify-to-primitive" style="cursor:pointer; background:#065f46; color:#a7f3d0; border:1px solid #10b981; font-weight:600; padding:5px; display:flex; align-items:center; justify-content:center; gap:6px; font-size:11px;" title="Simplificar trazado &lt;path&gt; a forma geométrica SVG canónica &lt;${detectedPrimitive.primitive}&gt;">
             <span>⚡</span>
-            <span>Simplificar a &lt;${detectedPrimitive.primitive}&gt;</span>
+            <span>Simplificar a &lt;${detectedPrimitive.primitive}${detectedPrimitive.attributes?.['data-ellipse-type'] ? ` (${detectedPrimitive.attributes['data-ellipse-type']})` : ''}&gt;</span>
           </button>
         </div>` : '')}
       </div>
@@ -91,7 +91,7 @@ export class GeometryInspector {
     box: BoundingBox | null,
     callbacks: PropertyPanelCallbacks,
     onReRender: () => void,
-    detectedPrimitive: { primitive: string } | null
+    detectedPrimitive: { primitive: string; attributes?: Record<string, string> } | null
   ): void {
     const elX = container.querySelector<HTMLInputElement>('#el-x');
     const elY = container.querySelector<HTMLInputElement>('#el-y');

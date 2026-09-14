@@ -335,7 +335,11 @@ export class PathGeometryCompiler {
     }
 
     // Step 6: Subdivide into segments of at most PI / 2
-    const numSegments = Math.max(1, Math.ceil(Math.abs(deltaAngle) / (Math.PI / 2)));
+    // ARCHITECTURAL RATIONALE: Numerical Stability Clamp for Multiples of PI / 2
+    // Floating point roundoff jitter (e.g. 1.5707963267948968 vs PI/2 = 1.5707963267948966)
+    // causes Math.ceil to inadvertently produce an extra segment for exact 90°, 180°, 270°, 360° arcs.
+    // Subtracting a microscopic epsilon (1e-9) ensures consistent, deterministic subdivision.
+    const numSegments = Math.max(1, Math.ceil((Math.abs(deltaAngle) - 1e-9) / (Math.PI / 2)));
     const segDelta = deltaAngle / numSegments;
     const alpha = (4 / 3) * Math.tan(segDelta / 4);
 
