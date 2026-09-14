@@ -173,14 +173,31 @@ export class TranslateInteraction {
               : undefined,
           }));
           const isClosed = ctx.model.isElementClosed(el);
-          el.attributes.d = ctx.model.compilePathD(el.vertices, isClosed);
-          if (ctx.model.isParametricElement(el)) {
-            if (el.attributes['data-ellipse-type'] === 'pie' || el.attributes['data-ellipse-type'] === 'arc') {
-              const oldCx = parseFloat(el.attributes.cx || '0');
-              const oldCy = parseFloat(el.attributes.cy || '0');
-              el.attributes.cx = (oldCx + this.ghostDragOffset!.x).toString();
-              el.attributes.cy = (oldCy + this.ghostDragOffset!.y).toString();
-            } else {
+          const isPieOrArc = el.attributes['data-ellipse-type'] === 'pie' || el.attributes['data-ellipse-type'] === 'arc';
+
+          /**
+           * ARCHITECTURAL RATIONALE: Faithful Arc Compilation on Translation (FIX-23)
+           * When moving active vectors in selection mode, parametric arc and pie primitives must retain
+           * their canonical SVG arc commands ('A') via `compileEllipseD`.
+           * Overwriting `el.attributes.d` with generic Bézier cubic approximations (`compilePathD`) degrades
+           * geometric precision and causes circular arcs to serialize as freeform spline curves.
+           */
+          if (ctx.model.isParametricElement(el) && isPieOrArc) {
+            const oldCx = parseFloat(el.attributes.cx || '0');
+            const oldCy = parseFloat(el.attributes.cy || '0');
+            const newCx = Math.round((oldCx + this.ghostDragOffset!.x) * 100) / 100;
+            const newCy = Math.round((oldCy + this.ghostDragOffset!.y) * 100) / 100;
+            el.attributes.cx = newCx.toString();
+            el.attributes.cy = newCy.toString();
+            const rx = parseFloat(el.attributes.rx || el.attributes.r || '1');
+            const ry = parseFloat(el.attributes.ry || el.attributes.r || '1');
+            const type = el.attributes['data-ellipse-type'] as 'pie' | 'arc';
+            const s = parseFloat(el.attributes['data-start-angle'] || '0');
+            const e = parseFloat(el.attributes['data-end-angle'] || '360');
+            el.attributes.d = ctx.model.compileEllipseD(newCx, newCy, rx, ry, type, s, e);
+          } else {
+            el.attributes.d = ctx.model.compilePathD(el.vertices, isClosed);
+            if (ctx.model.isParametricElement(el)) {
               ctx.model.syncParametricAttributes(el);
             }
           }
