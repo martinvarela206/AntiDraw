@@ -1,0 +1,161 @@
+import { CanvasManager } from '../engine/CanvasManager.js';
+import { VectorModel } from '../engine/VectorModel.js';
+import { SelectionTool } from '../engine/SelectionTool.js';
+import { GridCanvasRenderer } from './GridCanvasRenderer.js';
+import { Toolbar, ToolType } from './Toolbar.js';
+import { TopBar, TopBarCallbacks } from './TopBar.js';
+import { RulerView, RulerViewCallbacks } from './RulerView.js';
+import { PropertyPanel, PropertyPanelCallbacks } from './PropertyPanel.js';
+
+export interface AppLayoutConfig {
+  canvasMgr: CanvasManager;
+  model: VectorModel;
+  selectionTool: SelectionTool;
+  onToolChange: (tool: ToolType) => void;
+  topBarCallbacks: TopBarCallbacks;
+  rulerCallbacks: RulerViewCallbacks;
+  propertyPanelCallbacks: PropertyPanelCallbacks;
+  onScroll: () => void;
+}
+
+/**
+ * ARCHITECTURAL RATIONALE: Dedicated DOM Layout & UI Orchestrator (AppLayoutManager)
+ *
+ * 1. Single Responsibility Principle (SRP):
+ *    Separates DOM structure injection, SVG canvas/overlay instantiation, and UI component
+ *    construction (Toolbar, TopBar, RulerView, PropertyPanel) from the application event loop.
+ *
+ * 2. Guaranteed Coordinate Alignment:
+ *    Programmatically builds and appends `svg-canvas`, `grid-svg`, and `overlay-svg` into
+ *    `canvas-wrapper` within the same coordinate origin to ensure pixel-perfect parity across
+ *    native browser transforms, CSS styling, and pointer events.
+ *
+ * 3. High-Performance Viewport-Bounded Canvas:
+ *    Isolates the dynamic HTML5 2D canvas (`grid-canvas`) inside `canvas-scroll-area` to
+ *    achieve hardware-accelerated grid rendering without DOM reflows during zoom and pan operations.
+ */
+export class AppLayoutManager {
+  public canvasContainer!: HTMLElement;
+  public canvasScrollArea!: HTMLElement;
+  public canvasWrapper!: HTMLElement;
+  public svgCanvas!: SVGSVGElement;
+  public gridSvg!: SVGSVGElement;
+  public overlaySvg!: SVGSVGElement;
+  public gridCanvas!: HTMLCanvasElement;
+  public gridCanvasRenderer!: GridCanvasRenderer;
+
+  public toolbar!: Toolbar;
+  public topBar!: TopBar;
+  public rulerView!: RulerView;
+  public propertyPanel!: PropertyPanel;
+
+  constructor(private config: AppLayoutConfig) {
+    this.buildLayout();
+  }
+
+  private buildLayout(): void {
+    const appEl = document.getElementById('app')!;
+    // CSS grid structure inside #app
+    appEl.innerHTML = `
+      <div class="top-bar" id="top-bar"></div>
+      <div class="left-toolbar" id="left-toolbar"></div>
+      <div class="canvas-container" id="canvas-container">
+        <div class="ruler-corner" id="ruler-corner" title="Drag to set (0,0) Origin | Click for Ruler Settings | Double-click to Reset Origin">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 3H3v18h18V3z"/>
+            <path d="M3 9h6M3 15h4M9 3v6M15 3v4"/>
+          </svg>
+        </div>
+        <div class="ruler-top-container" id="ruler-top-container">
+          <canvas class="ruler-canvas" id="ruler-top-canvas"></canvas>
+        </div>
+        <div class="ruler-left-container" id="ruler-left-container">
+          <canvas class="ruler-canvas" id="ruler-left-canvas"></canvas>
+        </div>
+        <div class="canvas-scroll-area" id="canvas-scroll-area">
+          <div class="canvas-wrapper" id="canvas-wrapper">
+            <canvas id="canvas-hit" style="position:absolute;top:0;left:0;display:none;"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="right-panel" id="right-panel"></div>
+      <div class="status-bar">
+        <div class="status-left">
+          <span id="status-tool">Tool: Select</span>
+          <span id="status-coords">X: 0, Y: 0</span>
+        </div>
+        <div class="status-right">
+          <button class="status-btn" id="btn-recenter-viewbox" title="Recenter ViewBox / Camera (Artboard)">🎯 Recenter ViewBox</button>
+          <span id="status-info">Ready</span>
+          <button class="status-zoom-btn" id="status-zoom" title="Click to reset zoom to 100%">100%</button>
+        </div>
+      </div>
+    `;
+
+    this.canvasContainer = document.getElementById('canvas-container')!;
+    this.canvasScrollArea = document.getElementById('canvas-scroll-area')!;
+    this.canvasWrapper = document.getElementById('canvas-wrapper')!;
+
+    // Create svg-canvas, grid-svg, and overlay-svg in JS and append to wrapper for guaranteed same-origin alignment
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const svgEl = document.createElementNS(svgNS, 'svg') as SVGSVGElement;
+    svgEl.id = 'svg-canvas';
+    svgEl.style.cssText = 'position:absolute;top:0;left:0;display:block;overflow:visible;';
+    this.canvasWrapper.appendChild(svgEl);
+    this.svgCanvas = svgEl;
+
+    const gridSvgEl = document.createElementNS(svgNS, 'svg') as SVGSVGElement;
+    gridSvgEl.id = 'grid-svg';
+    gridSvgEl.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;overflow:visible;display:none;';
+    this.canvasWrapper.appendChild(gridSvgEl);
+    this.gridSvg = gridSvgEl;
+
+    const overlaySvgEl = document.createElementNS(svgNS, 'svg') as SVGSVGElement;
+    overlaySvgEl.id = 'overlay-svg';
+    overlaySvgEl.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;overflow:visible;';
+    this.canvasWrapper.appendChild(overlaySvgEl);
+    this.overlaySvg = overlaySvgEl;
+
+    // Viewport-bounded Grid Canvas: sized strictly to canvasScrollArea viewport to guarantee 60+ FPS zoom and 1px stroke invariance
+    const gridCanvasEl = document.createElement('canvas');
+    gridCanvasEl.id = 'grid-canvas';
+    gridCanvasEl.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;';
+    this.canvasScrollArea.appendChild(gridCanvasEl);
+    this.gridCanvas = gridCanvasEl;
+    this.gridCanvasRenderer = new GridCanvasRenderer(this.gridCanvas);
+
+    // Initialize Left Toolbar
+    this.toolbar = new Toolbar(
+      document.getElementById('left-toolbar')!,
+      (tool) => this.config.onToolChange(tool)
+    );
+
+    // Initialize Top Bar
+    this.topBar = new TopBar(
+      document.getElementById('top-bar')!,
+      this.config.canvasMgr,
+      this.config.topBarCallbacks
+    );
+
+    // Initialize Rulers
+    this.rulerView = new RulerView(
+      this.canvasContainer,
+      this.config.canvasMgr,
+      this.config.model,
+      this.config.rulerCallbacks
+    );
+
+    // Sync rulers with scroll area
+    this.canvasScrollArea.addEventListener('scroll', () => {
+      this.config.onScroll();
+    });
+
+    // Initialize Right Property Panel
+    this.propertyPanel = new PropertyPanel(
+      document.getElementById('right-panel')!,
+      this.config.model,
+      this.config.selectionTool,
+      this.config.propertyPanelCallbacks
+    );
+  }
+}

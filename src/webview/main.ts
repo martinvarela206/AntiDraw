@@ -19,6 +19,7 @@ import { RulerView } from './ui/RulerView.js';
 import { ContextMenu, ContextMenuItem } from './ui/ContextMenu.js';
 import { ConfirmationModal } from './ui/ConfirmationModal.js';
 import { GridCanvasRenderer } from './ui/GridCanvasRenderer.js';
+import { AppLayoutManager } from './ui/AppLayoutManager.js';
 import { ClipboardService } from './services/ClipboardService.js';
 import { HistoryService } from './services/HistoryService.js';
 import { CanvasActionDispatcher } from './services/CanvasActionDispatcher.js';
@@ -79,6 +80,7 @@ class AntiDrawApp {
   private isShiftPressed: boolean = false;
 
   // Subsystems & Services
+  private layoutMgr!: AppLayoutManager;
   private clipboardService!: ClipboardService;
   private historyService!: HistoryService;
   private actionDispatcher!: CanvasActionDispatcher;
@@ -207,87 +209,12 @@ class AntiDrawApp {
   }
 
   private initLayout(): void {
-    const appEl = document.getElementById('app')!;
-    // CSS grid structure inside #app
-    appEl.innerHTML = `
-      <div class="top-bar" id="top-bar"></div>
-      <div class="left-toolbar" id="left-toolbar"></div>
-      <div class="canvas-container" id="canvas-container">
-        <div class="ruler-corner" id="ruler-corner" title="Drag to set (0,0) Origin | Click for Ruler Settings | Double-click to Reset Origin">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 3H3v18h18V3z"/>
-            <path d="M3 9h6M3 15h4M9 3v6M15 3v4"/>
-          </svg>
-        </div>
-        <div class="ruler-top-container" id="ruler-top-container">
-          <canvas class="ruler-canvas" id="ruler-top-canvas"></canvas>
-        </div>
-        <div class="ruler-left-container" id="ruler-left-container">
-          <canvas class="ruler-canvas" id="ruler-left-canvas"></canvas>
-        </div>
-        <div class="canvas-scroll-area" id="canvas-scroll-area">
-          <div class="canvas-wrapper" id="canvas-wrapper">
-            <canvas id="canvas-hit" style="position:absolute;top:0;left:0;display:none;"></canvas>
-          </div>
-        </div>
-      </div>
-      <div class="right-panel" id="right-panel"></div>
-      <div class="status-bar">
-        <div class="status-left">
-          <span id="status-tool">Tool: Select</span>
-          <span id="status-coords">X: 0, Y: 0</span>
-        </div>
-        <div class="status-right">
-          <button class="status-btn" id="btn-recenter-viewbox" title="Recenter ViewBox / Camera (Artboard)">🎯 Recenter ViewBox</button>
-          <span id="status-info">Ready</span>
-          <button class="status-zoom-btn" id="status-zoom" title="Click to reset zoom to 100%">100%</button>
-        </div>
-      </div>
-    `;
-
-    this.canvasContainer = document.getElementById('canvas-container')!;
-    this.canvasScrollArea = document.getElementById('canvas-scroll-area')!;
-    this.canvasWrapper = document.getElementById('canvas-wrapper')!;
-
-    // Create svg-canvas, grid-svg, and overlay-svg in JS and append to wrapper for guaranteed same-origin alignment
-    const svgNS = 'http://www.w3.org/2000/svg';
-    const svgEl = document.createElementNS(svgNS, 'svg') as SVGSVGElement;
-    svgEl.id = 'svg-canvas';
-    svgEl.style.cssText = 'position:absolute;top:0;left:0;display:block;overflow:visible;';
-    this.canvasWrapper.appendChild(svgEl);
-    this.svgCanvas = svgEl;
-
-    const gridSvgEl = document.createElementNS(svgNS, 'svg') as SVGSVGElement;
-    gridSvgEl.id = 'grid-svg';
-    gridSvgEl.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;overflow:visible;display:none;';
-    this.canvasWrapper.appendChild(gridSvgEl);
-    this.gridSvg = gridSvgEl;
-
-    const overlaySvgEl = document.createElementNS(svgNS, 'svg') as SVGSVGElement;
-    overlaySvgEl.id = 'overlay-svg';
-    overlaySvgEl.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;overflow:visible;';
-    this.canvasWrapper.appendChild(overlaySvgEl);
-    this.overlaySvg = overlaySvgEl;
-
-    // Viewport-bounded Grid Canvas: sized strictly to canvasScrollArea viewport to guarantee 60+ FPS zoom and 1px stroke invariance
-    const gridCanvasEl = document.createElement('canvas');
-    gridCanvasEl.id = 'grid-canvas';
-    gridCanvasEl.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;';
-    this.canvasScrollArea.appendChild(gridCanvasEl);
-    this.gridCanvas = gridCanvasEl;
-    this.gridCanvasRenderer = new GridCanvasRenderer(this.gridCanvas);
-
-    // Initialize Left Toolbar
-    this.toolbar = new Toolbar(
-      document.getElementById('left-toolbar')!,
-      (tool) => this.handleToolChange(tool)
-    );
-
-    // Initialize Top Bar
-    this.topBar = new TopBar(
-      document.getElementById('top-bar')!,
-      this.canvasMgr,
-      {
+    this.layoutMgr = new AppLayoutManager({
+      canvasMgr: this.canvasMgr,
+      model: this.model,
+      selectionTool: this.selectionTool,
+      onToolChange: (tool) => this.handleToolChange(tool),
+      topBarCallbacks: {
         onUndo: () => this.undo(),
         onRedo: () => this.redo(),
         onAlign: (type) => this.handleAlign(type),
@@ -322,15 +249,8 @@ class AntiDrawApp {
           this.topBar.update();
           this.syncMetadataToHost();
         },
-      }
-    );
-
-    // Initialize Rulers
-    this.rulerView = new RulerView(
-      this.canvasContainer,
-      this.canvasMgr,
-      this.model,
-      {
+      },
+      rulerCallbacks: {
         onCornerClick: () => {
           if (this.propertyPanel.currentPanelMode === 'ruler') {
             this.rulerView.setCornerActive(false);
@@ -374,20 +294,11 @@ class AntiDrawApp {
           this.canvasMgr.selectedGuideId = null;
           this.render();
         },
-      }
-    );
-
-    // Sync rulers with scroll area
-    this.canvasScrollArea.addEventListener('scroll', () => {
-      this.syncRulerScroll();
-    });
-
-    // Initialize Right Property Panel
-    this.propertyPanel = new PropertyPanel(
-      document.getElementById('right-panel')!,
-      this.model,
-      this.selectionTool,
-      {
+      },
+      onScroll: () => {
+        this.syncRulerScroll();
+      },
+      propertyPanelCallbacks: {
         onRenderOverlay: () => this.renderOverlay(),
         onUpdateElement: (_el) => {
           this.render();
@@ -480,8 +391,21 @@ class AntiDrawApp {
         onStrokeToPath: () => this.handleStrokeToPath(),
         onConvertToCurves: (_el) => this.handleConvertToCurves(),
         onPushUndo: () => this.pushUndo(),
-      }
-    );
+      },
+    });
+
+    this.canvasContainer = this.layoutMgr.canvasContainer;
+    this.canvasScrollArea = this.layoutMgr.canvasScrollArea;
+    this.canvasWrapper = this.layoutMgr.canvasWrapper;
+    this.svgCanvas = this.layoutMgr.svgCanvas;
+    this.gridSvg = this.layoutMgr.gridSvg;
+    this.gridCanvas = this.layoutMgr.gridCanvas;
+    this.gridCanvasRenderer = this.layoutMgr.gridCanvasRenderer;
+    this.overlaySvg = this.layoutMgr.overlaySvg;
+    this.toolbar = this.layoutMgr.toolbar;
+    this.topBar = this.layoutMgr.topBar;
+    this.rulerView = this.layoutMgr.rulerView;
+    this.propertyPanel = this.layoutMgr.propertyPanel;
   }
 
   private syncRulerScroll(): void {
