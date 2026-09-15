@@ -3,6 +3,7 @@ import { VectorElement, PathVertex, Point, GradientConfig } from '../../engine/V
 import { HandleType } from '../../engine/SelectionTool.js';
 import { SvgSerializer } from '../../engine/serialization/SvgSerializer.js';
 import { ScaleTransformer } from './ScaleTransformer.js';
+import { RotateTransformer } from './RotateTransformer.js';
 import type { SelectToolCallbacks } from '../SelectToolHandler.js';
 
 /**
@@ -138,36 +139,13 @@ export class TransformInteraction {
     dragStartPt: Point,
     selectedEls: VectorElement[]
   ): void {
-    this.rotationPivot = { ...pivot };
-    this.initialRotationAngle = Math.atan2(dragStartPt.y - pivot.y, dragStartPt.x - pivot.x);
+    const init = RotateTransformer.initRotate(pivot, dragStartPt, selectedEls);
+    this.rotationPivot = init.rotationPivot;
+    this.initialRotationAngle = init.initialRotationAngle;
     this.lastDeltaAngle = 0;
-    this.initialElementsMap.clear();
-    this.initialAttributesMap.clear();
-    selectedEls.forEach((el) => {
-      this.initialAttributesMap.set(el.id, { ...el.attributes });
-      if (el.vertices) {
-        this.initialElementsMap.set(
-          el.id,
-          el.vertices.map((v) => ({ ...v, handleIn: v.handleIn ? { ...v.handleIn } : undefined, handleOut: v.handleOut ? { ...v.handleOut } : undefined }))
-        );
-      }
-    });
-    this.ghostTransformMap.clear();
-    /**
-     * ARCHITECTURAL RATIONALE: Instant Ghost Pre-Allocation on Drag Start
-     * Populating ghostTransformMap at rotation initiation guarantees immediate visual feedback
-     * upon handle press without waiting for the first mouse movement delta.
-     */
-    this.initialElementsMap.forEach((origVerts, id) => {
-      this.ghostTransformMap.set(
-        id,
-        origVerts.map((v) => ({
-          ...v,
-          handleIn: v.handleIn ? { ...v.handleIn } : undefined,
-          handleOut: v.handleOut ? { ...v.handleOut } : undefined,
-        }))
-      );
-    });
+    this.initialElementsMap = init.initialElementsMap;
+    this.initialAttributesMap = init.initialAttributesMap;
+    this.ghostTransformMap = init.ghostTransformMap;
   }
 
   public onPointerMove(
@@ -295,47 +273,17 @@ export class TransformInteraction {
 
     if (activeHandle === 'rotate' && this.rotationPivot && this.initialElementsMap.size > 0) {
       callbacks.setCursor?.('grabbing');
-
-      const otherVertices: Point[] = [];
-      ctx.model.elements.forEach((el) => {
-        if (!ctx.selectionTool.isSelected(el.id) && el.vertices) {
-          el.vertices.forEach((v) => otherVertices.push({ x: v.x, y: v.y }));
-        }
-      });
-
-      const snappedPt = ctx.snapPoint(pt, otherVertices);
-      const isMagneticallySnapped = Math.hypot(snappedPt.x - pt.x, snappedPt.y - pt.y) > 0.001;
-      this.currentRotationSnappedPt = isMagneticallySnapped ? snappedPt : null;
-
-      const currentAngle = Math.atan2(snappedPt.y - this.rotationPivot.y, snappedPt.x - this.rotationPivot.x);
-      let rawDelta = currentAngle - this.initialRotationAngle;
-      let deg = (rawDelta * 180) / Math.PI;
-
-      const shouldSnapAngular = e.shiftKey || (ctx.canvasMgr.snapAngular && !isMagneticallySnapped);
-      if (shouldSnapAngular) {
-        deg = Math.round(deg / 15) * 15;
-      } else if (!isMagneticallySnapped) {
-        const snapAngles = [0, 45, 90, 135, 180, 225, 270, 315, 360, -45, -90, -135, -180, -225, -270, -315];
-        for (const sa of snapAngles) {
-          if (Math.abs(deg - sa) <= 3) {
-            deg = sa;
-            break;
-          }
-        }
-      }
-
-      const deltaAngle = (deg * Math.PI) / 180;
-      this.lastDeltaAngle = deltaAngle;
-
-      this.ghostTransformMap.clear();
-      this.initialElementsMap.forEach((origVerts, id) => {
-        const rotated = ctx.selectionTool.rotateVerticesAroundPivot(
-          origVerts,
-          this.rotationPivot!,
-          deltaAngle
-        );
-        this.ghostTransformMap.set(id, rotated);
-      });
+      const result = RotateTransformer.computeRotation(
+        ctx,
+        pt,
+        this.rotationPivot,
+        this.initialRotationAngle,
+        this.initialElementsMap,
+        e.shiftKey
+      );
+      this.currentRotationSnappedPt = result.snappedPt;
+      this.lastDeltaAngle = result.deltaAngle;
+      this.ghostTransformMap = result.ghostMap;
       ctx.renderOverlay();
       return true;
     }
@@ -407,70 +355,16 @@ export class TransformInteraction {
       ctx.pushUndo();
       const selectedEls = ctx.model.elements.filter((el) => ctx.selectionTool.isSelected(el.id));
       if (activeHandle === 'rotate') {
-        this.ghostTransformMap.forEach((transformedVerts, id) => {
-          const el = ctx.model.elements.find((e) => e.id === id);
-          if (!el) return;
-
-          const isPieOrArc = el.attributes['data-ellipse-type'] === 'pie' || el.attributes['data-ellipse-type'] === 'arc';
-
-          if (ctx.model.isParametricElement(el)) {
-            const rx = parseFloat(el.attributes.rx || el.attributes.r || '1');
-            const ry = parseFloat(el.attributes.ry || el.attributes.r || '1');
-            if (isPieOrArc && Math.abs(rx - ry) < 0.5) {
-              // Circular arc or pie: preserve parametric! Shift angular bounds by lastDeltaAngle
-              const sAngle = parseFloat(el.attributes['data-start-angle'] || '0');
-              const eAngle = parseFloat(el.attributes['data-end-angle'] || '360');
-              let newStart = Math.round((sAngle + this.lastDeltaAngle) * 10) / 10;
-              let newEnd = Math.round((eAngle + this.lastDeltaAngle) * 10) / 10;
-              newStart = ((newStart % 360) + 360) % 360;
-              newEnd = ((newEnd % 360) + 360) % 360;
-              if (newStart === newEnd) newEnd = newStart + 360;
-
-              el.attributes['data-start-angle'] = newStart.toString();
-              el.attributes['data-end-angle'] = newEnd.toString();
-              const cx = parseFloat(el.attributes.cx || '0');
-              const cy = parseFloat(el.attributes.cy || '0');
-              el.attributes.d = ctx.model.compileEllipseD(cx, cy, rx, ry, el.attributes['data-ellipse-type'] as any, newStart, newEnd);
-              el.vertices = ctx.model.convertEllipseToVertices(cx, cy, rx, ry, el.attributes['data-ellipse-type'] as any, newStart, newEnd);
-              el.attributes['data-node-types'] = el.vertices.map((v) => v.nodeType).join(',');
-              return;
-            } else {
-              ctx.model.convertToCurves(el);
-            }
-          }
-
-          el.vertices = transformedVerts;
-          const isClosed = ctx.model.isElementClosed(el);
-          el.attributes.d = ctx.model.compilePathD(el.vertices, isClosed);
-          if (ctx.model.isParametricElement(el)) {
-            ctx.model.syncParametricAttributes(el);
-          }
-        });
-
         if (this.rotationPivot) {
-          ctx.selectionTool.updatePivotOnRotate(this.rotationPivot, this.lastDeltaAngle, selectedEls);
-
-          // ARCHITECTURAL RATIONALE: Solidary Gradient Rotation (FIX-06)
-          // Rotates linear angles and transforms radial gradient center, focus, radii (rx, ry)
-          // and rotation angle solidarily around the rotation pivot.
-          selectedEls.forEach((el) => {
-            if (el.attributes['data-gradient']) {
-              const initialVerts = this.initialElementsMap.get(el.id);
-              const oldElBox = initialVerts
-                ? ctx.selectionTool.getBoundingBox({ ...el, vertices: initialVerts })
-                : this.initialBox;
-              const newElBox = ctx.selectionTool.getBoundingBox(el);
-              if (oldElBox && newElBox) {
-                ctx.selectionTool.rotateElementGradient(
-                  el,
-                  this.rotationPivot!,
-                  this.lastDeltaAngle,
-                  oldElBox,
-                  newElBox
-                );
-              }
-            }
-          });
+          RotateTransformer.applyRotateCommit(
+            ctx,
+            this.ghostTransformMap,
+            this.rotationPivot,
+            this.lastDeltaAngle,
+            this.initialElementsMap,
+            this.initialBox,
+            selectedEls
+          );
         }
       } else if (this.initialBox) {
         ScaleTransformer.applyScaleCommit(
@@ -813,24 +707,13 @@ export class TransformInteraction {
     if (activeHandle === 'rotate' && this.rotationPivot && selectedEls.length > 0) {
       const gBox = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 0);
       if (gBox) {
-        const deg = (this.lastDeltaAngle * 180) / Math.PI;
-        html += `<rect x="${gBox.x}" y="${gBox.y}" width="${gBox.width}" height="${gBox.height}" transform="rotate(${deg}, ${this.rotationPivot.x}, ${this.rotationPivot.y})" fill="none" stroke="#6366f1" stroke-width="1.5" stroke-dasharray="4 4" vector-effect="non-scaling-stroke" />`;
+        html += RotateTransformer.renderGhostBoundingBox(gBox, this.rotationPivot, this.lastDeltaAngle);
       }
     }
 
     // Magnetic Snap Target Indicator during Vector or Guideline Rotation (FIX-08)
     if (this.currentRotationSnappedPt) {
-      const sp = this.currentRotationSnappedPt;
-      const sR = 6 / z;
-      const sCross = 9 / z;
-      html += `
-        <g class="rotation-snap-indicator" pointer-events="none">
-          <circle cx="${sp.x}" cy="${sp.y}" r="${sR}" fill="none" stroke="#f59e0b" stroke-width="1.5" vector-effect="non-scaling-stroke" />
-          <line x1="${sp.x - sCross}" y1="${sp.y}" x2="${sp.x + sCross}" y2="${sp.y}" stroke="#f59e0b" stroke-width="1" vector-effect="non-scaling-stroke" />
-          <line x1="${sp.x}" y1="${sp.y - sCross}" x2="${sp.x}" y2="${sp.y + sCross}" stroke="#f59e0b" stroke-width="1" vector-effect="non-scaling-stroke" />
-          <circle cx="${sp.x}" cy="${sp.y}" r="${1.8 / z}" fill="#f59e0b" />
-        </g>
-      `;
+      html += RotateTransformer.renderSnapIndicator(this.currentRotationSnappedPt, z);
     }
 
     // Magnetic Snap Target Indicator during Vector Scaling (Snapping to grid, guides, artboard, vertices)
