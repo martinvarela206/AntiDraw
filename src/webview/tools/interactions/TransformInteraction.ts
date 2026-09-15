@@ -4,6 +4,7 @@ import { HandleType } from '../../engine/SelectionTool.js';
 import { SvgSerializer } from '../../engine/serialization/SvgSerializer.js';
 import { ScaleTransformer } from './ScaleTransformer.js';
 import { RotateTransformer } from './RotateTransformer.js';
+import { PivotManager } from './PivotManager.js';
 import type { SelectToolCallbacks } from '../SelectToolHandler.js';
 
 /**
@@ -32,7 +33,15 @@ export class TransformInteraction {
   public initialGradientJson: string | null = null;
   public rotationPivot: Point | null = null;
   public initialRotationAngle: number = 0;
-  public initialPivot: Point | null = null;
+  public readonly pivotManager: PivotManager = new PivotManager();
+
+  public get initialPivot(): Point | null {
+    return this.pivotManager.initialPivot;
+  }
+  public set initialPivot(p: Point | null) {
+    this.pivotManager.initialPivot = p;
+  }
+
   public lastDeltaAngle: number = 0;
   public currentRotationSnappedPt: Point | null = null;
   public currentScaleSnappedPt: Point | null = null;
@@ -160,28 +169,7 @@ export class TransformInteraction {
     const dy = pt.y - dragStartPt.y;
 
     if (activeHandle === 'selection-pivot') {
-      callbacks.setCursor?.('move');
-      const otherVertices: Point[] = [];
-      ctx.model.elements.forEach((el) => {
-        if (el.vertices) {
-          el.vertices.forEach((v) => otherVertices.push({ x: v.x, y: v.y }));
-        }
-      });
-      const selectedEls = ctx.model.elements.filter((el) => ctx.selectionTool.isSelected(el.id));
-      if (selectedEls.length > 0) {
-        const groupBox = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 0);
-        if (groupBox) {
-          otherVertices.push({ x: groupBox.cx, y: groupBox.cy });
-          otherVertices.push({ x: groupBox.x, y: groupBox.y });
-          otherVertices.push({ x: groupBox.x + groupBox.width, y: groupBox.y });
-          otherVertices.push({ x: groupBox.x, y: groupBox.y + groupBox.height });
-          otherVertices.push({ x: groupBox.x + groupBox.width, y: groupBox.y + groupBox.height });
-        }
-      }
-      const snapped = ctx.snapPoint(pt, otherVertices);
-      ctx.selectionTool.customPivot = { x: Math.round(snapped.x), y: Math.round(snapped.y) };
-      ctx.renderOverlay();
-      return true;
+      return this.pivotManager.onPointerMove(ctx, pt, callbacks);
     }
 
     // Radial gradient interactive handles
@@ -315,15 +303,7 @@ export class TransformInteraction {
     callbacks: SelectToolCallbacks
   ): boolean {
     if (activeHandle === 'selection-pivot') {
-      const selectedEls = ctx.model.elements.filter((el) => ctx.selectionTool.isSelected(el.id));
-      if (selectedEls.length === 1 && ctx.selectionTool.customPivot) {
-        ctx.selectionTool.setCustomPivotForElement(selectedEls[0], ctx.selectionTool.customPivot);
-        ctx.syncToHost();
-      }
-      this.initialPivot = null;
-      callbacks.onSelectionChanged?.();
-      ctx.renderOverlay();
-      return true;
+      return this.pivotManager.onPointerUp(ctx, callbacks);
     }
 
     if (
@@ -410,9 +390,7 @@ export class TransformInteraction {
       handled = true;
     }
 
-    if (this.initialPivot) {
-      ctx.selectionTool.customPivot = this.initialPivot;
-      this.initialPivot = null;
+    if (this.pivotManager.cancel(ctx)) {
       handled = true;
     }
 
@@ -463,11 +441,7 @@ export class TransformInteraction {
 
     if (selectedEls.length > 0) {
       const groupBox = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 0);
-      if (groupBox && ctx.selectionTool.hitTestPivot(groupBox, pt, 10 / z)) {
-        ctx.selectionTool.resetPivot(selectedEls.length === 1 ? selectedEls[0] : undefined);
-        callbacks.onSelectionChanged?.();
-        ctx.syncToHost();
-        ctx.renderOverlay();
+      if (this.pivotManager.resetPivotOnDoubleClick(ctx, pt, groupBox, selectedEls, callbacks)) {
         return true;
       }
 
@@ -556,37 +530,8 @@ export class TransformInteraction {
           });
         }
 
-        if (selectedEls.length === 1 && !ctx.selectionTool.customPivot && ctx.selectionTool.elementPivots.has(selectedEls[0].id)) {
-          ctx.selectionTool.restorePivotForElement(selectedEls[0]);
-        }
-        let pivot = ctx.selectionTool.getPivot(groupBox);
-        if (activeHandle === 'move' && ghostDragOffset) {
-          pivot = { x: pivot.x + ghostDragOffset.x, y: pivot.y + ghostDragOffset.y };
-        }
-        const isCustomPivot = ctx.selectionTool.customPivot !== null;
-
-        if (isCustomPivot) {
-          const leverColor = mode === 'rotate' ? '#f59e0b' : '#0284c7';
-          html += `<line x1="${groupBox.cx}" y1="${groupBox.cy}" x2="${pivot.x}" y2="${pivot.y}" stroke="${leverColor}" stroke-width="1" stroke-dasharray="2 2" opacity="0.75" vector-effect="non-scaling-stroke" />`;
-        }
-
-        if (mode !== 'scale') {
-          const pR = 5.5 / z;
-          const tick = 8.5 / z;
-          const pColor = mode === 'rotate' ? '#f59e0b' : '#0284c7';
-          const pCursor = 'move';
-          const pPointerEvents = 'auto';
-          const pOpacity = '1.0';
-
-          html += `
-            <g class="selection-pivot-marker" style="cursor: ${pCursor}; pointer-events: ${pPointerEvents};" opacity="${pOpacity}">
-              <circle cx="${pivot.x}" cy="${pivot.y}" r="${pR}" fill="#ffffff" stroke="${pColor}" stroke-width="1.5" vector-effect="non-scaling-stroke" />
-              <line x1="${pivot.x - tick}" y1="${pivot.y}" x2="${pivot.x + tick}" y2="${pivot.y}" stroke="${pColor}" stroke-width="1.2" vector-effect="non-scaling-stroke" />
-              <line x1="${pivot.x}" y1="${pivot.y - tick}" x2="${pivot.x}" y2="${pivot.y + tick}" stroke="${pColor}" stroke-width="1.2" vector-effect="non-scaling-stroke" />
-              <circle cx="${pivot.x}" cy="${pivot.y}" r="${1.6 / z}" fill="${pColor}" />
-            </g>
-          `;
-        }
+        html += this.pivotManager.renderOverlay(ctx, groupBox, selectedEls, mode, activeHandle, ghostDragOffset, z);
+        const pivot = ctx.selectionTool.getPivot(groupBox);
 
         if (activeHandle === 'rotate' && this.rotationPivot) {
           if (this.currentRotationSnappedPt) {

@@ -1,0 +1,166 @@
+import { ToolContext } from '../IToolHandler.js';
+import { VectorElement, Point } from '../../engine/VectorModel.js';
+import type { SelectToolCallbacks } from '../SelectToolHandler.js';
+
+/**
+ * ARCHITECTURAL RATIONALE: Encapsulated Arbitrary Pivot Manager (SOLID / SRP)
+ * Segregates interactive pivot manipulation, affine center lever rendering,
+ * magnetic vertex/bounding-box snapping, and companion metadata persistence.
+ *
+ * Technical Justifications:
+ * 1. Single Responsibility: Manages exclusively the life-cycle of custom pivot points:
+ *    - Interactive dragging and snapping against canvas elements, artboards, and group bounds.
+ *    - Cancellation rollbacks when gestures are aborted via Escape.
+ *    - Relative coordinate serialization into companion metadata via SelectionTool.setCustomPivotForElement.
+ *    - SVG visual overlay rendering for pivot markers and connection levers.
+ * 2. Precision & Snapping: Gathers all element vertices and bounding box centers/corners
+ *    to provide instant magnetic snapping when adjusting rotation/scale origins.
+ * 3. Preserves Numerical Stability: Clamps and rounds final pivot coordinates to whole integers
+ *    to eliminate subpixel jitter during rotational matrix transformations.
+ */
+export class PivotManager {
+  public initialPivot: Point | null = null;
+
+  /**
+   * Captures initial pivot state for undo/cancellation during drag gestures.
+   */
+  public startDrag(currentPivot: Point | null): void {
+    this.initialPivot = currentPivot ? { ...currentPivot } : null;
+  }
+
+  /**
+   * Handles pointer motion when dragging the custom selection pivot marker.
+   * Snaps the pivot against all visible element vertices and group bounds.
+   */
+  public onPointerMove(
+    ctx: ToolContext,
+    pt: Point,
+    callbacks: SelectToolCallbacks
+  ): boolean {
+    callbacks.setCursor?.('move');
+    const otherVertices: Point[] = [];
+    ctx.model.elements.forEach((el) => {
+      if (el.vertices) {
+        el.vertices.forEach((v) => otherVertices.push({ x: v.x, y: v.y }));
+      }
+    });
+
+    const selectedEls = ctx.model.elements.filter((el) => ctx.selectionTool.isSelected(el.id));
+    if (selectedEls.length > 0) {
+      const groupBox = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 0);
+      if (groupBox) {
+        otherVertices.push({ x: groupBox.cx, y: groupBox.cy });
+        otherVertices.push({ x: groupBox.x, y: groupBox.y });
+        otherVertices.push({ x: groupBox.x + groupBox.width, y: groupBox.y });
+        otherVertices.push({ x: groupBox.x, y: groupBox.y + groupBox.height });
+        otherVertices.push({ x: groupBox.x + groupBox.width, y: groupBox.y + groupBox.height });
+      }
+    }
+
+    const snapped = ctx.snapPoint(pt, otherVertices);
+    ctx.selectionTool.customPivot = { x: Math.round(snapped.x), y: Math.round(snapped.y) };
+    ctx.renderOverlay();
+    return true;
+  }
+
+  /**
+   * Commits the custom pivot position on pointer release.
+   * For single elements, persists the relative pivot into elementPivots and syncs to host metadata.
+   */
+  public onPointerUp(
+    ctx: ToolContext,
+    callbacks: SelectToolCallbacks
+  ): boolean {
+    const selectedEls = ctx.model.elements.filter((el) => ctx.selectionTool.isSelected(el.id));
+    if (selectedEls.length === 1 && ctx.selectionTool.customPivot) {
+      ctx.selectionTool.setCustomPivotForElement(selectedEls[0], ctx.selectionTool.customPivot);
+      ctx.syncToHost();
+    }
+    this.initialPivot = null;
+    callbacks.onSelectionChanged?.();
+    ctx.renderOverlay();
+    return true;
+  }
+
+  /**
+   * Restores initial pivot on drag cancellation (e.g. Escape key press).
+   */
+  public cancel(ctx: ToolContext): boolean {
+    if (this.initialPivot) {
+      ctx.selectionTool.customPivot = this.initialPivot;
+      this.initialPivot = null;
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Evaluates double-click on pivot marker to reset custom pivot back to geometric center.
+   */
+  public resetPivotOnDoubleClick(
+    ctx: ToolContext,
+    pt: Point,
+    groupBox: any,
+    selectedEls: VectorElement[],
+    callbacks: SelectToolCallbacks
+  ): boolean {
+    const z = ctx.canvasMgr.zoom || 1;
+    if (groupBox && ctx.selectionTool.hitTestPivot(groupBox, pt, 10 / z)) {
+      ctx.selectionTool.resetPivot(selectedEls.length === 1 ? selectedEls[0] : undefined);
+      callbacks.onSelectionChanged?.();
+      ctx.syncToHost();
+      ctx.renderOverlay();
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Renders SVG overlay for custom pivot lever and interactive crosshair marker.
+   */
+  public renderOverlay(
+    ctx: ToolContext,
+    groupBox: any,
+    selectedEls: VectorElement[],
+    mode: string,
+    activeHandle: string | null,
+    ghostDragOffset: Point | null,
+    z: number
+  ): string {
+    if (selectedEls.length === 1 && !ctx.selectionTool.customPivot && ctx.selectionTool.elementPivots.has(selectedEls[0].id)) {
+      ctx.selectionTool.restorePivotForElement(selectedEls[0]);
+    }
+
+    let pivot = ctx.selectionTool.getPivot(groupBox);
+    if (activeHandle === 'move' && ghostDragOffset) {
+      pivot = { x: pivot.x + ghostDragOffset.x, y: pivot.y + ghostDragOffset.y };
+    }
+    const isCustomPivot = ctx.selectionTool.customPivot !== null;
+
+    let html = '';
+    if (isCustomPivot) {
+      const leverColor = mode === 'rotate' ? '#f59e0b' : '#0284c7';
+      html += `<line x1="${groupBox.cx}" y1="${groupBox.cy}" x2="${pivot.x}" y2="${pivot.y}" stroke="${leverColor}" stroke-width="1" stroke-dasharray="2 2" opacity="0.75" vector-effect="non-scaling-stroke" />`;
+    }
+
+    if (mode !== 'scale') {
+      const pR = 5.5 / z;
+      const tick = 8.5 / z;
+      const pColor = mode === 'rotate' ? '#f59e0b' : '#0284c7';
+      const pCursor = 'move';
+      const pPointerEvents = 'auto';
+      const pOpacity = '1.0';
+
+      html += `
+        <g class="selection-pivot-marker" style="cursor: ${pCursor}; pointer-events: ${pPointerEvents};" opacity="${pOpacity}">
+          <circle cx="${pivot.x}" cy="${pivot.y}" r="${pR}" fill="#ffffff" stroke="${pColor}" stroke-width="1.5" vector-effect="non-scaling-stroke" />
+          <line x1="${pivot.x - tick}" y1="${pivot.y}" x2="${pivot.x + tick}" y2="${pivot.y}" stroke="${pColor}" stroke-width="1.2" vector-effect="non-scaling-stroke" />
+          <line x1="${pivot.x}" y1="${pivot.y - tick}" x2="${pivot.x}" y2="${pivot.y + tick}" stroke="${pColor}" stroke-width="1.2" vector-effect="non-scaling-stroke" />
+          <circle cx="${pivot.x}" cy="${pivot.y}" r="${1.6 / z}" fill="${pColor}" />
+        </g>
+      `;
+    }
+
+    return html;
+  }
+}
