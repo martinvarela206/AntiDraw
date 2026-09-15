@@ -5,6 +5,7 @@ import { NodeEditorTool } from '../engine/NodeEditorTool.js';
 import { ConfirmationModal } from '../ui/ConfirmationModal.js';
 import { ParametricHandleController } from './node/ParametricHandleController.js';
 import { NodeMarqueeSelector } from './node/NodeMarqueeSelector.js';
+import { NodeOverlayBuilder } from './node/NodeOverlayBuilder.js';
 
 export interface NodeToolCallbacks {
   onNodeSelected?: (vertex: PathVertex, element: VectorElement) => void;
@@ -40,6 +41,7 @@ export class NodeToolHandler implements IToolHandler {
   private callbacks: NodeToolCallbacks;
   public readonly parametricController: ParametricHandleController;
   public readonly marqueeSelector: NodeMarqueeSelector;
+  public readonly overlayBuilder: NodeOverlayBuilder;
 
   public ghostNodeVertices: PathVertex[] | null = null;
   public activeHandle:
@@ -96,6 +98,7 @@ export class NodeToolHandler implements IToolHandler {
     this.callbacks = callbacks;
     this.parametricController = new ParametricHandleController(ctx);
     this.marqueeSelector = new NodeMarqueeSelector();
+    this.overlayBuilder = new NodeOverlayBuilder(ctx, nodeEditorTool);
   }
 
   private isElementClosed(el: VectorElement): boolean {
@@ -915,105 +918,42 @@ export class NodeToolHandler implements IToolHandler {
 
     const selectedEls = this.ctx.model.elements.filter((el) => this.ctx.selectionTool.isSelected(el.id));
 
-    // 1. Node Edit Mode Bézier Handles for Selected Element (rendered when not actively dragging ghost and not parametric)
-    if (!this.ghostNodeVertices && selectedEls.length === 1 && selectedEls[0].vertices && this.ctx.getActiveTool() === 'node' && !this.ctx.model.isParametricElement(selectedEls[0])) {
-      const selectedEl = selectedEls[0];
-      const verts = selectedEl.vertices!;
-      const selectedIdx = verts.findIndex((v) => v.id === this.nodeEditorTool.selectedVertexId);
-      const isClosed = this.isElementClosed(selectedEl);
-
-      const showHandlesFor = new Set<number>();
-      if (selectedIdx >= 0) {
-        showHandlesFor.add(selectedIdx);
-        const prevIdx = selectedIdx > 0 ? selectedIdx - 1 : isClosed ? verts.length - 1 : -1;
-        if (prevIdx >= 0) showHandlesFor.add(prevIdx);
-        const nextIdx = selectedIdx < verts.length - 1 ? selectedIdx + 1 : isClosed ? 0 : -1;
-        if (nextIdx >= 0) showHandlesFor.add(nextIdx);
-      }
-
-      const bHandleR = 3.5 / z;
-      verts.forEach((v, idx) => {
-        if (showHandlesFor.has(idx)) {
-          if (v.handleIn) {
-            html += `<line x1="${v.x}" y1="${v.y}" x2="${v.handleIn.x}" y2="${v.handleIn.y}" stroke="#a855f7" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
-            html += `<circle cx="${v.handleIn.x}" cy="${v.handleIn.y}" r="${bHandleR}" fill="#a855f7" stroke="#ffffff" stroke-width="1" vector-effect="non-scaling-stroke" />`;
-          }
-          if (v.handleOut) {
-            html += `<line x1="${v.x}" y1="${v.y}" x2="${v.handleOut.x}" y2="${v.handleOut.y}" stroke="#a855f7" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
-            html += `<circle cx="${v.handleOut.x}" cy="${v.handleOut.y}" r="${bHandleR}" fill="#a855f7" stroke="#ffffff" stroke-width="1" vector-effect="non-scaling-stroke" />`;
-          }
-        }
-      });
-
-      // 2. Highlight Selected Path Segment in Node Mode
-      if (this.nodeEditorTool.selectedSegmentIdx !== null) {
-        const segIdx = this.nodeEditorTool.selectedSegmentIdx;
-        if (segIdx >= 0 && segIdx < verts.length) {
-          const nextIdx = (segIdx + 1) % verts.length;
-          const v1 = verts[segIdx];
-          const v2 = verts[nextIdx];
-          const isCurve = !!(v1.handleOut || v2.handleIn);
-          let segD = '';
-          if (isCurve) {
-            const h1 = v1.handleOut || { x: v1.x, y: v1.y };
-            const h2 = v2.handleIn || { x: v2.x, y: v2.y };
-            segD = `M ${v1.x} ${v1.y} C ${h1.x} ${h1.y} ${h2.x} ${h2.y} ${v2.x} ${v2.y}`;
-          } else {
-            segD = `M ${v1.x} ${v1.y} L ${v2.x} ${v2.y}`;
-          }
-          html += `<path d="${segD}" fill="none" stroke="#38bdf8" stroke-width="${3 / z}" stroke-dasharray="4 2" vector-effect="non-scaling-stroke" />`;
-        }
-      }
+    // 1. Idle Bézier Handles & Tangents for Selected Element
+    if (
+      !this.ghostNodeVertices &&
+      selectedEls.length === 1 &&
+      this.ctx.getActiveTool() === 'node'
+    ) {
+      html += this.overlayBuilder.renderIdleBezierHandles(selectedEls[0], z);
+      html += this.overlayBuilder.renderSelectedSegment(selectedEls[0], z);
     }
 
-    // 3. Render Parametric Ghosts (Quadrant, Ellipse-Inner, Rect Corner) during active handle dragging
+    // 2. Parametric Drag Ghosts (Quadrant, Ellipse-Inner, Rect Corner)
     if (this.activeHandle) {
       html += this.parametricController.renderGhostOverlay(this.activeHandle, z);
-    } else if (this.ghostNodeVertices) {
-      // 4. Render Ghost Node Tool Path & Handles during active dragging
-      const selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
-      if (selectedEl) {
-        const isClosed = this.isElementClosed(selectedEl);
-        const d = this.ctx.model.compilePathD(this.ghostNodeVertices, isClosed);
-        html += `<path d="${d}" fill="rgba(56, 189, 248, 0.15)" stroke="#38bdf8" stroke-width="2" stroke-dasharray="4 3" vector-effect="non-scaling-stroke" />`;
-        this.ghostNodeVertices.forEach((gv) => {
-          const isSelected = gv.id === this.nodeEditorTool.selectedVertexId;
-          if (isSelected) {
-            html += `<circle cx="${gv.x}" cy="${gv.y}" r="${6 / z}" fill="none" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
-            html += `<circle cx="${gv.x}" cy="${gv.y}" r="${4 / z}" fill="#38bdf8" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
-            if (gv.handleIn) {
-              html += `<line x1="${gv.x}" y1="${gv.y}" x2="${gv.handleIn.x}" y2="${gv.handleIn.y}" stroke="#c084fc" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
-              html += `<circle cx="${gv.handleIn.x}" cy="${gv.handleIn.y}" r="${4 / z}" fill="#c084fc" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
-            }
-            if (gv.handleOut) {
-              html += `<line x1="${gv.x}" y1="${gv.y}" x2="${gv.handleOut.x}" y2="${gv.handleOut.y}" stroke="#c084fc" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
-              html += `<circle cx="${gv.handleOut.x}" cy="${gv.handleOut.y}" r="${4 / z}" fill="#c084fc" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
-            }
-          } else {
-            html += `<circle cx="${gv.x}" cy="${gv.y}" r="${3.5 / z}" fill="#ffffff" stroke="#0284c7" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
-          }
-        });
-      }
+    } else if (this.ghostNodeVertices && selectedEls.length > 0) {
+      // 3. Ghost Path & Node Handles during Drag
+      html += this.overlayBuilder.renderGhostPath(
+        selectedEls[0],
+        this.ghostNodeVertices,
+        this.marqueeSelector,
+        z
+      );
     }
 
-    // 5. Quadrant handle & Inner ratio handle & Corner radius handles on parametric elements when idle in Node Mode
+    // 4. Parametric Idle Handles (Quadrant, Donut, Rect Corners)
     if (!this.ghostNodeVertices && !this.activeHandle) {
       html += this.parametricController.renderIdleHandles(selectedEls, z);
     }
 
-    // 6. Render rubber-band marquee selection overlay
+    // 5. Rubber-band Marquee Selection Box
     if (this.marqueeSelector.isMarqueeActive()) {
       html += this.marqueeSelector.renderOverlay(z);
     }
 
-    // 7. Highlight any additional marquee-selected vertices when idle
-    if (!this.ghostNodeVertices && selectedEls.length === 1 && selectedEls[0].vertices && this.ctx.getActiveTool() === 'node') {
-      selectedEls[0].vertices.forEach((v) => {
-        if (this.marqueeSelector.isVertexSelected(v.id) && v.id !== this.nodeEditorTool.selectedVertexId) {
-          html += `<circle cx="${v.x}" cy="${v.y}" r="${5.5 / z}" fill="none" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
-          html += `<circle cx="${v.x}" cy="${v.y}" r="${3.5 / z}" fill="#38bdf8" stroke="#ffffff" stroke-width="1" vector-effect="non-scaling-stroke" />`;
-        }
-      });
+    // 6. Highlight Multi-Selected Vertices
+    if (!this.ghostNodeVertices && selectedEls.length === 1 && this.ctx.getActiveTool() === 'node') {
+      html += this.overlayBuilder.renderMultiSelectedVertices(selectedEls[0], this.marqueeSelector, z);
     }
 
     return html;
