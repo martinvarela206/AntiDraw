@@ -1,0 +1,295 @@
+import {
+  GradientConfig,
+  GradientStop,
+  ParametricShapeType,
+  VectorElement,
+} from '../VectorModel.js';
+import { IVectorModelSerializerContext } from './SvgSerializer.js';
+
+/**
+ * ARCHITECTURAL RATIONALE: Dedicated SVG Deserialization Service (SvgDeserializer)
+ *
+ * 1. Single Responsibility Principle (SRP):
+ *    Isolates XML document parsing, SVG tag extraction, viewBox and canvas property ingestion,
+ *    filter and gradient defs reconstruction, and parametric primitive restoration away from
+ *    outbound SVG generation in SvgSerializer.
+ *
+ * 2. Defs Sanitization & Ghost Comment Elimination (FIX-20):
+ *    Explicitly traverses and strips AntiDraw template comments, orphaned markers, filters,
+ *    and gradients to prevent unbounded comment growth across repeated save/reload cycles.
+ *
+ * 3. Strict ID Deduplication and Collision Prevention (FIX-19):
+ *    Guarantees that every imported element receives a unique identifier in memory, resolving
+ *    missing or duplicate IDs from external SVGs before registering into VectorModel.
+ *
+ * 4. Parametric Geometry Restoration (FEAT-01, FEAT-02, FEAT-03, FIX-22):
+ *    Preserves native primitives (<rect>, <circle>, <ellipse>, <line>, <polyline>, <polygon>)
+ *    and restores parametric paths without stripping essential scalar geometric attributes.
+ *
+ * 5. Open Vector Fill Restriction (FIX-13):
+ *    Prevents browser-simulated straight-line chord fills on open paths by forcing fill='none'
+ *    unless explicitly closed.
+ */
+export class SvgDeserializer {
+  /**
+   * Parses an SVG document string and populates the model canvas, custom defs, and vector elements.
+   */
+  public static loadSvgString(svgText: string, ctx: IVectorModelSerializerContext): void {
+    if (!svgText || !svgText.trim()) {
+      ctx.createDefaultCanvas();
+      return;
+    }
+
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(svgText, 'image/svg+xml');
+      const svgEl = doc.querySelector('svg');
+
+      if (!svgEl) {
+        ctx.createDefaultCanvas();
+        return;
+      }
+
+      // Read Canvas settings
+      const wAttr = svgEl.getAttribute('width');
+      const hAttr = svgEl.getAttribute('height');
+      const vbAttr = svgEl.getAttribute('viewBox');
+      const styleAttr = svgEl.getAttribute('style') || '';
+
+      let width = wAttr ? parseFloat(wAttr) : 800;
+      let height = hAttr ? parseFloat(hAttr) : 600;
+      if (isNaN(width) || width <= 0) width = 800;
+      if (isNaN(height) || height <= 0) height = 600;
+
+      let viewBox = vbAttr || `0 0 ${width} ${height}`;
+
+      let bg = '#ffffff';
+      const bgMatch = styleAttr.match(/background-color:\s*([^;]+)/i);
+      if (bgMatch) {
+        bg = bgMatch[1].trim();
+      } else if (svgEl.getAttribute('background-color')) {
+        bg = svgEl.getAttribute('background-color')!;
+      }
+
+      ctx.canvas.width = width;
+      ctx.canvas.height = height;
+      ctx.canvas.viewBox = viewBox;
+      ctx.canvas.backgroundColor = bg;
+      ctx.elements.length = 0;
+
+      // Strict Defs Sanitization & Orphaned Comments Elimination (FIX-20)
+      const defsEl = svgEl.querySelector('defs');
+      if (defsEl) {
+        const clone = defsEl.cloneNode(true) as HTMLElement;
+        clone.querySelectorAll('[id^="ad-marker-"]').forEach((m) => m.remove());
+        clone.querySelectorAll('[id^="ad-filter-"]').forEach((f) => f.remove());
+        clone.querySelectorAll('[id^="ad-grad-"]').forEach((g) => g.remove());
+
+        // Remove all comment nodes associated with AntiDraw template blocks or orphaned markers
+        const removeOrphanComments = (parent: Node) => {
+          const nodes = Array.from(parent.childNodes);
+          for (const node of nodes) {
+            if (node.nodeType === 8 /* Node.COMMENT_NODE */) {
+              const text = node.nodeValue || '';
+              if (
+                text.includes('AntiDraw') ||
+                text.includes('marker') ||
+                text.includes('Arrow') ||
+                text.includes('Circle Dot') ||
+                text.includes('Square Block') ||
+                text.includes('Bar Cap') ||
+                text.includes('Filter') ||
+                text.includes('Gradient')
+              ) {
+                node.remove();
+              }
+            } else if (node.hasChildNodes()) {
+              removeOrphanComments(node);
+            }
+          }
+        };
+        removeOrphanComments(clone);
+
+        // If no functional child elements remain in clone, defs had only standard AntiDraw resources
+        if (clone.children.length === 0) {
+          ctx.customDefs = '';
+        } else {
+          ctx.customDefs = clone.innerHTML
+            .split('\n')
+            .filter((line) => line.trim().length > 0)
+            .join('\n')
+            .trim();
+        }
+      } else {
+        ctx.customDefs = '';
+      }
+
+      // Parse child vector elements
+      const usedIds = new Set<string>();
+      const children = Array.from(svgEl.children);
+      children.forEach((child, idx) => {
+        const tag = child.tagName.toLowerCase();
+        if (['path', 'rect', 'ellipse', 'circle', 'line', 'polygon', 'polyline', 'star'].includes(tag)) {
+          const attrs: Record<string, string> = {};
+          for (let i = 0; i < child.attributes.length; i++) {
+            const attr = child.attributes[i];
+            attrs[attr.name] = attr.value;
+          }
+
+          // Import drop-shadow metadata from external <feDropShadow> filter if not already stored
+          if (!attrs['data-drop-shadow'] && attrs['filter'] && defsEl) {
+            const match = attrs['filter'].match(/url\(#([^)]+)\)/);
+            if (match) {
+              const filterId = match[1];
+              const filterEl = defsEl.querySelector(`#${filterId}`);
+              if (filterEl) {
+                const dropEl = filterEl.querySelector('feDropShadow');
+                if (dropEl) {
+                  const dx = parseFloat(dropEl.getAttribute('dx') || '4') || 4;
+                  const dy = parseFloat(dropEl.getAttribute('dy') || '4') || 4;
+                  const blur = parseFloat(dropEl.getAttribute('stdDeviation') || '4') || 4;
+                  const color = dropEl.getAttribute('flood-color') || '#000000';
+                  const opacity = parseFloat(dropEl.getAttribute('flood-opacity') || '0.5') || 0.5;
+                  attrs['data-drop-shadow'] = JSON.stringify({ enabled: true, dx, dy, blur, color, opacity });
+                }
+              }
+            }
+          }
+
+          // Import gradient metadata from external <linearGradient> or <radialGradient> if not already stored
+          if (!attrs['data-gradient'] && attrs['fill'] && defsEl) {
+            const match = attrs['fill'].match(/url\(#([^)]+)\)/);
+            if (match) {
+              const gradId = match[1];
+              const gradEl = defsEl.querySelector(`#${gradId}`);
+              if (gradEl) {
+                const gradTag = gradEl.tagName.toLowerCase();
+                if (gradTag === 'lineargradient' || gradTag === 'radialgradient') {
+                  const isLinear = gradTag === 'lineargradient';
+                  const stopEls = Array.from(gradEl.querySelectorAll('stop'));
+                  const stops: GradientStop[] = stopEls.map((s, sIdx) => {
+                    const offStr = s.getAttribute('offset') || '0';
+                    const offVal = offStr.includes('%') ? parseFloat(offStr) / 100 : parseFloat(offStr);
+                    const color = s.getAttribute('stop-color') || '#000000';
+                    const opStr = s.getAttribute('stop-opacity');
+                    const op = opStr ? parseFloat(opStr) : 1;
+                    return {
+                      id: `stop_${sIdx}`,
+                      offset: isNaN(offVal) ? 0 : offVal,
+                      color,
+                      opacity: isNaN(op) ? 1 : op,
+                    };
+                  });
+                  if (stops.length >= 2) {
+                    const gradConfig: GradientConfig = {
+                      type: isLinear ? 'linear' : 'radial',
+                      stops,
+                    };
+                    if (!isLinear) {
+                      const parsePctOrNum = (val: string | null, defVal: number): number => {
+                        if (!val) return defVal;
+                        return val.includes('%') ? parseFloat(val) / 100 : parseFloat(val);
+                      };
+                      gradConfig.cx = parsePctOrNum(gradEl.getAttribute('cx'), 0.5);
+                      gradConfig.cy = parsePctOrNum(gradEl.getAttribute('cy'), 0.5);
+                      gradConfig.r = parsePctOrNum(gradEl.getAttribute('r'), 0.5);
+                      gradConfig.rx = parsePctOrNum(gradEl.getAttribute('rx'), gradConfig.r);
+                      gradConfig.ry = parsePctOrNum(gradEl.getAttribute('ry'), gradConfig.r);
+                      if (gradEl.hasAttribute('fx')) gradConfig.fx = parsePctOrNum(gradEl.getAttribute('fx'), gradConfig.cx);
+                      if (gradEl.hasAttribute('fy')) gradConfig.fy = parsePctOrNum(gradEl.getAttribute('fy'), gradConfig.cy);
+
+                      const gTrans = gradEl.getAttribute('gradientTransform');
+                      if (gTrans) {
+                        const matMatch = gTrans.match(
+                          /matrix\(\s*([-\d.e]+)[\s,]+([-\d.e]+)[\s,]+([-\d.e]+)[\s,]+([-\d.e]+)[\s,]+([-\d.e]+)[\s,]+([-\d.e]+)\s*\)/i
+                        );
+                        if (matMatch) {
+                          const a = parseFloat(matMatch[1]);
+                          const b = parseFloat(matMatch[2]);
+                          const c = parseFloat(matMatch[3]);
+                          const d = parseFloat(matMatch[4]);
+                          const e = parseFloat(matMatch[5]);
+                          const f = parseFloat(matMatch[6]);
+                          gradConfig.cx = Math.round(e * 1000) / 1000;
+                          gradConfig.cy = Math.round(f * 1000) / 1000;
+                          const angleRad = Math.atan2(b, a);
+                          gradConfig.rotation = Math.round(((angleRad * 180) / Math.PI) * 10) / 10;
+                          gradConfig.rx = Math.round(Math.hypot(a, b) * 1000) / 1000;
+                          gradConfig.ry = Math.round(Math.hypot(c, d) * 1000) / 1000;
+                          gradConfig.r = gradConfig.rx;
+                        } else {
+                          const rotMatch = gTrans.match(/rotate\(([-\d.]+)/);
+                          if (rotMatch) gradConfig.rotation = parseFloat(rotMatch[1]);
+                          const scaleMatch = gTrans.match(/scale\(1,\s*([-\d.]+)\)/);
+                          if (scaleMatch && gradConfig.rx) {
+                            const sy = parseFloat(scaleMatch[1]);
+                            gradConfig.ry = Math.round(gradConfig.rx * sy * 1000) / 1000;
+                          }
+                        }
+                      }
+                    }
+                    attrs['data-gradient'] = JSON.stringify(gradConfig);
+                  }
+                }
+              }
+            }
+          }
+
+          let elementId = attrs.id;
+          if (!elementId || usedIds.has(elementId)) {
+            elementId = `el_${idx}_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
+            attrs.id = elementId;
+          }
+          usedIds.add(elementId);
+
+          const elem: VectorElement = {
+            id: elementId,
+            tagName: tag,
+            attributes: attrs,
+          };
+
+          const shapeAttrs = ['x', 'y', 'width', 'height', 'cx', 'cy', 'r', 'rx', 'ry', 'x1', 'y1', 'x2', 'y2', 'points'];
+
+          if (tag === 'path') {
+            const nodeTypesStr = attrs['data-node-types'] || '';
+            elem.vertices = ctx.parsePathD(attrs.d || '', nodeTypesStr);
+            elem.isClosed = (attrs.d || '').toUpperCase().includes('Z');
+
+            const isParametricPath =
+              attrs['data-shape'] &&
+              ['rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'star'].includes(attrs['data-shape']) &&
+              attrs['data-parametric'] === 'true';
+
+            if (isParametricPath) {
+              elem.isParametric = true;
+              elem.shapeType = attrs['data-shape'] as ParametricShapeType | 'star';
+              elem.tagName = attrs['data-shape'] === 'star' ? 'path' : attrs['data-shape'];
+            } else {
+              shapeAttrs.forEach((sa) => delete elem.attributes[sa]);
+              elem.isParametric = false;
+              elem.shapeType = 'path';
+            }
+          } else {
+            elem.vertices = ctx.convertShapeToVertices(tag, attrs);
+            elem.tagName = tag;
+            elem.isParametric = true;
+            elem.shapeType = tag as ParametricShapeType;
+            elem.attributes['data-shape'] = tag;
+            elem.attributes['data-parametric'] = 'true';
+            elem.isClosed = tag !== 'line' && tag !== 'polyline';
+          }
+
+          if (!elem.isClosed) {
+            elem.attributes.fill = 'none';
+            delete elem.attributes['data-gradient'];
+          }
+
+          ctx.elements.push(elem);
+        }
+      });
+    } catch (e) {
+      console.error('Failed to parse SVG string', e);
+      ctx.createDefaultCanvas();
+    }
+  }
+}
