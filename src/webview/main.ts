@@ -20,6 +20,7 @@ import { ContextMenu, ContextMenuItem } from './ui/ContextMenu.js';
 import { ConfirmationModal } from './ui/ConfirmationModal.js';
 import { GridCanvasRenderer } from './ui/GridCanvasRenderer.js';
 import { ClipboardService } from './services/ClipboardService.js';
+import { HistoryService } from './services/HistoryService.js';
 import './styles/main.css';
 
 class AntiDrawApp {
@@ -76,18 +77,15 @@ class AntiDrawApp {
 
   private isShiftPressed: boolean = false;
 
-  // Clipboard service subsystem
+  // Subsystems & Services
   private clipboardService!: ClipboardService;
-
-  // Undo / Redo history
-  private undoStack: string[] = [];
-  private redoStack: string[] = [];
-  private maxHistory: number = 20;
+  private historyService!: HistoryService;
 
   constructor() {
     this.initTools();
     this.initLayout();
     this.initClipboardService();
+    this.initHistoryService();
     this.initViewport();
     this.initEvents();
     this.notifyReady();
@@ -105,6 +103,16 @@ class AntiDrawApp {
       onResetPropertyPanel: () => this.propertyPanel.resetPanelMode(),
       onShowGuideSettings: (guide: GuideLine) => this.propertyPanel.showGuideSettings(guide),
       onUpdatePropertyPanel: () => this.propertyPanel.update(null, 'select'),
+    });
+  }
+
+  private initHistoryService(): void {
+    this.historyService = new HistoryService({
+      model: this.model,
+      selectionTool: this.selectionTool,
+      onResetPropertyPanel: () => this.propertyPanel.resetPanelMode(),
+      render: () => this.render(),
+      syncToHost: () => this.syncToHost(),
     });
   }
 
@@ -489,12 +497,7 @@ class AntiDrawApp {
         if (payload.metadata.shapeConfig) {
           this.canvasMgr.shapeConfig = { ...this.canvasMgr.shapeConfig, ...payload.metadata.shapeConfig };
         }
-        if (Array.isArray(payload.metadata.undoStack)) {
-          this.undoStack = payload.metadata.undoStack.slice(-this.maxHistory);
-        }
-        if (Array.isArray(payload.metadata.redoStack)) {
-          this.redoStack = payload.metadata.redoStack.slice(-this.maxHistory);
-        }
+        this.historyService.loadFromMetadata(payload.metadata);
         if (payload.metadata.zoom !== undefined) {
           this.canvasMgr.zoom = payload.metadata.zoom;
         }
@@ -996,8 +999,8 @@ class AntiDrawApp {
       snapToViewBox: this.canvasMgr.snapToViewBox,
       snapAngular: this.canvasMgr.snapAngular,
       shapeConfig: this.canvasMgr.shapeConfig,
-      undoStack: this.undoStack,
-      redoStack: this.redoStack,
+      undoStack: this.historyService.undoStackSnapshots,
+      redoStack: this.historyService.redoStackSnapshots,
       zoom: this.canvasMgr.zoom,
       cameraOffset: this.viewportCtrl ? { x: this.viewportCtrl.cameraOffset.x, y: this.viewportCtrl.cameraOffset.y } : undefined,
       isAspectRatioLocked: this.selectionTool.isAspectRatioLocked,
@@ -1745,36 +1748,15 @@ class AntiDrawApp {
 
 
   private pushUndo(): void {
-    const state = JSON.stringify(this.model.elements);
-    this.undoStack.push(state);
-    if (this.undoStack.length > this.maxHistory) {
-      this.undoStack.shift();
-    }
-    this.redoStack = [];
+    this.historyService.pushUndo();
   }
 
   private undo(): void {
-    if (this.undoStack.length === 0) return;
-    const currentState = JSON.stringify(this.model.elements);
-    this.redoStack.push(currentState);
-    const prevState = this.undoStack.pop()!;
-    this.model.elements = JSON.parse(prevState);
-    this.selectionTool.deselectAll();
-    this.propertyPanel.resetPanelMode();
-    this.render();
-    this.syncToHost();
+    this.historyService.undo();
   }
 
   private redo(): void {
-    if (this.redoStack.length === 0) return;
-    const currentState = JSON.stringify(this.model.elements);
-    this.undoStack.push(currentState);
-    const nextState = this.redoStack.pop()!;
-    this.model.elements = JSON.parse(nextState);
-    this.selectionTool.deselectAll();
-    this.propertyPanel.resetPanelMode();
-    this.render();
-    this.syncToHost();
+    this.historyService.redo();
   }
 
   private copySelection(): void {

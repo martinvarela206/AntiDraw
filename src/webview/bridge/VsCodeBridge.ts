@@ -35,6 +35,8 @@ export interface CompanionMetadata {
   snapToViewBox?: boolean;
   snapAngular?: boolean;
   shapeConfig?: any;
+  undoStack?: string[];
+  redoStack?: string[];
   [key: string]: any;
 }
 
