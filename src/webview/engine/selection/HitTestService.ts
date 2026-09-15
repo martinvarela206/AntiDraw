@@ -1,0 +1,275 @@
+import { VectorElement, PathVertex, Point } from '../VectorModel.js';
+import { BoundingBox, BoundingBoxCalculator } from '../geometry/BoundingBoxCalculator.js';
+
+export type HandleType =
+  | 'nw' | 'n' | 'ne'
+  | 'w'  |       'e'
+  | 'sw' | 's' | 'se'
+  | 'rotate';
+
+export interface HitTestResult {
+  element: VectorElement;
+  hitOnFill: boolean;
+}
+
+/**
+ * ARCHITECTURAL RATIONALE: Encapsulated Hit-Testing Service (SOLID / SRP)
+ * Segregates spatial query algorithms, curve distance math, raycasting polygon fill checks,
+ * zoom-independent tolerances, and handle hit-testing away from SelectionTool.
+ *
+ * Technical Justifications:
+ * 1. Zoom-Independent Physical Screen Tolerances:
+ *    Scaling tolerance inversely by zoomScale maintains a consistent, comfortable physical
+ *    screen-pixel hit target regardless of magnification.
+ * 2. Adaptive Piecewise Bézier Discretization for Fill Hit-Testing (FIX-02):
+ *    Standard curved geometries (e.g. ellipses anchored by 4 vertices) fail 36.34% of fill
+ *    area in naive raycasting against chords. Discretizing curved segments into 8 polynomial
+ *    samples covers 99.36% of mathematical area without the heavy overhead of Context2D isPointInPath.
+ * 3. Bimodal Handle Hit-Testing:
+ *    Clearly separates scale handles (8 bounding box points) from rotation handles (stem + corners).
+ * 4. Strict Containment Marquee (100% enclosed):
+ *    Avoids accidental selection of large background cards or artboards when dragging selection boxes.
+ */
+export class HitTestService {
+  /**
+   * Distance from point to line segment.
+   */
+  public static distToSegment(p: Point, v: Point, w: Point): number {
+    const l2 = (w.x - v.x) ** 2 + (w.y - v.y) ** 2;
+    if (l2 === 0) return Math.hypot(p.x - v.x, p.y - v.y);
+    let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(p.x - (v.x + t * (w.x - v.x)), p.y - (v.y + t * (w.y - v.y)));
+  }
+
+  /**
+   * Distance from point to cubic Bezier curve using uniform parameter sampling.
+   */
+  public static distToBezier(p: Point, p0: Point, p1: Point, p2: Point, p3: Point, samples: number = 20): number {
+    let minDist = Infinity;
+    let prevPt = p0;
+
+    for (let i = 1; i <= samples; i++) {
+      const t = i / samples;
+      const mt = 1 - t;
+      const currPt: Point = {
+        x: mt * mt * mt * p0.x + 3 * mt * mt * t * p1.x + 3 * mt * t * t * p2.x + t * t * t * p3.x,
+        y: mt * mt * mt * p0.y + 3 * mt * mt * t * p1.y + 3 * mt * t * t * p2.y + t * t * t * p3.y,
+      };
+      const d = this.distToSegment(p, prevPt, currPt);
+      if (d < minDist) minDist = d;
+      prevPt = currPt;
+    }
+
+    return minDist;
+  }
+
+  /**
+   * Evaluates pointer hit against vector elements top-to-bottom.
+   */
+  public static hitTest(
+    elements: VectorElement[],
+    pt: Point,
+    zoomScale: number = 1.0,
+    hoverTolerance: number = 3.0
+  ): HitTestResult | null {
+    const effectiveTolerance = Math.max((hoverTolerance / 2) / (zoomScale || 1), 3);
+
+    // Search top-to-bottom (reverse array)
+    for (let i = elements.length - 1; i >= 0; i--) {
+      const el = elements[i];
+      if (!el.vertices || el.vertices.length === 0) continue;
+
+      const fill = el.attributes.fill || 'none';
+      const isFilled = fill !== 'none' && fill !== 'transparent' && fill !== 'rgba(0,0,0,0)';
+      const isClosed = el.isClosed !== false;
+
+      // 1. Edge/Stroke Hit test
+      const edgeHit = this.hitTestPathEdge(el.vertices, pt, effectiveTolerance, isClosed);
+      if (edgeHit) {
+        return { element: el, hitOnFill: false };
+      }
+
+      // 2. Fill area hit test
+      if (isFilled && isClosed && this.hitTestPolygonFill(el.vertices, pt)) {
+        return { element: el, hitOnFill: true };
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Distance from point to path edge segments (lines and Bezier curves).
+   */
+  public static hitTestPathEdge(
+    vertices: PathVertex[],
+    pt: Point,
+    tolerance: number,
+    isClosed: boolean = true
+  ): boolean {
+    if (!vertices || vertices.length < 2) return false;
+    const count = isClosed ? vertices.length : vertices.length - 1;
+
+    for (let i = 0; i < count; i++) {
+      const p1 = vertices[i];
+      const p2 = vertices[(i + 1) % vertices.length];
+
+      if (p1.handleOut || p2.handleIn) {
+        const h1 = p1.handleOut || { x: p1.x, y: p1.y };
+        const h2 = p2.handleIn || { x: p2.x, y: p2.y };
+        if (this.distToBezier(pt, p1, h1, h2, p2) <= tolerance) {
+          return true;
+        }
+      } else {
+        if (this.distToSegment(pt, p1, p2) <= tolerance) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Raycasting point-in-polygon fill testing with adaptive Bezier piecewise sampling.
+   */
+  public static hitTestPolygonFill(vertices: PathVertex[], pt: Point): boolean {
+    if (!vertices || vertices.length < 3) return false;
+
+    // Build the boundary contour polygon with adaptive Bézier sampling
+    const polygon: Point[] = [];
+    const len = vertices.length;
+
+    for (let i = 0; i < len; i++) {
+      const p1 = vertices[i];
+      const p2 = vertices[(i + 1) % len];
+
+      polygon.push({ x: p1.x, y: p1.y });
+
+      // If either anchor possesses a Bézier handle, sample intermediate points along the curve
+      if (p1.handleOut || p2.handleIn) {
+        const h1 = p1.handleOut || { x: p1.x, y: p1.y };
+        const h2 = p2.handleIn || { x: p2.x, y: p2.y };
+        const samples = 8;
+
+        for (let s = 1; s < samples; s++) {
+          const t = s / samples;
+          const mt = 1 - t;
+          const mt2 = mt * mt;
+          const mt3 = mt2 * mt;
+          const t2 = t * t;
+          const t3 = t2 * t;
+
+          polygon.push({
+            x: mt3 * p1.x + 3 * mt2 * t * h1.x + 3 * mt * t2 * h2.x + t3 * p2.x,
+            y: mt3 * p1.y + 3 * mt2 * t * h1.y + 3 * mt * t2 * h2.y + t3 * p2.y,
+          });
+        }
+      }
+    }
+
+    // Standard Jordan Curve Theorem (Raycasting algorithm)
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      const xi = polygon[i].x, yi = polygon[i].y;
+      const xj = polygon[j].x, yj = polygon[j].y;
+
+      const intersect =
+        (yi > pt.y) !== (yj > pt.y) &&
+        pt.x < ((xj - xi) * (pt.y - yi)) / (yj - yi + 0.00001) + xi;
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  }
+
+  /**
+   * Bimodal transform and rotation handle hit-testing.
+   */
+  public static hitTestHandle(
+    box: BoundingBox,
+    pt: Point,
+    handleRadius: number = 12,
+    rotateOffset: number = 20,
+    mode: 'move' | 'scale' | 'rotate' | 'transform' = 'scale'
+  ): HandleType | null {
+    if (mode === 'rotate') {
+      const rotHandles: { type: HandleType; x: number; y: number }[] = [
+        { type: 'rotate', x: box.x, y: box.y },
+        { type: 'rotate', x: box.cx, y: box.y },
+        { type: 'rotate', x: box.x + box.width, y: box.y },
+        { type: 'rotate', x: box.x, y: box.cy },
+        { type: 'rotate', x: box.x + box.width, y: box.cy },
+        { type: 'rotate', x: box.x, y: box.y + box.height },
+        { type: 'rotate', x: box.cx, y: box.y + box.height },
+        { type: 'rotate', x: box.x + box.width, y: box.y + box.height },
+      ];
+      for (const h of rotHandles) {
+        if (Math.hypot(pt.x - h.x, pt.y - h.y) <= handleRadius) {
+          return h.type;
+        }
+      }
+      return null;
+    }
+
+    const handles: { type: HandleType; x: number; y: number }[] = [
+      { type: 'nw', x: box.x, y: box.y },
+      { type: 'n',  x: box.cx, y: box.y },
+      { type: 'ne', x: box.x + box.width, y: box.y },
+      { type: 'w',  x: box.x, y: box.cy },
+      { type: 'e',  x: box.x + box.width, y: box.cy },
+      { type: 'sw', x: box.x, y: box.y + box.height },
+      { type: 's',  x: box.cx, y: box.y + box.height },
+      { type: 'se', x: box.x + box.width, y: box.y + box.height },
+    ];
+
+    for (const h of handles) {
+      if (Math.hypot(pt.x - h.x, pt.y - h.y) <= handleRadius) {
+        return h.type;
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Tests whether a point lands within radius of the given pivot point.
+   */
+  public static hitTestPivot(pivot: Point, pt: Point, radius: number = 8): boolean {
+    return Math.hypot(pt.x - pivot.x, pt.y - pivot.y) <= radius;
+  }
+
+  /**
+   * Evaluates strict 100% containment of elements within a rectangular marquee.
+   */
+  public static hitTestMarquee(
+    elements: VectorElement[],
+    marquee: { x: number; y: number; width: number; height: number }
+  ): string[] {
+    const hits: string[] = [];
+    const mLeft = Math.min(marquee.x, marquee.x + marquee.width);
+    const mRight = Math.max(marquee.x, marquee.x + marquee.width);
+    const mTop = Math.min(marquee.y, marquee.y + marquee.height);
+    const mBottom = Math.max(marquee.y, marquee.y + marquee.height);
+
+    elements.forEach((el) => {
+      const box = BoundingBoxCalculator.getBoundingBox(el);
+      if (!box) return;
+
+      const bRight = box.x + box.width;
+      const bBottom = box.y + box.height;
+
+      // Strict containment: bounding box must be 100% inside marquee selection
+      const isInside =
+        box.x >= mLeft &&
+        bRight <= mRight &&
+        box.y >= mTop &&
+        bBottom <= mBottom;
+
+      if (isInside) {
+        hits.push(el.id);
+      }
+    });
+
+    return hits;
+  }
+}

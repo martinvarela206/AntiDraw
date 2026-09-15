@@ -2,15 +2,11 @@ import { VectorElement, PathVertex, Point, GradientConfig } from './VectorModel.
 import { PathGeometryCompiler } from './geometry/PathGeometryCompiler.js';
 import { StrokeOutlineGenerator } from './boolean/StrokeOutlineGenerator.js';
 import { BoundingBox, BoundingBoxCalculator } from './geometry/BoundingBoxCalculator.js';
+import { HandleType, HitTestResult, HitTestService } from './selection/HitTestService.js';
 import type { Polygon } from 'polygon-clipping';
 
 export { BoundingBox, BoundingBoxCalculator } from './geometry/BoundingBoxCalculator.js';
-
-export type HandleType =
-  | 'nw' | 'n' | 'ne'
-  | 'w'  |       'e'
-  | 'sw' | 's' | 'se'
-  | 'rotate';
+export { HandleType, HitTestResult, HitTestService } from './selection/HitTestService.js';
 
 export interface DragState {
   initialElement: VectorElement;
@@ -202,8 +198,7 @@ export class SelectionTool {
   }
 
   public hitTestPivot(box: BoundingBox, pt: Point, radius: number = 8): boolean {
-    const pivot = this.getPivot(box);
-    return Math.hypot(pt.x - pivot.x, pt.y - pivot.y) <= radius;
+    return HitTestService.hitTestPivot(this.getPivot(box), pt, radius);
   }
 
   /**
@@ -260,207 +255,21 @@ export class SelectionTool {
     return BoundingBoxCalculator.getGroupSelectionBoundingBox(elements, padding);
   }
 
-  /**
-   * ARCHITECTURAL RATIONALE: Strict Containment Marquee vs Box Intersection
-   * Why this solution is engineered this way:
-   * In vector illustration workflows, drawings frequently feature large background rectangles, containers,
-   * or surrounding artboards. An intersection-based marquee selection (capturing any element touched by the box)
-   * leads to severe friction because dragging a selection box almost invariably touches the large background object,
-   * selecting it unintentionally.
-   * Strict 100% containment (box.x >= mLeft && bRight <= mRight && ...) guarantees that only elements
-   * intentionally encapsulated inside the marquee are selected.
-   */
   public hitTestMarquee(
     elements: VectorElement[],
     marquee: { x: number; y: number; width: number; height: number }
   ): string[] {
-    const hits: string[] = [];
-    const mLeft = Math.min(marquee.x, marquee.x + marquee.width);
-    const mRight = Math.max(marquee.x, marquee.x + marquee.width);
-    const mTop = Math.min(marquee.y, marquee.y + marquee.height);
-    const mBottom = Math.max(marquee.y, marquee.y + marquee.height);
-
-    elements.forEach((el) => {
-      const box = this.getBoundingBox(el);
-      if (!box) return;
-
-      const bRight = box.x + box.width;
-      const bBottom = box.y + box.height;
-
-      // Strict containment: bounding box must be 100% inside marquee selection
-      const isInside =
-        box.x >= mLeft &&
-        bRight <= mRight &&
-        box.y >= mTop &&
-        bBottom <= mBottom;
-
-      if (isInside) {
-        hits.push(el.id);
-      }
-    });
-
-    return hits;
+    return HitTestService.hitTestMarquee(elements, marquee);
   }
 
-  /**
-   * ARCHITECTURAL RATIONALE: Zoom-Independent Physical Screen Hit Tolerances
-   * Why effectiveTolerance is scaled by (1 / zoomScale):
-   * Without zoom compensation, hit-test radii are fixed in SVG world coordinates:
-   * - At high zoom (e.g. 800%), a 10px world tolerance equates to an enormous 80px physical area on screen,
-   *   causing clicks far away from a path to erroneously trigger selection.
-   * - At low zoom (e.g. 20%), a 10px world tolerance shrinks to 2 physical pixels, making thin paths
-   *   infuriatingly difficult to hit.
-   * Scaling tolerance inversely by zoomScale maintains a consistent, comfortable physical screen-pixel hit target.
-   */
   public hitTest(
     elements: VectorElement[],
     pt: Point,
     zoomScale: number = 1.0
-  ): { element: VectorElement; hitOnFill: boolean } | null {
-    const effectiveTolerance = Math.max((this.hoverTolerance / 2) / (zoomScale || 1), 3);
-
-    // Search top-to-bottom (reverse array)
-    for (let i = elements.length - 1; i >= 0; i--) {
-      const el = elements[i];
-      if (!el.vertices || el.vertices.length === 0) continue;
-
-      const fill = el.attributes.fill || 'none';
-      const isFilled = fill !== 'none' && fill !== 'transparent' && fill !== 'rgba(0,0,0,0)';
-      const isClosed = el.isClosed !== false;
-
-      // 1. Edge/Stroke Hit test
-      const edgeHit = this.hitTestPathEdge(el.vertices, pt, effectiveTolerance, isClosed);
-      if (edgeHit) {
-        return { element: el, hitOnFill: false };
-      }
-
-      // 2. Fill area hit test
-      if (isFilled && isClosed && this.hitTestPolygonFill(el.vertices, pt)) {
-        return { element: el, hitOnFill: true };
-      }
-    }
-
-    return null;
+  ): HitTestResult | null {
+    return HitTestService.hitTest(elements, pt, zoomScale, this.hoverTolerance);
   }
 
-  // Distance from point to path edge segments (lines and Bezier curves)
-  private hitTestPathEdge(
-    vertices: PathVertex[],
-    pt: Point,
-    tolerance: number,
-    isClosed: boolean = true
-  ): boolean {
-    if (!vertices || vertices.length < 2) return false;
-    const count = isClosed ? vertices.length : vertices.length - 1;
-
-    for (let i = 0; i < count; i++) {
-      const p1 = vertices[i];
-      const p2 = vertices[(i + 1) % vertices.length];
-
-      if (p1.handleOut || p2.handleIn) {
-        const h1 = p1.handleOut || { x: p1.x, y: p1.y };
-        const h2 = p2.handleIn || { x: p2.x, y: p2.y };
-        if (distToBezier(pt, p1, h1, h2, p2) <= tolerance) {
-          return true;
-        }
-      } else {
-        if (distToSegment(pt, p1, p2) <= tolerance) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
-  /**
-   * ARCHITECTURAL RATIONALE: Adaptive Bézier Sampling for Raycasting Point-in-Polygon Hit-Testing (FIX-02)
-   *
-   * 1. The 36.34% Dead-Zone Flaw in Naive Inscribed Polygon Hit-Testing:
-   *    In SVG, standard curved geometries (such as circles, ellipses, teardrops, and organic Bézier shapes)
-   *    are parameterized using cubic Bézier segments anchored by sparse control vertices.
-   *    For instance, an ellipse is defined by exactly 4 orthogonal anchor vertices (at 0°, 90°, 180°, 270°)
-   *    with tangential handleIn/handleOut control vectors.
-   *    A naive point-in-polygon raycasting algorithm that tests only the straight chords between anchor vertices
-   *    treats the ellipse as an inscribed rhombus (diamond). The area of an ellipse is π*a*b (~3.1416*a*b)
-   *    whereas the inscribed diamond is only 2*a*b. This causes (3.1416 - 2) / 3.1416 = 36.34% of the visible
-   *    interior fill area (the 4 outer lobes) to completely fail fill hit-testing. Users clicking on the
-   *    periphery of a filled circle or ellipse experienced false de-selections.
-   *
-   * 2. Why Adaptive Piecewise Bézier Discretization:
-   *    - Naive Alternative Discarded (Full Canvas Context2D `isPointInPath`):
-   *      Instantiating an offscreen `<canvas>` or invoking `Path2D` / `ctx.isPointInPath()` in the webview
-   *      incurs DOM object thrashing, Canvas 2D context state switches, and heavy memory overhead when
-   *      iterating across hundreds of vector elements on every `pointerdown` / `pointermove` event.
-   *    - Naive Alternative Discarded (Exact Algebraic Bézier Ray-Intersection):
-   *      Solving cubic polynomial roots (Cardano's formula) for horizontal ray intersection against every
-   *      curved segment requires complex transcendental calculations and is prone to numerical instability
-   *      at horizontal tangents (double/triple roots, inflection points, and floating point jitter).
-   *    - Chosen Technical Solution:
-   *      Discretize only curved segments (where handleOut or handleIn exists) using 8 uniform parameter steps
-   *      along the cubic polynomial B(t) = (1-t)³P0 + 3(1-t)²tH1 + 3(1-t)t²H2 + t³P3.
-   *      For an ellipse with 4 anchor points, this constructs a 32-gon covering 99.36% of the true mathematical area.
-   *      The remaining 0.64% sub-pixel perimeter is completely covered by `hitTestPathEdge` with viewport-scaled
-   *      tolerance, achieving 100% gapless fill hit detection at zero noticeable CPU or garbage collection cost.
-   *
-   * 3. Straight Line Efficiency:
-   *    If a segment is purely linear (neither handleOut nor handleIn), no intermediate points are allocated,
-   *    preserving maximum performance for standard rectilinear polygons.
-   */
-  private hitTestPolygonFill(vertices: PathVertex[], pt: Point): boolean {
-    if (!vertices || vertices.length < 3) return false;
-
-    // Build the boundary contour polygon with adaptive Bézier sampling
-    const polygon: Point[] = [];
-    const len = vertices.length;
-
-    for (let i = 0; i < len; i++) {
-      const p1 = vertices[i];
-      const p2 = vertices[(i + 1) % len];
-
-      polygon.push({ x: p1.x, y: p1.y });
-
-      // If either anchor possesses a Bézier handle, sample intermediate points along the curve
-      if (p1.handleOut || p2.handleIn) {
-        const h1 = p1.handleOut || { x: p1.x, y: p1.y };
-        const h2 = p2.handleIn || { x: p2.x, y: p2.y };
-        const samples = 8;
-
-        for (let s = 1; s < samples; s++) {
-          const t = s / samples;
-          const mt = 1 - t;
-          const mt2 = mt * mt;
-          const mt3 = mt2 * mt;
-          const t2 = t * t;
-          const t3 = t2 * t;
-
-          polygon.push({
-            x: mt3 * p1.x + 3 * mt2 * t * h1.x + 3 * mt * t2 * h2.x + t3 * p2.x,
-            y: mt3 * p1.y + 3 * mt2 * t * h1.y + 3 * mt * t2 * h2.y + t3 * p2.y,
-          });
-        }
-      }
-    }
-
-    // Standard Jordan Curve Theorem (Raycasting algorithm)
-    let inside = false;
-    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-      const xi = polygon[i].x, yi = polygon[i].y;
-      const xj = polygon[j].x, yj = polygon[j].y;
-
-      const intersect =
-        (yi > pt.y) !== (yj > pt.y) &&
-        pt.x < ((xj - xi) * (pt.y - yi)) / (yj - yi + 0.00001) + xi;
-      if (intersect) inside = !inside;
-    }
-    return inside;
-  }
-
-  /**
-   * ARCHITECTURAL RATIONALE: Bimodal Handle Hit-Testing (FIX-05)
-   * Depending on `selectionMode`:
-   * - 'transform' mode: Only tests the 8 bounding box scale/resize handles. Rotation handles are excluded.
-   * - 'rotate' mode: Tests the top rotation stem handle and the 4 corner rotation handles. Scale handles are excluded.
-   */
   public hitTestHandle(
     box: BoundingBox,
     pt: Point,
@@ -468,43 +277,7 @@ export class SelectionTool {
     rotateOffset: number = 20,
     mode: 'move' | 'scale' | 'rotate' | 'transform' = 'scale'
   ): HandleType | null {
-    if (mode === 'rotate') {
-      const rotHandles: { type: HandleType; x: number; y: number }[] = [
-        { type: 'rotate', x: box.x, y: box.y },
-        { type: 'rotate', x: box.cx, y: box.y },
-        { type: 'rotate', x: box.x + box.width, y: box.y },
-        { type: 'rotate', x: box.x, y: box.cy },
-        { type: 'rotate', x: box.x + box.width, y: box.cy },
-        { type: 'rotate', x: box.x, y: box.y + box.height },
-        { type: 'rotate', x: box.cx, y: box.y + box.height },
-        { type: 'rotate', x: box.x + box.width, y: box.y + box.height },
-      ];
-      for (const h of rotHandles) {
-        if (Math.hypot(pt.x - h.x, pt.y - h.y) <= handleRadius) {
-          return h.type;
-        }
-      }
-      return null;
-    }
-
-    const handles: { type: HandleType; x: number; y: number }[] = [
-      { type: 'nw', x: box.x, y: box.y },
-      { type: 'n',  x: box.cx, y: box.y },
-      { type: 'ne', x: box.x + box.width, y: box.y },
-      { type: 'w',  x: box.x, y: box.cy },
-      { type: 'e',  x: box.x + box.width, y: box.cy },
-      { type: 'sw', x: box.x, y: box.y + box.height },
-      { type: 's',  x: box.cx, y: box.y + box.height },
-      { type: 'se', x: box.x + box.width, y: box.y + box.height },
-    ];
-
-    for (const h of handles) {
-      if (Math.hypot(pt.x - h.x, pt.y - h.y) <= handleRadius) {
-        return h.type;
-      }
-    }
-
-    return null;
+    return HitTestService.hitTestHandle(box, pt, handleRadius, rotateOffset, mode);
   }
 
   // Resize / Scale vector element vertices based on drag handle movement
@@ -903,31 +676,3 @@ export class SelectionTool {
   }
 }
 
-// Distance from point to line segment
-function distToSegment(p: Point, v: Point, w: Point): number {
-  const l2 = (w.x - v.x) ** 2 + (w.y - v.y) ** 2;
-  if (l2 === 0) return Math.hypot(p.x - v.x, p.y - v.y);
-  let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
-  t = Math.max(0, Math.min(1, t));
-  return Math.hypot(p.x - (v.x + t * (w.x - v.x)), p.y - (v.y + t * (w.y - v.y)));
-}
-
-// Distance from point to cubic Bezier curve (sampled)
-function distToBezier(p: Point, p0: Point, p1: Point, p2: Point, p3: Point, samples: number = 20): number {
-  let minDist = Infinity;
-  let prevPt = p0;
-
-  for (let i = 1; i <= samples; i++) {
-    const t = i / samples;
-    const mt = 1 - t;
-    const currPt: Point = {
-      x: mt * mt * mt * p0.x + 3 * mt * mt * t * p1.x + 3 * mt * t * t * p2.x + t * t * t * p3.x,
-      y: mt * mt * mt * p0.y + 3 * mt * mt * t * p1.y + 3 * mt * t * t * p2.y + t * t * t * p3.y,
-    };
-    const d = distToSegment(p, prevPt, currPt);
-    if (d < minDist) minDist = d;
-    prevPt = currPt;
-  }
-
-  return minDist;
-}
