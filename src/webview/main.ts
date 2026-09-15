@@ -353,6 +353,7 @@ class AntiDrawApp {
         },
         onGridAlignmentChange: (mode) => {
           this.canvasMgr.gridAlignmentMode = mode;
+          this.updateStatusGridAlignment();
           this.render();
           this.syncMetadataToHost();
         },
@@ -428,7 +429,10 @@ class AntiDrawApp {
         if (payload.metadata.showGrid !== undefined) this.canvasMgr.showGrid = payload.metadata.showGrid;
         if (payload.metadata.showGuides !== undefined) this.canvasMgr.showGuides = payload.metadata.showGuides;
         if (payload.metadata.gridSpacing !== undefined) this.canvasMgr.gridSpacing = payload.metadata.gridSpacing;
-        if (payload.metadata.gridAlignmentMode !== undefined) this.canvasMgr.gridAlignmentMode = payload.metadata.gridAlignmentMode;
+        if (payload.metadata.gridAlignmentMode !== undefined) {
+          this.canvasMgr.gridAlignmentMode = payload.metadata.gridAlignmentMode;
+          this.updateStatusGridAlignment();
+        }
         if (payload.metadata.snapToGrid !== undefined) this.canvasMgr.snapToGrid = payload.metadata.snapToGrid;
         if (payload.metadata.snapToGuides !== undefined) this.canvasMgr.snapToGuides = payload.metadata.snapToGuides;
         if (payload.metadata.snapToVertices !== undefined) this.canvasMgr.snapToVertices = payload.metadata.snapToVertices;
@@ -876,6 +880,58 @@ class AntiDrawApp {
       this.onDoubleClick(e);
     });
 
+    // ARCHITECTURAL RATIONALE: Persistent Status Bar Grid-Ruler Alignment (FEAT-StatusBarGridAlign)
+    // Synchronizes the grid-ruler alignment mode directly from the global bottom status bar.
+    // Why this exists:
+    // Previously, users had to click on empty canvas space to deselect active elements and reveal
+    // the CanvasInspector or RulerGuideInspector panels just to switch between 'origin' and 'cell-center'.
+    // Exposing these controls in the persistent status bar enables immediate toggling during active
+    // vector manipulation without interrupting selection context or multi-element transforms.
+    this.initStatusGridAlignment();
+  }
+
+  /**
+   * Synchronizes the active visual state of status bar grid alignment buttons with canvasMgr.gridAlignmentMode.
+   */
+  public updateStatusGridAlignment(): void {
+    const originBtn = document.getElementById('status-grid-align-origin');
+    const centerBtn = document.getElementById('status-grid-align-center');
+    const mode = this.canvasMgr.gridAlignmentMode;
+    if (originBtn) {
+      if (mode === 'origin') {
+        originBtn.classList.add('active');
+      } else {
+        originBtn.classList.remove('active');
+      }
+    }
+    if (centerBtn) {
+      if (mode === 'cell-center') {
+        centerBtn.classList.add('active');
+      } else {
+        centerBtn.classList.remove('active');
+      }
+    }
+  }
+
+  /**
+   * Initializes event listeners for status bar grid alignment buttons.
+   */
+  private initStatusGridAlignment(): void {
+    const originBtn = document.getElementById('status-grid-align-origin');
+    const centerBtn = document.getElementById('status-grid-align-center');
+    originBtn?.addEventListener('click', () => {
+      this.canvasMgr.gridAlignmentMode = 'origin';
+      this.updateStatusGridAlignment();
+      this.render();
+      this.syncMetadataToHost();
+    });
+    centerBtn?.addEventListener('click', () => {
+      this.canvasMgr.gridAlignmentMode = 'cell-center';
+      this.updateStatusGridAlignment();
+      this.render();
+      this.syncMetadataToHost();
+    });
+    this.updateStatusGridAlignment();
   }
 
   public recenterViewBox(): void {

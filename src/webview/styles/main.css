@@ -512,7 +512,8 @@ button.prop-input.active {
 }
 
 .status-zoom-btn:hover,
-.status-btn:hover {
+.status-btn:hover,
+.status-btn.active {
   background-color: var(--accent-color);
   color: #ffffff;
   border-color: var(--accent-color);
