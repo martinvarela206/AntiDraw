@@ -34,15 +34,30 @@ This file contains rules specific to the AntiDraw project. Rules are written in 
    - Every feature, UI panel, tool handler, and engine subsystem must remain strictly modular and componentized.
    - If any component, class, or handler grows too large, acquires excessive complexity, or violates single-responsibility principles, a dedicated refactoring task MUST immediately be added and prioritized at the top of `Docs/TODO.md`.
 
+6. **File Size Threshold & SOLID Modularization (>500 Lines)**:
+   - Whenever any source code file grows significantly (exceeding 500 lines) or begins accumulating disparate responsibilities, immediately analyze structural refactoring opportunities.
+   - Decompose monolithic units into cohesive classes, specialized modules, or decoupled interfaces.
+   - Audit other files across the codebase to detect shared capabilities, base properties, or parallel logic that can be abstracted into shared interfaces or reusable modules.
+   - Strictly adhere to SOLID design principles (especially Single Responsibility, Interface Segregation, and Dependency Inversion) to guarantee high cohesion and low coupling.
+
+---
+
+## Feature & Bug Fix Diagnostic & Solution Evaluation
+
+7. **Root-Cause Analysis, Multi-Solution Evaluation & Optimal Selection**:
+   - For any user request involving fixes, corrections, or new features, conduct a comprehensive analysis and diagnosis before jumping into implementation.
+   - Formulate and evaluate multiple viable architectural and algorithmic solutions, comparing their technical trade-offs, edge-case coverage, precision, and maintainability.
+   - Select and execute the most optimal, precise, and robust solution expected in professional-grade software engineering.
+
 ---
 
 ## Multi-Item Prompt Decomposition & Atomic Loop Execution
 
-6. **Dynamic Task Ingestion into `Docs/TODO.md`**:
+8. **Dynamic Task Ingestion into `Docs/TODO.md`**:
    - Whenever a user prompt mentions, enumerates, or identifies problems, bugs, corrections, missing functionality, or new features, these items MUST be cataloged and added to `Docs/TODO.md` before execution.
    - **Exception / Direct Flow**: If `Docs/TODO.md` has no pending items (empty list) and a problem is diagnosed, do not leave it parked in the TODO; immediately initiate the required implementation to resolve it.
 
-7. **Mandatory Decomposition of Multi-Item Prompts**:
+9. **Mandatory Decomposition of Multi-Item Prompts**:
    - Whenever the prompt or active TODO list contains multiple tasks, bullet points, fixes, additions, or removals (2 or more distinct items):
      - **NEVER** bundle, combine, or resolve multiple items together in a single step, file edit block, version bump, or commit.
      - You MUST immediately decompose the work into an ordered list of individual, discrete items.
@@ -50,7 +65,7 @@ This file contains rules specific to the AntiDraw project. Rules are written in 
        - If the feature already exists partially, or has defects/modifications: classify as `fix`.
        - If the capability is completely new and did not exist before: classify as `feat`.
 
-8. **Strict Sequential Atomic Execution Loop**:
+10. **Strict Sequential Atomic Execution Loop**:
    - Execute items sequentially, one by one, completing the entire cycle for each item before touching the next:
      1. **Implement Code**: Make code changes strictly for the single active item.
      2. **Update Documentation**:
@@ -68,18 +83,18 @@ This file contains rules specific to the AntiDraw project. Rules are written in 
 
 ## Code Hygiene & Architectural Rationale
 
-9. **Mandatory In-Code Rationale & Technical Solution Comments**:
+11. **Mandatory In-Code Rationale & Technical Solution Comments**:
    - Whenever a specific technical solution, algorithm, non-obvious workaround, or architectural choice is implemented in code, comprehensive comments MUST be placed directly in the code explaining the exact rationale:
      - **Why it was built this way and not another** (the underlying technical justification).
      - **Which edge cases, race conditions, focus/blur quirks, or numerical stability issues it solves**.
      - **Which naive or alternate approaches were discarded and why**.
    - Comments must be placed immediately above or within the relevant functions, event handlers, and data structures.
 
-10. **Permanent Preservation of Historical and Technical In-Code Comments**:
+12. **Permanent Preservation of Historical and Technical In-Code Comments**:
    - All historical, architectural, algorithmic, and optimization comments placed within code files MUST be preserved permanently across all future edits and refactorings.
    - These comments serve as living technical documentation and learning records for the repository. Never remove, strip, or truncate existing in-code rationale, performance diagnostics, or architectural comments unless the underlying subsystem itself is formally deprecated and removed.
 
-11. **Impersonal and Professional Comment Style (Third-Person Technical Voice)**:
+13. **Impersonal and Professional Comment Style (Third-Person Technical Voice)**:
     - In-code comments, code documentation, and architectural rationale MUST NEVER be written in the second person (strictly avoid "you", "tu", "usted", "you can", "you should", etc.).
     - Always use standard third-person technical engineering voice, passive construction, or concise descriptive imperative:
       - *Allowed*: "Calculates visible bounds analytically to prevent layout reflows..."
