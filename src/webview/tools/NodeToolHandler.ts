@@ -3,6 +3,7 @@ import { ToolType } from '../ui/Toolbar.js';
 import { Point, PathVertex, NodeType, VectorElement, RectCorners } from '../engine/VectorModel.js';
 import { NodeEditorTool } from '../engine/NodeEditorTool.js';
 import { ConfirmationModal } from '../ui/ConfirmationModal.js';
+import { ParametricHandleController } from './node/ParametricHandleController.js';
 
 export interface NodeToolCallbacks {
   onNodeSelected?: (vertex: PathVertex, element: VectorElement) => void;
@@ -38,6 +39,7 @@ export class NodeToolHandler implements IToolHandler {
   private ctx: ToolContext;
   public nodeEditorTool: NodeEditorTool;
   private callbacks: NodeToolCallbacks;
+  public readonly parametricController: ParametricHandleController;
 
   public ghostNodeVertices: PathVertex[] | null = null;
   public activeHandle:
@@ -56,23 +58,32 @@ export class NodeToolHandler implements IToolHandler {
   public initialVertices: PathVertex[] = [];
   public isDragging: boolean = false;
 
-  // FEAT-02: Parametric Ellipse Quadrant Control Handle State
-  public quadrantGhostMode: 'ellipse' | 'pie' | 'arc' = 'ellipse';
-  public quadrantGhostStartAngle: number = 0;
-  public quadrantGhostEndAngle: number = 360;
-  public quadrantCenter: Point = { x: 0, y: 0 };
-  public quadrantRadii: { rx: number; ry: number } = { rx: 1, ry: 1 };
-  public quadrantGhostD: string = '';
+  public get quadrantGhostMode(): 'ellipse' | 'pie' | 'arc' { return this.parametricController.quadrantGhostMode; }
+  public set quadrantGhostMode(val: 'ellipse' | 'pie' | 'arc') { this.parametricController.quadrantGhostMode = val; }
+  public get quadrantGhostStartAngle(): number { return this.parametricController.quadrantGhostStartAngle; }
+  public set quadrantGhostStartAngle(val: number) { this.parametricController.quadrantGhostStartAngle = val; }
+  public get quadrantGhostEndAngle(): number { return this.parametricController.quadrantGhostEndAngle; }
+  public set quadrantGhostEndAngle(val: number) { this.parametricController.quadrantGhostEndAngle = val; }
+  public get quadrantCenter(): Point { return this.parametricController.quadrantCenter; }
+  public set quadrantCenter(val: Point) { this.parametricController.quadrantCenter = val; }
+  public get quadrantRadii(): { rx: number; ry: number } { return this.parametricController.quadrantRadii; }
+  public set quadrantRadii(val: { rx: number; ry: number }) { this.parametricController.quadrantRadii = val; }
+  public get quadrantGhostD(): string { return this.parametricController.quadrantGhostD; }
+  public set quadrantGhostD(val: string) { this.parametricController.quadrantGhostD = val; }
 
-  // FEAT-10: Parametric Ellipse Inner Ratio (Donut/Ring) State
-  public ellipseInnerGhostRatio: number = 0;
+  public get ellipseInnerGhostRatio(): number { return this.parametricController.ellipseInnerGhostRatio; }
+  public set ellipseInnerGhostRatio(val: number) { this.parametricController.ellipseInnerGhostRatio = val; }
 
-  // FEAT-03: Parametric Rect Corner Radius Drag State
-  public rectGhostD: string = '';
-  public rectGhostCorners: RectCorners = { tl: 0, tr: 0, br: 0, bl: 0, mode: 'uniform', unit: 'px' };
-  public rectGhostBounds: { x: number; y: number; w: number; h: number } = { x: 0, y: 0, w: 0, h: 0 };
-  public rectGhostActiveRadius: number = 0;
-  public rectGhostActiveCorner: 'tl' | 'tr' | 'br' | 'bl' = 'tl';
+  public get rectGhostD(): string { return this.parametricController.rectGhostD; }
+  public set rectGhostD(val: string) { this.parametricController.rectGhostD = val; }
+  public get rectGhostCorners(): RectCorners { return this.parametricController.rectGhostCorners; }
+  public set rectGhostCorners(val: RectCorners) { this.parametricController.rectGhostCorners = val; }
+  public get rectGhostBounds(): { x: number; y: number; w: number; h: number } { return this.parametricController.rectGhostBounds; }
+  public set rectGhostBounds(val: { x: number; y: number; w: number; h: number }) { this.parametricController.rectGhostBounds = val; }
+  public get rectGhostActiveRadius(): number { return this.parametricController.rectGhostActiveRadius; }
+  public set rectGhostActiveRadius(val: number) { this.parametricController.rectGhostActiveRadius = val; }
+  public get rectGhostActiveCorner(): 'tl' | 'tr' | 'br' | 'bl' { return this.parametricController.rectGhostActiveCorner; }
+  public set rectGhostActiveCorner(val: 'tl' | 'tr' | 'br' | 'bl') { this.parametricController.rectGhostActiveCorner = val; }
 
   private lastClickTime: number = 0;
   private lastClickPt: Point = { x: 0, y: 0 };
@@ -82,97 +93,26 @@ export class NodeToolHandler implements IToolHandler {
     this.ctx = ctx;
     this.nodeEditorTool = nodeEditorTool;
     this.callbacks = callbacks;
+    this.parametricController = new ParametricHandleController(ctx);
   }
 
   private isElementClosed(el: VectorElement): boolean {
     return this.ctx.model.isElementClosed(el);
   }
 
-  /**
-   * ARCHITECTURAL RATIONALE: Interactive Ellipse Quadrant Control Point (FEAT-02)
-   *
-   * Computes the canvas coordinate of the quadrant control handle on an ellipse's perimeter.
-   * By default, it resides at the terminal endAngle (or 0° / 360° for full ellipse).
-   */
   public getQuadrantHandlePoint(el: VectorElement): Point | null {
-    if (!this.ctx.model.isParametricElement(el) || !this.ctx.model.isEllipse(el)) return null;
-    const cx = parseFloat(el.attributes.cx || '0');
-    const cy = parseFloat(el.attributes.cy || '0');
-    const rx = parseFloat(el.attributes.rx || el.attributes.r || '1');
-    const ry = parseFloat(el.attributes.ry || el.attributes.r || '1');
-    const endAngle = parseFloat(el.attributes['data-end-angle'] || '360');
-    const rad = (endAngle * Math.PI) / 180;
-    return {
-      x: cx + rx * Math.cos(rad),
-      y: cy + ry * Math.sin(rad),
-    };
+    return this.parametricController.getQuadrantHandlePoint(el);
   }
 
-  /**
-   * ARCHITECTURAL RATIONALE: Interactive Ellipse Inner Radius Control Handle (FEAT-10)
-   *
-   * Computes the canvas coordinate of the inner hole (donut/ring/annular sector) control handle.
-   * Positioned along the bisector angle of the arc/pie, or 0° for full ellipse/circle,
-   * at distance = innerRatio * radius from center (cx, cy).
-   * When innerRatio is 0 (solid circle), the handle sits at the center (cx, cy).
-   */
   public getEllipseInnerHandlePoint(el: VectorElement): Point | null {
-    if (!this.ctx.model.isParametricElement(el) || !this.ctx.model.isEllipse(el)) return null;
-    const cx = parseFloat(el.attributes.cx || '0');
-    const cy = parseFloat(el.attributes.cy || '0');
-    const rx = parseFloat(el.attributes.rx || el.attributes.r || '1');
-    const ry = parseFloat(el.attributes.ry || el.attributes.r || '1');
-    const innerRatio = parseFloat(el.attributes['data-inner-ratio'] || '0');
-    const type = (el.attributes['data-ellipse-type'] as 'ellipse' | 'pie' | 'arc') || 'ellipse';
-    const startAngle = parseFloat(el.attributes['data-start-angle'] || '0');
-    const endAngle = parseFloat(el.attributes['data-end-angle'] || '360');
-
-    if (innerRatio <= 0) {
-      return { x: cx, y: cy };
-    }
-
-    const isFull = type === 'ellipse' || Math.abs(endAngle - startAngle) >= 360;
-    const midAngle = isFull ? 0 : (startAngle + endAngle) / 2;
-    const rad = (midAngle * Math.PI) / 180;
-    return {
-      x: cx + rx * innerRatio * Math.cos(rad),
-      y: cy + ry * innerRatio * Math.sin(rad),
-    };
+    return this.parametricController.getEllipseInnerHandlePoint(el);
   }
 
-  /**
-   * ARCHITECTURAL RATIONALE: Interactive Rect Corner Radii Control Handles (FEAT-03)
-   *
-   * Computes the 4 canvas coordinates of the corner radius control handles for a parametric rectangle.
-   * Positioned along each corner's inward diagonal at distance = max(14 / z, effectiveRadius).
-   * Even when corner radius is 0 (sharp corner), the handle remains visible at an inset of 14 / z,
-   * allowing the user to immediately drag and round the corner with direct visual feedback.
-   */
   public getRectCornerHandles(
     el: VectorElement,
     z: number = 1
   ): { tl: Point; tr: Point; br: Point; bl: Point } | null {
-    if (!this.ctx.model.isParametricElement(el) || !this.ctx.model.isRect(el)) return null;
-    const x = parseFloat(el.attributes.x || '0');
-    const y = parseFloat(el.attributes.y || '0');
-    const w = parseFloat(el.attributes.width || '100');
-    const h = parseFloat(el.attributes.height || '100');
-
-    const corners = this.ctx.model.getRectCorners(el, w, h);
-    const eff = this.ctx.model.calculateEffectiveCorners(w, h, corners);
-
-    const minInset = Math.min(14 / z, w / 3, h / 3);
-    const dTL = Math.max(minInset, eff.tl);
-    const dTR = Math.max(minInset, eff.tr);
-    const dBR = Math.max(minInset, eff.br);
-    const dBL = Math.max(minInset, eff.bl);
-
-    return {
-      tl: { x: x + dTL, y: y + dTL },
-      tr: { x: x + w - dTR, y: y + dTR },
-      br: { x: x + w - dBR, y: y + h - dBR },
-      bl: { x: x + dBL, y: y + h - dBL },
-    };
+    return this.parametricController.getRectCornerHandles(el, z);
   }
 
   /**
@@ -330,76 +270,15 @@ export class NodeToolHandler implements IToolHandler {
     }
 
     if (selectedEl && selectedEl.vertices && selectedEl.vertices.length > 0) {
-      // 0. Check if clicking on parametric ellipse handles (FEAT-02 & FEAT-10)
-      if (this.ctx.model.isParametricElement(selectedEl) && this.ctx.model.isEllipse(selectedEl)) {
-        const innerPt = this.getEllipseInnerHandlePoint(selectedEl);
-        const qPt = this.getQuadrantHandlePoint(selectedEl);
-        const cx = parseFloat(selectedEl.attributes.cx || '0');
-        const cy = parseFloat(selectedEl.attributes.cy || '0');
-        const rx = parseFloat(selectedEl.attributes.rx || selectedEl.attributes.r || '1');
-        const ry = parseFloat(selectedEl.attributes.ry || selectedEl.attributes.r || '1');
-        const currentInnerRatio = parseFloat(selectedEl.attributes['data-inner-ratio'] || '0');
-
-        if (innerPt && Math.hypot(pt.x - innerPt.x, pt.y - innerPt.y) <= 12 / z) {
-          this.activeHandle = 'ellipse-inner';
-          this.dragStartPt = { x: pt.x, y: pt.y };
-          this.initialVertices = JSON.parse(JSON.stringify(selectedEl.vertices));
-          this.quadrantCenter = { x: cx, y: cy };
-          this.quadrantRadii = { rx, ry };
-          this.quadrantGhostMode = (selectedEl.attributes['data-ellipse-type'] as 'ellipse' | 'pie' | 'arc') || 'ellipse';
-          this.quadrantGhostStartAngle = parseFloat(selectedEl.attributes['data-start-angle'] || '0');
-          this.quadrantGhostEndAngle = parseFloat(selectedEl.attributes['data-end-angle'] || '360');
-          this.ellipseInnerGhostRatio = currentInnerRatio;
-          this.quadrantGhostD = selectedEl.attributes.d || '';
-          this.isDragging = true;
-          this.ctx.renderOverlay();
-          return true;
-        }
-
-        if (qPt && Math.hypot(pt.x - qPt.x, pt.y - qPt.y) <= 12 / z) {
-          this.activeHandle = 'quadrant';
-          this.dragStartPt = { x: pt.x, y: pt.y };
-          this.initialVertices = JSON.parse(JSON.stringify(selectedEl.vertices));
-          this.quadrantCenter = { x: cx, y: cy };
-          this.quadrantRadii = { rx, ry };
-          this.quadrantGhostMode = (selectedEl.attributes['data-ellipse-type'] as 'ellipse' | 'pie' | 'arc') || 'ellipse';
-          this.quadrantGhostStartAngle = parseFloat(selectedEl.attributes['data-start-angle'] || '0');
-          this.quadrantGhostEndAngle = parseFloat(selectedEl.attributes['data-end-angle'] || '360');
-          this.ellipseInnerGhostRatio = currentInnerRatio;
-          this.quadrantGhostD = selectedEl.attributes.d || '';
-          this.isDragging = true;
-          this.ctx.renderOverlay();
-          return true;
-        }
-      }
-
-      // 0b. Check if clicking on parametric rect corner radius control handles (FEAT-03)
-      if (this.ctx.model.isParametricElement(selectedEl) && this.ctx.model.isRect(selectedEl)) {
-        const cornerHandles = this.getRectCornerHandles(selectedEl, z);
-        if (cornerHandles) {
-          const cornersList: ('tl' | 'tr' | 'br' | 'bl')[] = ['tl', 'tr', 'br', 'bl'];
-          for (const cornerKey of cornersList) {
-            const hPt = cornerHandles[cornerKey];
-            if (Math.hypot(pt.x - hPt.x, pt.y - hPt.y) <= 12 / z) {
-              this.activeHandle = `corner-${cornerKey}` as any;
-              this.dragStartPt = { x: pt.x, y: pt.y };
-              this.initialVertices = JSON.parse(JSON.stringify(selectedEl.vertices));
-
-              const x = parseFloat(selectedEl.attributes.x || '0');
-              const y = parseFloat(selectedEl.attributes.y || '0');
-              const w = parseFloat(selectedEl.attributes.width || '100');
-              const h = parseFloat(selectedEl.attributes.height || '100');
-              this.rectGhostBounds = { x, y, w, h };
-              this.rectGhostCorners = this.ctx.model.getRectCorners(selectedEl, w, h);
-              this.rectGhostActiveCorner = cornerKey;
-              this.rectGhostActiveRadius = this.rectGhostCorners[cornerKey];
-              this.rectGhostD = selectedEl.attributes.d || '';
-              this.isDragging = true;
-              this.ctx.renderOverlay();
-              return true;
-            }
-          }
-        }
+      // 0. Check if clicking on parametric handles (ellipse quadrant/inner or rect corner)
+      const paramDown = this.parametricController.handlePointerDown(selectedEl, pt, z);
+      if (paramDown) {
+        this.activeHandle = paramDown.activeHandle as any;
+        this.dragStartPt = { x: pt.x, y: pt.y };
+        this.initialVertices = paramDown.initialVertices;
+        this.isDragging = true;
+        this.ctx.renderOverlay();
+        return true;
       }
 
       const isClosed = this.isElementClosed(selectedEl);
@@ -512,192 +391,27 @@ export class NodeToolHandler implements IToolHandler {
       const isShift = e.shiftKey;
       const isCtrl = e.ctrlKey || e.metaKey;
 
-      if (this.activeHandle === 'quadrant' && selectedEl) {
-        const cx = this.quadrantCenter.x;
-        const cy = this.quadrantCenter.y;
-        const rx = Math.max(1, this.quadrantRadii.rx);
-        const ry = Math.max(1, this.quadrantRadii.ry);
-
-        const dx = pt.x - cx;
-        const dy = pt.y - cy;
-        // Normalized radial distance from center
-        const D = Math.sqrt((dx / rx) ** 2 + (dy / ry) ** 2);
-
-        // Polar angle in degrees (0 to 360)
-        const rad = Math.atan2(dy / ry, dx / rx);
-        let deg = (rad * 180) / Math.PI;
-        if (deg < 0) deg += 360;
-
-        if (isShift || isCtrl) {
-          deg = Math.round(deg / 15) * 15;
-        } else {
-          // Snap within 3 degrees of cardinal angles (0, 90, 180, 270, 360)
-          for (const cardinal of [0, 90, 180, 270, 360]) {
-            if (Math.abs(deg - (cardinal % 360)) <= 3) {
-              deg = cardinal % 360;
-              break;
-            }
+      if (
+        (this.activeHandle === 'quadrant' ||
+          this.activeHandle === 'ellipse-inner' ||
+          (this.activeHandle && this.activeHandle.startsWith('corner-'))) &&
+        selectedEl
+      ) {
+        const paramMove = this.parametricController.handlePointerMove(
+          selectedEl,
+          this.activeHandle,
+          pt,
+          isShift,
+          isCtrl,
+          e.altKey
+        );
+        if (paramMove && paramMove.handled) {
+          if (paramMove.ghostNodeVertices) {
+            this.ghostNodeVertices = paramMove.ghostNodeVertices;
           }
+          this.ctx.renderOverlay();
+          return true;
         }
-        deg = Math.round(deg * 10) / 10;
-
-        let startAngle = this.quadrantGhostStartAngle;
-        let endAngle = deg;
-
-        let mode: 'ellipse' | 'pie' | 'arc' = 'pie';
-        const delta = Math.abs(endAngle - startAngle);
-        if (delta < 2 || Math.abs(delta - 360) < 2) {
-          mode = 'ellipse';
-          startAngle = 0;
-          endAngle = 360;
-        } else {
-          // D > 1.0 -> outside perimeter -> Open Arc
-          // D <= 1.0 -> on or inside perimeter -> Closed Pie Wedge
-          mode = D > 1.0 ? 'arc' : 'pie';
-        }
-
-        this.quadrantGhostMode = mode;
-        this.quadrantGhostStartAngle = startAngle;
-        this.quadrantGhostEndAngle = endAngle;
-
-        this.ghostNodeVertices = this.ctx.model.convertEllipseToVertices(
-          cx,
-          cy,
-          rx,
-          ry,
-          mode,
-          startAngle,
-          endAngle,
-          this.ellipseInnerGhostRatio
-        );
-        this.quadrantGhostD = this.ctx.model.compileEllipseD(
-          cx,
-          cy,
-          rx,
-          ry,
-          mode,
-          startAngle,
-          endAngle,
-          this.ellipseInnerGhostRatio
-        );
-
-        this.ctx.renderOverlay();
-        return true;
-      }
-
-      // FEAT-10: Interactive Inner Ratio (Donut/Ring) Dragging for Parametric Ellipse
-      if (this.activeHandle === 'ellipse-inner' && selectedEl) {
-        const cx = this.quadrantCenter.x;
-        const cy = this.quadrantCenter.y;
-        const rx = Math.max(1, this.quadrantRadii.rx);
-        const ry = Math.max(1, this.quadrantRadii.ry);
-
-        const dx = pt.x - cx;
-        const dy = pt.y - cy;
-        // Normalized radial distance from center
-        const D = Math.sqrt((dx / rx) ** 2 + (dy / ry) ** 2);
-        let ratio = Math.max(0, Math.min(0.95, D));
-
-        // Snap to solid circle (ratio = 0) if dragged close to center (< 0.05)
-        if (ratio < 0.05) {
-          ratio = 0;
-        } else if (isShift || isCtrl) {
-          ratio = Math.round(ratio * 20) / 20; // 5% step increments
-        } else {
-          ratio = Math.round(ratio * 100) / 100;
-        }
-
-        this.ellipseInnerGhostRatio = ratio;
-
-        this.ghostNodeVertices = this.ctx.model.convertEllipseToVertices(
-          cx,
-          cy,
-          rx,
-          ry,
-          this.quadrantGhostMode,
-          this.quadrantGhostStartAngle,
-          this.quadrantGhostEndAngle,
-          ratio
-        );
-        this.quadrantGhostD = this.ctx.model.compileEllipseD(
-          cx,
-          cy,
-          rx,
-          ry,
-          this.quadrantGhostMode,
-          this.quadrantGhostStartAngle,
-          this.quadrantGhostEndAngle,
-          ratio
-        );
-
-        this.ctx.renderOverlay();
-        return true;
-      }
-
-      // FEAT-03: Interactive Corner Radii Dragging for Parametric Rect
-      if (this.activeHandle && this.activeHandle.startsWith('corner-') && selectedEl) {
-        const cornerKey = this.activeHandle.replace('corner-', '') as 'tl' | 'tr' | 'br' | 'bl';
-        const { x, y, w, h } = this.rectGhostBounds;
-        const maxRadius = Math.min(w, h) / 2;
-
-        let rawRadiusPx = 0;
-        if (cornerKey === 'tl') {
-          const dx = Math.max(0, pt.x - x);
-          const dy = Math.max(0, pt.y - y);
-          rawRadiusPx = (dx + dy) / 2;
-        } else if (cornerKey === 'tr') {
-          const dx = Math.max(0, x + w - pt.x);
-          const dy = Math.max(0, pt.y - y);
-          rawRadiusPx = (dx + dy) / 2;
-        } else if (cornerKey === 'br') {
-          const dx = Math.max(0, x + w - pt.x);
-          const dy = Math.max(0, y + h - pt.y);
-          rawRadiusPx = (dx + dy) / 2;
-        } else if (cornerKey === 'bl') {
-          const dx = Math.max(0, pt.x - x);
-          const dy = Math.max(0, y + h - pt.y);
-          rawRadiusPx = (dx + dy) / 2;
-        }
-
-        rawRadiusPx = Math.max(0, Math.min(maxRadius, rawRadiusPx));
-        if (isShift || isCtrl) {
-          rawRadiusPx = Math.round(rawRadiusPx / 5) * 5;
-        } else {
-          rawRadiusPx = Math.round(rawRadiusPx * 10) / 10;
-        }
-
-        const isAlt = e.altKey;
-        const isIndependent = isAlt || this.rectGhostCorners.mode === 'independent';
-
-        let targetValue = rawRadiusPx;
-        if (this.rectGhostCorners.unit === '%') {
-          targetValue = Math.round(((rawRadiusPx / maxRadius) * 50) * 10) / 10;
-        }
-
-        const updatedCorners: RectCorners = {
-          ...this.rectGhostCorners,
-          mode: isIndependent ? 'independent' : 'uniform',
-        };
-
-        if (isIndependent) {
-          updatedCorners[cornerKey] = targetValue;
-        } else {
-          updatedCorners.tl = targetValue;
-          updatedCorners.tr = targetValue;
-          updatedCorners.br = targetValue;
-          updatedCorners.bl = targetValue;
-        }
-
-        this.rectGhostActiveRadius = rawRadiusPx;
-        this.rectGhostActiveCorner = cornerKey;
-        this.rectGhostCorners = updatedCorners;
-
-        const eff = this.ctx.model.calculateEffectiveCorners(w, h, updatedCorners);
-        this.ghostNodeVertices = this.ctx.model.convertRectToVertices(x, y, w, h, eff.tl, eff.tr, eff.br, eff.bl);
-        this.rectGhostD = this.ctx.model.compileRectD(x, y, w, h, eff.tl, eff.tr, eff.br, eff.bl);
-
-        this.ctx.renderOverlay();
-        return true;
       }
 
       if (this.activeHandle === 'vertex' && this.nodeEditorTool.selectedVertexId) {
@@ -862,115 +576,24 @@ export class NodeToolHandler implements IToolHandler {
       this.isDragging = false;
       const selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
 
-      if (this.activeHandle === 'quadrant' && selectedEl) {
-        this.ctx.pushUndo();
-        selectedEl.attributes['data-ellipse-type'] = this.quadrantGhostMode;
-        selectedEl.attributes['data-start-angle'] = this.quadrantGhostStartAngle.toString();
-        selectedEl.attributes['data-end-angle'] = this.quadrantGhostEndAngle.toString();
-        selectedEl.isClosed = this.quadrantGhostMode !== 'arc';
-
-        if (this.quadrantGhostMode === 'arc') {
-          selectedEl.attributes.fill = 'none';
-          delete selectedEl.attributes['data-gradient'];
-        } else if (this.quadrantGhostMode === 'pie' || this.quadrantGhostMode === 'ellipse') {
-          if (!selectedEl.attributes.fill || selectedEl.attributes.fill === 'none') {
-            selectedEl.attributes.fill = '#6366f1';
-          }
-        }
-
-        const innerRatio = parseFloat(selectedEl.attributes['data-inner-ratio'] || '0');
-        if (innerRatio > 0) {
-          selectedEl.attributes['fill-rule'] = 'evenodd';
-        }
-
-        selectedEl.vertices = this.ghostNodeVertices || this.initialVertices;
-        selectedEl.attributes.d = this.quadrantGhostD || this.ctx.model.compileEllipseD(
-          this.quadrantCenter.x,
-          this.quadrantCenter.y,
-          this.quadrantRadii.rx,
-          this.quadrantRadii.ry,
-          this.quadrantGhostMode,
-          this.quadrantGhostStartAngle,
-          this.quadrantGhostEndAngle,
-          innerRatio
+      if (
+        (this.activeHandle === 'quadrant' ||
+          this.activeHandle === 'ellipse-inner' ||
+          (this.activeHandle && this.activeHandle.startsWith('corner-'))) &&
+        selectedEl
+      ) {
+        const handled = this.parametricController.handlePointerUp(
+          selectedEl,
+          this.activeHandle,
+          this.ghostNodeVertices,
+          this.initialVertices
         );
-        selectedEl.attributes['data-node-types'] = selectedEl.vertices.map((v) => v.nodeType).join(',');
-
-        this.activeHandle = null;
-        this.ghostNodeVertices = null;
-        this.quadrantGhostD = '';
-        this.initialVertices = [];
-        if (this.ctx.applyCanvasSize) this.ctx.applyCanvasSize();
-        this.ctx.render();
-        this.ctx.syncToHost();
-        return true;
-      }
-
-      // FEAT-10: Commit Interactive Inner Ratio for Parametric Ellipse
-      if (this.activeHandle === 'ellipse-inner' && selectedEl) {
-        this.ctx.pushUndo();
-        selectedEl.attributes['data-inner-ratio'] = this.ellipseInnerGhostRatio > 0 ? this.ellipseInnerGhostRatio.toString() : '0';
-        if (this.ellipseInnerGhostRatio > 0) {
-          selectedEl.attributes['fill-rule'] = 'evenodd';
-        } else {
-          delete selectedEl.attributes['fill-rule'];
+        if (handled) {
+          this.activeHandle = null;
+          this.ghostNodeVertices = null;
+          this.initialVertices = [];
+          return true;
         }
-
-        selectedEl.vertices = this.ghostNodeVertices || this.initialVertices;
-        selectedEl.attributes.d = this.quadrantGhostD || this.ctx.model.compileEllipseD(
-          this.quadrantCenter.x,
-          this.quadrantCenter.y,
-          this.quadrantRadii.rx,
-          this.quadrantRadii.ry,
-          this.quadrantGhostMode,
-          this.quadrantGhostStartAngle,
-          this.quadrantGhostEndAngle,
-          this.ellipseInnerGhostRatio
-        );
-        selectedEl.attributes['data-node-types'] = selectedEl.vertices.map((v) => v.nodeType).join(',');
-
-        this.activeHandle = null;
-        this.ghostNodeVertices = null;
-        this.quadrantGhostD = '';
-        this.initialVertices = [];
-        if (this.ctx.applyCanvasSize) this.ctx.applyCanvasSize();
-        this.ctx.render();
-        this.ctx.syncToHost();
-        return true;
-      }
-
-      // FEAT-03: Commit Interactive Corner Radii for Parametric Rect
-      if (this.activeHandle && this.activeHandle.startsWith('corner-') && selectedEl) {
-        this.ctx.pushUndo();
-        const c = this.rectGhostCorners;
-        selectedEl.attributes['data-corner-mode'] = c.mode;
-        selectedEl.attributes['data-corner-unit'] = c.unit;
-        selectedEl.attributes['data-corner-tl'] = c.tl.toString();
-        selectedEl.attributes['data-corner-tr'] = c.tr.toString();
-        selectedEl.attributes['data-corner-br'] = c.br.toString();
-        selectedEl.attributes['data-corner-bl'] = c.bl.toString();
-        selectedEl.attributes['data-corner-radius'] = `${c.tl},${c.tr},${c.br},${c.bl}`;
-
-        if (c.mode === 'uniform') {
-          selectedEl.attributes['rx'] = c.unit === '%' ? `${c.tl}%` : c.tl.toString();
-          selectedEl.attributes['ry'] = selectedEl.attributes['rx'];
-        } else {
-          delete selectedEl.attributes['rx'];
-          delete selectedEl.attributes['ry'];
-        }
-
-        selectedEl.vertices = this.ghostNodeVertices || this.initialVertices;
-        selectedEl.attributes.d = this.rectGhostD || this.ctx.model.compilePathD(selectedEl.vertices, true);
-        selectedEl.attributes['data-node-types'] = selectedEl.vertices.map((v) => v.nodeType).join(',');
-
-        this.activeHandle = null;
-        this.ghostNodeVertices = null;
-        this.rectGhostD = '';
-        this.initialVertices = [];
-        if (this.ctx.applyCanvasSize) this.ctx.applyCanvasSize();
-        this.ctx.render();
-        this.ctx.syncToHost();
-        return true;
       }
 
       if (selectedEl && this.ghostNodeVertices) {
@@ -1282,97 +905,9 @@ export class NodeToolHandler implements IToolHandler {
       }
     }
 
-    // 3. Render Quadrant Ghost during active quadrant dragging (FEAT-02)
-    if (this.activeHandle === 'quadrant') {
-      const isArc = this.quadrantGhostMode === 'arc';
-      const fill = isArc ? 'none' : 'rgba(245, 158, 11, 0.2)';
-      const d = this.quadrantGhostD;
-      html += `<path d="${d}" fill="${fill}" stroke="#f59e0b" stroke-width="2" stroke-dasharray="4 3" vector-effect="non-scaling-stroke" />`;
-      const cx = this.quadrantCenter.x;
-      const cy = this.quadrantCenter.y;
-      const rx = this.quadrantRadii.rx;
-      const ry = this.quadrantRadii.ry;
-      const endRad = (this.quadrantGhostEndAngle * Math.PI) / 180;
-      const qx = cx + rx * Math.cos(endRad);
-      const qy = cy + ry * Math.sin(endRad);
-
-      // Ray from center to quadrant handle
-      html += `<line x1="${cx}" y1="${cy}" x2="${qx}" y2="${qy}" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
-      html += `<circle cx="${cx}" cy="${cy}" r="${3 / z}" fill="#f59e0b" />`;
-      // Quadrant handle circle
-      html += `<circle cx="${qx}" cy="${qy}" r="${6 / z}" fill="#f59e0b" stroke="#ffffff" stroke-width="2" vector-effect="non-scaling-stroke" />`;
-      // Angle and mode badge
-      const badgeW = 92;
-      const badgeH = 18;
-      html += `
-        <g opacity="0.95">
-          <rect x="${qx + 10}" y="${qy - 22}" width="${badgeW}" height="${badgeH}" rx="3" fill="#1e1b4b" stroke="#f59e0b" stroke-width="1" vector-effect="non-scaling-stroke" />
-          <text x="${qx + 14}" y="${qy - 9}" font-size="10" fill="#fde68a" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" font-weight="600">${Math.round(this.quadrantGhostEndAngle)}° [${this.quadrantGhostMode.toUpperCase()}]</text>
-        </g>
-      `;
-    } else if (this.activeHandle === 'ellipse-inner') {
-      // 3c. Render Ellipse Inner Ratio Ghost during active inner handle dragging (FEAT-10)
-      const isArc = this.quadrantGhostMode === 'arc';
-      const fill = isArc ? 'none' : 'rgba(6, 182, 212, 0.2)';
-      const d = this.quadrantGhostD;
-      html += `<path d="${d}" fill="${fill}" fill-rule="evenodd" stroke="#06b6d4" stroke-width="2" stroke-dasharray="4 3" vector-effect="non-scaling-stroke" />`;
-      const cx = this.quadrantCenter.x;
-      const cy = this.quadrantCenter.y;
-      const rx = this.quadrantRadii.rx;
-      const ry = this.quadrantRadii.ry;
-      const ratio = this.ellipseInnerGhostRatio;
-
-      const isFull = this.quadrantGhostMode === 'ellipse' || Math.abs(this.quadrantGhostEndAngle - this.quadrantGhostStartAngle) >= 360;
-      const midAngle = isFull ? 0 : (this.quadrantGhostStartAngle + this.quadrantGhostEndAngle) / 2;
-      const midRad = (midAngle * Math.PI) / 180;
-      const inX = cx + rx * ratio * Math.cos(midRad);
-      const inY = cy + ry * ratio * Math.sin(midRad);
-
-      // Concentric inner ring/arc guide
-      if (ratio > 0) {
-        html += `<ellipse cx="${cx}" cy="${cy}" rx="${rx * ratio}" ry="${ry * ratio}" fill="none" stroke="#06b6d4" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
-      }
-      html += `<line x1="${cx}" y1="${cy}" x2="${inX}" y2="${inY}" stroke="#06b6d4" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
-      html += `<circle cx="${cx}" cy="${cy}" r="${3 / z}" fill="#06b6d4" />`;
-      html += `<circle cx="${inX}" cy="${inY}" r="${6 / z}" fill="#06b6d4" stroke="#ffffff" stroke-width="2" vector-effect="non-scaling-stroke" />`;
-
-      const badgeW = 92;
-      const badgeH = 18;
-      const pct = Math.round(ratio * 100);
-      html += `
-        <g opacity="0.95">
-          <rect x="${inX + 10}" y="${inY - 22}" width="${badgeW}" height="${badgeH}" rx="3" fill="#083344" stroke="#06b6d4" stroke-width="1" vector-effect="non-scaling-stroke" />
-          <text x="${inX + 14}" y="${inY - 9}" font-size="10" fill="#67e8f9" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" font-weight="600">Hueco: ${pct}%</text>
-        </g>
-      `;
-    } else if (this.activeHandle && this.activeHandle.startsWith('corner-')) {
-      // 3b. Render Rect Corner Ghost during active corner dragging (FEAT-03)
-      const d = this.rectGhostD;
-      html += `<path d="${d}" fill="rgba(56, 189, 248, 0.15)" stroke="#38bdf8" stroke-width="2" stroke-dasharray="4 3" vector-effect="non-scaling-stroke" />`;
-
-      const cornerHandles = this.getRectCornerHandles(
-        { attributes: { ...this.rectGhostCorners as any, ...this.rectGhostBounds as any }, isParametric: true, shapeType: 'rect', tagName: 'rect', id: '' },
-        z
-      );
-      if (cornerHandles) {
-        const activeKey = this.rectGhostActiveCorner;
-        const hPt = cornerHandles[activeKey];
-        const { x, y, w, h } = this.rectGhostBounds;
-        const cornerX = (activeKey === 'tl' || activeKey === 'bl') ? x : x + w;
-        const cornerY = (activeKey === 'tl' || activeKey === 'tr') ? y : y + h;
-        html += `<line x1="${cornerX}" y1="${cornerY}" x2="${hPt.x}" y2="${hPt.y}" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
-        html += `<circle cx="${hPt.x}" cy="${hPt.y}" r="${6 / z}" fill="#38bdf8" stroke="#ffffff" stroke-width="2" vector-effect="non-scaling-stroke" />`;
-
-        const badgeW = 110;
-        const badgeH = 18;
-        const badgeText = `R: ${Math.round(this.rectGhostActiveRadius)}px [${this.rectGhostCorners.mode.toUpperCase()}]`;
-        html += `
-          <g opacity="0.95">
-            <rect x="${hPt.x + 10}" y="${hPt.y - 22}" width="${badgeW}" height="${badgeH}" rx="3" fill="#0f172a" stroke="#38bdf8" stroke-width="1" vector-effect="non-scaling-stroke" />
-            <text x="${hPt.x + 14}" y="${hPt.y - 9}" font-size="10" fill="#38bdf8" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" font-weight="600">${badgeText}</text>
-          </g>
-        `;
-      }
+    // 3. Render Parametric Ghosts (Quadrant, Ellipse-Inner, Rect Corner) during active handle dragging
+    if (this.activeHandle) {
+      html += this.parametricController.renderGhostOverlay(this.activeHandle, z);
     } else if (this.ghostNodeVertices) {
       // 4. Render Ghost Node Tool Path & Handles during active dragging
       const selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
@@ -1400,44 +935,9 @@ export class NodeToolHandler implements IToolHandler {
       }
     }
 
-    // 5. Quadrant handle & Inner ratio handle on parametric ellipse when idle in Node Mode (FEAT-02 & FEAT-10)
-    if (!this.ghostNodeVertices && !this.activeHandle && selectedEls.length === 1 && this.ctx.model.isParametricElement(selectedEls[0]) && this.ctx.model.isEllipse(selectedEls[0])) {
-      const qPt = this.getQuadrantHandlePoint(selectedEls[0]);
-      if (qPt) {
-        html += `
-          <g style="cursor: crosshair;" title="Tirador de Apertura Angular (Sweep / Arco)">
-            <circle cx="${qPt.x}" cy="${qPt.y}" r="${6 / z}" fill="#f59e0b" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" />
-            <circle cx="${qPt.x}" cy="${qPt.y}" r="${2.5 / z}" fill="#ffffff" />
-          </g>
-        `;
-      }
-
-      const innerPt = this.getEllipseInnerHandlePoint(selectedEls[0]);
-      if (innerPt) {
-        html += `
-          <g style="cursor: crosshair;" title="Tirador de Hueco Interior (Radio Interno / Rosca)">
-            <circle cx="${innerPt.x}" cy="${innerPt.y}" r="${5.5 / z}" fill="#06b6d4" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" />
-            <circle cx="${innerPt.x}" cy="${innerPt.y}" r="${2 / z}" fill="#ffffff" />
-          </g>
-        `;
-      }
-    }
-
-    // 6. Corner radius handles on parametric rect when idle in Node Mode (FEAT-03)
-    if (!this.ghostNodeVertices && !this.activeHandle && selectedEls.length === 1 && this.ctx.model.isParametricElement(selectedEls[0]) && this.ctx.model.isRect(selectedEls[0])) {
-      const cornerHandles = this.getRectCornerHandles(selectedEls[0], z);
-      if (cornerHandles) {
-        const cornersList: ('tl' | 'tr' | 'br' | 'bl')[] = ['tl', 'tr', 'br', 'bl'];
-        cornersList.forEach((key) => {
-          const pt = cornerHandles[key];
-          html += `
-            <g style="cursor: crosshair;">
-              <circle cx="${pt.x}" cy="${pt.y}" r="${5.5 / z}" fill="#38bdf8" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" />
-              <circle cx="${pt.x}" cy="${pt.y}" r="${2 / z}" fill="#ffffff" />
-            </g>
-          `;
-        });
-      }
+    // 5. Quadrant handle & Inner ratio handle & Corner radius handles on parametric elements when idle in Node Mode
+    if (!this.ghostNodeVertices && !this.activeHandle) {
+      html += this.parametricController.renderIdleHandles(selectedEls, z);
     }
 
     return html;
