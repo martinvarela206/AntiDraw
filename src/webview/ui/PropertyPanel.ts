@@ -47,6 +47,7 @@ import { GeometryInspector } from './inspectors/GeometryInspector.js';
 import { AppearanceInspector, miterLimitToDegrees, degreesToMiterLimit } from './inspectors/AppearanceInspector.js';
 import { EffectsInspector } from './inspectors/EffectsInspector.js';
 import { PrimitiveInspector } from './inspectors/PrimitiveInspector.js';
+import { ShapeDefaultsInspector } from './inspectors/ShapeDefaultsInspector.js';
 import { NodeInspector } from './inspectors/NodeInspector.js';
 import { MultiSelectionInspector } from './inspectors/MultiSelectionInspector.js';
 import { StrokeInspector, StrokeInspectorProps } from './inspectors/StrokeInspector.js';
@@ -422,7 +423,7 @@ export class PropertyPanel {
 
   // Render properties when a shape tool is active and no element is selected
   private renderShapeToolProperties(): void {
-    PrimitiveInspector.renderShapeToolProperties(
+    ShapeDefaultsInspector.render(
       this.container,
       this.activeTool,
       this.shapeConfig,
