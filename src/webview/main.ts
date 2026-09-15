@@ -19,6 +19,7 @@ import { RulerView } from './ui/RulerView.js';
 import { ContextMenu, ContextMenuItem } from './ui/ContextMenu.js';
 import { ConfirmationModal } from './ui/ConfirmationModal.js';
 import { GridCanvasRenderer } from './ui/GridCanvasRenderer.js';
+import { ClipboardService } from './services/ClipboardService.js';
 import './styles/main.css';
 
 class AntiDrawApp {
@@ -75,9 +76,8 @@ class AntiDrawApp {
 
   private isShiftPressed: boolean = false;
 
-  // Clipboard buffer
-  private clipboardElements: VectorElement[] = [];
-  private clipboardGuides: GuideLine[] = [];
+  // Clipboard service subsystem
+  private clipboardService!: ClipboardService;
 
   // Undo / Redo history
   private undoStack: string[] = [];
@@ -87,9 +87,25 @@ class AntiDrawApp {
   constructor() {
     this.initTools();
     this.initLayout();
+    this.initClipboardService();
     this.initViewport();
     this.initEvents();
     this.notifyReady();
+  }
+
+  private initClipboardService(): void {
+    this.clipboardService = new ClipboardService({
+      model: this.model,
+      selectionTool: this.selectionTool,
+      canvasMgr: this.canvasMgr,
+      pushUndo: () => this.pushUndo(),
+      render: () => this.render(),
+      syncToHost: () => this.syncToHost(),
+      syncMetadataToHost: () => this.syncMetadataToHost(),
+      onResetPropertyPanel: () => this.propertyPanel.resetPanelMode(),
+      onShowGuideSettings: (guide: GuideLine) => this.propertyPanel.showGuideSettings(guide),
+      onUpdatePropertyPanel: () => this.propertyPanel.update(null, 'select'),
+    });
   }
 
   private initTools(): void {
@@ -557,7 +573,7 @@ class AntiDrawApp {
       }
 
       if (isCtrl && (e.key === 'v' || e.key === 'V')) {
-        if (this.clipboardElements.length > 0 || this.clipboardGuides.length > 0) {
+        if (this.clipboardService.hasContent) {
           e.preventDefault();
           this.pasteClipboard();
           return;
@@ -827,7 +843,7 @@ class AntiDrawApp {
             id: 'paste',
             label: 'Pegar',
             shortcut: 'Ctrl+V',
-            disabled: this.clipboardElements.length === 0 && this.clipboardGuides.length === 0,
+            disabled: !this.clipboardService.hasContent,
             action: () => this.pasteClipboard(),
           },
           {
@@ -1762,148 +1778,19 @@ class AntiDrawApp {
   }
 
   private copySelection(): void {
-    if (this.selectionTool.selectedElementIds.size > 0) {
-      const selected = this.model.elements.filter((el) => this.selectionTool.isSelected(el.id));
-      this.clipboardElements = JSON.parse(JSON.stringify(selected));
-    } else {
-      this.clipboardElements = [];
-    }
-
-    if (this.canvasMgr.selectedGuideId) {
-      const guide = this.canvasMgr.guides.find((g) => g.id === this.canvasMgr.selectedGuideId);
-      this.clipboardGuides = guide ? [JSON.parse(JSON.stringify(guide))] : [];
-    } else {
-      this.clipboardGuides = [];
-    }
+    this.clipboardService.copy();
   }
 
   private cutSelection(): void {
-    this.copySelection();
-    this.pushUndo();
-
-    if (this.canvasMgr.selectedGuideId) {
-      this.canvasMgr.removeGuide(this.canvasMgr.selectedGuideId);
-      this.canvasMgr.selectedGuideId = null;
-      this.canvasMgr.activeGuideTransformId = null;
-      this.propertyPanel.resetPanelMode();
-      this.syncMetadataToHost();
-    }
-
-    if (this.selectionTool.selectedElementIds.size > 0) {
-      this.model.elements = this.model.elements.filter((el) => !this.selectionTool.isSelected(el.id));
-      this.selectionTool.deselectAll();
-      this.propertyPanel.resetPanelMode();
-      this.syncToHost();
-    }
-
-    this.render();
+    this.clipboardService.cut();
   }
 
   private pasteClipboard(): void {
-    const offset = 15;
-    const newSelectedIds: string[] = [];
-
-    if (this.clipboardElements.length > 0) {
-      this.pushUndo();
-      const pastedElements: VectorElement[] = this.clipboardElements.map((srcEl) => {
-        const el: VectorElement = JSON.parse(JSON.stringify(srcEl));
-        /**
-         * HISTORICAL ARCHITECTURE (FIX-19):
-         * Strict Synchronization of el.attributes.id with el.id on Clipboard Paste.
-         * Why this was built:
-         * Previously, pasting a cloned element reassigned `el.id` in memory but left `el.attributes.id`
-         * untouched with the original element's ID. When serialized to SVG (`toSvgString`), attributes.id
-         * was written, causing both the original and pasted elements to share identical ID attributes
-         * in the SVG XML. Upon closing and reopening the file, DOMParser loaded both paths with the same ID,
-         * resulting in phantom multi-selection coupling, inability to move or select elements independently,
-         * and corruption of object tracking. Synchronizing `el.attributes.id = el.id` guarantees absolute
-         * identifier independence across paste, serialization, and disk reload cycles.
-         */
-        el.id = `el_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
-        el.attributes.id = el.id;
-
-        if (el.vertices && el.vertices.length > 0) {
-          el.vertices.forEach((v) => {
-            v.id = `v_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
-            v.x += offset;
-            v.y += offset;
-            if (v.handleIn) {
-              v.handleIn.x += offset;
-              v.handleIn.y += offset;
-            }
-            if (v.handleOut) {
-              v.handleOut.x += offset;
-              v.handleOut.y += offset;
-            }
-          });
-
-          const isClosed = el.isClosed ?? (!el.tagName || ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(el.tagName) || (el.attributes.d ? /z/i.test(el.attributes.d) : false));
-          el.attributes.d = this.model.compilePathD(el.vertices, isClosed);
-        }
-
-        if (el.attributes.x) el.attributes.x = (parseFloat(el.attributes.x) + offset).toString();
-        if (el.attributes.y) el.attributes.y = (parseFloat(el.attributes.y) + offset).toString();
-        if (el.attributes.cx) el.attributes.cx = (parseFloat(el.attributes.cx) + offset).toString();
-        if (el.attributes.cy) el.attributes.cy = (parseFloat(el.attributes.cy) + offset).toString();
-
-        if (el.attributes['filter'] && el.attributes['filter'].includes('ad-filter-shadow-')) {
-          el.attributes['filter'] = `url(#ad-filter-shadow-${el.id})`;
-        }
-
-        if (el.attributes['fill'] && el.attributes['fill'].includes('ad-grad-')) {
-          el.attributes['fill'] = `url(#ad-grad-${el.id})`;
-        }
-
-        ['marker-start', 'marker-mid', 'marker-end'].forEach((attr) => {
-          if (el.attributes[attr] && el.attributes[attr].includes('ad-marker-')) {
-            el.attributes[attr] = el.attributes[attr].replace(/(ad-marker-[^)]+)-[a-zA-Z0-9_-]+(\))/, `$1-${el.id}$2`);
-          }
-        });
-
-        return el;
-      });
-
-      this.selectionTool.deselectAll();
-      pastedElements.forEach((el) => {
-        this.model.elements.push(el);
-        this.selectionTool.selectedElementIds.add(el.id);
-        newSelectedIds.push(el.id);
-      });
-
-      // Update clipboard elements so repeated pastes stagger automatically
-      this.clipboardElements = JSON.parse(JSON.stringify(pastedElements));
-
-      this.propertyPanel.resetPanelMode();
-      this.propertyPanel.update(null, 'select');
-      this.syncToHost();
-    }
-
-    if (this.clipboardGuides.length > 0) {
-      const pastedGuides: GuideLine[] = this.clipboardGuides.map((srcGuide) => {
-        const g: GuideLine = JSON.parse(JSON.stringify(srcGuide));
-        g.id = `guide_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
-        g.position += offset;
-        g.pivotX += offset;
-        g.pivotY += offset;
-        return g;
-      });
-
-      pastedGuides.forEach((g) => {
-        this.canvasMgr.guides.push(g);
-        this.canvasMgr.selectedGuideId = g.id;
-        this.propertyPanel.showGuideSettings(g);
-      });
-
-      this.clipboardGuides = JSON.parse(JSON.stringify(pastedGuides));
-      this.syncMetadataToHost();
-    }
-
-    this.render();
+    this.clipboardService.paste();
   }
 
   private duplicateSelection(): void {
-    this.copySelection();
-    this.pasteClipboard();
+    this.clipboardService.duplicate();
   }
 
   private render(autoResize: boolean = true): void {
