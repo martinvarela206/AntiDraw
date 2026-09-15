@@ -4,6 +4,7 @@ import { Point, PathVertex, NodeType, VectorElement, RectCorners } from '../engi
 import { NodeEditorTool } from '../engine/NodeEditorTool.js';
 import { ConfirmationModal } from '../ui/ConfirmationModal.js';
 import { ParametricHandleController } from './node/ParametricHandleController.js';
+import { NodeMarqueeSelector } from './node/NodeMarqueeSelector.js';
 
 export interface NodeToolCallbacks {
   onNodeSelected?: (vertex: PathVertex, element: VectorElement) => void;
@@ -23,15 +24,13 @@ export interface NodeToolCallbacks {
  *    Double-clicking anywhere on a path segment divides the segment at the exact mathematical
  *    point via De Casteljau subdivision (`insertVertexOnPath`), inserting a new vertex while
  *    preserving the original contour curve with sub-pixel tolerance.
- *
- * 3. Explicit Endpoint Auto-Fusion with Ctrl (FIX-03):
- *    Endpoints of open paths only fuse and close when the user explicitly holds the `Ctrl` key
- *    while dragging/releasing near another free endpoint (`isCtrlPressed`). Without Ctrl, nodes
- *    remain strictly independent and can be positioned or crossed freely without accidental welding.
- *
- * 4. Ephemeral Ghost Manipulation:
- *    All active vertex and handle drags operate entirely on `ghostNodeVertices` and render to the
- *    overlay layer (`renderOverlay`). Mutations are only committed to the real document model upon
+ * Why this solution is engineered this way:
+ * 1. Single Responsibility Principle (SRP):
+ *    All Bézier spline node movements, tangent/handle manipulation, segment dragging,
+ *    and endpoint fusion logic are encapsulated cleanly here without polluting canvasMgr.
+ * 2. Visual Ghost Feedback (Zero Intermediate Commits):
+ *    Modifications are collected into `ghostNodeVertices` during pointer drag,
+ *    updating only the overlay SVG. Final changes are committed to the model on
  *    `onPointerUp`, guaranteeing clean undo/redo history stacks.
  */
 export class NodeToolHandler implements IToolHandler {
@@ -40,6 +39,7 @@ export class NodeToolHandler implements IToolHandler {
   public nodeEditorTool: NodeEditorTool;
   private callbacks: NodeToolCallbacks;
   public readonly parametricController: ParametricHandleController;
+  public readonly marqueeSelector: NodeMarqueeSelector;
 
   public ghostNodeVertices: PathVertex[] | null = null;
   public activeHandle:
@@ -53,6 +53,7 @@ export class NodeToolHandler implements IToolHandler {
     | 'corner-tr'
     | 'corner-br'
     | 'corner-bl'
+    | 'marquee'
     | null = null;
   public dragStartPt: Point = { x: 0, y: 0 };
   public initialVertices: PathVertex[] = [];
@@ -94,6 +95,7 @@ export class NodeToolHandler implements IToolHandler {
     this.nodeEditorTool = nodeEditorTool;
     this.callbacks = callbacks;
     this.parametricController = new ParametricHandleController(ctx);
+    this.marqueeSelector = new NodeMarqueeSelector();
   }
 
   private isElementClosed(el: VectorElement): boolean {
@@ -292,6 +294,8 @@ export class NodeToolHandler implements IToolHandler {
       );
 
       if (hitNode) {
+        const isAdditive = e.shiftKey || e.ctrlKey || e.metaKey;
+        this.marqueeSelector.selectVertex(hitNode.vertex.id, isAdditive);
         this.nodeEditorTool.selectedVertexId = hitNode.vertex.id;
         this.nodeEditorTool.selectedHandleType = hitNode.type;
         this.nodeEditorTool.selectedSegmentIdx = null;
@@ -346,6 +350,7 @@ export class NodeToolHandler implements IToolHandler {
         this.nodeEditorTool.selectedVertexId = null;
         this.nodeEditorTool.selectedHandleType = null;
         this.nodeEditorTool.selectedSegmentIdx = null;
+        this.marqueeSelector.clearSelection();
         if (this.callbacks.onDeselectNode) {
           this.callbacks.onDeselectNode();
         }
@@ -353,14 +358,17 @@ export class NodeToolHandler implements IToolHandler {
         return true;
       }
 
-      // 3. Clicked empty area: deselect active vertex/segment
-      this.nodeEditorTool.selectedVertexId = null;
-      this.nodeEditorTool.selectedHandleType = null;
-      this.nodeEditorTool.selectedSegmentIdx = null;
-      if (this.callbacks.onDeselectNode) {
-        this.callbacks.onDeselectNode();
-      }
-      this.ctx.render();
+      // 3. Clicked empty area: start rubber-band marquee selection across vertices
+      const isShift = e.shiftKey;
+      const isCtrl = e.ctrlKey || e.metaKey;
+      const isAlt = e.altKey;
+      this.activeHandle = 'marquee';
+      this.dragStartPt = { x: pt.x, y: pt.y };
+      this.initialVertices = JSON.parse(JSON.stringify(selectedEl.vertices));
+      this.ghostNodeVertices = null;
+      this.isDragging = true;
+      this.marqueeSelector.startMarquee(pt, isShift || isCtrl, isAlt);
+      this.ctx.renderOverlay();
       return true;
     }
 
@@ -391,6 +399,12 @@ export class NodeToolHandler implements IToolHandler {
       const isShift = e.shiftKey;
       const isCtrl = e.ctrlKey || e.metaKey;
 
+      if (this.activeHandle === 'marquee') {
+        this.marqueeSelector.updateMarquee(pt);
+        this.ctx.renderOverlay();
+        return true;
+      }
+
       if (
         (this.activeHandle === 'quadrant' ||
           this.activeHandle === 'ellipse-inner' ||
@@ -419,13 +433,36 @@ export class NodeToolHandler implements IToolHandler {
         this.ctx.model.elements.forEach((el) => {
           if (el.vertices) {
             el.vertices.forEach((v) => {
-              if (v.id !== this.nodeEditorTool.selectedVertexId) {
+              if (!this.marqueeSelector.isVertexSelected(v.id)) {
                 otherVertices.push({ x: v.x, y: v.y });
               }
             });
           }
         });
         const snappedPt = this.ctx.snapPoint(pt, otherVertices);
+
+        // Multi-vertex translation when multiple nodes are selected
+        if (
+          this.marqueeSelector.selectedVertexIds.size > 1 &&
+          this.marqueeSelector.isVertexSelected(this.nodeEditorTool.selectedVertexId)
+        ) {
+          const dx = snappedPt.x - this.dragStartPt.x;
+          const dy = snappedPt.y - this.dragStartPt.y;
+          this.ghostNodeVertices = this.initialVertices.map((v) => {
+            if (this.marqueeSelector.isVertexSelected(v.id)) {
+              return {
+                ...v,
+                x: v.x + dx,
+                y: v.y + dy,
+                handleIn: v.handleIn ? { x: v.handleIn.x + dx, y: v.handleIn.y + dy } : undefined,
+                handleOut: v.handleOut ? { x: v.handleOut.x + dx, y: v.handleOut.y + dy } : undefined,
+              };
+            }
+            return v;
+          });
+          this.ctx.renderOverlay();
+          return true;
+        }
 
         // ARCHITECTURAL RATIONALE: Constrained Parametric Primitive Dragging (FEAT-01)
         // When moving vertices of a parametric primitive, maintain its geometric invariants
@@ -576,6 +613,28 @@ export class NodeToolHandler implements IToolHandler {
       this.isDragging = false;
       const selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
 
+      if (this.activeHandle === 'marquee' && selectedEl) {
+        const hitIds = this.marqueeSelector.finishMarquee(selectedEl.vertices || []);
+        this.activeHandle = null;
+        this.initialVertices = [];
+        if (hitIds.length > 0) {
+          this.nodeEditorTool.selectedVertexId = hitIds[0];
+          this.nodeEditorTool.selectedHandleType = 'vertex';
+          const v = selectedEl.vertices?.find((vert) => vert.id === hitIds[0]);
+          if (v && this.callbacks.onNodeSelected) {
+            this.callbacks.onNodeSelected(v, selectedEl);
+          }
+        } else if (!this.marqueeSelector.isAdditive) {
+          this.nodeEditorTool.selectedVertexId = null;
+          this.nodeEditorTool.selectedHandleType = null;
+          if (this.callbacks.onDeselectNode) {
+            this.callbacks.onDeselectNode();
+          }
+        }
+        this.ctx.render();
+        return true;
+      }
+
       if (
         (this.activeHandle === 'quadrant' ||
           this.activeHandle === 'ellipse-inner' ||
@@ -670,12 +729,13 @@ export class NodeToolHandler implements IToolHandler {
   }
 
   public cancel(): boolean {
-    if (this.ghostNodeVertices || this.isDragging) {
+    if (this.ghostNodeVertices || this.isDragging || this.marqueeSelector.isMarqueeActive()) {
       this.ghostNodeVertices = null;
       this.initialVertices = [];
       this.activeHandle = null;
       this.isDragging = false;
       this.nodeEditorTool.selectedSegmentIdx = null;
+      this.marqueeSelector.cancelMarquee();
       this.ctx.renderOverlay();
       return true;
     }
@@ -690,6 +750,7 @@ export class NodeToolHandler implements IToolHandler {
     this.nodeEditorTool.selectedVertexId = null;
     this.nodeEditorTool.selectedHandleType = null;
     this.nodeEditorTool.selectedSegmentIdx = null;
+    this.marqueeSelector.clearSelection();
   }
 
   public deleteSelectedVertex(): boolean {
@@ -938,6 +999,21 @@ export class NodeToolHandler implements IToolHandler {
     // 5. Quadrant handle & Inner ratio handle & Corner radius handles on parametric elements when idle in Node Mode
     if (!this.ghostNodeVertices && !this.activeHandle) {
       html += this.parametricController.renderIdleHandles(selectedEls, z);
+    }
+
+    // 6. Render rubber-band marquee selection overlay
+    if (this.marqueeSelector.isMarqueeActive()) {
+      html += this.marqueeSelector.renderOverlay(z);
+    }
+
+    // 7. Highlight any additional marquee-selected vertices when idle
+    if (!this.ghostNodeVertices && selectedEls.length === 1 && selectedEls[0].vertices && this.ctx.getActiveTool() === 'node') {
+      selectedEls[0].vertices.forEach((v) => {
+        if (this.marqueeSelector.isVertexSelected(v.id) && v.id !== this.nodeEditorTool.selectedVertexId) {
+          html += `<circle cx="${v.x}" cy="${v.y}" r="${5.5 / z}" fill="none" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
+          html += `<circle cx="${v.x}" cy="${v.y}" r="${3.5 / z}" fill="#38bdf8" stroke="#ffffff" stroke-width="1" vector-effect="non-scaling-stroke" />`;
+        }
+      });
     }
 
     return html;
