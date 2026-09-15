@@ -201,10 +201,23 @@ export class PrimitiveInspector {
     box: BoundingBox | null
   ): string {
     const isEllipse = model.isEllipse(el);
-    const ellipseCx = box ? box.cx : (parseFloat(el.attributes['cx'] || '0') || 0);
-    const ellipseCy = box ? box.cy : (parseFloat(el.attributes['cy'] || '0') || 0);
-    const ellipseRx = box ? box.width / 2 : (parseFloat(el.attributes['rx'] || '0') || 0);
-    const ellipseRy = box ? box.height / 2 : (parseFloat(el.attributes['ry'] || '0') || 0);
+    const rawCx = el.attributes['cx'];
+    const rawCy = el.attributes['cy'];
+    const rawRx = el.attributes['rx'] || el.attributes['r'];
+    const rawRy = el.attributes['ry'] || el.attributes['r'];
+
+    /**
+     * ARCHITECTURAL RATIONALE: Canonical Primitive Geometry vs AABB Fallback (FIX-20)
+     * Evaluates native element parametric attributes ('cx', 'cy', 'rx', 'ry', 'r') as primary ground truth.
+     * Naive reliance on `box` (BoundingBox) causes catastrophic geometric deformation when an ellipse is
+     * converted to an arc or pie wedge (< 360°): the visual bounding box of a 90° or 60° arc only spans a fraction
+     * of the circle's radius and has an eccentric center, halving or distorting radii upon subsequent angle changes.
+     * `box` is strictly retained as a fallback for non-parametric imported paths with 4-point bezier curvature.
+     */
+    const ellipseCx = rawCx !== undefined ? parseFloat(rawCx) : (box ? box.cx : 0);
+    const ellipseCy = rawCy !== undefined ? parseFloat(rawCy) : (box ? box.cy : 0);
+    const ellipseRx = rawRx !== undefined ? parseFloat(rawRx) : (box ? box.width / 2 : 0);
+    const ellipseRy = rawRy !== undefined ? parseFloat(rawRy) : (box ? box.height / 2 : 0);
     const isCircle = Math.abs(ellipseRx - ellipseRy) < 0.5;
     const ellipseType = (el.attributes['data-ellipse-type'] as 'ellipse' | 'pie' | 'arc') || 'ellipse';
     const ellipseStartAngle = Math.round(parseFloat(el.attributes['data-start-angle'] || '0'));
@@ -221,10 +234,14 @@ export class PrimitiveInspector {
     const isPolyline = model.isPolyline(el);
     const isPolygon = model.isPolygon(el);
     const isStar = model.isStar(el);
-    const starCx = box ? box.cx : (parseFloat(el.attributes['cx'] || '0') || 0);
-    const starCy = box ? box.cy : (parseFloat(el.attributes['cy'] || '0') || 0);
-    const starRx = box ? box.width / 2 : (parseFloat(el.attributes['rx'] || el.attributes['r'] || '50') || 50);
-    const starRy = box ? box.height / 2 : (parseFloat(el.attributes['ry'] || el.attributes['r'] || '50') || 50);
+    const rawStarCx = el.attributes['cx'];
+    const rawStarCy = el.attributes['cy'];
+    const rawStarRx = el.attributes['rx'] || el.attributes['r'];
+    const rawStarRy = el.attributes['ry'] || el.attributes['r'];
+    const starCx = rawStarCx !== undefined ? parseFloat(rawStarCx) : (box ? box.cx : 0);
+    const starCy = rawStarCy !== undefined ? parseFloat(rawStarCy) : (box ? box.cy : 0);
+    const starRx = rawStarRx !== undefined ? parseFloat(rawStarRx) : (box ? box.width / 2 : 50);
+    const starRy = rawStarRy !== undefined ? parseFloat(rawStarRy) : (box ? box.height / 2 : 50);
     const starPoints = parseInt(el.attributes['data-star-points'] || el.attributes['points'] || '5', 10);
     const starInnerRatio = parseFloat(el.attributes['data-star-inner-ratio'] || el.attributes['innerRatio'] || '0.4');
     const starInnerPct = Math.round(starInnerRatio * 100);
@@ -571,10 +588,23 @@ export class PrimitiveInspector {
     onReRender: () => void
   ): void {
     const isEllipse = model.isEllipse(el);
-    const ellipseCx = box ? box.cx : (parseFloat(el.attributes['cx'] || '0') || 0);
-    const ellipseCy = box ? box.cy : (parseFloat(el.attributes['cy'] || '0') || 0);
-    const ellipseRx = box ? box.width / 2 : (parseFloat(el.attributes['rx'] || '0') || 0);
-    const ellipseRy = box ? box.height / 2 : (parseFloat(el.attributes['ry'] || '0') || 0);
+    const rawCx = el.attributes['cx'];
+    const rawCy = el.attributes['cy'];
+    const rawRx = el.attributes['rx'] || el.attributes['r'];
+    const rawRy = el.attributes['ry'] || el.attributes['r'];
+
+    /**
+     * ARCHITECTURAL RATIONALE: Canonical Primitive Geometry vs AABB Fallback (FIX-20)
+     * Evaluates native element parametric attributes ('cx', 'cy', 'rx', 'ry', 'r') as primary ground truth.
+     * Naive reliance on `box` (BoundingBox) causes catastrophic geometric deformation when an ellipse is
+     * converted to an arc or pie wedge (< 360°): the visual bounding box of a 90° or 60° arc only spans a fraction
+     * of the circle's radius and has an eccentric center, halving or distorting radii upon subsequent angle changes.
+     * `box` is strictly retained as a fallback for non-parametric imported paths with 4-point bezier curvature.
+     */
+    const ellipseCx = rawCx !== undefined ? parseFloat(rawCx) : (box ? box.cx : 0);
+    const ellipseCy = rawCy !== undefined ? parseFloat(rawCy) : (box ? box.cy : 0);
+    const ellipseRx = rawRx !== undefined ? parseFloat(rawRx) : (box ? box.width / 2 : 0);
+    const ellipseRy = rawRy !== undefined ? parseFloat(rawRy) : (box ? box.height / 2 : 0);
     const ellipseType = (el.attributes['data-ellipse-type'] as 'ellipse' | 'pie' | 'arc') || 'ellipse';
     const ellipseStartAngle = Math.round(parseFloat(el.attributes['data-start-angle'] || '0'));
     const ellipseEndAngle = Math.round(parseFloat(el.attributes['data-end-angle'] || '360'));
@@ -588,10 +618,14 @@ export class PrimitiveInspector {
     const isPolyline = model.isPolyline(el);
     const isPolygon = model.isPolygon(el);
     const isStar = model.isStar(el);
-    const starCx = box ? box.cx : (parseFloat(el.attributes['cx'] || '0') || 0);
-    const starCy = box ? box.cy : (parseFloat(el.attributes['cy'] || '0') || 0);
-    const starRx = box ? box.width / 2 : (parseFloat(el.attributes['rx'] || el.attributes['r'] || '50') || 50);
-    const starRy = box ? box.height / 2 : (parseFloat(el.attributes['ry'] || el.attributes['r'] || '50') || 50);
+    const rawStarCx = el.attributes['cx'];
+    const rawStarCy = el.attributes['cy'];
+    const rawStarRx = el.attributes['rx'] || el.attributes['r'];
+    const rawStarRy = el.attributes['ry'] || el.attributes['r'];
+    const starCx = rawStarCx !== undefined ? parseFloat(rawStarCx) : (box ? box.cx : 0);
+    const starCy = rawStarCy !== undefined ? parseFloat(rawStarCy) : (box ? box.cy : 0);
+    const starRx = rawStarRx !== undefined ? parseFloat(rawStarRx) : (box ? box.width / 2 : 50);
+    const starRy = rawStarRy !== undefined ? parseFloat(rawStarRy) : (box ? box.height / 2 : 50);
     const starPoints = parseInt(el.attributes['data-star-points'] || el.attributes['points'] || '5', 10);
     const starInnerRatio = parseFloat(el.attributes['data-star-inner-ratio'] || el.attributes['innerRatio'] || '0.4');
     const lineX1 = parseFloat(el.attributes.x1 || (el.vertices && el.vertices[0] ? el.vertices[0].x.toString() : '0'));
@@ -600,7 +634,7 @@ export class PrimitiveInspector {
     const lineY2 = parseFloat(el.attributes.y2 || (el.vertices && el.vertices[1] ? el.vertices[1].y.toString() : '100'));
 
     // Ellipse / Circle Event Bindings
-    if (isEllipse && box) {
+    if (isEllipse && (box || rawCx !== undefined)) {
       const ellipseCxInput = container.querySelector<HTMLInputElement>('#ellipse-cx');
       const ellipseCyInput = container.querySelector<HTMLInputElement>('#ellipse-cy');
       const ellipseRxInput = container.querySelector<HTMLInputElement>('#ellipse-rx');
@@ -613,6 +647,13 @@ export class PrimitiveInspector {
       const innerSlider = container.querySelector<HTMLInputElement>('#ellipse-inner-ratio-slider');
       const innerNum = container.querySelector<HTMLInputElement>('#ellipse-inner-ratio-num');
       const btnInnerReset = container.querySelector<HTMLButtonElement>('#btn-ellipse-inner-reset');
+
+      const getCurGeometry = () => ({
+        cx: parseFloat(el.attributes.cx || ellipseCx.toString()),
+        cy: parseFloat(el.attributes.cy || ellipseCy.toString()),
+        rx: parseFloat(el.attributes.rx || el.attributes.r || ellipseRx.toString()),
+        ry: parseFloat(el.attributes.ry || el.attributes.r || ellipseRy.toString())
+      });
 
       const applyEllipseGeometry = (
         newCx: number,
@@ -633,6 +674,7 @@ export class PrimitiveInspector {
         el.attributes['cy'] = newCy.toString();
         el.attributes['rx'] = clampedRx.toString();
         el.attributes['ry'] = clampedRy.toString();
+        delete el.attributes['r'];
         el.attributes['data-ellipse-type'] = newType;
         el.attributes['data-start-angle'] = newStart.toString();
         el.attributes['data-end-angle'] = newEnd.toString();
@@ -677,7 +719,7 @@ export class PrimitiveInspector {
         el.attributes['data-node-types'] = el.vertices.map((v) => v.nodeType).join(',');
 
         const newBox = selectionTool.getBoundingBox(el);
-        if (newBox) {
+        if (newBox && box) {
           selectionTool.updatePivotOnScale(box, newBox, [el]);
         }
         callbacks.onUpdateElement(el);
@@ -688,7 +730,8 @@ export class PrimitiveInspector {
         const onCenterChange = () => {
           const targetCx = parseFloat(ellipseCxInput.value) || 0;
           const targetCy = parseFloat(ellipseCyInput.value) || 0;
-          applyEllipseGeometry(targetCx, targetCy, ellipseRx, ellipseRy);
+          const { rx, ry } = getCurGeometry();
+          applyEllipseGeometry(targetCx, targetCy, rx, ry);
         };
         ellipseCxInput.addEventListener('change', onCenterChange);
         ellipseCyInput.addEventListener('change', onCenterChange);
@@ -698,7 +741,8 @@ export class PrimitiveInspector {
         const onRadiiChange = () => {
           const targetRx = Math.max(1, parseFloat(ellipseRxInput.value) || 1);
           const targetRy = Math.max(1, parseFloat(ellipseRyInput.value) || 1);
-          applyEllipseGeometry(ellipseCx, ellipseCy, targetRx, targetRy);
+          const { cx, cy } = getCurGeometry();
+          applyEllipseGeometry(cx, cy, targetRx, targetRy);
         };
         ellipseRxInput.addEventListener('change', onRadiiChange);
         ellipseRyInput.addEventListener('change', onRadiiChange);
@@ -712,19 +756,22 @@ export class PrimitiveInspector {
       const btnInvertAngles = container.querySelector<HTMLButtonElement>('#btn-ellipse-invert-angles');
 
       btnModeFull?.addEventListener('click', () => {
-        applyEllipseGeometry(ellipseCx, ellipseCy, ellipseRx, ellipseRy, 'ellipse', 0, 360);
+        const { cx, cy, rx, ry } = getCurGeometry();
+        applyEllipseGeometry(cx, cy, rx, ry, 'ellipse', 0, 360);
       });
 
       btnModePie?.addEventListener('click', () => {
+        const { cx, cy, rx, ry } = getCurGeometry();
         const s = ellipseStartAngle;
         const e = (ellipseEndAngle === 360 && s === 0) ? 270 : ellipseEndAngle;
-        applyEllipseGeometry(ellipseCx, ellipseCy, ellipseRx, ellipseRy, 'pie', s, e);
+        applyEllipseGeometry(cx, cy, rx, ry, 'pie', s, e);
       });
 
       btnModeArc?.addEventListener('click', () => {
+        const { cx, cy, rx, ry } = getCurGeometry();
         const s = ellipseStartAngle;
         const e = (ellipseEndAngle === 360 && s === 0) ? 270 : ellipseEndAngle;
-        applyEllipseGeometry(ellipseCx, ellipseCy, ellipseRx, ellipseRy, 'arc', s, e);
+        applyEllipseGeometry(cx, cy, rx, ry, 'arc', s, e);
       });
 
       if (inputStartAngle && inputEndAngle) {
@@ -734,28 +781,32 @@ export class PrimitiveInspector {
           s = ((s % 360) + 360) % 360;
           e = ((e % 360) + 360) % 360;
           if (s === e) e = (s + 360);
-          applyEllipseGeometry(ellipseCx, ellipseCy, ellipseRx, ellipseRy, ellipseType === 'ellipse' ? 'pie' : ellipseType, s, e);
+          const { cx, cy, rx, ry } = getCurGeometry();
+          applyEllipseGeometry(cx, cy, rx, ry, ellipseType === 'ellipse' ? 'pie' : ellipseType, s, e);
         };
         inputStartAngle.addEventListener('change', onAnglesChange);
         inputEndAngle.addEventListener('change', onAnglesChange);
       }
 
       btnInvertAngles?.addEventListener('click', () => {
-        applyEllipseGeometry(ellipseCx, ellipseCy, ellipseRx, ellipseRy, ellipseType === 'ellipse' ? 'pie' : ellipseType, ellipseEndAngle, ellipseStartAngle);
+        const { cx, cy, rx, ry } = getCurGeometry();
+        applyEllipseGeometry(cx, cy, rx, ry, ellipseType === 'ellipse' ? 'pie' : ellipseType, ellipseEndAngle, ellipseStartAngle);
       });
 
       if (innerSlider && innerNum) {
         innerSlider.addEventListener('input', () => {
           const valPct = parseFloat(innerSlider.value) || 0;
           innerNum.value = valPct.toString();
-          applyEllipseGeometry(ellipseCx, ellipseCy, ellipseRx, ellipseRy, ellipseType, ellipseStartAngle, ellipseEndAngle, valPct / 100);
+          const { cx, cy, rx, ry } = getCurGeometry();
+          applyEllipseGeometry(cx, cy, rx, ry, ellipseType, ellipseStartAngle, ellipseEndAngle, valPct / 100);
         });
 
         innerNum.addEventListener('change', () => {
           let valPct = parseFloat(innerNum.value) || 0;
           valPct = Math.max(0, Math.min(95, valPct));
           innerSlider.value = valPct.toString();
-          applyEllipseGeometry(ellipseCx, ellipseCy, ellipseRx, ellipseRy, ellipseType, ellipseStartAngle, ellipseEndAngle, valPct / 100);
+          const { cx, cy, rx, ry } = getCurGeometry();
+          applyEllipseGeometry(cx, cy, rx, ry, ellipseType, ellipseStartAngle, ellipseEndAngle, valPct / 100);
         });
       }
 
@@ -763,20 +814,23 @@ export class PrimitiveInspector {
         btnInnerReset.addEventListener('click', () => {
           if (innerSlider) innerSlider.value = '0';
           if (innerNum) innerNum.value = '0';
-          applyEllipseGeometry(ellipseCx, ellipseCy, ellipseRx, ellipseRy, ellipseType, ellipseStartAngle, ellipseEndAngle, 0);
+          const { cx, cy, rx, ry } = getCurGeometry();
+          applyEllipseGeometry(cx, cy, rx, ry, ellipseType, ellipseStartAngle, ellipseEndAngle, 0);
         });
       }
 
       if (btnEllipseMakeCircle) {
         btnEllipseMakeCircle.addEventListener('click', () => {
-          const uniformR = Math.max(1, Math.round((ellipseRx + ellipseRy) / 2));
-          applyEllipseGeometry(ellipseCx, ellipseCy, uniformR, uniformR);
+          const { cx, cy, rx, ry } = getCurGeometry();
+          const uniformR = Math.max(1, Math.round((rx + ry) / 2));
+          applyEllipseGeometry(cx, cy, uniformR, uniformR);
         });
       }
 
       if (btnEllipseSwapRadii) {
         btnEllipseSwapRadii.addEventListener('click', () => {
-          applyEllipseGeometry(ellipseCx, ellipseCy, ellipseRy, ellipseRx);
+          const { cx, cy, rx, ry } = getCurGeometry();
+          applyEllipseGeometry(cx, cy, ry, rx);
         });
       }
 
@@ -1047,7 +1101,14 @@ export class PrimitiveInspector {
      * and conversion to freeform curves) and the vector element model.
      * Regenerates star vertices and compiled path 'd' analytically, preserving bounding box pivot scaling.
      */
-    if (isStar && box) {
+    if (isStar && (box || rawStarCx !== undefined)) {
+      const getCurStarGeometry = () => ({
+        cx: parseFloat(el.attributes.cx || starCx.toString()),
+        cy: parseFloat(el.attributes.cy || starCy.toString()),
+        rx: parseFloat(el.attributes.rx || el.attributes.r || starRx.toString()),
+        ry: parseFloat(el.attributes.ry || el.attributes.r || starRy.toString())
+      });
+
       const applyStarGeometry = (
         newCx: number,
         newCy: number,
@@ -1078,7 +1139,7 @@ export class PrimitiveInspector {
         el.attributes['data-node-types'] = el.vertices.map((v) => v.nodeType).join(',');
 
         const newBox = selectionTool.getBoundingBox(el);
-        if (newBox) {
+        if (newBox && box) {
           selectionTool.updatePivotOnScale(box, newBox, [el]);
         }
         callbacks.onUpdateElement(el);
@@ -1099,7 +1160,8 @@ export class PrimitiveInspector {
         const onCenterChange = () => {
           const targetCx = parseFloat(starCxInput.value) || 0;
           const targetCy = parseFloat(starCyInput.value) || 0;
-          applyStarGeometry(targetCx, targetCy, starRx, starRy);
+          const { rx, ry } = getCurStarGeometry();
+          applyStarGeometry(targetCx, targetCy, rx, ry);
         };
         starCxInput.addEventListener('change', onCenterChange);
         starCyInput.addEventListener('change', onCenterChange);
@@ -1109,27 +1171,31 @@ export class PrimitiveInspector {
         const onRadiiChange = () => {
           const targetRx = Math.max(1, parseFloat(starRxInput.value) || 1);
           const targetRy = Math.max(1, parseFloat(starRyInput.value) || 1);
-          applyStarGeometry(starCx, starCy, targetRx, targetRy);
+          const { cx, cy } = getCurStarGeometry();
+          applyStarGeometry(cx, cy, targetRx, targetRy);
         };
         starRxInput.addEventListener('change', onRadiiChange);
         starRyInput.addEventListener('change', onRadiiChange);
       }
 
       btnStarUniform?.addEventListener('click', () => {
-        const uniformR = Math.max(1, Math.round((starRx + starRy) / 2));
-        applyStarGeometry(starCx, starCy, uniformR, uniformR);
+        const { cx, cy, rx, ry } = getCurStarGeometry();
+        const uniformR = Math.max(1, Math.round((rx + ry) / 2));
+        applyStarGeometry(cx, cy, uniformR, uniformR);
       });
 
       starPointsInput?.addEventListener('change', () => {
         const pts = Math.max(3, Math.min(64, parseInt(starPointsInput.value, 10) || 5));
-        applyStarGeometry(starCx, starCy, starRx, starRy, pts, starInnerRatio);
+        const { cx, cy, rx, ry } = getCurStarGeometry();
+        applyStarGeometry(cx, cy, rx, ry, pts, starInnerRatio);
       });
 
       const presetPoints = [3, 4, 5, 6, 8, 12];
       for (const p of presetPoints) {
         const btnPreset = container.querySelector<HTMLButtonElement>(`#btn-star-preset-${p}`);
         btnPreset?.addEventListener('click', () => {
-          applyStarGeometry(starCx, starCy, starRx, starRy, p, starInnerRatio);
+          const { cx, cy, rx, ry } = getCurStarGeometry();
+          applyStarGeometry(cx, cy, rx, ry, p, starInnerRatio);
         });
       }
 
@@ -1137,14 +1203,16 @@ export class PrimitiveInspector {
         starInnerSlider.addEventListener('input', () => {
           const valPct = parseFloat(starInnerSlider.value) || 40;
           starInnerNum.value = valPct.toString();
-          applyStarGeometry(starCx, starCy, starRx, starRy, starPoints, valPct / 100);
+          const { cx, cy, rx, ry } = getCurStarGeometry();
+          applyStarGeometry(cx, cy, rx, ry, starPoints, valPct / 100);
         });
 
         starInnerNum.addEventListener('change', () => {
           let valPct = parseFloat(starInnerNum.value) || 40;
           valPct = Math.max(5, Math.min(95, valPct));
           starInnerSlider.value = valPct.toString();
-          applyStarGeometry(starCx, starCy, starRx, starRy, starPoints, valPct / 100);
+          const { cx, cy, rx, ry } = getCurStarGeometry();
+          applyStarGeometry(cx, cy, rx, ry, starPoints, valPct / 100);
         });
       }
 
@@ -1157,7 +1225,8 @@ export class PrimitiveInspector {
       for (const preset of ratioPresets) {
         const btn = container.querySelector<HTMLButtonElement>(preset.id);
         btn?.addEventListener('click', () => {
-          applyStarGeometry(starCx, starCy, starRx, starRy, starPoints, preset.ratio);
+          const { cx, cy, rx, ry } = getCurStarGeometry();
+          applyStarGeometry(cx, cy, rx, ry, starPoints, preset.ratio);
         });
       }
 
