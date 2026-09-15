@@ -2,6 +2,7 @@ import { ToolContext } from '../IToolHandler.js';
 import { VectorElement, PathVertex, Point, GradientConfig } from '../../engine/VectorModel.js';
 import { HandleType } from '../../engine/SelectionTool.js';
 import { SvgSerializer } from '../../engine/serialization/SvgSerializer.js';
+import { ScaleTransformer } from './ScaleTransformer.js';
 import type { SelectToolCallbacks } from '../SelectToolHandler.js';
 
 /**
@@ -341,96 +342,18 @@ export class TransformInteraction {
 
     // Scaling with directional handle Snap To (Snapping to grid, guidelines, artboard bounds, and unselected vertices)
     if (this.initialBox && activeHandle !== 'move' && this.initialElementsMap.size > 0) {
-      const b = this.initialBox;
-      let handleInitialX = b.x;
-      let handleInitialY = b.y;
-
-      switch (activeHandle) {
-        case 'nw':
-          handleInitialX = b.x;
-          handleInitialY = b.y;
-          break;
-        case 'n':
-          handleInitialX = b.cx;
-          handleInitialY = b.y;
-          break;
-        case 'ne':
-          handleInitialX = b.x + b.width;
-          handleInitialY = b.y;
-          break;
-        case 'w':
-          handleInitialX = b.x;
-          handleInitialY = b.cy;
-          break;
-        case 'e':
-          handleInitialX = b.x + b.width;
-          handleInitialY = b.cy;
-          break;
-        case 'sw':
-          handleInitialX = b.x;
-          handleInitialY = b.y + b.height;
-          break;
-        case 's':
-          handleInitialX = b.cx;
-          handleInitialY = b.y + b.height;
-          break;
-        case 'se':
-          handleInitialX = b.x + b.width;
-          handleInitialY = b.y + b.height;
-          break;
-      }
-
-      // Collect unselected vertices for magnetic vertex snapping
-      const otherVertices: Point[] = [];
-      ctx.model.elements.forEach((el) => {
-        if (!ctx.selectionTool.isSelected(el.id) && el.vertices) {
-          el.vertices.forEach((v) => otherVertices.push({ x: v.x, y: v.y }));
-        }
+      const result = ScaleTransformer.computeGhostScale(ctx, {
+        pt,
+        dragStartPt,
+        activeHandle,
+        initialBox: this.initialBox,
+        initialBoxPadding: this.initialBoxPadding,
+        initialElementsMap: this.initialElementsMap,
+        shiftKey: e.shiftKey,
+        ctrlKey: e.ctrlKey,
       });
-
-      const rawDx = pt.x - dragStartPt.x;
-      const rawDy = pt.y - dragStartPt.y;
-
-      const isXHandle = ['nw', 'ne', 'w', 'e', 'sw', 'se'].includes(activeHandle);
-      const isYHandle = ['nw', 'n', 'ne', 'sw', 's', 'se'].includes(activeHandle);
-
-      const targetHandlePt: Point = {
-        x: handleInitialX + (isXHandle ? rawDx : 0),
-        y: handleInitialY + (isYHandle ? rawDy : 0),
-      };
-
-      const snappedHandlePt = ctx.snapPoint(targetHandlePt, otherVertices);
-
-      let effectiveDx = 0;
-      let effectiveDy = 0;
-
-      if (isXHandle) {
-        effectiveDx = snappedHandlePt.x - handleInitialX;
-      }
-      if (isYHandle) {
-        effectiveDy = snappedHandlePt.y - handleInitialY;
-      }
-
-      const didSnap =
-        Math.hypot(snappedHandlePt.x - targetHandlePt.x, snappedHandlePt.y - targetHandlePt.y) > 0.001;
-      this.currentScaleSnappedPt = didSnap ? snappedHandlePt : null;
-
-      const isProportional = ctx.selectionTool.isAspectRatioLocked || e.ctrlKey;
-
-      this.ghostTransformMap.clear();
-      this.initialElementsMap.forEach((origVerts, id) => {
-        const transformed = ctx.selectionTool.transformVertices(
-          origVerts,
-          this.initialBox,
-          activeHandle as HandleType,
-          effectiveDx,
-          effectiveDy,
-          this.initialBoxPadding,
-          e.shiftKey,
-          isProportional
-        );
-        this.ghostTransformMap.set(id, transformed);
-      });
+      this.currentScaleSnappedPt = result.snappedPt;
+      this.ghostTransformMap = result.ghostMap;
       ctx.renderOverlay();
       return true;
     }
@@ -483,38 +406,14 @@ export class TransformInteraction {
     if (activeHandle && activeHandle !== 'move' && this.ghostTransformMap.size > 0) {
       ctx.pushUndo();
       const selectedEls = ctx.model.elements.filter((el) => ctx.selectionTool.isSelected(el.id));
-      this.ghostTransformMap.forEach((transformedVerts, id) => {
-        const el = ctx.model.elements.find((e) => e.id === id);
-        if (el) {
-          /**
-           * ARCHITECTURAL RATIONALE: Non-Destructive Parametric Transformation (FIX-21)
-           *
-           * 1. Preserving Parametric Status on Scale:
-           *    Previously, any transformation of arc or pie primitives triggered `convertToCurves(el)`,
-           *    stripping all parametric metadata (cx, cy, rx, ry, angles, data-ellipse-type) and locking
-           *    the element into an irreversible freeform path.
-           *    Under non-rotational scale (`activeHandle !== 'rotate'`), the affine bounding box transform
-           *    is mapped directly to center and radii:
-           *      newCx = newBox.x + (oldCx - oldBox.x) * scaleX
-           *      newCy = newBox.y + (oldCy - oldBox.y) * scaleY
-           *      newRx = oldRx * |scaleX|
-           *      newRy = oldRy * |scaleY|
-           *    The exact SVG path is recompiled via `compileEllipseD` preserving native SVG arc commands ('A')
-           *    and maintaining full parametric inspector controls.
-           *
-           * 2. Circular Arc/Pie Rotation without De-Structuring:
-           *    For uniform circular arcs/pies (rx == ry), rotating around the element or selection pivot
-           *    simply shifts startAngle and endAngle by lastDeltaAngle, completely avoiding conversion to curves.
-           *
-           * 3. Fallback for Non-Uniform Tilted Primitives:
-           *    Standard SVG 1.1 lacks an intrinsic rotation angle attribute on <rect> and <ellipse> scalars.
-           *    Non-uniform ellipses rotated arbitrarily without a container transform attribute must de-structure
-           *    to Béziers to maintain visual fidelity without shearing.
-           */
-          const isRotate = activeHandle === 'rotate';
+      if (activeHandle === 'rotate') {
+        this.ghostTransformMap.forEach((transformedVerts, id) => {
+          const el = ctx.model.elements.find((e) => e.id === id);
+          if (!el) return;
+
           const isPieOrArc = el.attributes['data-ellipse-type'] === 'pie' || el.attributes['data-ellipse-type'] === 'arc';
 
-          if (isRotate && ctx.model.isParametricElement(el)) {
+          if (ctx.model.isParametricElement(el)) {
             const rx = parseFloat(el.attributes.rx || el.attributes.r || '1');
             const ry = parseFloat(el.attributes.ry || el.attributes.r || '1');
             if (isPieOrArc && Math.abs(rx - ry) < 0.5) {
@@ -540,89 +439,48 @@ export class TransformInteraction {
             }
           }
 
-          if (!isRotate && isPieOrArc && ctx.model.isParametricElement(el) && this.initialBox) {
-            const initAttrs = this.initialAttributesMap.get(id);
-            const oldCx = parseFloat((initAttrs && initAttrs.cx) || el.attributes.cx || '0');
-            const oldCy = parseFloat((initAttrs && initAttrs.cy) || el.attributes.cy || '0');
-            const oldRx = parseFloat((initAttrs && (initAttrs.rx || initAttrs.r)) || el.attributes.rx || '1');
-            const oldRy = parseFloat((initAttrs && (initAttrs.ry || initAttrs.r)) || el.attributes.ry || '1');
-            const startAngle = parseFloat(el.attributes['data-start-angle'] || '0');
-            const endAngle = parseFloat(el.attributes['data-end-angle'] || '360');
-            const type = (el.attributes['data-ellipse-type'] as 'pie' | 'arc') || 'pie';
-
-            const newBox = ctx.selectionTool.getBoundingBox({ ...el, vertices: transformedVerts });
-            const oldBox = this.initialBox;
-            if (newBox && oldBox.width > 0 && oldBox.height > 0) {
-              const scaleX = newBox.width / oldBox.width;
-              const scaleY = newBox.height / oldBox.height;
-              const newCx = newBox.x + (oldCx - oldBox.x) * scaleX;
-              const newCy = newBox.y + (oldCy - oldBox.y) * scaleY;
-              const newRx = Math.max(0.1, oldRx * scaleX);
-              const newRy = Math.max(0.1, oldRy * scaleY);
-
-              el.attributes.cx = Math.round(newCx * 100) / 100 + '';
-              el.attributes.cy = Math.round(newCy * 100) / 100 + '';
-              el.attributes.rx = Math.round(newRx * 100) / 100 + '';
-              el.attributes.ry = Math.round(newRy * 100) / 100 + '';
-              el.attributes.d = ctx.model.compileEllipseD(newCx, newCy, newRx, newRy, type, startAngle, endAngle);
-              el.vertices = ctx.model.convertEllipseToVertices(newCx, newCy, newRx, newRy, type, startAngle, endAngle);
-              el.attributes['data-node-types'] = el.vertices.map((v) => v.nodeType).join(',');
-              return;
-            }
-          }
-
           el.vertices = transformedVerts;
           const isClosed = ctx.model.isElementClosed(el);
           el.attributes.d = ctx.model.compilePathD(el.vertices, isClosed);
           if (ctx.model.isParametricElement(el)) {
             ctx.model.syncParametricAttributes(el);
           }
-        }
-      });
-
-      if (activeHandle === 'rotate' && this.rotationPivot) {
-        ctx.selectionTool.updatePivotOnRotate(this.rotationPivot, this.lastDeltaAngle, selectedEls);
-
-        // ARCHITECTURAL RATIONALE: Solidary Gradient Rotation (FIX-06)
-        // Rotates linear angles and transforms radial gradient center, focus, radii (rx, ry)
-        // and rotation angle solidarily around the rotation pivot.
-        selectedEls.forEach((el) => {
-          if (el.attributes['data-gradient']) {
-            const initialVerts = this.initialElementsMap.get(el.id);
-            const oldElBox = initialVerts
-              ? ctx.selectionTool.getBoundingBox({ ...el, vertices: initialVerts })
-              : this.initialBox;
-            const newElBox = ctx.selectionTool.getBoundingBox(el);
-            if (oldElBox && newElBox) {
-              ctx.selectionTool.rotateElementGradient(
-                el,
-                this.rotationPivot!,
-                this.lastDeltaAngle,
-                oldElBox,
-                newElBox
-              );
-            }
-          }
         });
+
+        if (this.rotationPivot) {
+          ctx.selectionTool.updatePivotOnRotate(this.rotationPivot, this.lastDeltaAngle, selectedEls);
+
+          // ARCHITECTURAL RATIONALE: Solidary Gradient Rotation (FIX-06)
+          // Rotates linear angles and transforms radial gradient center, focus, radii (rx, ry)
+          // and rotation angle solidarily around the rotation pivot.
+          selectedEls.forEach((el) => {
+            if (el.attributes['data-gradient']) {
+              const initialVerts = this.initialElementsMap.get(el.id);
+              const oldElBox = initialVerts
+                ? ctx.selectionTool.getBoundingBox({ ...el, vertices: initialVerts })
+                : this.initialBox;
+              const newElBox = ctx.selectionTool.getBoundingBox(el);
+              if (oldElBox && newElBox) {
+                ctx.selectionTool.rotateElementGradient(
+                  el,
+                  this.rotationPivot!,
+                  this.lastDeltaAngle,
+                  oldElBox,
+                  newElBox
+                );
+              }
+            }
+          });
+        }
       } else if (this.initialBox) {
-        const newBox = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 0);
-        if (newBox) {
-          ctx.selectionTool.updatePivotOnScale(this.initialBox, newBox, selectedEls);
-        }
-
-        // Compensate gradients for elements with lockScale === false (FIX-FillLocks)
-        selectedEls.forEach((el) => {
-          if (el.attributes['data-gradient']) {
-            const initialVerts = this.initialElementsMap.get(el.id);
-            const oldElBox = initialVerts
-              ? ctx.selectionTool.getBoundingBox({ ...el, vertices: initialVerts })
-              : this.initialBox;
-            const newElBox = ctx.selectionTool.getBoundingBox(el);
-            if (oldElBox && newElBox) {
-              ctx.selectionTool.compensateGradientOnScale(el, oldElBox, newElBox);
-            }
-          }
-        });
+        ScaleTransformer.applyScaleCommit(
+          ctx,
+          this.ghostTransformMap,
+          this.initialBox,
+          this.initialAttributesMap,
+          this.initialElementsMap,
+          selectedEls
+        );
       }
 
       this.ghostTransformMap.clear();
