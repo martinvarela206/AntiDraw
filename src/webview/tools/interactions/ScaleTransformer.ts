@@ -111,30 +111,40 @@ export class ScaleTransformer {
     const isXHandle = ['nw', 'ne', 'w', 'e', 'sw', 'se'].includes(activeHandle);
     const isYHandle = ['nw', 'n', 'ne', 'sw', 's', 'se'].includes(activeHandle);
 
-    const targetHandlePt: Point = {
-      x: handlePt.x + (isXHandle ? rawDx : 0),
-      y: handlePt.y + (isYHandle ? rawDy : 0),
-    };
+    const rawTargetX = handlePt.x + (isXHandle ? rawDx : 0);
+    const rawTargetY = handlePt.y + (isYHandle ? rawDy : 0);
 
+    const targetHandlePt: Point = { x: rawTargetX, y: rawTargetY };
     const snappedHandlePt = ctx.snapPoint(targetHandlePt, otherVertices);
 
-    let effectiveDx = 0;
-    let effectiveDy = 0;
+    /**
+     * ARCHITECTURAL RATIONALE: Axial Scale Constraint & Snapping Decoupling
+     * When dragging single-axis handles (e.g. 'n', 's' for vertical or 'e', 'w' for horizontal),
+     * the unconstrained axis must remain strictly invariant. Snapping calculations on the unconstrained
+     * axis are disregarded so transverse grid points, cell centers, or guide intersections do not
+     * trigger false displacements or misplaced snap target indicators.
+     */
+    const effectiveTargetX = isXHandle ? snappedHandlePt.x : rawTargetX;
+    const effectiveTargetY = isYHandle ? snappedHandlePt.y : rawTargetY;
 
-    if (isXHandle) {
-      effectiveDx = snappedHandlePt.x - handlePt.x;
-    }
-    if (isYHandle) {
-      effectiveDy = snappedHandlePt.y - handlePt.y;
-    }
+    const effectiveDx = isXHandle ? effectiveTargetX - handlePt.x : 0;
+    const effectiveDy = isYHandle ? effectiveTargetY - handlePt.y : 0;
 
-    const didSnap =
-      Math.hypot(snappedHandlePt.x - targetHandlePt.x, snappedHandlePt.y - targetHandlePt.y) > 0.001;
+    const didSnapX = isXHandle && Math.abs(snappedHandlePt.x - rawTargetX) > 0.001;
+    const didSnapY = isYHandle && Math.abs(snappedHandlePt.y - rawTargetY) > 0.001;
+    const didSnap = didSnapX || didSnapY;
+
+    const snappedPt: Point | null = didSnap
+      ? {
+          x: isXHandle && didSnapX ? snappedHandlePt.x : rawTargetX,
+          y: isYHandle && didSnapY ? snappedHandlePt.y : rawTargetY,
+        }
+      : null;
 
     return {
       effectiveDx,
       effectiveDy,
-      snappedPt: didSnap ? snappedHandlePt : null,
+      snappedPt,
     };
   }
 

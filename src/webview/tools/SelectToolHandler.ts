@@ -227,7 +227,26 @@ export class SelectToolHandler implements IToolHandler {
           this.activeHandle = handle;
           if (handle === 'rotate') {
             const pivot = this.ctx.selectionTool.getPivot(groupBox);
-            this.transformInteraction.startRotate(pivot, pt, selectedEls);
+            const rotHandles = [
+              { x: groupBox.x, y: groupBox.y },
+              { x: groupBox.cx, y: groupBox.y },
+              { x: groupBox.x + groupBox.width, y: groupBox.y },
+              { x: groupBox.x, y: groupBox.cy },
+              { x: groupBox.x + groupBox.width, y: groupBox.cy },
+              { x: groupBox.x, y: groupBox.y + groupBox.height },
+              { x: groupBox.cx, y: groupBox.y + groupBox.height },
+              { x: groupBox.x + groupBox.width, y: groupBox.y + groupBox.height },
+            ];
+            let closestHandlePt = rotHandles[0];
+            let minHDist = Infinity;
+            for (const rh of rotHandles) {
+              const d = Math.hypot(pt.x - rh.x, pt.y - rh.y);
+              if (d < minHDist) {
+                minHDist = d;
+                closestHandlePt = rh;
+              }
+            }
+            this.transformInteraction.startRotate(pivot, closestHandlePt, selectedEls);
             this.callbacks.setCursor?.('grabbing');
           } else {
             this.transformInteraction.startScale(handle, groupBox, selectedEls, 0);

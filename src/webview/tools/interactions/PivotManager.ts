@@ -58,7 +58,16 @@ export class PivotManager {
     }
 
     const snapped = ctx.snapPoint(pt, otherVertices);
-    ctx.selectionTool.customPivot = { x: Math.round(snapped.x), y: Math.round(snapped.y) };
+    /**
+     * ARCHITECTURAL RATIONALE: Sub-Pixel Cell-Center Pivot Precision
+     * Preserves fractional/subpixel coordinates (such as 0.5 for 1px cell-center or odd spacing baricenters)
+     * without destructive Math.round truncation to integer pixels, rounding only to 4 decimal places
+     * for numerical stability and preventing coordinate jitter across save-reload cycles.
+     */
+    ctx.selectionTool.customPivot = {
+      x: Math.round(snapped.x * 10000) / 10000,
+      y: Math.round(snapped.y * 10000) / 10000,
+    };
     ctx.renderOverlay();
     return true;
   }
