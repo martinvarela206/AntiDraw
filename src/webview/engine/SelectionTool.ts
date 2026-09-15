@@ -1,16 +1,10 @@
 import { VectorElement, PathVertex, Point, GradientConfig } from './VectorModel.js';
 import { PathGeometryCompiler } from './geometry/PathGeometryCompiler.js';
 import { StrokeOutlineGenerator } from './boolean/StrokeOutlineGenerator.js';
+import { BoundingBox, BoundingBoxCalculator } from './geometry/BoundingBoxCalculator.js';
 import type { Polygon } from 'polygon-clipping';
 
-export interface BoundingBox {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  cx: number;
-  cy: number;
-}
+export { BoundingBox, BoundingBoxCalculator } from './geometry/BoundingBoxCalculator.js';
 
 export type HandleType =
   | 'nw' | 'n' | 'ne'
@@ -235,34 +229,7 @@ export class SelectionTool {
    *    precision directly on grid intersections, guidelines, and other vector vertices.
    */
   public getBoundingBox(element: VectorElement): BoundingBox | null {
-    if (!element.vertices || element.vertices.length === 0) return null;
-
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-
-    for (let i = 0; i < element.vertices.length; i++) {
-      const v = element.vertices[i];
-      if (v.x < minX) minX = v.x;
-      if (v.x > maxX) maxX = v.x;
-      if (v.y < minY) minY = v.y;
-      if (v.y > maxY) maxY = v.y;
-    }
-
-    if (minX === Infinity) return null;
-
-    const width = Math.max(maxX - minX, 1);
-    const height = Math.max(maxY - minY, 1);
-
-    return {
-      x: minX,
-      y: minY,
-      width,
-      height,
-      cx: minX + width / 2,
-      cy: minY + height / 2,
-    };
+    return BoundingBoxCalculator.getBoundingBox(element);
   }
 
   /**
@@ -280,63 +247,17 @@ export class SelectionTool {
    *    artboard edges, and other vector vertices without requiring offset compensation.
    */
   public getSelectionBoundingBox(element: VectorElement, padding: number = 0): BoundingBox | null {
-    const box = this.getBoundingBox(element);
-    if (!box) return null;
-    return {
-      x: box.x - padding,
-      y: box.y - padding,
-      width: box.width + padding * 2,
-      height: box.height + padding * 2,
-      cx: box.cx,
-      cy: box.cy,
-    };
+    return BoundingBoxCalculator.getSelectionBoundingBox(element, padding);
   }
 
   // Calculate composite group bounding box for multiple elements
   public getGroupBoundingBox(elements: VectorElement[]): BoundingBox | null {
-    if (!elements || elements.length === 0) return null;
-
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-
-    elements.forEach((el) => {
-      const box = this.getBoundingBox(el);
-      if (box) {
-        minX = Math.min(minX, box.x);
-        minY = Math.min(minY, box.y);
-        maxX = Math.max(maxX, box.x + box.width);
-        maxY = Math.max(maxY, box.y + box.height);
-      }
-    });
-
-    if (minX === Infinity) return null;
-    const width = Math.max(maxX - minX, 1);
-    const height = Math.max(maxY - minY, 1);
-
-    return {
-      x: minX,
-      y: minY,
-      width,
-      height,
-      cx: minX + width / 2,
-      cy: minY + height / 2,
-    };
+    return BoundingBoxCalculator.getGroupBoundingBox(elements);
   }
 
   // Calculate composite group selection bounding box with padding (tight zero-clearance by default)
   public getGroupSelectionBoundingBox(elements: VectorElement[], padding: number = 0): BoundingBox | null {
-    const box = this.getGroupBoundingBox(elements);
-    if (!box) return null;
-    return {
-      x: box.x - padding,
-      y: box.y - padding,
-      width: box.width + padding * 2,
-      height: box.height + padding * 2,
-      cx: box.cx,
-      cy: box.cy,
-    };
+    return BoundingBoxCalculator.getGroupSelectionBoundingBox(elements, padding);
   }
 
   /**
