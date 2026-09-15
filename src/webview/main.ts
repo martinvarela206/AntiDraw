@@ -21,6 +21,7 @@ import { ConfirmationModal } from './ui/ConfirmationModal.js';
 import { GridCanvasRenderer } from './ui/GridCanvasRenderer.js';
 import { ClipboardService } from './services/ClipboardService.js';
 import { HistoryService } from './services/HistoryService.js';
+import { CanvasActionDispatcher } from './services/CanvasActionDispatcher.js';
 import './styles/main.css';
 
 class AntiDrawApp {
@@ -80,12 +81,14 @@ class AntiDrawApp {
   // Subsystems & Services
   private clipboardService!: ClipboardService;
   private historyService!: HistoryService;
+  private actionDispatcher!: CanvasActionDispatcher;
 
   constructor() {
     this.initTools();
     this.initLayout();
     this.initClipboardService();
     this.initHistoryService();
+    this.initActionDispatcher();
     this.initViewport();
     this.initEvents();
     this.notifyReady();
@@ -113,6 +116,19 @@ class AntiDrawApp {
       onResetPropertyPanel: () => this.propertyPanel.resetPanelMode(),
       render: () => this.render(),
       syncToHost: () => this.syncToHost(),
+    });
+  }
+
+  private initActionDispatcher(): void {
+    this.actionDispatcher = new CanvasActionDispatcher({
+      model: this.model,
+      selectionTool: this.selectionTool,
+      pushUndo: () => this.pushUndo(),
+      render: () => this.render(),
+      syncToHost: () => this.syncToHost(),
+      onResetPropertyPanel: () => this.propertyPanel.resetPanelMode(),
+      onUpdatePropertyPanel: (activeTool: string) => this.propertyPanel.update(null, activeTool),
+      getActiveTool: () => this.toolbar?.activeTool || 'select',
     });
   }
 
@@ -1520,229 +1536,27 @@ class AntiDrawApp {
 
 
   private handleAlign(type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom'): void {
-    const selectedIds = Array.from(this.selectionTool.selectedElementIds);
-    const selectedEls: VectorElement[] = [];
-    selectedIds.forEach((id) => {
-      const el = this.model.elements.find((e) => e.id === id);
-      if (el) selectedEls.push(el);
-    });
-
-    if (selectedEls.length > 0) {
-      this.pushUndo();
-      const aligned = BooleanOperations.alignElements(
-        selectedEls,
-        type,
-        this.model.canvas.width,
-        this.model.canvas.height
-      );
-      aligned.forEach((aEl) => {
-        const target = this.model.elements.find((e) => e.id === aEl.id);
-        if (target) {
-          target.vertices = aEl.vertices;
-          target.attributes.d = this.model.compilePathD(target.vertices || [], this.model.isElementClosed(target));
-          if (this.model.isParametricElement(target)) {
-            this.model.syncParametricAttributes(target);
-          }
-        }
-      });
-      this.render();
-      this.syncToHost();
-    }
+    this.actionDispatcher.align(type);
   }
 
   private handleBoolean(op: 'union' | 'subtract' | 'intersect' | 'exclude' | 'combine' | 'fragment'): void {
-    const selectedIds = Array.from(this.selectionTool.selectedElementIds);
-    const selectedEls: VectorElement[] = [];
-    selectedIds.forEach((id) => {
-      const el = this.model.elements.find((e) => e.id === id);
-      if (el) selectedEls.push(el);
-    });
-
-    if (selectedEls.length < 2) return;
-    this.pushUndo();
-
-    if (op === 'union') {
-      const result = BooleanOperations.union(selectedEls, this.model);
-      if (result) {
-        const removeIds = new Set(selectedEls.map((e) => e.id));
-        this.model.elements = this.model.elements.filter((e) => !removeIds.has(e.id));
-        this.model.elements.push(result);
-        this.selectionTool.select(result.id);
-        this.propertyPanel.resetPanelMode();
-        this.render();
-        this.syncToHost();
-      }
-    } else if (op === 'subtract') {
-      // 1st selected vector cuts the last selected vector; cutter is NOT deleted
-      const trimRes = BooleanOperations.subtract(selectedEls, this.model);
-      if (trimRes) {
-        const targetIdx = this.model.elements.findIndex((e) => e.id === trimRes.targetId);
-        if (targetIdx >= 0) {
-          this.model.elements[targetIdx] = trimRes.trimmed;
-        }
-        this.selectionTool.select(trimRes.trimmed.id);
-        this.propertyPanel.resetPanelMode();
-        this.render();
-        this.syncToHost();
-      }
-    } else if (op === 'intersect') {
-      const result = BooleanOperations.intersect(selectedEls, this.model);
-      if (result) {
-        const removeIds = new Set(selectedEls.map((e) => e.id));
-        this.model.elements = this.model.elements.filter((e) => !removeIds.has(e.id));
-        this.model.elements.push(result);
-        this.selectionTool.select(result.id);
-        this.propertyPanel.resetPanelMode();
-        this.render();
-        this.syncToHost();
-      }
-    } else if (op === 'exclude') {
-      const result = BooleanOperations.exclude(selectedEls, this.model);
-      if (result) {
-        const removeIds = new Set(selectedEls.map((e) => e.id));
-        this.model.elements = this.model.elements.filter((e) => !removeIds.has(e.id));
-        this.model.elements.push(result);
-        this.selectionTool.select(result.id);
-        this.propertyPanel.resetPanelMode();
-        this.render();
-        this.syncToHost();
-      }
-    } else if (op === 'combine') {
-      /**
-       * ARCHITECTURAL RATIONALE: Compound Path (Combine) with Source Removal (FIX-07)
-       * Combines multiple vector contours into a single unified <path fill-rule="evenodd">
-       * and removes the source shapes so inner contours render as actual cutouts/holes.
-       */
-      const result = BooleanOperations.combine(selectedEls, this.model);
-      if (result) {
-        const removeIds = new Set(selectedEls.map((e) => e.id));
-        this.model.elements = this.model.elements.filter((e) => !removeIds.has(e.id));
-        this.model.elements.push(result);
-        this.selectionTool.select(result.id);
-        this.propertyPanel.resetPanelMode();
-        this.render();
-        this.syncToHost();
-      }
-    } else if (op === 'fragment') {
-      // Divide into intersection + exclusion simultaneously, removing originals
-      const frags = BooleanOperations.fragment(selectedEls, this.model);
-      if (frags && frags.length > 0) {
-        const removeIds = new Set(selectedEls.map((e) => e.id));
-        this.model.elements = this.model.elements.filter((e) => !removeIds.has(e.id));
-        frags.forEach((f) => this.model.elements.push(f));
-        this.selectionTool.deselectAll();
-        frags.forEach((f) => this.selectionTool.selectedElementIds.add(f.id));
-        this.propertyPanel.resetPanelMode();
-        this.render();
-        this.syncToHost();
-      }
-    }
+    this.actionDispatcher.executeBoolean(op);
   }
 
   private handleZOrder(action: 'front' | 'forward' | 'backward' | 'back'): void {
-    const selectedIds = Array.from(this.selectionTool.selectedElementIds);
-    if (selectedIds.length === 0) return;
-    this.pushUndo();
-    selectedIds.forEach((id) => {
-      this.model.elements = BooleanOperations.reorder(this.model.elements, id, action);
-    });
-    this.render();
-    this.syncToHost();
+    this.actionDispatcher.reorderZ(action);
   }
 
-  /**
-   * ARCHITECTURAL RATIONALE: Stroke to Path (Outline Stroke) Invocation
-   * Why this exists:
-   * Replaces an open or closed stroked vector with an extruded planar polygon whose fill is the original stroke color.
-   *
-   * Edge Cases & Safety Handled:
-   * 1. Preserves Undo/Redo stack prior to mutating the element.
-   * 2. Swaps the element in-place in `model.elements` keeping layer ordering intact rather than appending to end.
-   * 3. Seamlessly updates `selectionTool` with the new element ID and re-renders the property panel with the new closed polygon.
-   * 4. Discarded alternative: leaving the stroke in place and creating a duplicate path. Discarded because standard graphic suites
-   *    (Corel Draw "Convert Outline to Object", Illustrator "Outline Stroke") replace the stroked vector directly, avoiding
-   *    accidental duplicate geometry and z-fighting.
-   */
   private handleStrokeToPath(): void {
-    const selectedEl = this.model.elements.find((el) => this.selectionTool.isSelected(el.id));
-    if (!selectedEl) return;
-    this.pushUndo();
-    const newElements = BooleanOperations.outlineStrokeElements(selectedEl, this.model);
-    if (newElements.length > 0) {
-      const idx = this.model.elements.findIndex((el) => el.id === selectedEl.id);
-      if (idx >= 0) {
-        this.model.elements.splice(idx, 1, ...newElements);
-        this.selectionTool.deselectAll();
-        newElements.forEach((el) => this.selectionTool.select(el.id));
-        this.propertyPanel.resetPanelMode();
-        this.render();
-        this.syncToHost();
-      }
-    }
+    this.actionDispatcher.strokeToPath();
   }
 
-  /**
-   * ARCHITECTURAL RATIONALE: Explicit Parametric Shape to Curves Conversion (FEAT-01)
-   *
-   * Why this exists:
-   * Translates native SVG parametric primitives (<rect>, <circle>, <ellipse>, <line>, <polyline>, <polygon>)
-   * into standard editable <path> elements with independent Bézier anchor nodes and tangents.
-   *
-   * Non-Accidental Invariant:
-   * Conversion is NEVER performed automatically during selection, dragging, or handle manipulation.
-   * It is triggered exclusively by explicit user intent via:
-  /**
-   * ARCHITECTURAL RATIONALE: Explicit Modal Confirmation for Curve De-Structuring (FEAT-09)
-   * Primitives (<rect>, <circle>, <ellipse>, <line>, <polyline>, <polygon>) carry high-level
-   * parametric configuration and custom inspector interfaces. Converting to curves is destructive
-   * and irreversible. This handler blocks conversion until the designer explicitly confirms the modal dialog.
-   */
   private async handleConvertToCurves(): Promise<void> {
-    const selected = this.model.elements.filter((el) => this.selectionTool.isSelected(el.id));
-    const parametricEls = selected.filter((el) => this.model.isParametricElement(el));
-    if (parametricEls.length === 0) return;
-
-    const names = parametricEls.map((el) => `<${el.shapeType || el.tagName}>`).join(', ');
-    const confirmed = await ConfirmationModal.confirm({
-      title: 'Convertir Primitiva a Curvas',
-      message: `¿Deseas convertir ${parametricEls.length === 1 ? `la primitiva ${names}` : `las ${parametricEls.length} primitivas (${names})`} a trazado libre <path>?`,
-      details: 'Esta acción desestructurará la figura en nodos y curvas de Bézier libres. Se perderán los controles paramétricos de radios, esquinas o sectores.',
-      confirmText: 'Convertir a Curvas',
-      cancelText: 'Cancelar',
-    });
-    if (!confirmed) return;
-
-    this.pushUndo();
-    parametricEls.forEach((el) => {
-      this.model.convertToCurves(el);
-    });
-    this.propertyPanel.resetPanelMode();
-    this.propertyPanel.update(null, this.toolbar.activeTool);
-    this.render();
-    this.syncToHost();
+    await this.actionDispatcher.convertToCurves();
   }
 
-  /**
-   * ARCHITECTURAL RATIONALE: Batch Path to Primitive Optimizer (FEAT-05)
-   * Scans all selected non-parametric <path> elements, performs inverse geometric recognition,
-   * converts them to their canonical native SVG primitives (<line>, <polyline>, <polygon>, <rect>, <circle>, <ellipse>),
-   * purges path d attributes, recalculates vertex bounds, and records undo state.
-   */
   private handleConvertToPrimitives(): void {
-    const selected = this.model.elements.filter((el) => this.selectionTool.isSelected(el.id));
-    const convertibleEls = selected.filter(
-      (el) => !this.model.isParametricElement(el) && el.tagName === 'path' && this.model.detectPrimitiveFromPath(el) !== null
-    );
-    if (convertibleEls.length === 0) return;
-
-    this.pushUndo();
-    convertibleEls.forEach((el) => {
-      this.model.convertPathToPrimitive(el);
-    });
-    this.propertyPanel.resetPanelMode();
-    this.propertyPanel.update(null, this.toolbar.activeTool);
-    this.render();
-    this.syncToHost();
+    this.actionDispatcher.convertToPrimitives();
   }
 
 
