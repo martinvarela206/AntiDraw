@@ -104,15 +104,69 @@ export class GeometryInspector {
         const targetY = parseFloat(elY.value) || 0;
         const dx = targetX - box.x;
         const dy = targetY - box.y;
-        el.vertices = el.vertices!.map((v) => ({
-          ...v,
-          x: v.x + dx,
-          y: v.y + dy,
-          handleIn: v.handleIn ? { x: v.handleIn.x + dx, y: v.handleIn.y + dy } : undefined,
-          handleOut: v.handleOut ? { x: v.handleOut.x + dx, y: v.handleOut.y + dy } : undefined,
-        }));
+
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+
+        const isPieOrArc =
+          el.attributes['data-ellipse-type'] === 'pie' || el.attributes['data-ellipse-type'] === 'arc';
+
+        /**
+         * ARCHITECTURAL RATIONALE: Parametric Arc & Pie Position Synchronization (FIX-ApplyPosParametric)
+         *
+         * 1. Technical Justification:
+         *    Parametric arc and pie primitives store their center coordinates explicitly in attributes `cx` and `cy`.
+         *    When repositioning via GeometryInspector (X/Y input boxes), naively translating only the vertex array
+         *    causes `cx` and `cy` to remain static at their pre-translation coordinates. Because `SvgSerializer`
+         *    re-synthesizes the canonical SVG arc path ('A') using `cleanAttrs.cx` and `cleanAttrs.cy`, the element
+         *    would snap back to its prior position during document export or canvas re-render.
+         *
+         * 2. Analytical Translation:
+         *    Center coordinates translate solidarily with the bounding box displacement:
+         *      newCx = oldCx + dx
+         *      newCy = oldCy + dy
+         *    Both canonical path commands ('A') and unified vertex representations are regenerated
+         *    via `compileEllipseD` and `convertEllipseToVertices` incorporating optional donut hole ratio (`innerRatio`).
+         *
+         * 3. Fallback for Standard & Freeform Paths:
+         *    Standard shapes translate vertex arrays, recompile path 'd', and delegate to
+         *    `syncParametricAttributes(el)`.
+         */
+        if (isPieOrArc && model.isParametricElement(el)) {
+          const oldCx = parseFloat(el.attributes.cx || '0');
+          const oldCy = parseFloat(el.attributes.cy || '0');
+          const newCx = Math.round((oldCx + dx) * 100) / 100;
+          const newCy = Math.round((oldCy + dy) * 100) / 100;
+          el.attributes.cx = newCx.toString();
+          el.attributes.cy = newCy.toString();
+
+          const rx = parseFloat(el.attributes.rx || el.attributes.r || '1');
+          const ry = parseFloat(el.attributes.ry || el.attributes.r || '1');
+          const startAngle = parseFloat(el.attributes['data-start-angle'] || '0');
+          const endAngle = parseFloat(el.attributes['data-end-angle'] || '360');
+          const innerRatio = parseFloat(el.attributes['data-inner-ratio'] || '0');
+          const type = (el.attributes['data-ellipse-type'] as 'pie' | 'arc') || 'pie';
+
+          el.attributes.d = model.compileEllipseD(newCx, newCy, rx, ry, type, startAngle, endAngle, innerRatio);
+          el.vertices = model.convertEllipseToVertices(newCx, newCy, rx, ry, type, startAngle, endAngle, innerRatio);
+          el.attributes['data-node-types'] = el.vertices.map((v) => v.nodeType).join(',');
+        } else {
+          el.vertices = el.vertices!.map((v) => ({
+            ...v,
+            x: v.x + dx,
+            y: v.y + dy,
+            handleIn: v.handleIn ? { x: v.handleIn.x + dx, y: v.handleIn.y + dy } : undefined,
+            handleOut: v.handleOut ? { x: v.handleOut.x + dx, y: v.handleOut.y + dy } : undefined,
+          }));
+          const isClosed = model.isElementClosed(el);
+          el.attributes.d = model.compilePathD(el.vertices, isClosed);
+          if (model.isParametricElement(el)) {
+            model.syncParametricAttributes(el);
+          }
+        }
+
         selectionTool.updatePivotOnTranslate(dx, dy, [el]);
         callbacks.onUpdateElement(el);
+        onReRender();
       };
       elX.addEventListener('change', applyPos);
       elY.addEventListener('change', applyPos);
