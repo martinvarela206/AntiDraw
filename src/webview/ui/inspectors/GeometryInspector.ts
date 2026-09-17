@@ -144,17 +144,80 @@ export class GeometryInspector {
           }
         }
 
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+
         const sx = targetW / (box.width || 1);
         const sy = targetH / (box.height || 1);
-        el.vertices = el.vertices!.map((v) => ({
-          ...v,
-          x: box.x + (v.x - box.x) * sx,
-          y: box.y + (v.y - box.y) * sy,
-          handleIn: v.handleIn ? { x: box.x + (v.handleIn.x - box.x) * sx, y: box.y + (v.handleIn.y - box.y) * sy } : undefined,
-          handleOut: v.handleOut ? { x: box.x + (v.handleOut.x - box.x) * sx, y: box.y + (v.handleOut.y - box.y) * sy } : undefined,
-        }));
+
+        const isPieOrArc =
+          el.attributes['data-ellipse-type'] === 'pie' || el.attributes['data-ellipse-type'] === 'arc';
+
+        /**
+         * ARCHITECTURAL RATIONALE: Parametric Arc & Pie Resizing Synchronization (FIX-ApplySizeParametric)
+         *
+         * 1. Technical Justification:
+         *    Parametric arc and pie primitives maintain their canonical geometry through center (cx, cy),
+         *    radii (rx, ry), angular sweep (start-angle, end-angle), and optional inner ratio (inner-ratio).
+         *    When resizing from GeometryInspector (W/H inputs), naively transforming only the vertex array
+         *    leaves the element attributes out of sync. Because SvgSerializer re-synthesizes the SVG path 'd'
+         *    from cleanAttrs.cx, cy, rx, ry via `compileEllipseD`, stale center and radius attributes would
+         *    cause the element to revert to its previous dimensions or distort upon document export.
+         *
+         * 2. Coordinate Transformation:
+         *    The ellipse center scales proportionally relative to the bounding box origin:
+         *      newCx = box.x + (oldCx - box.x) * sx
+         *      newCy = box.y + (oldCy - box.y) * sy
+         *      newRx = max(0.1, oldRx * sx)
+         *      newRy = max(0.1, oldRy * sy)
+         *    Both canonical path commands ('A') and unified vertex representations are regenerated
+         *    via `compileEllipseD` and `convertEllipseToVertices`.
+         *
+         * 3. Fallback for Standard & Freeform Paths:
+         *    Non-pie/arc shapes undergo standard vertex scaling, recompilation of path 'd', and
+         *    delegation to `syncParametricAttributes(el)`.
+         */
+        if (isPieOrArc && model.isParametricElement(el)) {
+          const oldCx = parseFloat(el.attributes.cx || '0');
+          const oldCy = parseFloat(el.attributes.cy || '0');
+          const oldRx = parseFloat(el.attributes.rx || el.attributes.r || '1');
+          const oldRy = parseFloat(el.attributes.ry || el.attributes.r || '1');
+          const startAngle = parseFloat(el.attributes['data-start-angle'] || '0');
+          const endAngle = parseFloat(el.attributes['data-end-angle'] || '360');
+          const innerRatio = parseFloat(el.attributes['data-inner-ratio'] || '0');
+          const type = (el.attributes['data-ellipse-type'] as 'pie' | 'arc') || 'pie';
+
+          const newCx = box.x + (oldCx - box.x) * sx;
+          const newCy = box.y + (oldCy - box.y) * sy;
+          const newRx = Math.max(0.1, oldRx * sx);
+          const newRy = Math.max(0.1, oldRy * sy);
+
+          el.attributes.cx = (Math.round(newCx * 100) / 100).toString();
+          el.attributes.cy = (Math.round(newCy * 100) / 100).toString();
+          el.attributes.rx = (Math.round(newRx * 100) / 100).toString();
+          el.attributes.ry = (Math.round(newRy * 100) / 100).toString();
+          delete el.attributes.r;
+
+          el.attributes.d = model.compileEllipseD(newCx, newCy, newRx, newRy, type, startAngle, endAngle, innerRatio);
+          el.vertices = model.convertEllipseToVertices(newCx, newCy, newRx, newRy, type, startAngle, endAngle, innerRatio);
+          el.attributes['data-node-types'] = el.vertices.map((v) => v.nodeType).join(',');
+        } else {
+          el.vertices = el.vertices!.map((v) => ({
+            ...v,
+            x: box.x + (v.x - box.x) * sx,
+            y: box.y + (v.y - box.y) * sy,
+            handleIn: v.handleIn ? { x: box.x + (v.handleIn.x - box.x) * sx, y: box.y + (v.handleIn.y - box.y) * sy } : undefined,
+            handleOut: v.handleOut ? { x: box.x + (v.handleOut.x - box.x) * sx, y: box.y + (v.handleOut.y - box.y) * sy } : undefined,
+          }));
+          const isClosed = model.isElementClosed(el);
+          el.attributes.d = model.compilePathD(el.vertices, isClosed);
+          if (model.isParametricElement(el)) {
+            model.syncParametricAttributes(el);
+          }
+        }
+
         selectionTool.updatePivotOnScale(box, { ...box, width: targetW, height: targetH }, [el]);
         callbacks.onUpdateElement(el);
+        onReRender();
       };
       elW.addEventListener('change', () => applySize('w'));
       elH.addEventListener('change', () => applySize('h'));
