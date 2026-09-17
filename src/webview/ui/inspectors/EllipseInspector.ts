@@ -291,13 +291,44 @@ export class EllipseInspector {
 
     if (inputStartAngle && inputEndAngle) {
       const onAnglesChange = () => {
-        let s = parseFloat(inputStartAngle.value) || 0;
-        let e = parseFloat(inputEndAngle.value) || 0;
-        s = ((s % 360) + 360) % 360;
-        e = ((e % 360) + 360) % 360;
-        if (s === e) e = (s + 360);
+        const rawS = parseFloat(inputStartAngle.value) || 0;
+        const rawE = parseFloat(inputEndAngle.value) || 0;
+        let s = ((rawS % 360) + 360) % 360;
+        let e = ((rawE % 360) + 360) % 360;
+        if (s === e || Math.abs(rawE - rawS) >= 360) {
+          e = s + 360;
+        }
+        let span = e - s;
+        while (span < 0) span += 360;
+        while (span > 360) span -= 360;
+        if (span === 0) span = 360;
+
+        /**
+         * ARCHITECTURAL RATIONALE: Full 360° Sweep Auto-Transition to Ellipse Mode (FIX-EllipseAutoMode)
+         *
+         * 1. Technical Justification:
+         *    When adjusting start/end angles in EllipseInspector, reaching a complete 360° sweep
+         *    (e.g., 0° to 360°, identical angles, or delta >= 360°) geometrically forms a full closed ellipse.
+         *    Retaining 'pie' or 'arc' mode causes the inspector to keep showing angle controls and radial spokes
+         *    instead of the canonical full-ellipse controls. Automatically switching `data-ellipse-type` to
+         *    'ellipse' aligns the element's metadata with its true topological closure and seamlessly hides
+         *    the angle inputs in favor of standard full ellipse editing.
+         *
+         * 2. Canonical Angle Normalization:
+         *    Upon reaching span >= 360° (or within floating-point tolerance), angles are normalized to
+         *    canonical boundaries (start: 0, end: 360) and mode is upgraded to 'ellipse'.
+         *
+         * 3. Partial Sectors:
+         *    If span < 360°, an element previously in 'ellipse' mode transitions to 'pie', while existing
+         *    'pie' or 'arc' modes are preserved.
+         */
+        const isFullCircle = Math.abs(span - 360) < 1e-4;
+        const targetType = isFullCircle ? 'ellipse' : (ellipseType === 'ellipse' ? 'pie' : ellipseType);
+        const finalS = isFullCircle ? 0 : s;
+        const finalE = isFullCircle ? 360 : e;
+
         const { cx, cy, rx, ry } = getCurGeometry();
-        applyEllipseGeometry(cx, cy, rx, ry, ellipseType === 'ellipse' ? 'pie' : ellipseType, s, e);
+        applyEllipseGeometry(cx, cy, rx, ry, targetType, finalS, finalE);
       };
       inputStartAngle.addEventListener('change', onAnglesChange);
       inputEndAngle.addEventListener('change', onAnglesChange);
