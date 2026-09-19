@@ -1,6 +1,9 @@
 import { ToolContext } from '../IToolHandler.js';
 import { VectorElement, PathVertex, Point } from '../../engine/VectorModel.js';
 import type { SelectToolCallbacks } from '../SelectToolHandler.js';
+import { NodeCatalogService } from '../../engine/selection/NodeCatalogService.js';
+import { BaseHelper } from '../../ui/helpers/index.js';
+import { SnappingEngine } from '../../engine/canvas/SnappingEngine.js';
 
 /**
  * TranslateInteraction
@@ -22,11 +25,13 @@ export class TranslateInteraction {
   public initialBox: any = null;
   public ghostDragOffset: Point | null = null;
   public dragAnchorPt: Point = { x: 0, y: 0 };
+  public isAnchorPicked: boolean = false;
 
   /**
    * ARCHITECTURAL RATIONALE: Proximity Anchor Detection (FIX-05)
-   * Evaluates all vertices of the selected elements and the group bounding box pivot/center.
-   * If any vertex or the center is within `20 / zoom` pixels of `pt`, the closest one is returned
+   * Evaluates all vertices of the selected elements, parametric handles, positional landmarks,
+   * bounding box keypoints, and the group bounding box pivot/center.
+   * If any landmark is within `20 / zoom` pixels of `pt`, the closest one is returned
    * as the definitive magnetic anchor coordinate for translation (`dragAnchorPt`).
    * This guarantees zero-tolerance magnetic snapping to grid, guidelines, and other vertices
    * without requiring pixel-perfect clicking directly on sub-pixel vertex handles.
@@ -37,10 +42,11 @@ export class TranslateInteraction {
     pt: Point,
     groupBox: any,
     zoom: number
-  ): Point {
+  ): { point: Point; isPickedNode: boolean } {
     const threshold = 20 / (zoom || 1);
     let bestPt: Point = { x: pt.x, y: pt.y };
     let bestDist = threshold;
+    let isPickedNode = false;
 
     if (groupBox) {
       const singleEl = selectedEls.length === 1 ? selectedEls[0] : undefined;
@@ -49,22 +55,43 @@ export class TranslateInteraction {
       if (dPivot < bestDist) {
         bestDist = dPivot;
         bestPt = { x: pivot.x, y: pivot.y };
+        isPickedNode = true;
       }
-    }
-
-    for (const el of selectedEls) {
-      if (el.vertices) {
-        for (const v of el.vertices) {
-          const d = Math.hypot(pt.x - v.x, pt.y - v.y);
-          if (d < bestDist) {
-            bestDist = d;
-            bestPt = { x: v.x, y: v.y };
-          }
+      const boxPts: Point[] = [
+        { x: groupBox.x, y: groupBox.y },
+        { x: groupBox.x + groupBox.width, y: groupBox.y },
+        { x: groupBox.x, y: groupBox.y + groupBox.height },
+        { x: groupBox.x + groupBox.width, y: groupBox.y + groupBox.height },
+        { x: groupBox.x + groupBox.width / 2, y: groupBox.y },
+        { x: groupBox.x + groupBox.width / 2, y: groupBox.y + groupBox.height },
+        { x: groupBox.x, y: groupBox.y + groupBox.height / 2 },
+        { x: groupBox.x + groupBox.width, y: groupBox.y + groupBox.height / 2 },
+      ];
+      for (const bp of boxPts) {
+        const d = Math.hypot(pt.x - bp.x, pt.y - bp.y);
+        if (d < bestDist) {
+          bestDist = d;
+          bestPt = bp;
+          isPickedNode = true;
         }
       }
     }
 
-    return bestPt;
+    const snappable = NodeCatalogService.collectSnappableNodes(selectedEls, {
+      structural: true,
+      handles: true,
+      positional: true,
+    });
+    for (const p of snappable) {
+      const d = Math.hypot(pt.x - p.x, pt.y - p.y);
+      if (d < bestDist) {
+        bestDist = d;
+        bestPt = p;
+        isPickedNode = true;
+      }
+    }
+
+    return { point: bestPt, isPickedNode };
   }
 
   public isNearSelectionAnchor(
@@ -81,15 +108,29 @@ export class TranslateInteraction {
       if (Math.hypot(pt.x - pivot.x, pt.y - pivot.y) <= threshold) {
         return true;
       }
+      const boxPts: Point[] = [
+        { x: groupBox.x, y: groupBox.y },
+        { x: groupBox.x + groupBox.width, y: groupBox.y },
+        { x: groupBox.x, y: groupBox.y + groupBox.height },
+        { x: groupBox.x + groupBox.width, y: groupBox.y + groupBox.height },
+        { x: groupBox.x + groupBox.width / 2, y: groupBox.y },
+        { x: groupBox.x + groupBox.width / 2, y: groupBox.y + groupBox.height },
+        { x: groupBox.x, y: groupBox.y + groupBox.height / 2 },
+        { x: groupBox.x + groupBox.width, y: groupBox.y + groupBox.height / 2 },
+      ];
+      for (const bp of boxPts) {
+        if (Math.hypot(pt.x - bp.x, pt.y - bp.y) <= threshold) return true;
+      }
     }
 
-    for (const el of selectedEls) {
-      if (el.vertices) {
-        for (const v of el.vertices) {
-          if (Math.hypot(pt.x - v.x, pt.y - v.y) <= threshold) {
-            return true;
-          }
-        }
+    const snappable = NodeCatalogService.collectSnappableNodes(selectedEls, {
+      structural: true,
+      handles: true,
+      positional: true,
+    });
+    for (const p of snappable) {
+      if (Math.hypot(pt.x - p.x, pt.y - p.y) <= threshold) {
+        return true;
       }
     }
 
@@ -103,7 +144,9 @@ export class TranslateInteraction {
     groupBox: any
   ): void {
     const z = ctx.canvasMgr.zoom || 1;
-    this.dragAnchorPt = this.findClosestMoveAnchor(ctx, selectedEls, pt, groupBox, z);
+    const anchorInfo = this.findClosestMoveAnchor(ctx, selectedEls, pt, groupBox, z);
+    this.dragAnchorPt = anchorInfo.point;
+    this.isAnchorPicked = anchorInfo.isPickedNode;
     this.initialElementsMap.clear();
     selectedEls.forEach((el) => {
       if (el.vertices) {
@@ -265,6 +308,26 @@ export class TranslateInteraction {
         html += `<path d="${d}" fill="none" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="4 2" opacity="0.8" vector-effect="non-scaling-stroke" />`;
       }
     });
+
+    // Visual halo for active drag anchor
+    const z = ctx.canvasMgr.zoom || 1;
+    const inv = BaseHelper.getInverseScale(z);
+    const curAnchorX = this.dragAnchorPt.x + this.ghostDragOffset.x;
+    const curAnchorY = this.dragAnchorPt.y + this.ghostDragOffset.y;
+    const isSnapped = SnappingEngine.lastSnapResult !== null;
+
+    const haloRingR = isSnapped ? 9 : 7;
+    const strokeColor = isSnapped ? '#00f0ff' : '#38bdf8';
+    const centerColor = isSnapped ? '#00f0ff' : '#0284c7';
+
+    html += `
+      <g transform="translate(${curAnchorX}, ${curAnchorY}) scale(${inv})" pointer-events="none">
+        <circle cx="0" cy="0" r="${haloRingR}" fill="none" stroke="${strokeColor}" stroke-width="1.5" stroke-dasharray="3 2" />
+        ${isSnapped ? `<circle cx="0" cy="0" r="13" fill="none" stroke="#00f0ff" stroke-width="1" opacity="0.4" />` : ''}
+        <circle cx="0" cy="0" r="2.5" fill="${centerColor}" />
+      </g>
+    `;
+
     return html;
   }
 }
