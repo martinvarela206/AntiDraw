@@ -318,18 +318,15 @@ export class ShapeToolHandler implements IToolHandler {
       });
     } else if (tool === 'polygon') {
       const sides = Math.max(3, this.ctx.canvasMgr.shapeConfig?.polygonSides || 5);
-      for (let k = 0; k < sides; k++) {
-        const angle = -Math.PI / 2 + (k * 2 * Math.PI) / sides;
-        const px = bounds.cx + bounds.rx * Math.cos(angle);
-        const py = bounds.cy + bounds.ry * Math.sin(angle);
-        vertices.push({
-          id: `v_${k}`,
-          x: px,
-          y: py,
-          nodeType: 'asymmetric',
-          command: k === 0 ? 'M' : 'L',
-        });
-      }
+      const regularRatio = Math.cos(Math.PI / sides);
+      vertices = this.ctx.model.convertShapeToVertices('star', {
+        cx: bounds.cx.toString(),
+        cy: bounds.cy.toString(),
+        rx: bounds.rx.toString(),
+        ry: bounds.ry.toString(),
+        points: sides.toString(),
+        innerRatio: regularRatio.toString(),
+      });
     } else if (tool === 'star') {
       vertices = this.ctx.model.convertShapeToVertices('star', {
         cx: bounds.cx.toString(),
@@ -381,9 +378,18 @@ export class ShapeToolHandler implements IToolHandler {
       attributes['points'] = starPts;
       attributes['innerRatio'] = starRatio;
     } else if (tool === 'polygon') {
-      const pointsStr = vertices.map((v) => `${formatNum(v.x)},${formatNum(v.y)}`).join(' ');
-      attributes['points'] = pointsStr;
-      attributes['data-polygon-sides'] = (this.ctx.canvasMgr.shapeConfig?.polygonSides || 5).toString();
+      const sides = Math.max(3, this.ctx.canvasMgr.shapeConfig?.polygonSides || 5);
+      const regularRatio = Math.cos(Math.PI / sides);
+      attributes['cx'] = formatNum(bounds.cx);
+      attributes['cy'] = formatNum(bounds.cy);
+      attributes['rx'] = formatNum(bounds.rx);
+      attributes['ry'] = formatNum(bounds.ry);
+      attributes['data-star-points'] = sides.toString();
+      attributes['data-star-inner-ratio'] = regularRatio.toString();
+      attributes['data-polygon-sides'] = sides.toString();
+      attributes['points'] = sides.toString();
+      attributes['innerRatio'] = regularRatio.toString();
+      attributes['data-shape'] = 'polygon';
     } else if (tool === 'rect') {
       const cr = (this.ctx.canvasMgr.shapeConfig?.rectCornerRadius || 0).toString();
       attributes['x'] = bounds.x.toString();
@@ -404,7 +410,7 @@ export class ShapeToolHandler implements IToolHandler {
 
     return {
       id,
-      tagName: isParametric ? (tool === 'star' ? 'path' : (tool as any)) : 'path',
+      tagName: isParametric ? (tool === 'star' || tool === 'polygon' ? 'path' : (tool as any)) : 'path',
       attributes,
       vertices,
       isClosed,

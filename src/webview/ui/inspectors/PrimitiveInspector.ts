@@ -74,23 +74,32 @@ export class PrimitiveInspector {
     html += LineInspector.render(el, model);
 
     if (isStar) {
+      const regularRatio = Math.cos(Math.PI / starPoints);
+      const isRegularPolygon = Math.abs(starInnerRatio - regularRatio) < 0.01;
+      const isOuterStar = starInnerRatio > regularRatio + 0.01;
+      const starBadgeText = isRegularPolygon
+        ? `⬡ Polígono regular (${starPoints} lados)`
+        : isOuterStar
+        ? `✦ Estrella externa (${starPoints} puntas)`
+        : `★ Estrella interna (${starPoints} puntas)`;
+
       html += `
-      <!-- Star Geometry Controls (FEAT-07) -->
+      <!-- Star & Regular Polygon Geometry Controls (FEAT-07 & FEAT-UnifiedStar) -->
       <div class="panel-section">
         <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
-          <span>Estrella Paramétrica</span>
+          <span>Polígono / Estrella</span>
           <span style="font-size:10px; color:var(--accent-color); font-weight:600; text-transform:none;">
-            ★ ${starPoints} puntas (${starInnerPct}%)
+            ${starBadgeText}
           </span>
         </div>
         <div class="prop-row" style="gap: 6px;">
-          <span class="prop-label" style="width: 46px;" title="Coordenadas del centro de la estrella">Centro</span>
+          <span class="prop-label" style="width: 46px;" title="Coordenadas del centro de la figura">Centro</span>
           <div class="prop-coord-group">
-            <div class="prop-coord-box" title="Coordenada X del centro de la estrella">
+            <div class="prop-coord-box" title="Coordenada X del centro">
               <span class="prop-coord-sublabel">X</span>
               <input type="number" class="prop-coord-input" id="star-cx" value="${Math.round(starCx)}" />
             </div>
-            <div class="prop-coord-box" title="Coordenada Y del centro de la estrella">
+            <div class="prop-coord-box" title="Coordenada Y del centro">
               <span class="prop-coord-sublabel">Y</span>
               <input type="number" class="prop-coord-input" id="star-cy" value="${Math.round(starCy)}" />
             </div>
@@ -110,35 +119,36 @@ export class PrimitiveInspector {
           </div>
         </div>
         <div class="prop-row" style="gap: 4px;">
-          <button class="prop-input" id="btn-star-make-uniform" style="flex:1; cursor:pointer; font-size:9px; height:22px; padding:0;" title="Hacer radios Rx y Ry iguales (Estrella regular 1:1)">1:1 Regular</button>
+          <button class="prop-input" id="btn-star-make-uniform" style="flex:1; cursor:pointer; font-size:9px; height:22px; padding:0;" title="Hacer radios Rx y Ry iguales (1:1 Regular)">1:1 Regular</button>
+          <button class="prop-input" id="btn-star-reset-regular" style="flex:1.4; cursor:pointer; font-size:9px; height:22px; padding:0; background:var(--accent-color); color:#ffffff; font-weight:600;" title="Revertir a polígono regular perfecto (${Math.round(regularRatio * 100)}%)">⬡ A Polígono Regular</button>
         </div>
 
         <div class="prop-row" style="gap: 6px; margin-top: 4px;">
-          <span class="prop-label" style="width: 46px;" title="Número de puntas de la estrella (3 a 64)">Puntas</span>
+          <span class="prop-label" style="width: 46px;" title="Número de lados o puntas (3 a 64)">Lados</span>
           <input type="number" class="prop-coord-input" id="star-points" value="${starPoints}" min="3" max="64" step="1" style="flex: 1;" />
         </div>
         <div class="prop-row" style="gap: 4px;">
-          <button class="prop-input" id="btn-star-preset-3" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;">3</button>
-          <button class="prop-input" id="btn-star-preset-4" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;">4</button>
-          <button class="prop-input" id="btn-star-preset-5" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;">5</button>
-          <button class="prop-input" id="btn-star-preset-6" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;">6</button>
-          <button class="prop-input" id="btn-star-preset-8" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;">8</button>
-          <button class="prop-input" id="btn-star-preset-12" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;">12</button>
+          <button class="prop-input" id="btn-star-preset-3" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="Triángulo regular (3)">3 ▲</button>
+          <button class="prop-input" id="btn-star-preset-4" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="Cuadrado / 4 puntas (4)">4 ◆</button>
+          <button class="prop-input" id="btn-star-preset-5" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="Pentágono / 5 puntas (5)">5 ★</button>
+          <button class="prop-input" id="btn-star-preset-6" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="Hexágono / 6 puntas (6)">6 ⬡</button>
+          <button class="prop-input" id="btn-star-preset-8" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="Octógono / 8 puntas (8)">8 ✴</button>
+          <button class="prop-input" id="btn-star-preset-12" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="Dodecágono / 12 puntas (12)">12 ✹</button>
         </div>
 
         <div class="prop-row" style="gap: 6px; margin-top: 6px;">
-          <span class="prop-label" style="width: 46px;" title="Radio interior (profundidad de las puntas en %)">Radio int.</span>
+          <span class="prop-label" style="width: 46px;" title="Profundidad de arista / Radio interior (5% a 200%)">Arista</span>
           <div style="flex: 1; display: flex; align-items: center; gap: 4px;">
-            <input type="range" id="star-inner-ratio-slider" min="5" max="95" step="1" value="${starInnerPct}" style="flex: 1; accent-color: var(--accent-color); cursor: pointer;" />
-            <input type="number" class="prop-coord-input" id="star-inner-ratio-num" value="${starInnerPct}" min="5" max="95" step="1" style="width: 38px; text-align: center;" />
+            <input type="range" id="star-inner-ratio-slider" min="5" max="200" step="1" value="${starInnerPct}" style="flex: 1; accent-color: var(--accent-color); cursor: pointer;" />
+            <input type="number" class="prop-coord-input" id="star-inner-ratio-num" value="${starInnerPct}" min="5" max="200" step="1" style="width: 42px; text-align: center;" />
             <span style="font-size: 10px; color: var(--text-muted);">%</span>
           </div>
         </div>
         <div class="prop-row" style="gap: 4px;">
-          <button class="prop-input" id="btn-star-ratio-20" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="Puntas muy afiladas (20%)">20% Aguda</button>
-          <button class="prop-input" id="btn-star-ratio-38" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="Proporción áurea clásica (38.2%)">38% Áurea</button>
-          <button class="prop-input" id="btn-star-ratio-50" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="Equilibrada estándar (50%)">50% Media</button>
-          <button class="prop-input" id="btn-star-ratio-70" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="Puntas suaves / estrella gruesa (70%)">70% Suave</button>
+          <button class="prop-input" id="btn-star-ratio-25" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="Puntas muy afiladas hacia adentro (25%)">25% Aguda</button>
+          <button class="prop-input" id="btn-star-ratio-50" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="Estrella media equilibrada (50%)">50% Media</button>
+          <button class="prop-input" id="btn-star-ratio-regular" style="flex:1.2; cursor:pointer; font-size:9px; height:20px; padding:0;" title="Polígono regular alineado (${Math.round(regularRatio * 100)}%)">⬡ ${Math.round(regularRatio * 100)}% Regular</button>
+          <button class="prop-input" id="btn-star-ratio-130" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="Estrella extendida hacia afuera (130%)">130% Externa</button>
         </div>
 
         <div class="prop-row" style="gap: 6px; margin-top: 6px;">
@@ -226,9 +236,16 @@ export class PrimitiveInspector {
         const clampedRx = Math.max(1, newRx);
         const clampedRy = Math.max(1, newRy);
         const clampedPoints = Math.max(3, Math.min(64, Math.round(newPoints)));
-        const clampedInner = Math.max(0.05, Math.min(0.95, newInnerRatio));
+        const clampedInner = Math.max(0.05, Math.min(2.0, newInnerRatio));
+        const regularRatio = Math.cos(Math.PI / clampedPoints);
+        const isRegular = Math.abs(clampedInner - regularRatio) < 0.005;
 
-        el.attributes['data-shape'] = 'star';
+        if (isRegular) {
+          el.attributes['data-shape'] = 'polygon';
+          el.attributes['data-polygon-sides'] = clampedPoints.toString();
+        } else {
+          el.attributes['data-shape'] = 'star';
+        }
         el.attributes['data-parametric'] = 'true';
         el.attributes['cx'] = newCx.toString();
         el.attributes['cy'] = newCy.toString();
@@ -256,6 +273,7 @@ export class PrimitiveInspector {
       const starRxInput = container.querySelector<HTMLInputElement>('#star-rx');
       const starRyInput = container.querySelector<HTMLInputElement>('#star-ry');
       const btnStarUniform = container.querySelector<HTMLButtonElement>('#btn-star-make-uniform');
+      const btnStarResetRegular = container.querySelector<HTMLButtonElement>('#btn-star-reset-regular');
       const starPointsInput = container.querySelector<HTMLInputElement>('#star-points');
       const starInnerSlider = container.querySelector<HTMLInputElement>('#star-inner-ratio-slider');
       const starInnerNum = container.querySelector<HTMLInputElement>('#star-inner-ratio-num');
@@ -289,6 +307,12 @@ export class PrimitiveInspector {
         applyStarGeometry(cx, cy, uniformR, uniformR);
       });
 
+      btnStarResetRegular?.addEventListener('click', () => {
+        const { cx, cy, rx, ry } = getCurStarGeometry();
+        const regRatio = Math.cos(Math.PI / starPoints);
+        applyStarGeometry(cx, cy, rx, ry, starPoints, regRatio);
+      });
+
       starPointsInput?.addEventListener('change', () => {
         const pts = Math.max(3, Math.min(64, parseInt(starPointsInput.value, 10) || 5));
         const { cx, cy, rx, ry } = getCurStarGeometry();
@@ -314,24 +338,24 @@ export class PrimitiveInspector {
 
         starInnerNum.addEventListener('change', () => {
           let valPct = parseFloat(starInnerNum.value) || 40;
-          valPct = Math.max(5, Math.min(95, valPct));
+          valPct = Math.max(5, Math.min(200, valPct));
           starInnerSlider.value = valPct.toString();
           const { cx, cy, rx, ry } = getCurStarGeometry();
           applyStarGeometry(cx, cy, rx, ry, starPoints, valPct / 100);
         });
       }
 
-      const ratioPresets: { id: string; ratio: number }[] = [
-        { id: '#btn-star-ratio-20', ratio: 0.20 },
-        { id: '#btn-star-ratio-38', ratio: 0.382 },
-        { id: '#btn-star-ratio-50', ratio: 0.50 },
-        { id: '#btn-star-ratio-70', ratio: 0.70 },
+      const ratioPresets: { id: string; ratio: () => number }[] = [
+        { id: '#btn-star-ratio-25', ratio: () => 0.25 },
+        { id: '#btn-star-ratio-50', ratio: () => 0.50 },
+        { id: '#btn-star-ratio-regular', ratio: () => Math.cos(Math.PI / starPoints) },
+        { id: '#btn-star-ratio-130', ratio: () => 1.30 },
       ];
       for (const preset of ratioPresets) {
         const btn = container.querySelector<HTMLButtonElement>(preset.id);
         btn?.addEventListener('click', () => {
           const { cx, cy, rx, ry } = getCurStarGeometry();
-          applyStarGeometry(cx, cy, rx, ry, starPoints, preset.ratio);
+          applyStarGeometry(cx, cy, rx, ry, starPoints, preset.ratio());
         });
       }
 

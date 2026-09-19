@@ -56,7 +56,13 @@ export class PrimitiveDetector {
 
   public static isStar(el: VectorElement): boolean {
     if (el.attributes?.['data-shape'] === 'path' || el.attributes?.['data-parametric'] === 'false') return false;
-    return el.tagName === 'star' || el.shapeType === 'star' || el.attributes?.['data-shape'] === 'star';
+    return (
+      el.tagName === 'star' ||
+      el.shapeType === 'star' ||
+      el.attributes?.['data-shape'] === 'star' ||
+      (el.attributes?.['data-star-points'] !== undefined && el.attributes?.cx !== undefined) ||
+      ((el.tagName === 'polygon' || el.shapeType === 'polygon' || el.attributes?.['data-shape'] === 'polygon') && el.attributes?.cx !== undefined)
+    );
   }
 
   /**
@@ -277,13 +283,16 @@ export class PrimitiveDetector {
       vertices.push(mkV(cx + rx, cy, { x: cx + rx, y: cy - oy }, { x: cx + rx, y: cy + oy }, 'symmetric'));
       vertices.push(mkV(cx, cy + ry, { x: cx + ox, y: cy + ry }, { x: cx - ox, y: cy + ry }, 'symmetric'));
       vertices.push(mkV(cx - rx, cy, { x: cx - rx, y: cy + oy }, { x: cx - rx, y: cy - oy }, 'symmetric'));
-    } else if (tag === 'star') {
+    } else if (tag === 'star' || ((tag === 'polygon' || tag === 'path') && attrs.cx)) {
       const cx = parseFloat(attrs.cx || '50');
       const cy = parseFloat(attrs.cy || '50');
       const rx = parseFloat(attrs.rx || attrs.r || '50');
       const ry = parseFloat(attrs.ry || attrs.r || '50');
-      const points = Math.max(3, Math.min(64, parseInt(attrs['data-star-points'] || attrs.points || '5', 10)));
-      const innerRatio = Math.max(0.05, Math.min(0.95, parseFloat(attrs['data-star-inner-ratio'] || attrs.innerRatio || '0.4')));
+      const points = Math.max(3, Math.min(64, parseInt(attrs['data-star-points'] || attrs['data-polygon-sides'] || attrs.points || '5', 10)));
+      const regularRatio = Math.cos(Math.PI / points);
+      let innerRatio = parseFloat(attrs['data-star-inner-ratio'] || attrs.innerRatio || regularRatio.toString());
+      if (isNaN(innerRatio) || innerRatio <= 0) innerRatio = regularRatio;
+      innerRatio = Math.max(0.05, Math.min(2.0, innerRatio));
 
       for (let k = 0; k < points * 2; k++) {
         const angle = -Math.PI / 2 + (k * Math.PI) / points;
