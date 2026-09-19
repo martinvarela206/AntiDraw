@@ -43,7 +43,8 @@ export class TranslateInteraction {
     let bestDist = threshold;
 
     if (groupBox) {
-      const pivot = ctx.selectionTool.getPivot(groupBox);
+      const singleEl = selectedEls.length === 1 ? selectedEls[0] : undefined;
+      const pivot = ctx.selectionTool.getPivot(groupBox, singleEl);
       const dPivot = Math.hypot(pt.x - pivot.x, pt.y - pivot.y);
       if (dPivot < bestDist) {
         bestDist = dPivot;
@@ -75,7 +76,8 @@ export class TranslateInteraction {
   ): boolean {
     const threshold = 20 / (zoom || 1);
     if (groupBox) {
-      const pivot = ctx.selectionTool.getPivot(groupBox);
+      const singleEl = selectedEls.length === 1 ? selectedEls[0] : undefined;
+      const pivot = ctx.selectionTool.getPivot(groupBox, singleEl);
       if (Math.hypot(pt.x - pivot.x, pt.y - pivot.y) <= threshold) {
         return true;
       }

@@ -145,7 +145,8 @@ export class SelectToolHandler implements IToolHandler {
     if (selectedEls.length > 0 && this.ctx.selectionTool.selectionMode === 'rotate') {
       const z = this.ctx.canvasMgr.zoom || 1;
       const groupBox = this.ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 0);
-      if (groupBox && this.ctx.selectionTool.hitTestPivot(groupBox, pt, 8 / z)) {
+      const singleEl = selectedEls.length === 1 ? selectedEls[0] : undefined;
+      if (groupBox && this.ctx.selectionTool.hitTestPivot(groupBox, pt, 8 / z, singleEl)) {
         this.activeHandle = 'selection-pivot';
         this.transformInteraction.initialPivot = this.ctx.selectionTool.customPivot ? { ...this.ctx.selectionTool.customPivot } : null;
         this.callbacks.setCursor?.('move');
@@ -226,7 +227,8 @@ export class SelectToolHandler implements IToolHandler {
         if (handle) {
           this.activeHandle = handle;
           if (handle === 'rotate') {
-            const pivot = this.ctx.selectionTool.getPivot(groupBox);
+            const singleEl = selectedEls.length === 1 ? selectedEls[0] : undefined;
+            const pivot = this.ctx.selectionTool.getPivot(groupBox, singleEl);
             const rotHandles = [
               { x: groupBox.x, y: groupBox.y },
               { x: groupBox.cx, y: groupBox.y },

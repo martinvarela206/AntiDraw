@@ -535,7 +535,7 @@ export class PropertyPanel {
     if (el.attributes['data-pivot'] && !this.selectionTool.customPivot) {
       this.selectionTool.restorePivotForElement(el);
     }
-    const pivot = box ? this.selectionTool.getPivot(box) : { x: 0, y: 0 };
+    const pivot = box ? this.selectionTool.getPivot(box, el) : { x: 0, y: 0 };
     // Inverse Primitive Recognition (FEAT-05):
     // If element is a pure path and not currently parametric, detect whether its vertices
     // conform to canonical native SVG primitives (line, polyline, polygon, rect, circle, ellipse).
@@ -701,7 +701,7 @@ export class PropertyPanel {
     if (el.attributes['data-pivot'] && !this.selectionTool.customPivot) {
       this.selectionTool.restorePivotForElement(el);
     }
-    const pivot = box ? this.selectionTool.getPivot(box) : { x: 0, y: 0 };
+    const pivot = box ? this.selectionTool.getPivot(box, el) : { x: 0, y: 0 };
     const detectedPrimitive = !this.model.isParametricElement(el) && el.tagName === 'path'
       ? this.model.detectPrimitiveFromPath(el)
       : null;

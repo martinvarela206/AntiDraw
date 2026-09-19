@@ -114,8 +114,9 @@ export class PivotManager {
     callbacks: SelectToolCallbacks
   ): boolean {
     const z = ctx.canvasMgr.zoom || 1;
-    if (groupBox && ctx.selectionTool.hitTestPivot(groupBox, pt, 10 / z)) {
-      ctx.selectionTool.resetPivot(selectedEls.length === 1 ? selectedEls[0] : undefined);
+    const singleEl = selectedEls.length === 1 ? selectedEls[0] : undefined;
+    if (groupBox && ctx.selectionTool.hitTestPivot(groupBox, pt, 10 / z, singleEl)) {
+      ctx.selectionTool.resetPivot(singleEl);
       callbacks.onSelectionChanged?.();
       ctx.syncToHost();
       ctx.renderOverlay();
@@ -136,11 +137,12 @@ export class PivotManager {
     ghostDragOffset: Point | null,
     z: number
   ): string {
-    if (selectedEls.length === 1 && !ctx.selectionTool.customPivot && ctx.selectionTool.elementPivots.has(selectedEls[0].id)) {
-      ctx.selectionTool.restorePivotForElement(selectedEls[0]);
+    const singleEl = selectedEls.length === 1 ? selectedEls[0] : undefined;
+    if (singleEl && !ctx.selectionTool.customPivot && ctx.selectionTool.elementPivots.has(singleEl.id)) {
+      ctx.selectionTool.restorePivotForElement(singleEl);
     }
 
-    let pivot = ctx.selectionTool.getPivot(groupBox);
+    let pivot = ctx.selectionTool.getPivot(groupBox, singleEl);
     if (activeHandle === 'move' && ghostDragOffset) {
       pivot = { x: pivot.x + ghostDragOffset.x, y: pivot.y + ghostDragOffset.y };
     }

@@ -1,4 +1,5 @@
 import { VectorElement, PathVertex, Point, GradientConfig } from './VectorModel.js';
+import { EllipsePrimitive } from './primitives/EllipsePrimitive.js';
 import { PathGeometryCompiler } from './geometry/PathGeometryCompiler.js';
 import { StrokeOutlineGenerator } from './boolean/StrokeOutlineGenerator.js';
 import { BoundingBox, BoundingBoxCalculator } from './geometry/BoundingBoxCalculator.js';
@@ -105,8 +106,29 @@ export class SelectionTool {
     this.selectionMode = 'move';
   }
 
-  public getPivot(box: BoundingBox): Point {
-    return this.customPivot ? { ...this.customPivot } : { x: box.cx, y: box.cy };
+  /**
+   * ARCHITECTURAL RATIONALE: Canonical Center for Ellipses, Pies, Arcs and Donut Rings (FIX-09)
+   * Why: For parametric ellipses, circles, pies, arcs, and donuts, the bounding box of a partial arc
+   * fluctuates dynamically as start and end angles change (e.g. a 90° arc only spans a single quadrant).
+   * If the default rotation pivot were taken from `box.cx, box.cy`, the center marker would shift wildly
+   * across the canvas as the circle is opened, and rotating the arc would wobble off-center instead of
+   * revolving smoothly along its natural circular trajectory.
+   * Discarded alternatives:
+   * - Using `box.cx, box.cy` unconditionally: Destroys circular rotation behavior for partial arcs and donuts.
+   * - Forcing a full-circle bounding box for partial arcs: Distorts resize handles and selection bounds.
+   * Solution: When `customPivot` is null and a single parametric ellipse/arc/rosca is selected, return
+   * the canonical center `(cx, cy)` of the circle. Otherwise, fallback to `box.cx, box.cy`.
+   */
+  public getPivot(box: BoundingBox, element?: VectorElement): Point {
+    if (this.customPivot) {
+      return { ...this.customPivot };
+    }
+    if (element && EllipsePrimitive.isEllipse(element)) {
+      const cx = parseFloat(element.attributes.cx || '0');
+      const cy = parseFloat(element.attributes.cy || '0');
+      return { x: cx, y: cy };
+    }
+    return { x: box.cx, y: box.cy };
   }
 
   public elementPivots: Map<string, Point> = new Map();
@@ -197,8 +219,8 @@ export class SelectionTool {
     }
   }
 
-  public hitTestPivot(box: BoundingBox, pt: Point, radius: number = 8): boolean {
-    return HitTestService.hitTestPivot(this.getPivot(box), pt, radius);
+  public hitTestPivot(box: BoundingBox, pt: Point, radius: number = 8, element?: VectorElement): boolean {
+    return HitTestService.hitTestPivot(this.getPivot(box, element), pt, radius);
   }
 
   /**

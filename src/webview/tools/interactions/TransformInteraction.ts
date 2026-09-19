@@ -81,7 +81,8 @@ export class TransformInteraction {
     if (!box) return null;
 
     if (ctx.selectionTool.selectionMode === 'rotate') {
-      if (ctx.selectionTool.hitTestPivot(box, pt, 8 / z)) {
+      const singleEl = selectedEls.length === 1 ? selectedEls[0] : undefined;
+      if (ctx.selectionTool.hitTestPivot(box, pt, 8 / z, singleEl)) {
         return 'move';
       }
       const h = ctx.selectionTool.hitTestHandle(box, pt, 12 / z, 18 / z, 'rotate');
@@ -402,7 +403,8 @@ export class TransformInteraction {
         }
 
         html += this.pivotManager.renderOverlay(ctx, groupBox, selectedEls, mode, activeHandle, ghostDragOffset, z);
-        const pivot = ctx.selectionTool.getPivot(groupBox);
+        const singleEl = selectedEls.length === 1 ? selectedEls[0] : undefined;
+        const pivot = ctx.selectionTool.getPivot(groupBox, singleEl);
 
         if (activeHandle === 'rotate' && this.rotationPivot) {
           if (this.currentRotationSnappedPt) {
