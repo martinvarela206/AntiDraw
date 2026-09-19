@@ -145,10 +145,20 @@ export class CanvasManager {
     polygonSides: 5,
   };
 
-  // Snap options disabled by default
+  // Quad-Group Snap Activators (Grid, Guides/ViewBox, Vector Nodes, Vector Edges)
   public snapToGrid: boolean = false;
   public snapToGuides: boolean = false;
-  public snapToVertices: boolean = false;
+  public snapToNodes: boolean = false;
+  public snapToEdges: boolean = false;
+
+  // Backward compatibility alias for legacy code & SVG metadata
+  public get snapToVertices(): boolean {
+    return this.snapToNodes;
+  }
+  public set snapToVertices(val: boolean) {
+    this.snapToNodes = val;
+  }
+
   public snapToViewBox: boolean = false;
   public snapAngular: boolean = false;
   public snapThreshold: number = 5; // 5px proximity threshold

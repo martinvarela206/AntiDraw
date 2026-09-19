@@ -10,7 +10,7 @@ export interface TopBarCallbacks {
   onToggleRulers?: () => void;
   onToggleGrid: () => void;
   onToggleGuides: () => void;
-  onToggleSnap: (type: 'grid' | 'guide' | 'vertex' | 'viewbox' | 'angular') => void;
+  onToggleSnap: (type: 'grid' | 'guide' | 'vertex' | 'nodes' | 'edges' | 'viewbox' | 'angular') => void;
 }
 
 export class TopBar {
@@ -64,10 +64,10 @@ export class TopBar {
         <button class="btn-icon ${this.canvasMgr.showRulers ? 'active' : ''}" id="btn-toggle-rulers" title="Toggle Rulers">${ToolIcons.ruler}</button>
         <button class="btn-icon ${this.canvasMgr.showGrid ? 'active' : ''}" id="btn-toggle-grid" title="Toggle Grid Overlay">${ToolIcons.grid}</button>
         <button class="btn-icon ${this.canvasMgr.showGuides ? 'active' : ''}" id="btn-toggle-guides" title="Toggle Guide Lines">${ToolIcons.guide}</button>
-        <button class="btn-icon ${this.canvasMgr.snapToGrid ? 'active' : ''}" id="btn-snap-grid" title="Snap to Grid (Lines &amp; Intersections)">${ToolIcons.snapGrid}</button>
-        <button class="btn-icon ${this.canvasMgr.snapToGuides ? 'active' : ''}" id="btn-snap-guide" title="Snap to Guide Lines &amp; Intersections">${ToolIcons.snapGuide}</button>
-        <button class="btn-icon ${this.canvasMgr.snapToVertices ? 'active' : ''}" id="btn-snap-vertex" title="Snap to Vertices">${ToolIcons.snapVertex}</button>
-        <button class="btn-icon ${this.canvasMgr.snapToViewBox ? 'active' : ''}" id="btn-snap-viewbox" title="Snap to ViewBox (Edges, Corners &amp; Center)">${ToolIcons.snapViewBox}</button>
+        <button class="btn-icon ${this.canvasMgr.snapToGrid ? 'active' : ''}" id="btn-snap-grid" title="Snap to Grid (Lines &amp; Cells)">${ToolIcons.snapGrid}</button>
+        <button class="btn-icon ${this.canvasMgr.snapToGuides ? 'active' : ''}" id="btn-snap-guide" title="Snap to Guides &amp; ViewBox (Lines, Borders &amp; Center)">${ToolIcons.snapGuide}</button>
+        <button class="btn-icon ${this.canvasMgr.snapToNodes ? 'active' : ''}" id="btn-snap-nodes" title="Snap to Vector Nodes (Structural, Handles &amp; Positional)">${ToolIcons.snapVertex}</button>
+        <button class="btn-icon ${this.canvasMgr.snapToEdges ? 'active' : ''}" id="btn-snap-edges" title="Snap to Vector Edges (Contours &amp; Paths)">${ToolIcons.snapEdge}</button>
         <button class="btn-icon ${this.canvasMgr.snapAngular ? 'active' : ''}" id="btn-snap-angular" title="Snap Angular (Multiples of 15°)">${ToolIcons.snapAngular}</button>
       </div>
     `;
@@ -93,8 +93,8 @@ export class TopBar {
     this.bindClick('btn-toggle-guides', () => this.callbacks.onToggleGuides());
     this.bindClick('btn-snap-grid', () => this.callbacks.onToggleSnap('grid'));
     this.bindClick('btn-snap-guide', () => this.callbacks.onToggleSnap('guide'));
-    this.bindClick('btn-snap-vertex', () => this.callbacks.onToggleSnap('vertex'));
-    this.bindClick('btn-snap-viewbox', () => this.callbacks.onToggleSnap('viewbox'));
+    this.bindClick('btn-snap-nodes', () => this.callbacks.onToggleSnap('nodes'));
+    this.bindClick('btn-snap-edges', () => this.callbacks.onToggleSnap('edges'));
     this.bindClick('btn-snap-angular', () => this.callbacks.onToggleSnap('angular'));
   }
 

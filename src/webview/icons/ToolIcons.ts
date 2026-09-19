@@ -114,6 +114,12 @@ export const ToolIcons = {
     <path d="M12 2v6M12 16v6M2 12h6M16 12h6"/>
   </svg>`,
 
+  snapEdge: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M3 17C8 17 8 7 13 7s5 10 8 10" stroke-dasharray="3 2"/>
+    <circle cx="13" cy="7" r="3.5" fill="none"/>
+    <circle cx="13" cy="7" r="1.5" fill="currentColor"/>
+  </svg>`,
+
   snapViewBox: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8">
     <rect x="4" y="4" width="16" height="16" stroke-dasharray="2 2" rx="1"/>
     <circle cx="4" cy="4" r="1.5" fill="currentColor"/>

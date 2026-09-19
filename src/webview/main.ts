@@ -6,6 +6,7 @@ import { BooleanOperations } from './engine/BooleanOperations.js';
 import { ViewportController } from './engine/ViewportController.js';
 import { OverlayRenderer } from './engine/OverlayRenderer.js';
 import { VsCodeBridge } from './bridge/VsCodeBridge.js';
+import { NodeCatalogService } from './engine/selection/NodeCatalogService.js';
 import { ToolContext } from './tools/IToolHandler.js';
 import { SelectToolHandler } from './tools/SelectToolHandler.js';
 import { ShapeToolHandler } from './tools/ShapeToolHandler.js';
@@ -242,8 +243,12 @@ class AntiDrawApp {
         },
         onToggleSnap: (type) => {
           if (type === 'grid') this.canvasMgr.snapToGrid = !this.canvasMgr.snapToGrid;
-          if (type === 'guide') this.canvasMgr.snapToGuides = !this.canvasMgr.snapToGuides;
-          if (type === 'vertex') this.canvasMgr.snapToVertices = !this.canvasMgr.snapToVertices;
+          if (type === 'guide') {
+            this.canvasMgr.snapToGuides = !this.canvasMgr.snapToGuides;
+            this.canvasMgr.snapToViewBox = this.canvasMgr.snapToGuides;
+          }
+          if (type === 'nodes' || type === 'vertex') this.canvasMgr.snapToNodes = !this.canvasMgr.snapToNodes;
+          if (type === 'edges') this.canvasMgr.snapToEdges = !this.canvasMgr.snapToEdges;
           if (type === 'viewbox') this.canvasMgr.snapToViewBox = !this.canvasMgr.snapToViewBox;
           if (type === 'angular') this.canvasMgr.snapAngular = !this.canvasMgr.snapAngular;
           this.topBar.update();
@@ -435,7 +440,9 @@ class AntiDrawApp {
         }
         if (payload.metadata.snapToGrid !== undefined) this.canvasMgr.snapToGrid = payload.metadata.snapToGrid;
         if (payload.metadata.snapToGuides !== undefined) this.canvasMgr.snapToGuides = payload.metadata.snapToGuides;
-        if (payload.metadata.snapToVertices !== undefined) this.canvasMgr.snapToVertices = payload.metadata.snapToVertices;
+        if (payload.metadata.snapToNodes !== undefined) this.canvasMgr.snapToNodes = payload.metadata.snapToNodes;
+        else if (payload.metadata.snapToVertices !== undefined) this.canvasMgr.snapToNodes = payload.metadata.snapToVertices;
+        if (payload.metadata.snapToEdges !== undefined) this.canvasMgr.snapToEdges = payload.metadata.snapToEdges;
         if (payload.metadata.snapToViewBox !== undefined) this.canvasMgr.snapToViewBox = payload.metadata.snapToViewBox;
         if (payload.metadata.snapAngular !== undefined) this.canvasMgr.snapAngular = payload.metadata.snapAngular;
         if (payload.metadata.shapeConfig) {
@@ -1005,7 +1012,9 @@ class AntiDrawApp {
       gridAlignmentMode: this.canvasMgr.gridAlignmentMode,
       snapToGrid: this.canvasMgr.snapToGrid,
       snapToGuides: this.canvasMgr.snapToGuides,
-      snapToVertices: this.canvasMgr.snapToVertices,
+      snapToNodes: this.canvasMgr.snapToNodes,
+      snapToVertices: this.canvasMgr.snapToNodes,
+      snapToEdges: this.canvasMgr.snapToEdges,
       snapToViewBox: this.canvasMgr.snapToViewBox,
       snapAngular: this.canvasMgr.snapAngular,
       shapeConfig: this.canvasMgr.shapeConfig,
@@ -1548,14 +1557,7 @@ class AntiDrawApp {
   }
 
   private getOtherVertices(excludeIds: string[] = []): Point[] {
-    const pts: Point[] = [];
-    const excludeSet = new Set(excludeIds);
-    this.model.elements.forEach((el) => {
-      if (!excludeSet.has(el.id) && el.vertices) {
-        el.vertices.forEach((v) => pts.push({ x: v.x, y: v.y }));
-      }
-    });
-    return pts;
+    return NodeCatalogService.collectSnappableNodes(this.model.elements, { excludeIds });
   }
 
 

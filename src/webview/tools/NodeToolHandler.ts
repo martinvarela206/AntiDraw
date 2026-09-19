@@ -455,16 +455,14 @@ export class NodeToolHandler implements IToolHandler {
       }
 
       if (this.activeHandle === 'vertex' && this.nodeEditorTool.selectedVertexId) {
-        const otherVertices: Point[] = [];
-        this.ctx.model.elements.forEach((el) => {
-          if (el.vertices) {
-            el.vertices.forEach((v) => {
-              if (!this.marqueeSelector.isVertexSelected(v.id)) {
-                otherVertices.push({ x: v.x, y: v.y });
-              }
-            });
-          }
-        });
+        const otherVertices = this.ctx.getOtherVertices([selectedEl.id]);
+        if (selectedEl.vertices) {
+          selectedEl.vertices.forEach((v) => {
+            if (!this.marqueeSelector.isVertexSelected(v.id)) {
+              otherVertices.push({ x: v.x, y: v.y });
+            }
+          });
+        }
         const snappedPt = this.ctx.snapPoint(pt, otherVertices);
 
         // Multi-vertex translation when multiple nodes are selected
@@ -609,12 +607,7 @@ export class NodeToolHandler implements IToolHandler {
         this.activeHandle === 'segment' &&
         this.nodeEditorTool.selectedSegmentIdx !== null
       ) {
-        const otherVertices: Point[] = [];
-        this.ctx.model.elements.forEach((el) => {
-          if (!this.ctx.selectionTool.isSelected(el.id) && el.vertices) {
-            el.vertices.forEach((v) => otherVertices.push({ x: v.x, y: v.y }));
-          }
-        });
+        const otherVertices = this.ctx.getOtherVertices(Array.from(this.ctx.selectionTool.selectedElementIds));
         const snappedPt = this.ctx.snapPoint(pt, otherVertices);
         const dx = snappedPt.x - this.dragStartPt.x;
         const dy = snappedPt.y - this.dragStartPt.y;

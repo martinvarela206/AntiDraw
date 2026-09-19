@@ -333,6 +333,20 @@ export class ParametricHandleController {
     isCtrl: boolean,
     isAlt: boolean
   ): { handled: boolean; ghostNodeVertices?: PathVertex[] } | null {
+    // Collect magnetic landmarks from other elements and fixed quadrants of active element
+    const otherNodes = this.ctx.getOtherVertices([selectedEl.id]);
+    if (this.ctx.model.isEllipse(selectedEl)) {
+      const cx = parseFloat(selectedEl.attributes.cx || '0');
+      const cy = parseFloat(selectedEl.attributes.cy || '0');
+      const rx = parseFloat(selectedEl.attributes.rx || selectedEl.attributes.r || '1');
+      const ry = parseFloat(selectedEl.attributes.ry || selectedEl.attributes.r || '1');
+      for (const r of [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]) {
+        otherNodes.push({ x: cx + rx * Math.cos(r), y: cy + ry * Math.sin(r) });
+      }
+    }
+    const snappedPt = this.ctx.snapPoint(pt, otherNodes);
+    const usePt = snappedPt || pt;
+
     // Quadrant angle dragging (FEAT-02 & FEAT-DualHandles)
     if (activeHandle === 'quadrant' || activeHandle === 'quadrant-start' || activeHandle === 'quadrant-end') {
       const cx = this.quadrantCenter.x;
@@ -340,8 +354,8 @@ export class ParametricHandleController {
       const rx = Math.max(1, this.quadrantRadii.rx);
       const ry = Math.max(1, this.quadrantRadii.ry);
 
-      const dx = pt.x - cx;
-      const dy = pt.y - cy;
+      const dx = usePt.x - cx;
+      const dy = usePt.y - cy;
       const D = Math.sqrt((dx / rx) ** 2 + (dy / ry) ** 2);
 
       const rad = Math.atan2(dy / ry, dx / rx);
@@ -418,14 +432,15 @@ export class ParametricHandleController {
     }
 
     // Inner donut/ring ratio dragging
+    // Inner donut/ring ratio dragging
     if (activeHandle === 'ellipse-inner') {
       const cx = this.quadrantCenter.x;
       const cy = this.quadrantCenter.y;
       const rx = Math.max(1, this.quadrantRadii.rx);
       const ry = Math.max(1, this.quadrantRadii.ry);
 
-      const dx = pt.x - cx;
-      const dy = pt.y - cy;
+      const dx = usePt.x - cx;
+      const dy = usePt.y - cy;
       const D = Math.sqrt((dx / rx) ** 2 + (dy / ry) ** 2);
       let ratio = Math.max(0, Math.min(0.95, D));
 
@@ -471,20 +486,20 @@ export class ParametricHandleController {
 
       let rawRadiusPx = 0;
       if (cornerKey === 'tl') {
-        const dx = Math.max(0, pt.x - x);
-        const dy = Math.max(0, pt.y - y);
+        const dx = Math.max(0, usePt.x - x);
+        const dy = Math.max(0, usePt.y - y);
         rawRadiusPx = (dx + dy) / 2;
       } else if (cornerKey === 'tr') {
-        const dx = Math.max(0, x + w - pt.x);
-        const dy = Math.max(0, pt.y - y);
+        const dx = Math.max(0, x + w - usePt.x);
+        const dy = Math.max(0, usePt.y - y);
         rawRadiusPx = (dx + dy) / 2;
       } else if (cornerKey === 'br') {
-        const dx = Math.max(0, x + w - pt.x);
-        const dy = Math.max(0, y + h - pt.y);
+        const dx = Math.max(0, x + w - usePt.x);
+        const dy = Math.max(0, y + h - usePt.y);
         rawRadiusPx = (dx + dy) / 2;
       } else if (cornerKey === 'bl') {
-        const dx = Math.max(0, pt.x - x);
-        const dy = Math.max(0, y + h - pt.y);
+        const dx = Math.max(0, usePt.x - x);
+        const dy = Math.max(0, y + h - usePt.y);
         rawRadiusPx = (dx + dy) / 2;
       }
 
@@ -536,8 +551,8 @@ export class ParametricHandleController {
       const points = this.starPoints;
       const regularRatio = Math.cos(Math.PI / points);
 
-      const dx = pt.x - cx;
-      const dy = pt.y - cy;
+      const dx = usePt.x - cx;
+      const dy = usePt.y - cy;
       const D = Math.sqrt((dx / rx) ** 2 + (dy / ry) ** 2);
 
       let ratio = Math.max(0.05, Math.min(2.0, D));

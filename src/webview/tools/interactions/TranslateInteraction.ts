@@ -127,13 +127,8 @@ export class TranslateInteraction {
     const dx = pt.x - dragStartPt.x;
     const dy = pt.y - dragStartPt.y;
 
-    // Collect other unselected vertices for snapToVertices
-    const otherVertices: Point[] = [];
-    ctx.model.elements.forEach((el) => {
-      if (!ctx.selectionTool.isSelected(el.id) && el.vertices) {
-        el.vertices.forEach((v) => otherVertices.push({ x: v.x, y: v.y }));
-      }
-    });
+    // Collect other unselected nodes (structural, handles, positional)
+    const otherVertices = ctx.getOtherVertices(Array.from(ctx.selectionTool.selectedElementIds));
 
     // Compute target position of the anchor and snap it
     const rawTarget: Point = { x: this.dragAnchorPt.x + dx, y: this.dragAnchorPt.y + dy };

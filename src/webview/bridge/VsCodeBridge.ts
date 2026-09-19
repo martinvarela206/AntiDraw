@@ -31,6 +31,8 @@ export interface CompanionMetadata {
   gridSpacing?: number;
   snapToGrid?: boolean;
   snapToGuides?: boolean;
+  snapToNodes?: boolean;
+  snapToEdges?: boolean;
   snapToVertices?: boolean;
   snapToViewBox?: boolean;
   snapAngular?: boolean;

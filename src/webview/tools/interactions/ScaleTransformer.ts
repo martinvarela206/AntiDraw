@@ -98,12 +98,7 @@ export class ScaleTransformer {
   ): { effectiveDx: number; effectiveDy: number; snappedPt: Point | null } {
     const handlePt = this.calculateInitialHandlePoint(initialBox, activeHandle);
 
-    const otherVertices: Point[] = [];
-    ctx.model.elements.forEach((el) => {
-      if (!ctx.selectionTool.isSelected(el.id) && el.vertices) {
-        el.vertices.forEach((v) => otherVertices.push({ x: v.x, y: v.y }));
-      }
-    });
+    const otherVertices = ctx.getOtherVertices(Array.from(ctx.selectionTool.selectedElementIds));
 
     const rawDx = pt.x - dragStartPt.x;
     const rawDy = pt.y - dragStartPt.y;

@@ -9,6 +9,8 @@ export interface SnappingContext {
   snapToGrid: boolean;
   snapToGuides: boolean;
   snapToVertices: boolean;
+  snapToNodes?: boolean;
+  snapToEdges?: boolean;
   snapToViewBox: boolean;
   snapAngular?: boolean;
   showGuides: boolean;
@@ -71,8 +73,9 @@ export class SnappingEngine {
     let ySnapped = false;
     const threshold = ctx.snapThreshold / (ctx.zoom || 1);
 
-    // 1. Snap to Vertices of other vector elements (highest priority)
-    if (ctx.snapToVertices && otherVertices.length > 0) {
+    // 1. Snap to Vector Nodes (Structural, Handles, Positional)
+    const snapToNodesActive = ctx.snapToNodes ?? ctx.snapToVertices;
+    if (snapToNodesActive && otherVertices.length > 0) {
       let minDist = threshold;
       let bestVertex: Point | null = null;
       for (const v of otherVertices) {
@@ -178,7 +181,8 @@ export class SnappingEngine {
     }
 
     // 3. Snap to ViewBox Frame (Artboard boundaries & keypoints)
-    if (ctx.snapToViewBox && viewBoxBounds) {
+    const snapToGuidesOrViewBox = ctx.snapToGuides || ctx.snapToViewBox;
+    if (snapToGuidesOrViewBox && viewBoxBounds) {
       const vb = viewBoxBounds;
       const keypoints: Point[] = [
         { x: vb.minX, y: vb.minY },
@@ -585,8 +589,9 @@ export class SnappingEngine {
 
       const candidates: Point[] = [];
 
-      // Vector vertices
-      if (ctx.snapToVertices && otherVertices.length > 0) {
+      // Vector nodes (structural, handles, positional)
+      const snapToNodesActive = ctx.snapToNodes ?? ctx.snapToVertices;
+      if (snapToNodesActive && otherVertices.length > 0) {
         for (const v of otherVertices) {
           candidates.push(v);
         }
