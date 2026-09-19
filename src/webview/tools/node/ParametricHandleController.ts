@@ -348,12 +348,19 @@ export class ParametricHandleController {
       let deg = (rad * 180) / Math.PI;
       if (deg < 0) deg += 360;
 
+      /**
+       * ARCHITECTURAL RATIONALE: Shortest-Arc Magnetic Quadrant Snapping (FIX-08)
+       * Calculates shortest modular angular difference to cardinal quadrants (0°, 90°, 180°, 270°).
+       * Solves discontinuity at 360°/0° boundary where naive subtraction failed to snap for angles > 357°.
+       */
       if (isShift || isCtrl) {
         deg = Math.round(deg / 15) * 15;
       } else {
-        for (const cardinal of [0, 90, 180, 270, 360]) {
-          if (Math.abs(deg - (cardinal % 360)) <= 3) {
-            deg = cardinal % 360;
+        const snapTol = 4; // 4 degrees magnetic snap window
+        for (const cardinal of [0, 90, 180, 270]) {
+          const diff = Math.abs(((deg - cardinal + 540) % 360) - 180);
+          if (diff <= snapTol) {
+            deg = cardinal;
             break;
           }
         }
@@ -738,6 +745,14 @@ export class ParametricHandleController {
       const qx = cx + rx * Math.cos(activeRad);
       const qy = cy + ry * Math.sin(activeRad);
 
+      // 4 Canonical fixed quadrant snap targets
+      const quadrantAngles = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2];
+      quadrantAngles.forEach((qRad) => {
+        const refX = cx + rx * Math.cos(qRad);
+        const refY = cy + ry * Math.sin(qRad);
+        html += `<circle cx="${refX}" cy="${refY}" r="${3.5 / z}" fill="#ffffff" stroke="#0284c7" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none" />`;
+      });
+
       // Ray from center to active handle
       html += `<line x1="${cx}" y1="${cy}" x2="${qx}" y2="${qy}" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
       html += `<circle cx="${cx}" cy="${cy}" r="${3 / z}" fill="#f59e0b" />`;
@@ -799,6 +814,14 @@ export class ParametricHandleController {
           html += `<path d="${arcD}" fill="none" stroke="#06b6d4" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
         }
       }
+      // 4 Canonical fixed quadrant snap targets
+      const quadrantAngles = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2];
+      quadrantAngles.forEach((qRad) => {
+        const refX = cx + rx * Math.cos(qRad);
+        const refY = cy + ry * Math.sin(qRad);
+        html += `<circle cx="${refX}" cy="${refY}" r="${3.5 / z}" fill="#ffffff" stroke="#0284c7" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none" />`;
+      });
+
       html += `<line x1="${cx}" y1="${cy}" x2="${inX}" y2="${inY}" stroke="#06b6d4" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
       html += `<circle cx="${cx}" cy="${cy}" r="${3 / z}" fill="#06b6d4" />`;
       html += `<circle cx="${inX}" cy="${inY}" r="${6 / z}" fill="#06b6d4" stroke="#ffffff" stroke-width="2" vector-effect="non-scaling-stroke" />`;

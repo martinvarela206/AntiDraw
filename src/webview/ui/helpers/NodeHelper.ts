@@ -63,6 +63,20 @@ export class NodeHelper extends BaseHelper {
   }
 
   /**
+   * ARCHITECTURAL RATIONALE: Canonical Fixed Quadrant Reference Node (FIX-08)
+   * Renders a fixed, non-interactive referential quadrant indicator for parametric ellipses/circles/donuts.
+   * Remains locked to cardinal angles (0°, 90°, 180°, 270°) and does not intercept mouse events (`pointer-events="none"`).
+   */
+  public static renderQuadrantReferenceNode(x: number, y: number, zoom: number): string {
+    const inv = BaseHelper.getInverseScale(zoom);
+    return `
+      <g transform="translate(${x}, ${y}) scale(${inv})" pointer-events="none">
+        <circle cx="0" cy="0" r="3.5" fill="#ffffff" stroke="#0284c7" stroke-width="1.5" />
+      </g>
+    `;
+  }
+
+  /**
    * Renders a scale-invariant Bézier control handle with connecting arm.
    */
   public static renderHandleArm(

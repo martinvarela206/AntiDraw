@@ -218,7 +218,27 @@ export class OverlayRenderer {
       (ctx.activeTool === 'node' || ctx.selectionTool.selectionMode === 'move')
     ) {
       selectedEls.forEach((el) => {
-        if (el.vertices) {
+        if (ctx.model.isEllipse(el)) {
+          /**
+           * ARCHITECTURAL RATIONALE: Invariant Referential Quadrant Nodes (FIX-08)
+           * For parametric ellipses, circles, pies, arcs, and donuts, the internal Bézier subdivision
+           * vertices must never be rendered as interactive nodes. Doing so would mislead users into
+           * attempting free vertex editing and visually clutters the contour.
+           * Instead, the 4 canonical quadrant nodes (0°, 90°, 180°, 270°) are rendered as fixed,
+           * non-movable reference indicators that act as magnetic snap targets for Start/End handles.
+           */
+          const cx = parseFloat(el.attributes.cx || '0');
+          const cy = parseFloat(el.attributes.cy || '0');
+          const rx = parseFloat(el.attributes.rx || el.attributes.r || '1');
+          const ry = parseFloat(el.attributes.ry || el.attributes.r || '1');
+          const quadrantAngles = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2];
+
+          quadrantAngles.forEach((rad) => {
+            const qx = cx + rx * Math.cos(rad);
+            const qy = cy + ry * Math.sin(rad);
+            html += NodeHelper.renderQuadrantReferenceNode(qx, qy, z);
+          });
+        } else if (el.vertices) {
           const isNodeMode = ctx.activeTool === 'node' && selectedEls.length === 1;
           const selectedVertexId = ctx.nodeEditorTool.selectedVertexId;
           const isParametric = ctx.model.isParametricElement(el);
