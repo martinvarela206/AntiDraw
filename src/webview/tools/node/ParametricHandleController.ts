@@ -47,9 +47,28 @@ export class ParametricHandleController {
   }
 
   /**
-   * Computes the canvas coordinate of the quadrant control handle on an ellipse's perimeter.
+   * ARCHITECTURAL RATIONALE: Dual Perimeter Handles for Ellipse Arc & Pie (FEAT-DualHandles)
+   * Exposes startAngle and endAngle handles independently on the circumference:
+   * - In closed full ellipses (360°), a single handle is shown at startAngle (or 0°).
+   *   Manipulating it splits the circle and reveals the complementary handle.
+   * - In open arcs or pie wedges, both 'start' and 'end' handles are visible and draggable,
+   *   allowing bidirectional adjustment clockwise or counter-clockwise.
    */
-  public getQuadrantHandlePoint(el: VectorElement): Point | null {
+  public getQuadrantStartHandlePoint(el: VectorElement): Point | null {
+    if (!this.ctx.model.isParametricElement(el) || !this.ctx.model.isEllipse(el)) return null;
+    const cx = parseFloat(el.attributes.cx || '0');
+    const cy = parseFloat(el.attributes.cy || '0');
+    const rx = parseFloat(el.attributes.rx || el.attributes.r || '1');
+    const ry = parseFloat(el.attributes.ry || el.attributes.r || '1');
+    const startAngle = parseFloat(el.attributes['data-start-angle'] || '0');
+    const rad = (startAngle * Math.PI) / 180;
+    return {
+      x: cx + rx * Math.cos(rad),
+      y: cy + ry * Math.sin(rad),
+    };
+  }
+
+  public getQuadrantEndHandlePoint(el: VectorElement): Point | null {
     if (!this.ctx.model.isParametricElement(el) || !this.ctx.model.isEllipse(el)) return null;
     const cx = parseFloat(el.attributes.cx || '0');
     const cy = parseFloat(el.attributes.cy || '0');
@@ -61,6 +80,10 @@ export class ParametricHandleController {
       x: cx + rx * Math.cos(rad),
       y: cy + ry * Math.sin(rad),
     };
+  }
+
+  public getQuadrantHandlePoint(el: VectorElement): Point | null {
+    return this.getQuadrantEndHandlePoint(el);
   }
 
   /**
@@ -128,22 +151,27 @@ export class ParametricHandleController {
     pt: Point,
     z: number
   ): { activeHandle: string; initialVertices: PathVertex[]; handled: boolean } | null {
-    // 1. Parametric ellipse handles (FEAT-02 & FEAT-10)
+    // 1. Parametric ellipse handles (FEAT-02, FEAT-10 & FEAT-DualHandles)
     if (this.ctx.model.isParametricElement(selectedEl) && this.ctx.model.isEllipse(selectedEl)) {
       const innerPt = this.getEllipseInnerHandlePoint(selectedEl);
-      const qPt = this.getQuadrantHandlePoint(selectedEl);
+      const startPt = this.getQuadrantStartHandlePoint(selectedEl);
+      const endPt = this.getQuadrantEndHandlePoint(selectedEl);
       const cx = parseFloat(selectedEl.attributes.cx || '0');
       const cy = parseFloat(selectedEl.attributes.cy || '0');
       const rx = parseFloat(selectedEl.attributes.rx || selectedEl.attributes.r || '1');
       const ry = parseFloat(selectedEl.attributes.ry || selectedEl.attributes.r || '1');
       const currentInnerRatio = parseFloat(selectedEl.attributes['data-inner-ratio'] || '0');
+      const type = (selectedEl.attributes['data-ellipse-type'] as 'ellipse' | 'pie' | 'arc') || 'ellipse';
+      const sAngle = parseFloat(selectedEl.attributes['data-start-angle'] || '0');
+      const eAngle = parseFloat(selectedEl.attributes['data-end-angle'] || '360');
+      const isFull = type === 'ellipse' || Math.abs(eAngle - sAngle) >= 360;
 
       if (innerPt && Math.hypot(pt.x - innerPt.x, pt.y - innerPt.y) <= 12 / z) {
         this.quadrantCenter = { x: cx, y: cy };
         this.quadrantRadii = { rx, ry };
-        this.quadrantGhostMode = (selectedEl.attributes['data-ellipse-type'] as 'ellipse' | 'pie' | 'arc') || 'ellipse';
-        this.quadrantGhostStartAngle = parseFloat(selectedEl.attributes['data-start-angle'] || '0');
-        this.quadrantGhostEndAngle = parseFloat(selectedEl.attributes['data-end-angle'] || '360');
+        this.quadrantGhostMode = type;
+        this.quadrantGhostStartAngle = sAngle;
+        this.quadrantGhostEndAngle = eAngle;
         this.ellipseInnerGhostRatio = currentInnerRatio;
         this.quadrantGhostD = selectedEl.attributes.d || '';
         return {
@@ -153,19 +181,52 @@ export class ParametricHandleController {
         };
       }
 
-      if (qPt && Math.hypot(pt.x - qPt.x, pt.y - qPt.y) <= 12 / z) {
-        this.quadrantCenter = { x: cx, y: cy };
-        this.quadrantRadii = { rx, ry };
-        this.quadrantGhostMode = (selectedEl.attributes['data-ellipse-type'] as 'ellipse' | 'pie' | 'arc') || 'ellipse';
-        this.quadrantGhostStartAngle = parseFloat(selectedEl.attributes['data-start-angle'] || '0');
-        this.quadrantGhostEndAngle = parseFloat(selectedEl.attributes['data-end-angle'] || '360');
-        this.ellipseInnerGhostRatio = currentInnerRatio;
-        this.quadrantGhostD = selectedEl.attributes.d || '';
-        return {
-          activeHandle: 'quadrant',
-          initialVertices: JSON.parse(JSON.stringify(selectedEl.vertices)),
-          handled: true,
-        };
+      if (isFull) {
+        if (startPt && Math.hypot(pt.x - startPt.x, pt.y - startPt.y) <= 12 / z) {
+          this.quadrantCenter = { x: cx, y: cy };
+          this.quadrantRadii = { rx, ry };
+          this.quadrantGhostMode = type;
+          this.quadrantGhostStartAngle = 0;
+          this.quadrantGhostEndAngle = 360;
+          this.ellipseInnerGhostRatio = currentInnerRatio;
+          this.quadrantGhostD = selectedEl.attributes.d || '';
+          return {
+            activeHandle: 'quadrant-end',
+            initialVertices: JSON.parse(JSON.stringify(selectedEl.vertices)),
+            handled: true,
+          };
+        }
+      } else {
+        // Test start handle first
+        if (startPt && Math.hypot(pt.x - startPt.x, pt.y - startPt.y) <= 12 / z) {
+          this.quadrantCenter = { x: cx, y: cy };
+          this.quadrantRadii = { rx, ry };
+          this.quadrantGhostMode = type;
+          this.quadrantGhostStartAngle = sAngle;
+          this.quadrantGhostEndAngle = eAngle;
+          this.ellipseInnerGhostRatio = currentInnerRatio;
+          this.quadrantGhostD = selectedEl.attributes.d || '';
+          return {
+            activeHandle: 'quadrant-start',
+            initialVertices: JSON.parse(JSON.stringify(selectedEl.vertices)),
+            handled: true,
+          };
+        }
+        // Test end handle
+        if (endPt && Math.hypot(pt.x - endPt.x, pt.y - endPt.y) <= 12 / z) {
+          this.quadrantCenter = { x: cx, y: cy };
+          this.quadrantRadii = { rx, ry };
+          this.quadrantGhostMode = type;
+          this.quadrantGhostStartAngle = sAngle;
+          this.quadrantGhostEndAngle = eAngle;
+          this.ellipseInnerGhostRatio = currentInnerRatio;
+          this.quadrantGhostD = selectedEl.attributes.d || '';
+          return {
+            activeHandle: 'quadrant-end',
+            initialVertices: JSON.parse(JSON.stringify(selectedEl.vertices)),
+            handled: true,
+          };
+        }
       }
     }
 
@@ -210,8 +271,8 @@ export class ParametricHandleController {
     isCtrl: boolean,
     isAlt: boolean
   ): { handled: boolean; ghostNodeVertices?: PathVertex[] } | null {
-    // Quadrant angle dragging
-    if (activeHandle === 'quadrant') {
+    // Quadrant angle dragging (FEAT-02 & FEAT-DualHandles)
+    if (activeHandle === 'quadrant' || activeHandle === 'quadrant-start' || activeHandle === 'quadrant-end') {
       const cx = this.quadrantCenter.x;
       const cy = this.quadrantCenter.y;
       const rx = Math.max(1, this.quadrantRadii.rx);
@@ -238,11 +299,20 @@ export class ParametricHandleController {
       deg = Math.round(deg * 10) / 10;
 
       let startAngle = this.quadrantGhostStartAngle;
-      let endAngle = deg;
+      let endAngle = this.quadrantGhostEndAngle;
+
+      if (activeHandle === 'quadrant-start') {
+        startAngle = deg;
+      } else {
+        endAngle = deg;
+      }
+
+      let deltaDeg = endAngle - startAngle;
+      while (deltaDeg < 0) deltaDeg += 360;
+      while (deltaDeg > 360) deltaDeg -= 360;
 
       let mode: 'ellipse' | 'pie' | 'arc' = 'pie';
-      const delta = Math.abs(endAngle - startAngle);
-      if (delta < 2 || Math.abs(delta - 360) < 2) {
+      if (deltaDeg <= 3 || Math.abs(deltaDeg - 360) <= 3) {
         mode = 'ellipse';
         startAngle = 0;
         endAngle = 360;
@@ -400,7 +470,7 @@ export class ParametricHandleController {
     ghostNodeVertices: PathVertex[] | null,
     initialVertices: PathVertex[]
   ): boolean {
-    if (activeHandle === 'quadrant') {
+    if (activeHandle === 'quadrant' || activeHandle === 'quadrant-start' || activeHandle === 'quadrant-end') {
       this.ctx.pushUndo();
       selectedEl.attributes['data-ellipse-type'] = this.quadrantGhostMode;
       selectedEl.attributes['data-start-angle'] = this.quadrantGhostStartAngle.toString();
@@ -521,8 +591,8 @@ export class ParametricHandleController {
   public renderGhostOverlay(activeHandle: string | null, z: number): string {
     if (!activeHandle) return '';
 
-    // 1. Quadrant Ghost during active quadrant dragging (FEAT-02)
-    if (activeHandle === 'quadrant') {
+    // 1. Quadrant Ghost during active quadrant dragging (FEAT-02 & FEAT-DualHandles)
+    if (activeHandle === 'quadrant' || activeHandle === 'quadrant-start' || activeHandle === 'quadrant-end') {
       const isArc = this.quadrantGhostMode === 'arc';
       const fill = isArc ? 'none' : 'rgba(245, 158, 11, 0.2)';
       const d = this.quadrantGhostD;
@@ -531,22 +601,25 @@ export class ParametricHandleController {
       const cy = this.quadrantCenter.y;
       const rx = this.quadrantRadii.rx;
       const ry = this.quadrantRadii.ry;
-      const endRad = (this.quadrantGhostEndAngle * Math.PI) / 180;
-      const qx = cx + rx * Math.cos(endRad);
-      const qy = cy + ry * Math.sin(endRad);
 
-      // Ray from center to quadrant handle
+      const activeAngle = activeHandle === 'quadrant-start' ? this.quadrantGhostStartAngle : this.quadrantGhostEndAngle;
+      const activeRad = (activeAngle * Math.PI) / 180;
+      const qx = cx + rx * Math.cos(activeRad);
+      const qy = cy + ry * Math.sin(activeRad);
+
+      // Ray from center to active handle
       html += `<line x1="${cx}" y1="${cy}" x2="${qx}" y2="${qy}" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
       html += `<circle cx="${cx}" cy="${cy}" r="${3 / z}" fill="#f59e0b" />`;
-      // Quadrant handle circle
+      // Active handle circle
       html += `<circle cx="${qx}" cy="${qy}" r="${6 / z}" fill="#f59e0b" stroke="#ffffff" stroke-width="2" vector-effect="non-scaling-stroke" />`;
       // Angle and mode badge
-      const badgeW = 92;
+      const badgeW = 96;
       const badgeH = 18;
+      const label = activeHandle === 'quadrant-start' ? 'Ini' : 'Fin';
       html += `
         <g opacity="0.95">
           <rect x="${qx + 10}" y="${qy - 22}" width="${badgeW}" height="${badgeH}" rx="3" fill="#1e1b4b" stroke="#f59e0b" stroke-width="1" vector-effect="non-scaling-stroke" />
-          <text x="${qx + 14}" y="${qy - 9}" font-size="10" fill="#fde68a" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" font-weight="600">${Math.round(this.quadrantGhostEndAngle)}° [${this.quadrantGhostMode.toUpperCase()}]</text>
+          <text x="${qx + 14}" y="${qy - 9}" font-size="10" fill="#fde68a" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" font-weight="600">${label}: ${Math.round(activeAngle)}° [${this.quadrantGhostMode.toUpperCase()}]</text>
         </g>
       `;
       return html;
@@ -635,16 +708,42 @@ export class ParametricHandleController {
     const el = selectedEls[0];
     let html = '';
 
-    // Quadrant and Inner ratio handles on ellipse
+    // Quadrant Start and End handles and Inner ratio handles on ellipse (FEAT-DualHandles)
     if (this.ctx.model.isEllipse(el)) {
-      const qPt = this.getQuadrantHandlePoint(el);
-      if (qPt) {
-        html += `
-          <g style="cursor: crosshair;" title="Tirador de Apertura Angular (Sweep / Arco)">
-            <circle cx="${qPt.x}" cy="${qPt.y}" r="${6 / z}" fill="#f59e0b" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" />
-            <circle cx="${qPt.x}" cy="${qPt.y}" r="${2.5 / z}" fill="#ffffff" />
-          </g>
-        `;
+      const type = (el.attributes['data-ellipse-type'] as 'ellipse' | 'pie' | 'arc') || 'ellipse';
+      const sAngle = Math.round(parseFloat(el.attributes['data-start-angle'] || '0'));
+      const eAngle = Math.round(parseFloat(el.attributes['data-end-angle'] || '360'));
+      const isFull = type === 'ellipse' || Math.abs(eAngle - sAngle) >= 360;
+
+      const startPt = this.getQuadrantStartHandlePoint(el);
+      const endPt = this.getQuadrantEndHandlePoint(el);
+
+      if (isFull) {
+        if (startPt) {
+          html += `
+            <g style="cursor: crosshair;" title="Tirador de Apertura Angular (Arrastrar para abrir tarta o arco)">
+              <circle cx="${startPt.x}" cy="${startPt.y}" r="${6 / z}" fill="#f59e0b" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" />
+              <circle cx="${startPt.x}" cy="${startPt.y}" r="${2.5 / z}" fill="#ffffff" />
+            </g>
+          `;
+        }
+      } else {
+        if (startPt) {
+          html += `
+            <g style="cursor: crosshair;" title="Tirador de Ángulo Inicial (${sAngle}°)">
+              <circle cx="${startPt.x}" cy="${startPt.y}" r="${6 / z}" fill="#f59e0b" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" />
+              <circle cx="${startPt.x}" cy="${startPt.y}" r="${2.5 / z}" fill="#1e1b4b" />
+            </g>
+          `;
+        }
+        if (endPt) {
+          html += `
+            <g style="cursor: crosshair;" title="Tirador de Ángulo Final (${eAngle}°)">
+              <circle cx="${endPt.x}" cy="${endPt.y}" r="${6 / z}" fill="#f59e0b" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" />
+              <circle cx="${endPt.x}" cy="${endPt.y}" r="${2.5 / z}" fill="#ffffff" />
+            </g>
+          `;
+        }
       }
 
       const innerPt = this.getEllipseInnerHandlePoint(el);
