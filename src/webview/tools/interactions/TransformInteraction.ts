@@ -462,6 +462,19 @@ export class TransformInteraction {
       if (gBox) {
         html += RotateTransformer.renderGhostBoundingBox(gBox, this.rotationPivot, this.lastDeltaAngle);
       }
+
+      // Angular degree badge display during rotation
+      const deg = Math.round(((this.lastDeltaAngle * 180) / Math.PI) * 10) / 10;
+      const inv = 1 / z;
+      const degText = `${deg > 0 ? '+' : ''}${deg}°`;
+      const badgeX = this.rotationPivot.x + 18 / z;
+      const badgeY = this.rotationPivot.y - 18 / z;
+      html += `
+        <g transform="translate(${badgeX}, ${badgeY}) scale(${inv})" pointer-events="none">
+          <rect x="0" y="-14" width="50" height="18" rx="3" fill="#1e1b4b" stroke="#6366f1" stroke-width="1" opacity="0.9" />
+          <text x="6" y="-1" font-size="11" fill="#c7d2fe" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" font-weight="600">${degText}</text>
+        </g>
+      `;
     }
 
     // Magnetic Snap Target Indicator during Vector or Guideline Rotation (FIX-08)

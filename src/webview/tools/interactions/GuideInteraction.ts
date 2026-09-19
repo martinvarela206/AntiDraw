@@ -2,6 +2,7 @@ import { ToolContext } from '../IToolHandler.js';
 import { Point } from '../../engine/VectorModel.js';
 import { GuideLine } from '../../engine/CanvasManager.js';
 import type { SelectToolCallbacks } from '../SelectToolHandler.js';
+import { GuideHelper } from '../../ui/helpers/index.js';
 
 export type GuideHandleType = 'guide-move' | 'guide-pivot' | 'guide-rotate';
 
@@ -23,6 +24,7 @@ export type GuideHandleType = 'guide-move' | 'guide-pivot' | 'guide-rotate';
  */
 export class GuideInteraction {
   public guideInitialState: GuideLine | null = null;
+  public ghostGuideState: GuideLine | null = null;
   public activeRotateArrowIdx: 1 | 2 = 1;
   public currentRotationSnappedPt: Point | null = null;
 
@@ -187,15 +189,16 @@ export class GuideInteraction {
       const g = ctx.canvasMgr.getGuide(ctx.canvasMgr.selectedGuideId);
       if (g) {
         const otherVertices = ctx.getOtherVertices();
+        const ghost: GuideLine = { ...this.guideInitialState };
         if (g.orientation === 'horizontal') {
           const rawTarget: Point = {
             x: (this.guideInitialState.pivotX ?? pt.x) + dx,
             y: this.guideInitialState.position + dy,
           };
           const snapped = ctx.snapPoint(rawTarget, otherVertices, g.id);
-          g.position = Math.round(snapped.y);
-          g.pivotY = g.position;
-          g.pivotX = Math.round((this.guideInitialState.pivotX ?? pt.x) + dx);
+          ghost.position = Math.round(snapped.y);
+          ghost.pivotY = ghost.position;
+          ghost.pivotX = Math.round((this.guideInitialState.pivotX ?? pt.x) + dx);
           this.currentRotationSnappedPt = Math.abs(snapped.y - rawTarget.y) > 0.001 ? snapped : null;
         } else if (g.orientation === 'vertical') {
           const rawTarget: Point = {
@@ -203,9 +206,9 @@ export class GuideInteraction {
             y: (this.guideInitialState.pivotY ?? pt.y) + dy,
           };
           const snapped = ctx.snapPoint(rawTarget, otherVertices, g.id);
-          g.position = Math.round(snapped.x);
-          g.pivotX = g.position;
-          g.pivotY = Math.round((this.guideInitialState.pivotY ?? pt.y) + dy);
+          ghost.position = Math.round(snapped.x);
+          ghost.pivotX = ghost.position;
+          ghost.pivotY = Math.round((this.guideInitialState.pivotY ?? pt.y) + dy);
           this.currentRotationSnappedPt = Math.abs(snapped.x - rawTarget.x) > 0.001 ? snapped : null;
         } else {
           const vb = ctx.model.getViewBoxBounds();
@@ -222,18 +225,20 @@ export class GuideInteraction {
             origin,
             vb
           );
-          g.pivotX = res.pivotX;
-          g.pivotY = res.pivotY;
+          ghost.pivotX = res.pivotX;
+          ghost.pivotY = res.pivotY;
           this.currentRotationSnappedPt = res.snappedPt;
         }
+        this.ghostGuideState = ghost;
       }
       ctx.render();
       return true;
     }
 
-    if (activeHandle === 'guide-pivot' && ctx.canvasMgr.selectedGuideId) {
+    if (activeHandle === 'guide-pivot' && ctx.canvasMgr.selectedGuideId && this.guideInitialState) {
       const g = ctx.canvasMgr.getGuide(ctx.canvasMgr.selectedGuideId);
       if (g) {
+        const ghost: GuideLine = { ...this.guideInitialState };
         if (!g.mode || g.mode === 'move') {
           // ARCHITECTURAL RATIONALE: Move Mode Center Snapping
           // Translating the guideline by its visual center snaps the guideline directly
@@ -243,10 +248,10 @@ export class GuideInteraction {
           const isMagneticallySnapped = Math.hypot(snapped.x - pt.x, snapped.y - pt.y) > 0.001;
           this.currentRotationSnappedPt = isMagneticallySnapped ? snapped : null;
 
-          g.pivotX = Math.round(snapped.x);
-          g.pivotY = Math.round(snapped.y);
-          if (g.orientation === 'horizontal') g.position = g.pivotY;
-          if (g.orientation === 'vertical') g.position = g.pivotX;
+          ghost.pivotX = Math.round(snapped.x);
+          ghost.pivotY = Math.round(snapped.y);
+          if (ghost.orientation === 'horizontal') ghost.position = ghost.pivotY;
+          if (ghost.orientation === 'vertical') ghost.position = ghost.pivotX;
         } else {
           // ARCHITECTURAL RATIONALE: Rotate Mode Constrained Pivot Axis Dragging
           // In Rotate mode, the center pivot handle defines the rotation pivot and has
@@ -256,8 +261,8 @@ export class GuideInteraction {
           const cos = Math.cos(rad);
           const sin = Math.sin(rad);
 
-          const px0 = g.orientation === 'vertical' ? g.position : (g.pivotX ?? ctx.model.canvas.width / 2);
-          const py0 = g.orientation === 'horizontal' ? g.position : (g.pivotY ?? ctx.model.canvas.height / 2);
+          const px0 = g.orientation === 'vertical' ? g.position : (this.guideInitialState.pivotX ?? ctx.model.canvas.width / 2);
+          const py0 = g.orientation === 'horizontal' ? g.position : (this.guideInitialState.pivotY ?? ctx.model.canvas.height / 2);
 
           const otherVertices = ctx.getOtherVertices();
           const snapped = ctx.snapPoint(pt, otherVertices, g.id);
@@ -267,20 +272,22 @@ export class GuideInteraction {
           const targetPt = isMagneticallySnapped ? snapped : pt;
           const t = (targetPt.x - px0) * cos + (targetPt.y - py0) * sin;
 
-          g.pivotX = Math.round(px0 + t * cos);
-          g.pivotY = Math.round(py0 + t * sin);
+          ghost.pivotX = Math.round(px0 + t * cos);
+          ghost.pivotY = Math.round(py0 + t * sin);
         }
+        this.ghostGuideState = ghost;
       }
       ctx.render();
       return true;
     }
 
-    if (activeHandle === 'guide-rotate' && ctx.canvasMgr.selectedGuideId) {
+    if (activeHandle === 'guide-rotate' && ctx.canvasMgr.selectedGuideId && this.guideInitialState) {
       callbacks.setCursor?.('grabbing');
       const g = ctx.canvasMgr.getGuide(ctx.canvasMgr.selectedGuideId);
       if (g) {
-        const px = g.pivotX ?? (g.orientation === 'vertical' ? g.position : ctx.model.canvas.width / 2);
-        const py = g.pivotY ?? (g.orientation === 'horizontal' ? g.position : ctx.model.canvas.height / 2);
+        const ghost: GuideLine = { ...this.guideInitialState };
+        const px = this.guideInitialState.pivotX ?? (this.guideInitialState.orientation === 'vertical' ? this.guideInitialState.position : ctx.model.canvas.width / 2);
+        const py = this.guideInitialState.pivotY ?? (this.guideInitialState.orientation === 'horizontal' ? this.guideInitialState.position : ctx.model.canvas.height / 2);
 
         const otherVertices = ctx.getOtherVertices();
         const snapped = ctx.snapPoint(pt, otherVertices, g.id);
@@ -313,16 +320,17 @@ export class GuideInteraction {
           }
         }
 
-        g.angle = deg;
-        if (g.angle === 0 || g.angle === 180) {
-          g.orientation = 'horizontal';
-          g.position = g.pivotY;
-        } else if (g.angle === 90 || g.angle === 270) {
-          g.orientation = 'vertical';
-          g.position = g.pivotX;
+        ghost.angle = deg;
+        if (ghost.angle === 0 || ghost.angle === 180) {
+          ghost.orientation = 'horizontal';
+          ghost.position = ghost.pivotY ?? py;
+        } else if (ghost.angle === 90 || ghost.angle === 270) {
+          ghost.orientation = 'vertical';
+          ghost.position = ghost.pivotX ?? px;
         } else {
-          g.orientation = 'angled';
+          ghost.orientation = 'angled';
         }
+        this.ghostGuideState = ghost;
       }
       ctx.render();
       return true;
@@ -375,6 +383,7 @@ export class GuideInteraction {
           ctx.render();
           callbacks.syncMetadataToHost?.();
           this.guideInitialState = null;
+          this.ghostGuideState = null;
           this.currentRotationSnappedPt = null;
           this.lastGuideClickTime = 0;
           return true;
@@ -382,7 +391,16 @@ export class GuideInteraction {
       }
     }
 
+    if (this.ghostGuideState && ctx.canvasMgr.selectedGuideId) {
+      const g = ctx.canvasMgr.getGuide(ctx.canvasMgr.selectedGuideId);
+      if (g) {
+        Object.assign(g, this.ghostGuideState);
+        callbacks.onGuideSelected?.(g);
+      }
+    }
+
     this.guideInitialState = null;
+    this.ghostGuideState = null;
     this.currentRotationSnappedPt = null;
 
     if (!moved) {
@@ -485,25 +503,63 @@ export class GuideInteraction {
         Object.assign(g, this.guideInitialState);
       }
       this.guideInitialState = null;
+      this.ghostGuideState = null;
       this.currentRotationSnappedPt = null;
       return true;
     }
+    this.ghostGuideState = null;
     this.currentRotationSnappedPt = null;
     return false;
   }
 
   /**
-   * Renders ray from guideline pivot to snapped point when rotating a guideline.
+   * Renders ghost guideline, ghost transform handles, and ray from pivot to snapped point.
    */
   public renderOverlay(ctx: ToolContext): string {
-    if (!this.currentRotationSnappedPt || !ctx.canvasMgr.selectedGuideId) return '';
-    const g = ctx.canvasMgr.getGuide(ctx.canvasMgr.selectedGuideId);
-    if (!g) return '';
+    let html = '';
 
-    const px = g.pivotX ?? (g.orientation === 'vertical' ? g.position : ctx.model.canvas.width / 2);
-    const py = g.pivotY ?? (g.orientation === 'horizontal' ? g.position : ctx.model.canvas.height / 2);
-    const sp = this.currentRotationSnappedPt;
+    if (this.ghostGuideState) {
+      const z = ctx.canvasMgr.zoom || 1;
+      const vb = ctx.model.getViewBoxBounds();
+      const visibleBounds = ctx.canvasMgr.visibleBoundsProvider?.() || {
+        minX: vb.minX - 500,
+        minY: vb.minY - 500,
+        maxX: vb.minX + vb.width + 500,
+        maxY: vb.minY + vb.height + 500,
+      };
+      const geom = ctx.canvasMgr.getGuideGeometry(
+        this.ghostGuideState,
+        ctx.model.canvas.width,
+        ctx.model.canvas.height,
+        visibleBounds
+      );
+      const isRotate = this.ghostGuideState.mode === 'rotate';
+      const ghostColor = '#00f0ff';
 
-    return `<line x1="${px}" y1="${py}" x2="${sp.x}" y2="${sp.y}" stroke="#f59e0b" stroke-width="1.2" stroke-dasharray="3 2" opacity="0.9" vector-effect="non-scaling-stroke" />`;
+      if (geom.p1.x !== geom.p2.x || geom.p1.y !== geom.p2.y) {
+        html += `<line x1="${geom.p1.x}" y1="${geom.p1.y}" x2="${geom.p2.x}" y2="${geom.p2.y}" stroke="${ghostColor}" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.85" vector-effect="non-scaling-stroke" />`;
+      }
+
+      html += GuideHelper.renderCenterHandle(geom.pivot.x, geom.pivot.y, ghostColor, z);
+
+      if (isRotate) {
+        const arrowRot = this.ghostGuideState.angle || 0;
+        html += GuideHelper.renderRotationArrow(geom.arrow1.x, geom.arrow1.y, arrowRot, false, ghostColor, z);
+        html += GuideHelper.renderRotationArrow(geom.arrow2.x, geom.arrow2.y, arrowRot, true, ghostColor, z);
+      }
+    }
+
+    if (this.currentRotationSnappedPt && ctx.canvasMgr.selectedGuideId) {
+      const g = this.ghostGuideState || ctx.canvasMgr.getGuide(ctx.canvasMgr.selectedGuideId);
+      if (g) {
+        const px = g.pivotX ?? (g.orientation === 'vertical' ? g.position : ctx.model.canvas.width / 2);
+        const py = g.pivotY ?? (g.orientation === 'horizontal' ? g.position : ctx.model.canvas.height / 2);
+        const sp = this.currentRotationSnappedPt;
+        html += `<line x1="${px}" y1="${py}" x2="${sp.x}" y2="${sp.y}" stroke="#f59e0b" stroke-width="1.2" stroke-dasharray="3 2" opacity="0.9" vector-effect="non-scaling-stroke" />`;
+      }
+    }
+
+    return html;
   }
 }
+
