@@ -25,6 +25,7 @@ import { ClipboardService } from './services/ClipboardService.js';
 import { HistoryService } from './services/HistoryService.js';
 import { CanvasActionDispatcher } from './services/CanvasActionDispatcher.js';
 import { KeyboardShortcutController } from './controllers/KeyboardShortcutController.js';
+import { ContextMenuController } from './controllers/ContextMenuController.js';
 import './styles/main.css';
 
 class AntiDrawApp {
@@ -80,6 +81,7 @@ class AntiDrawApp {
   }
 
   private keyboardController!: KeyboardShortcutController;
+  private contextMenuController!: ContextMenuController;
   private get isShiftPressed(): boolean {
     return this.keyboardController?.isShiftPressed ?? false;
   }
@@ -536,104 +538,31 @@ class AntiDrawApp {
       this.handleLostFocusOrCancel();
     });
 
-    // Right-click / Context Menu
-    const handleContextMenu = (e: MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-
-      const pt = this.getCanvasPoint(e);
-      const z = this.canvasMgr.zoom || 1;
-      const hit = this.selectionTool.hitTest(this.model.elements, pt, z);
-
-      if (hit) {
-        if (!this.selectionTool.isSelected(hit.element.id)) {
-          this.selectionTool.select(hit.element.id);
-          this.propertyPanel.update(null, this.toolbar.activeTool);
-          this.render();
-        }
-      }
-
-      const selectedEls = this.model.elements.filter((el) => this.selectionTool.isSelected(el.id));
-      if (selectedEls.length > 0) {
-        const hasParametric = selectedEls.some((el) => this.model.isParametricElement(el));
-        const canSimplifyToPrimitive = selectedEls.some((el) => !this.model.isParametricElement(el) && el.tagName === 'path' && this.model.detectPrimitiveFromPath(el) !== null);
-
-        const menuItems: ContextMenuItem[] = [
-          {
-            id: 'convert-to-path',
-            label: 'Convertir a Curvas',
-            shortcut: 'Ctrl+Q',
-            disabled: !hasParametric,
-            action: () => this.handleConvertToCurves(),
-          },
-          {
-            id: 'convert-to-primitive',
-            label: 'Simplificar a Primitivas SVG',
-            disabled: !canSimplifyToPrimitive,
-            action: () => this.handleConvertToPrimitives(),
-          },
-          { id: 'separator', label: '', action: () => {} },
-          {
-            id: 'cut',
-            label: 'Cortar',
-            shortcut: 'Ctrl+X',
-            action: () => this.cutSelection(),
-          },
-          {
-            id: 'copy',
-            label: 'Copiar',
-            shortcut: 'Ctrl+C',
-            action: () => this.copySelection(),
-          },
-          {
-            id: 'paste',
-            label: 'Pegar',
-            shortcut: 'Ctrl+V',
-            disabled: !this.clipboardService.hasContent,
-            action: () => this.pasteClipboard(),
-          },
-          {
-            id: 'duplicate',
-            label: 'Duplicar',
-            shortcut: 'Ctrl+D',
-            action: () => this.duplicateSelection(),
-          },
-          { id: 'separator', label: '', action: () => {} },
-          {
-            id: 'bring-to-front',
-            label: 'Traer al Frente',
-            action: () => this.handleZOrder('front'),
-          },
-          {
-            id: 'send-to-back',
-            label: 'Enviar al Fondo',
-            action: () => this.handleZOrder('back'),
-          },
-          { id: 'separator', label: '', action: () => {} },
-          {
-            id: 'delete',
-            label: 'Eliminar',
-            shortcut: 'Supr',
-            action: () => {
-              this.pushUndo();
-              this.model.elements = this.model.elements.filter((el) => !this.selectionTool.isSelected(el.id));
-              this.selectionTool.deselectAll();
-              this.propertyPanel.resetPanelMode();
-              this.render();
-              this.syncToHost();
-            },
-          },
-        ];
-
-        this.contextMenu.show(e.clientX, e.clientY, menuItems);
-      } else {
-        this.contextMenu.hide();
-        this.cancelCurrentAction();
-      }
-    };
-    this.canvasContainer.addEventListener('contextmenu', handleContextMenu);
-    this.canvasWrapper.addEventListener('contextmenu', handleContextMenu);
-    this.canvasScrollArea.addEventListener('contextmenu', handleContextMenu);
+    // Dedicated Context Menu Controller (SOLID / SRP)
+    this.contextMenuController = new ContextMenuController(
+      {
+        contextMenu: this.contextMenu,
+        selectionTool: this.selectionTool,
+        canvasMgr: this.canvasMgr,
+        model: this.model,
+        toolbar: this.toolbar,
+        propertyPanel: this.propertyPanel,
+        clipboardService: this.clipboardService,
+        getCanvasPoint: (e) => this.getCanvasPoint(e),
+        handleConvertToCurves: () => this.handleConvertToCurves(),
+        handleConvertToPrimitives: () => this.handleConvertToPrimitives(),
+        cutSelection: () => this.cutSelection(),
+        copySelection: () => this.copySelection(),
+        pasteClipboard: () => this.pasteClipboard(),
+        duplicateSelection: () => this.duplicateSelection(),
+        handleZOrder: (action) => this.handleZOrder(action),
+        pushUndo: () => this.pushUndo(),
+        render: () => this.render(),
+        syncToHost: () => this.syncToHost(),
+        cancelCurrentAction: () => this.cancelCurrentAction(),
+      },
+      [this.canvasContainer, this.canvasWrapper, this.canvasScrollArea]
+    );
 
     // Pointer events on Canvas Wrapper
     this.canvasWrapper.addEventListener('pointerdown', (e) => {
