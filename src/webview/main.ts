@@ -24,6 +24,7 @@ import { AppLayoutManager } from './ui/AppLayoutManager.js';
 import { ClipboardService } from './services/ClipboardService.js';
 import { HistoryService } from './services/HistoryService.js';
 import { CanvasActionDispatcher } from './services/CanvasActionDispatcher.js';
+import { KeyboardShortcutController } from './controllers/KeyboardShortcutController.js';
 import './styles/main.css';
 
 class AntiDrawApp {
@@ -78,7 +79,10 @@ class AntiDrawApp {
     return this.viewportCtrl?.isMiddlePanning ?? false;
   }
 
-  private isShiftPressed: boolean = false;
+  private keyboardController!: KeyboardShortcutController;
+  private get isShiftPressed(): boolean {
+    return this.keyboardController?.isShiftPressed ?? false;
+  }
 
   // Subsystems & Services
   private layoutMgr!: AppLayoutManager;
@@ -482,254 +486,33 @@ class AntiDrawApp {
       }
     });
 
-    // Keyboard shortcuts & modifiers
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'Shift') this.isShiftPressed = true;
-
-      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'SELECT') return;
-
-      if (e.key === 'v' || e.key === 'V') this.toolbar.setTool('select');
-      if (e.key === 't' || e.key === 'T') this.toolbar.setTool('stroke');
-      if (e.key === 'n' || e.key === 'N') this.toolbar.setTool('node');
-      if (!e.ctrlKey && !e.metaKey && (e.key === 'y' || e.key === 'Y')) this.toolbar.setTool('polyline');
-      if (e.key === 'p' || e.key === 'P') this.toolbar.setTool('pen');
-      if (e.key === 'r' || e.key === 'R') this.toolbar.setTool('rect');
-      if (e.key === 'o' || e.key === 'O') this.toolbar.setTool('circle');
-      if (e.key === 'e' || e.key === 'E') this.toolbar.setTool('ellipse');
-      if (e.key === 'l' || e.key === 'L') this.toolbar.setTool('line');
-      if (e.key === 'g' || e.key === 'G') this.toolbar.setTool('polygon');
-      if (e.key === 's' || e.key === 'S') this.toolbar.setTool('star');
-      if (!e.ctrlKey && !e.metaKey && (e.key === 'z' || e.key === 'Z')) this.toolbar.setTool('zoom');
-
-      const isCtrl = e.ctrlKey || e.metaKey;
-
-      if (isCtrl && (e.key === 'c' || e.key === 'C')) {
-        if (this.selectionTool.selectedElementIds.size > 0 || this.canvasMgr.selectedGuideId) {
-          e.preventDefault();
-          this.copySelection();
-          return;
-        }
-      }
-
-      if (isCtrl && (e.key === 'q' || e.key === 'Q')) {
-        if (this.selectionTool.selectedElementIds.size > 0) {
-          e.preventDefault();
-          this.handleConvertToCurves();
-          return;
-        }
-      }
-
-      if (isCtrl && (e.key === 'x' || e.key === 'X')) {
-        if (this.selectionTool.selectedElementIds.size > 0 || this.canvasMgr.selectedGuideId) {
-          e.preventDefault();
-          this.cutSelection();
-          return;
-        }
-      }
-
-      if (isCtrl && (e.key === 'v' || e.key === 'V')) {
-        if (this.clipboardService.hasContent) {
-          e.preventDefault();
-          this.pasteClipboard();
-          return;
-        }
-      }
-
-      if (isCtrl && (e.key === 'd' || e.key === 'D')) {
-        if (this.selectionTool.selectedElementIds.size > 0 || this.canvasMgr.selectedGuideId) {
-          e.preventDefault();
-          this.duplicateSelection();
-          return;
-        }
-      }
-
-      if (isCtrl && (e.key === 'z' || e.key === 'Z')) {
-        e.preventDefault();
-        if (e.shiftKey) {
-          this.redo();
-        } else {
-          this.undo();
-        }
-        return;
-      }
-
-      if (isCtrl && (e.key === 'y' || e.key === 'Y')) {
-        e.preventDefault();
-        this.redo();
-        return;
-      }
-
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        const hasActiveDrag = !!(
-          this.isDragging ||
-          this.nodeToolHandler.isDragging ||
-          this.shapeToolHandler.shapeStartPt ||
-          this.activeHandle === 'shape' ||
-          (this.toolbar.activeTool === 'pen' && (this.penToolHandler.isDragging || this.penToolHandler.vertexCount > 0)) ||
-          (this.toolbar.activeTool === 'polyline' && this.polylineToolHandler.vertexCount > 0) ||
-          this.selectionTool.marqueeRect ||
-          this.activeHandle === 'guide-create' ||
-          this.activeHandle === 'origin-drag'
-        );
-
-        if (hasActiveDrag) {
-          this.cancelCurrentAction();
-        } else {
-          // Deselect elements/nodes/guides and switch to canvas/viewbox properties panel
-          this.selectionTool.deselectAll();
-          this.canvasMgr.selectedGuideId = null;
-          this.canvasMgr.activeGuideTransformId = null;
-          this.nodeEditorTool.selectedVertexId = null;
-          this.nodeEditorTool.selectedHandleType = null;
-          if (this.toolbar.activeTool === 'node') {
-            this.toolbar.setTool('select');
-          }
-          this.propertyPanel.resetPanelMode();
-          this.render();
-        }
-        return;
-      }
-
-      if (this.toolbar.activeTool === 'polyline') {
-        if (e.key === 'Enter') {
-          this.polylineToolHandler.finishPolylinePath(false);
-          return;
-        }
-      }
-
-      if (this.toolbar.activeTool === 'pen') {
-        if (e.key === 'Enter') {
-          this.penToolHandler.finishPenPath(false);
-          return;
-        }
-      }
-
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        // 1. Delete selected guide line
-        if (this.canvasMgr.selectedGuideId) {
-          this.canvasMgr.removeGuide(this.canvasMgr.selectedGuideId);
-          this.propertyPanel.resetPanelMode();
-          this.render();
-          this.syncMetadataToHost();
-          return;
-        }
-
-        // 1b. Delete selected vertex in node editor
-        if (this.toolbar.activeTool === 'node' && this.nodeEditorTool.selectedVertexId) {
-          if (this.nodeToolHandler.deleteSelectedVertex()) {
-            this.propertyPanel.update(null, 'node');
-            return;
-          }
-        }
-
-        // 2. Delete selected vector elements
-        if (this.selectionTool.selectedElementIds.size > 0) {
-          this.pushUndo();
-          this.model.elements = this.model.elements.filter(
-            (el) => !this.selectionTool.isSelected(el.id)
-          );
-          this.selectionTool.deselectAll();
-          this.propertyPanel.resetPanelMode();
-          this.render();
-          this.syncToHost();
-        }
-      }
-
-      // Arrow Key Nudge for selected vectors with modifier multiplier steps
-      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-        if (this.selectionTool.selectedElementIds.size > 0) {
-          e.preventDefault();
-
-          let step = 1;
-          const ctrl = e.ctrlKey || e.metaKey;
-          const shift = e.shiftKey;
-          const alt = e.altKey;
-
-          if (shift && alt) {
-            step = 100;
-          } else if (ctrl && alt) {
-            step = 75;
-          } else if (ctrl && shift) {
-            step = 50;
-          } else if (alt) {
-            step = 25;
-          } else if (shift) {
-            step = 10;
-          } else if (ctrl) {
-            step = 5;
-          } else {
-            step = 1;
-          }
-
-          let dx = 0;
-          let dy = 0;
-          if (e.key === 'ArrowLeft') dx = -step;
-          if (e.key === 'ArrowRight') dx = step;
-          if (e.key === 'ArrowUp') dy = -step;
-          if (e.key === 'ArrowDown') dy = step;
-
-          // If in Node Tool and a specific vertex is selected, move only that vertex
-          const activeEl = this.model.elements.find(
-            (el) => el.id === this.selectionTool.selectedElementId
-          );
-          if (
-            this.toolbar.activeTool === 'node' &&
-            activeEl &&
-            activeEl.vertices &&
-            this.nodeEditorTool.selectedVertexId
-          ) {
-            const v = activeEl.vertices.find(
-              (n) => n.id === this.nodeEditorTool.selectedVertexId
-            );
-            if (v) {
-              v.x += dx;
-              v.y += dy;
-              if (v.handleIn) {
-                v.handleIn.x += dx;
-                v.handleIn.y += dy;
-              }
-              if (v.handleOut) {
-                v.handleOut.x += dx;
-                v.handleOut.y += dy;
-              }
-              activeEl.attributes.d = this.model.compilePathD(
-                activeEl.vertices,
-                activeEl.isClosed
-              );
-              this.render();
-              this.syncToHost();
-              return;
-            }
-          }
-
-          // Otherwise translate all selected vector elements
-          this.model.elements.forEach((el) => {
-            if (this.selectionTool.isSelected(el.id) && el.vertices) {
-              el.vertices.forEach((v) => {
-                v.x += dx;
-                v.y += dy;
-                if (v.handleIn) {
-                  v.handleIn.x += dx;
-                  v.handleIn.y += dy;
-                }
-                if (v.handleOut) {
-                  v.handleOut.x += dx;
-                  v.handleOut.y += dy;
-                }
-              });
-              el.attributes.d = this.model.compilePathD(el.vertices, el.isClosed);
-            }
-          });
-
-          this.render();
-          this.syncToHost();
-        }
-      }
-    });
-
-    window.addEventListener('keyup', (e) => {
-      if (e.key === 'Shift') this.isShiftPressed = false;
+    // Dedicated Keyboard Shortcut Controller (SOLID / SRP)
+    this.keyboardController = new KeyboardShortcutController({
+      toolbar: this.toolbar,
+      selectionTool: this.selectionTool,
+      canvasMgr: this.canvasMgr,
+      nodeEditorTool: this.nodeEditorTool,
+      model: this.model,
+      propertyPanel: this.propertyPanel,
+      clipboardService: this.clipboardService,
+      nodeToolHandler: this.nodeToolHandler,
+      shapeToolHandler: this.shapeToolHandler,
+      penToolHandler: this.penToolHandler,
+      polylineToolHandler: this.polylineToolHandler,
+      isDragging: () => this.isDragging,
+      activeHandle: () => this.activeHandle,
+      copySelection: () => this.copySelection(),
+      cutSelection: () => this.cutSelection(),
+      pasteClipboard: () => this.pasteClipboard(),
+      duplicateSelection: () => this.duplicateSelection(),
+      handleConvertToCurves: () => this.handleConvertToCurves(),
+      undo: () => this.undo(),
+      redo: () => this.redo(),
+      cancelCurrentAction: () => this.cancelCurrentAction(),
+      pushUndo: () => this.pushUndo(),
+      render: () => this.render(),
+      syncToHost: () => this.syncToHost(),
+      syncMetadataToHost: () => this.syncMetadataToHost(),
     });
 
     // Window level pointer events for dragging across boundaries
