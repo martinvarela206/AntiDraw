@@ -771,12 +771,12 @@ export class ParametricHandleController {
       return html;
     }
 
-    // 2. Ellipse Inner Ratio Ghost during active inner handle dragging (FEAT-10)
+    // 2. Ellipse Inner Ratio Ghost during active inner handle dragging (FEAT-10 & FIX-HandleColor)
     if (activeHandle === 'ellipse-inner') {
       const isArc = this.quadrantGhostMode === 'arc';
-      const fill = isArc ? 'none' : 'rgba(6, 182, 212, 0.2)';
+      const fill = isArc ? 'none' : 'rgba(245, 158, 11, 0.2)';
       const d = this.quadrantGhostD;
-      let html = `<path d="${d}" fill="${fill}" fill-rule="evenodd" stroke="#06b6d4" stroke-width="2" stroke-dasharray="4 3" vector-effect="non-scaling-stroke" />`;
+      let html = `<path d="${d}" fill="${fill}" fill-rule="evenodd" stroke="#f59e0b" stroke-width="2" stroke-dasharray="4 3" vector-effect="non-scaling-stroke" />`;
       const cx = this.quadrantCenter.x;
       const cy = this.quadrantCenter.y;
       const rx = this.quadrantRadii.rx;
@@ -800,7 +800,7 @@ export class ParametricHandleController {
       // Concentric inner ring/arc guide
       if (ratio > 0) {
         if (isFull) {
-          html += `<ellipse cx="${cx}" cy="${cy}" rx="${rx * ratio}" ry="${ry * ratio}" fill="none" stroke="#06b6d4" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
+          html += `<ellipse cx="${cx}" cy="${cy}" rx="${rx * ratio}" ry="${ry * ratio}" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
         } else {
           const inRx = rx * ratio;
           const inRy = ry * ratio;
@@ -811,7 +811,7 @@ export class ParametricHandleController {
           while (deltaDeg > 360) deltaDeg -= 360;
           const largeArc = deltaDeg > 180 ? 1 : 0;
           const arcD = `M ${cx + inRx * Math.cos(a1)} ${cy + inRy * Math.sin(a1)} A ${inRx} ${inRy} 0 ${largeArc} 1 ${cx + inRx * Math.cos(a2)} ${cy + inRy * Math.sin(a2)}`;
-          html += `<path d="${arcD}" fill="none" stroke="#06b6d4" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
+          html += `<path d="${arcD}" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
         }
       }
       // 4 Canonical fixed quadrant snap targets
@@ -822,17 +822,17 @@ export class ParametricHandleController {
         html += `<circle cx="${refX}" cy="${refY}" r="${3.5 / z}" fill="#ffffff" stroke="#0284c7" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none" />`;
       });
 
-      html += `<line x1="${cx}" y1="${cy}" x2="${inX}" y2="${inY}" stroke="#06b6d4" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
-      html += `<circle cx="${cx}" cy="${cy}" r="${3 / z}" fill="#06b6d4" />`;
-      html += `<circle cx="${inX}" cy="${inY}" r="${6 / z}" fill="#06b6d4" stroke="#ffffff" stroke-width="2" vector-effect="non-scaling-stroke" />`;
+      html += `<line x1="${cx}" y1="${cy}" x2="${inX}" y2="${inY}" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
+      html += `<circle cx="${cx}" cy="${cy}" r="${3 / z}" fill="#f59e0b" />`;
+      html += `<circle cx="${inX}" cy="${inY}" r="${6 / z}" fill="#f59e0b" stroke="#ffffff" stroke-width="2" vector-effect="non-scaling-stroke" />`;
 
       const badgeW = 92;
       const badgeH = 18;
       const pct = Math.round(ratio * 100);
       html += `
         <g opacity="0.95">
-          <rect x="${inX + 10}" y="${inY - 22}" width="${badgeW}" height="${badgeH}" rx="3" fill="#083344" stroke="#06b6d4" stroke-width="1" vector-effect="non-scaling-stroke" />
-          <text x="${inX + 14}" y="${inY - 9}" font-size="10" fill="#67e8f9" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" font-weight="600">Hueco: ${pct}%</text>
+          <rect x="${inX + 10}" y="${inY - 22}" width="${badgeW}" height="${badgeH}" rx="3" fill="#1e1b4b" stroke="#f59e0b" stroke-width="1" vector-effect="non-scaling-stroke" />
+          <text x="${inX + 14}" y="${inY - 9}" font-size="10" fill="#fde68a" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" font-weight="600">Hueco: ${pct}%</text>
         </g>
       `;
       return html;
@@ -970,8 +970,8 @@ export class ParametricHandleController {
       if (innerPt) {
         html += `
           <g style="cursor: crosshair;" title="Tirador de Hueco Interior (Radio Interno / Rosca)">
-            <circle cx="${innerPt.x}" cy="${innerPt.y}" r="${5.5 / z}" fill="#06b6d4" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" />
-            <circle cx="${innerPt.x}" cy="${innerPt.y}" r="${2 / z}" fill="#ffffff" />
+            <circle cx="${innerPt.x}" cy="${innerPt.y}" r="${6 / z}" fill="#f59e0b" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" />
+            <circle cx="${innerPt.x}" cy="${innerPt.y}" r="${2.5 / z}" fill="#ffffff" />
           </g>
         `;
       }
