@@ -252,49 +252,128 @@ export class SnappingEngine {
         let phaseY = origY;
 
         if (grid.type === 'isometric') {
+          /**
+           * ARCHITECTURAL RATIONALE: Rigorous Isometric Grid Snapping (Lines, Continuous Diagonals, and Intersections)
+           *
+           * 1. Row Spacing Calibration (S / 2):
+           *    Visual isometric diagonals cross vertical axes at y = 0, S/2, S, 3S/2...
+           *    Using rowSpacing = S previously missed exactly 50% of the rendered grid lines.
+           *    Setting rowSpacing = S / 2 provides 100% geometric parity with GridManager SVG pattern.
+           *
+           * 2. Continuous Sliding Projection along ±30° Diagonals:
+           *    Rather than only snapping to discrete vertices at line crossings, points within threshold
+           *    of any ±30° diagonal are projected orthogonally onto the line:
+           *      P_proj = P - d_signed * n_unit
+           *    This allows continuous, smooth magnetic sliding along isometric axes during drawing and editing.
+           *
+           * 3. Intersection Prioritization:
+           *    When a point is near the crossing of two diagonals or a diagonal and a vertical line,
+           *    the exact analytical intersection is prioritized over single-line projection.
+           */
           const tileH = S;
           const tileW = S * Math.sqrt(3);
+          const rowSpacing = tileH / 2;
+          const colSpacing = tileW / 2;
+          const m = 1 / Math.sqrt(3); // tan(30°)
+          const cos30 = Math.sqrt(3) / 2;
+          const sin30 = 0.5;
 
           if (grid.alignmentMode === 'cell-center') {
-            phaseX += tileW / 2;
-            phaseY += tileH / 2;
+            // Isometric diamond cell centers and triangle barycenters
+            const relX = pt.x - phaseX;
+            const relY = pt.y - phaseY;
+            const kX = Math.round(relX / tileW);
+            const kY = Math.round(relY / rowSpacing);
+
+            // Candidate cell center in alternating isometric lattice
+            const candidateCenterX = phaseX + kX * tileW + (Math.abs(kY) % 2 === 1 ? colSpacing : 0);
+            const candidateCenterY = phaseY + kY * rowSpacing;
+            const distCenter = Math.hypot(pt.x - candidateCenterX, pt.y - candidateCenterY);
+
+            if (distCenter <= threshold) {
+              snappedX = candidateCenterX;
+              snappedY = candidateCenterY;
+              xSnapped = true;
+              ySnapped = true;
+              break;
+            }
           }
 
           const relX = pt.x - phaseX;
           const relY = pt.y - phaseY;
 
-          // Vertical lines at k * (tileW / 2)
-          const colSpacing = tileW / 2;
+          // 1. Vertical lines at k * (tileW / 2)
           const kCol = Math.round(relX / colSpacing);
           const snapColX = phaseX + kCol * colSpacing;
           const distV = Math.abs(pt.x - snapColX);
 
-          // Diagonal lines at +30° and -30°
-          const rowSpacing = tileH;
-          const diagPos = (relY - relX / Math.sqrt(3)) / rowSpacing;
-          const kDiagPos = Math.round(diagPos);
-          const distDiagPos = Math.abs(relY - (relX / Math.sqrt(3) + kDiagPos * rowSpacing)) * (Math.sqrt(3) / 2);
+          // 2. +30° Diagonal line: y - m*x = c1
+          const c1 = relY - m * relX;
+          const k1 = Math.round(c1 / rowSpacing);
+          const c1Snap = k1 * rowSpacing;
+          const signedDist1 = (c1 - c1Snap) * cos30;
+          const dist1 = Math.abs(signedDist1);
+          const proj1X = pt.x + signedDist1 * sin30;
+          const proj1Y = pt.y - signedDist1 * cos30;
 
-          const diagNeg = (relY + relX / Math.sqrt(3)) / rowSpacing;
-          const kDiagNeg = Math.round(diagNeg);
-          const distDiagNeg = Math.abs(relY - (-relX / Math.sqrt(3) + kDiagNeg * rowSpacing)) * (Math.sqrt(3) / 2);
+          // 3. -30° Diagonal line: y + m*x = c2
+          const c2 = relY + m * relX;
+          const k2 = Math.round(c2 / rowSpacing);
+          const c2Snap = k2 * rowSpacing;
+          const signedDist2 = (c2 - c2Snap) * cos30;
+          const dist2 = Math.abs(signedDist2);
+          const proj2X = pt.x - signedDist2 * sin30;
+          const proj2Y = pt.y - signedDist2 * cos30;
 
-          // Check intersection of diagonals with vertical lines (diamond vertices)
-          const interY1 = (snapColX - phaseX) / Math.sqrt(3) + kDiagPos * rowSpacing + phaseY;
-          const distInter1 = Math.hypot(pt.x - snapColX, pt.y - interY1);
+          // 4. Analytical Intersections
+          // a) Intersection of +30° and -30° diagonals
+          const interYDiag = phaseY + (c1Snap + c2Snap) / 2;
+          const interXDiag = phaseX + (c2Snap - c1Snap) * cos30;
+          const distInterDiag = Math.hypot(pt.x - interXDiag, pt.y - interYDiag);
 
-          const interY2 = -(snapColX - phaseX) / Math.sqrt(3) + kDiagNeg * rowSpacing + phaseY;
-          const distInter2 = Math.hypot(pt.x - snapColX, pt.y - interY2);
+          // b) Intersection of +30° diagonal with vertical line
+          const interYV1 = phaseY + m * (snapColX - phaseX) + c1Snap;
+          const distInterV1 = Math.hypot(pt.x - snapColX, pt.y - interYV1);
 
-          if (distInter1 <= threshold && distInter1 <= distInter2) {
-            snappedX = snapColX;
-            snappedY = interY1;
+          // c) Intersection of -30° diagonal with vertical line
+          const interYV2 = phaseY - m * (snapColX - phaseX) + c2Snap;
+          const distInterV2 = Math.hypot(pt.x - snapColX, pt.y - interYV2);
+
+          // Prioritize closest intersection within threshold
+          let bestInterDist = threshold + 1;
+          let bestInterPt: Point | null = null;
+
+          if (distInterDiag <= threshold && distInterDiag < bestInterDist) {
+            bestInterDist = distInterDiag;
+            bestInterPt = { x: interXDiag, y: interYDiag };
+          }
+          if (distInterV1 <= threshold && distInterV1 < bestInterDist) {
+            bestInterDist = distInterV1;
+            bestInterPt = { x: snapColX, y: interYV1 };
+          }
+          if (distInterV2 <= threshold && distInterV2 < bestInterDist) {
+            bestInterDist = distInterV2;
+            bestInterPt = { x: snapColX, y: interYV2 };
+          }
+
+          if (bestInterPt) {
+            snappedX = bestInterPt.x;
+            snappedY = bestInterPt.y;
             xSnapped = true;
             ySnapped = true;
             break;
-          } else if (distInter2 <= threshold) {
-            snappedX = snapColX;
-            snappedY = interY2;
+          }
+
+          // Fallback to continuous projection onto nearest diagonal or vertical line
+          if (dist1 <= threshold && dist1 <= dist2 && dist1 <= distV) {
+            snappedX = proj1X;
+            snappedY = proj1Y;
+            xSnapped = true;
+            ySnapped = true;
+            break;
+          } else if (dist2 <= threshold && dist2 <= distV) {
+            snappedX = proj2X;
+            snappedY = proj2Y;
             xSnapped = true;
             ySnapped = true;
             break;
@@ -303,33 +382,100 @@ export class SnappingEngine {
             xSnapped = true;
           }
         } else if (grid.type === 'axonometric') {
+          /**
+           * ARCHITECTURAL RATIONALE: Rigorous Axonometric Grid Snapping
+           * Continuous sliding projection onto ±45° diagonals and intersection snapping.
+           */
           const tileW = S;
           const tileH = S;
 
           if (grid.alignmentMode === 'cell-center') {
-            phaseX += tileW / 2;
-            phaseY += tileH / 2;
+            const relX = pt.x - phaseX;
+            const relY = pt.y - phaseY;
+            const kX = Math.round((relX - tileW / 2) / tileW);
+            const kY = Math.round((relY - tileH / 2) / tileH);
+            const candidateCenterX = phaseX + kX * tileW + tileW / 2;
+            const candidateCenterY = phaseY + kY * tileH + tileH / 2;
+            const distCenter = Math.hypot(pt.x - candidateCenterX, pt.y - candidateCenterY);
+            if (distCenter <= threshold) {
+              snappedX = candidateCenterX;
+              snappedY = candidateCenterY;
+              xSnapped = true;
+              ySnapped = true;
+              break;
+            }
           }
 
           const relX = pt.x - phaseX;
           const relY = pt.y - phaseY;
 
-          // Vertical lines
+          // Vertical lines at k * tileW
           const kX = Math.round(relX / tileW);
           const snapX = phaseX + kX * tileW;
           const distV = Math.abs(pt.x - snapX);
 
-          // Diagonal intersections (+45° and -45°)
-          const kSum = Math.round((relY + relX) / tileW);
-          const kDiff = Math.round((relY - relX) / tileW);
+          // +45° Diagonal line: y - x = c1
+          const c1 = relY - relX;
+          const k1 = Math.round(c1 / tileH);
+          const c1Snap = k1 * tileH;
+          const signedDist1 = (c1 - c1Snap) / Math.SQRT2;
+          const dist1 = Math.abs(signedDist1);
+          const proj1X = pt.x + signedDist1 / Math.SQRT2;
+          const proj1Y = pt.y - signedDist1 / Math.SQRT2;
 
-          const ix = phaseX + (kSum - kDiff) * tileW / 2;
-          const iy = phaseY + (kSum + kDiff) * tileW / 2;
-          const distInter = Math.hypot(pt.x - ix, pt.y - iy);
+          // -45° Diagonal line: y + x = c2
+          const c2 = relY + relX;
+          const k2 = Math.round(c2 / tileH);
+          const c2Snap = k2 * tileH;
+          const signedDist2 = (c2 - c2Snap) / Math.SQRT2;
+          const dist2 = Math.abs(signedDist2);
+          const proj2X = pt.x - signedDist2 / Math.SQRT2;
+          const proj2Y = pt.y - signedDist2 / Math.SQRT2;
 
-          if (distInter <= threshold) {
-            snappedX = ix;
-            snappedY = iy;
+          // Intersections
+          const ixDiag = phaseX + (c2Snap - c1Snap) / 2;
+          const iyDiag = phaseY + (c1Snap + c2Snap) / 2;
+          const distInterDiag = Math.hypot(pt.x - ixDiag, pt.y - iyDiag);
+
+          const iyV1 = phaseY + (snapX - phaseX) + c1Snap;
+          const distInterV1 = Math.hypot(pt.x - snapX, pt.y - iyV1);
+
+          const iyV2 = phaseY - (snapX - phaseX) + c2Snap;
+          const distInterV2 = Math.hypot(pt.x - snapX, pt.y - iyV2);
+
+          let bestInterDist = threshold + 1;
+          let bestInterPt: Point | null = null;
+
+          if (distInterDiag <= threshold && distInterDiag < bestInterDist) {
+            bestInterDist = distInterDiag;
+            bestInterPt = { x: ixDiag, y: iyDiag };
+          }
+          if (distInterV1 <= threshold && distInterV1 < bestInterDist) {
+            bestInterDist = distInterV1;
+            bestInterPt = { x: snapX, y: iyV1 };
+          }
+          if (distInterV2 <= threshold && distInterV2 < bestInterDist) {
+            bestInterDist = distInterV2;
+            bestInterPt = { x: snapX, y: iyV2 };
+          }
+
+          if (bestInterPt) {
+            snappedX = bestInterPt.x;
+            snappedY = bestInterPt.y;
+            xSnapped = true;
+            ySnapped = true;
+            break;
+          }
+
+          if (dist1 <= threshold && dist1 <= dist2 && dist1 <= distV) {
+            snappedX = proj1X;
+            snappedY = proj1Y;
+            xSnapped = true;
+            ySnapped = true;
+            break;
+          } else if (dist2 <= threshold && dist2 <= distV) {
+            snappedX = proj2X;
+            snappedY = proj2Y;
             xSnapped = true;
             ySnapped = true;
             break;
