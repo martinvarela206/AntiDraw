@@ -726,15 +726,23 @@ class AntiDrawApp {
 
     // Window level pointer events for dragging across boundaries
     window.addEventListener('pointermove', (e) => {
-      if (this.isDragging && (this.activeHandle === 'guide-create' || this.toolbar.activeTool === 'select')) {
+      if (this.isDragging) {
         this.onPointerMove(e);
       }
     });
 
     window.addEventListener('pointerup', (e) => {
-      if (this.isDragging && (this.activeHandle === 'guide-create' || this.toolbar.activeTool === 'select')) {
+      if (this.isDragging) {
         this.onPointerUp(e);
       }
+    });
+
+    // Window-level focus loss and pointer cancellation (e.g. Windows Snipping Tool with delay, Alt+Tab, OS modals)
+    window.addEventListener('blur', () => {
+      this.handleLostFocusOrCancel();
+    });
+    window.addEventListener('pointercancel', () => {
+      this.handleLostFocusOrCancel();
     });
 
     // Right-click / Context Menu
@@ -850,6 +858,9 @@ class AntiDrawApp {
       e.stopPropagation();
       this.onPointerUp(e);
     });
+    this.canvasWrapper.addEventListener('pointercancel', () => {
+      this.handleLostFocusOrCancel();
+    });
     this.canvasWrapper.addEventListener('dblclick', (e) => {
       e.stopPropagation();
       this.onDoubleClick(e);
@@ -875,6 +886,9 @@ class AntiDrawApp {
       if (e.button === 0 && this.isDragging) {
         this.onPointerUp(e);
       }
+    });
+    this.canvasScrollArea.addEventListener('pointercancel', () => {
+      this.handleLostFocusOrCancel();
     });
     this.canvasScrollArea.addEventListener('dblclick', (e: MouseEvent) => {
       this.onDoubleClick(e);
@@ -1188,11 +1202,41 @@ class AntiDrawApp {
       needsRender = true;
     }
 
+    this.isDragging = false;
+    this.activeHandle = null;
+    if (this.pointerMoveRafId !== null) {
+      cancelAnimationFrame(this.pointerMoveRafId);
+      this.pointerMoveRafId = null;
+    }
+    this.latestPointerMoveEvent = null;
+
     this.canvasWrapper.style.cursor = '';
     this.canvasScrollArea.style.cursor = '';
 
     if (needsRender) {
       this.render();
+    } else {
+      this.renderOverlay();
+    }
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Global Focus Loss & Pointer Cancellation Purge (FIX-LostFocusGhost)
+   * When OS-level capture occurs (such as Windows Snipping Tool with delay, Alt+Tab, system alerts),
+   * the webview window immediately fires 'blur' and in-flight pointer streams receive 'pointercancel'.
+   * Because 'pointerup' is never received, drag states and preview ghosts in #overlay-svg would remain
+   * permanently frozen on the canvas.
+   * This handler cancels all active tool drags, releases pointer capture, and purges the ephemeral overlay.
+   */
+  private handleLostFocusOrCancel(): void {
+    if (
+      this.isDragging ||
+      this.nodeToolHandler.isDragging ||
+      this.shapeToolHandler.shapeStartPt !== null ||
+      this.activeHandle !== null ||
+      (this.toolbar.activeTool === 'pen' && this.penToolHandler.isDragging)
+    ) {
+      this.cancelCurrentAction();
     }
   }
 

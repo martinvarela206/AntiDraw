@@ -504,6 +504,18 @@ export class ParametricHandleController {
   }
 
   /**
+   * ARCHITECTURAL RATIONALE: Non-Destructive Cancellation (FIX-GhostFreeze)
+   * Purges ephemeral drag states and preview strings ('quadrantGhostD', 'rectGhostD'),
+   * preventing orphaned overlay artifacts when focus is lost or pointer interaction is cancelled.
+   */
+  public cancel(): boolean {
+    const hadGhost = !!(this.quadrantGhostD || this.rectGhostD);
+    this.quadrantGhostD = '';
+    this.rectGhostD = '';
+    return hadGhost;
+  }
+
+  /**
    * Renders ghost overlay during live dragging of parametric quadrant, donut inner ratio, or rect corners.
    */
   public renderGhostOverlay(activeHandle: string | null, z: number): string {

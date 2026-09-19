@@ -732,6 +732,8 @@ export class NodeToolHandler implements IToolHandler {
   }
 
   public cancel(): boolean {
+    let handled = false;
+    if (this.parametricController.cancel()) handled = true;
     if (this.ghostNodeVertices || this.isDragging || this.marqueeSelector.isMarqueeActive()) {
       this.ghostNodeVertices = null;
       this.initialVertices = [];
@@ -739,13 +741,16 @@ export class NodeToolHandler implements IToolHandler {
       this.isDragging = false;
       this.nodeEditorTool.selectedSegmentIdx = null;
       this.marqueeSelector.cancelMarquee();
-      this.ctx.renderOverlay();
-      return true;
+      handled = true;
     }
-    return false;
+    if (handled) {
+      this.ctx.renderOverlay();
+    }
+    return handled;
   }
 
   public deactivate(): void {
+    this.parametricController.cancel();
     this.ghostNodeVertices = null;
     this.initialVertices = [];
     this.activeHandle = null;
