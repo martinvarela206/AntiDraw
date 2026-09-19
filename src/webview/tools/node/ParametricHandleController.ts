@@ -105,7 +105,15 @@ export class ParametricHandleController {
     }
 
     const isFull = type === 'ellipse' || Math.abs(endAngle - startAngle) >= 360;
-    const midAngle = isFull ? 0 : (startAngle + endAngle) / 2;
+    let midAngle: number;
+    if (isFull) {
+      midAngle = 0;
+    } else {
+      let sweep = endAngle - startAngle;
+      while (sweep < 0) sweep += 360;
+      while (sweep > 360) sweep -= 360;
+      midAngle = startAngle + sweep / 2;
+    }
     const rad = (midAngle * Math.PI) / 180;
     return {
       x: cx + rx * innerRatio * Math.cos(rad),
@@ -638,14 +646,35 @@ export class ParametricHandleController {
       const ratio = this.ellipseInnerGhostRatio;
 
       const isFull = this.quadrantGhostMode === 'ellipse' || Math.abs(this.quadrantGhostEndAngle - this.quadrantGhostStartAngle) >= 360;
-      const midAngle = isFull ? 0 : (this.quadrantGhostStartAngle + this.quadrantGhostEndAngle) / 2;
+      let midAngle: number;
+      if (isFull) {
+        midAngle = 0;
+      } else {
+        let sweep = this.quadrantGhostEndAngle - this.quadrantGhostStartAngle;
+        while (sweep < 0) sweep += 360;
+        while (sweep > 360) sweep -= 360;
+        midAngle = this.quadrantGhostStartAngle + sweep / 2;
+      }
       const midRad = (midAngle * Math.PI) / 180;
       const inX = cx + rx * ratio * Math.cos(midRad);
       const inY = cy + ry * ratio * Math.sin(midRad);
 
       // Concentric inner ring/arc guide
       if (ratio > 0) {
-        html += `<ellipse cx="${cx}" cy="${cy}" rx="${rx * ratio}" ry="${ry * ratio}" fill="none" stroke="#06b6d4" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
+        if (isFull) {
+          html += `<ellipse cx="${cx}" cy="${cy}" rx="${rx * ratio}" ry="${ry * ratio}" fill="none" stroke="#06b6d4" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
+        } else {
+          const inRx = rx * ratio;
+          const inRy = ry * ratio;
+          const a1 = (this.quadrantGhostStartAngle * Math.PI) / 180;
+          const a2 = (this.quadrantGhostEndAngle * Math.PI) / 180;
+          let deltaDeg = this.quadrantGhostEndAngle - this.quadrantGhostStartAngle;
+          while (deltaDeg < 0) deltaDeg += 360;
+          while (deltaDeg > 360) deltaDeg -= 360;
+          const largeArc = deltaDeg > 180 ? 1 : 0;
+          const arcD = `M ${cx + inRx * Math.cos(a1)} ${cy + inRy * Math.sin(a1)} A ${inRx} ${inRy} 0 ${largeArc} 1 ${cx + inRx * Math.cos(a2)} ${cy + inRy * Math.sin(a2)}`;
+          html += `<path d="${arcD}" fill="none" stroke="#06b6d4" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
+        }
       }
       html += `<line x1="${cx}" y1="${cy}" x2="${inX}" y2="${inY}" stroke="#06b6d4" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
       html += `<circle cx="${cx}" cy="${cy}" r="${3 / z}" fill="#06b6d4" />`;

@@ -128,7 +128,18 @@ export class EllipsePrimitive {
       }
     } else {
       // type === 'arc'
-      return `M ${formatNum(x1)} ${formatNum(y1)} A ${formatNum(rx)} ${formatNum(ry)} 0 ${largeArc} ${sweep} ${formatNum(x2)} ${formatNum(y2)}`;
+      if (innerRatio > 0) {
+        // Double arc: outer arc subpath and concentric inner arc subpath
+        const inRx = rx * innerRatio;
+        const inRy = ry * innerRatio;
+        const inX1 = cx + inRx * Math.cos(a1);
+        const inY1 = cy + inRy * Math.sin(a1);
+        const inX2 = cx + inRx * Math.cos(a2);
+        const inY2 = cy + inRy * Math.sin(a2);
+        return `M ${formatNum(x1)} ${formatNum(y1)} A ${formatNum(rx)} ${formatNum(ry)} 0 ${largeArc} ${sweep} ${formatNum(x2)} ${formatNum(y2)} M ${formatNum(inX1)} ${formatNum(inY1)} A ${formatNum(inRx)} ${formatNum(inRy)} 0 ${largeArc} ${sweep} ${formatNum(inX2)} ${formatNum(inY2)}`;
+      } else {
+        return `M ${formatNum(x1)} ${formatNum(y1)} A ${formatNum(rx)} ${formatNum(ry)} 0 ${largeArc} ${sweep} ${formatNum(x2)} ${formatNum(y2)}`;
+      }
     }
   }
 
@@ -352,6 +363,45 @@ export class EllipsePrimitive {
           vArc.handleOut = { x: beziers[bIdx + 1].p1.x, y: beziers[bIdx + 1].p1.y };
         }
         vertices.push(vArc);
+      }
+
+      if (innerRatio > 0) {
+        // Concentric inner arc subpath (non-closed double arc)
+        const inRx = rx * innerRatio;
+        const inRy = ry * innerRatio;
+        const inX1 = cx + inRx * Math.cos(a1);
+        const inY1 = cy + inRy * Math.sin(a1);
+        const inX2 = cx + inRx * Math.cos(a2);
+        const inY2 = cy + inRy * Math.sin(a2);
+        const innerBeziers = PathGeometryCompiler.arcToBezier(inX1, inY1, inRx, inRy, 0, largeArc, sweep, inX2, inY2);
+
+        const vIn0: PathVertex = {
+          id: `v_${idx++}`,
+          x: inX1,
+          y: inY1,
+          nodeType: 'smooth',
+          command: 'M',
+        };
+        if (innerBeziers.length > 0) {
+          vIn0.handleOut = { x: innerBeziers[0].p1.x, y: innerBeziers[0].p1.y };
+        }
+        vertices.push(vIn0);
+
+        for (let bIdx = 0; bIdx < innerBeziers.length; bIdx++) {
+          const b = innerBeziers[bIdx];
+          const vInArc: PathVertex = {
+            id: `v_${idx++}`,
+            x: b.p.x,
+            y: b.p.y,
+            handleIn: { x: b.p2.x, y: b.p2.y },
+            nodeType: 'smooth',
+            command: 'C',
+          };
+          if (bIdx + 1 < innerBeziers.length) {
+            vInArc.handleOut = { x: innerBeziers[bIdx + 1].p1.x, y: innerBeziers[bIdx + 1].p1.y };
+          }
+          vertices.push(vInArc);
+        }
       }
     }
 
