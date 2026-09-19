@@ -385,23 +385,29 @@ export class SelectionTool {
       newY = initialBox.y + initialBox.height / 2 - newH / 2;
     }
 
-    const minDim = Math.max(padding * 2 + 2, 2);
-    if (newW < minDim) newW = minDim;
-    if (newH < minDim) newH = minDim;
+    /**
+     * ARCHITECTURAL RATIONALE: Interactive Negative Scale & Real-Time Reflection
+     * Previously clamped to `minDim = 2`, preventing users from dragging past the opposing
+     * anchor to mirror objects interactively across X or Y axes.
+     * By preserving the algebraic sign of `newW` and `newH`, vertices and Bézier handles reflect
+     * symmetrically across the fixed anchor line without requiring a separate mirror modal.
+     * Singularities (|w| < 1 or |h| < 1) are normalized to ±1 to prevent division-by-zero.
+     */
+    const signW = newW < 0 ? -1 : 1;
+    const signH = newH < 0 ? -1 : 1;
+    const absW = Math.max(Math.abs(newW), 1);
+    const absH = Math.max(Math.abs(newH), 1);
 
-    // Tight boxes before and after
     const initialTightX = initialBox.x + padding;
     const initialTightY = initialBox.y + padding;
     const initialTightW = Math.max(initialBox.width - padding * 2, 1);
     const initialTightH = Math.max(initialBox.height - padding * 2, 1);
 
+    const scaleX = (absW * signW) / initialTightW;
+    const scaleY = (absH * signH) / initialTightH;
+
     const newTightX = newX + padding;
     const newTightY = newY + padding;
-    const newTightW = Math.max(newW - padding * 2, 1);
-    const newTightH = Math.max(newH - padding * 2, 1);
-
-    const scaleX = newTightW / initialTightW;
-    const scaleY = newTightH / initialTightH;
 
     return initialVertices.map((v) => {
       const next: PathVertex = {

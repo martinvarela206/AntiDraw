@@ -184,6 +184,10 @@ export const ToolIcons = {
   sendBackward: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>`,
   sendBack: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/><line x1="4" y1="21" x2="20" y2="21"/></svg>`,
 
+  // Flip / Mirror
+  flipHorizontal: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="2" x2="12" y2="22" stroke-dasharray="2 2"/><path d="M8 7L2 12l6 5V7z" fill="currentColor" fill-opacity="0.3"/><path d="M16 7l6 5-6 5V7z"/></svg>`,
+  flipVertical: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="2" y1="12" x2="22" y2="12" stroke-dasharray="2 2"/><path d="M7 8l5-6 5 6H7z" fill="currentColor" fill-opacity="0.3"/><path d="M7 16l5 6 5-6H7z"/></svg>`,
+
   // Node modes
   nodeSharp: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19L12 5L20 19"/><circle cx="12" cy="5" r="3" fill="currentColor"/></svg>`,
   nodeAsymmetric: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3" fill="currentColor"/><path d="M4 18l5-4M15 10l5-4"/><circle cx="4" cy="18" r="2"/><circle cx="20" cy="6" r="2"/></svg>`,

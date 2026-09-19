@@ -249,4 +249,76 @@ export class CanvasActionDispatcher {
     this.ctx.render();
     this.ctx.syncToHost();
   }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Rigorous Horizontal & Vertical Reflection (ITEM-06)
+   * Reflects all selected vector elements across the central axis of their collective bounding box.
+   * Modulates vertex coordinates and Bézier control handles symmetrically:
+   *   Horizontal (Mirror X): x' = 2 * cx - x, y' = y, handleIn.x' = 2 * cx - handleIn.x
+   *   Vertical (Mirror Y):   x' = x, y' = 2 * cy - y, handleIn.y' = 2 * cy - handleIn.y
+   * Compensates custom selection pivots and synchronizes parametric attributes.
+   */
+  public flip(axis: 'horizontal' | 'vertical'): void {
+    const selectedIds = Array.from(this.ctx.selectionTool.selectedElementIds);
+    const selectedEls: VectorElement[] = [];
+    selectedIds.forEach((id) => {
+      const el = this.ctx.model.elements.find((e) => e.id === id);
+      if (el) selectedEls.push(el);
+    });
+
+    if (selectedEls.length === 0) return;
+
+    const groupBox = this.ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 0);
+    if (!groupBox) return;
+
+    this.ctx.pushUndo();
+
+    const mirrorAxisX = groupBox.x + groupBox.width / 2;
+    const mirrorAxisY = groupBox.y + groupBox.height / 2;
+
+    selectedEls.forEach((el) => {
+      if (el.vertices && el.vertices.length > 0) {
+        el.vertices = el.vertices.map((v) => {
+          const next = {
+            ...v,
+            x: axis === 'horizontal' ? 2 * mirrorAxisX - v.x : v.x,
+            y: axis === 'vertical' ? 2 * mirrorAxisY - v.y : v.y,
+          };
+          if (v.handleIn) {
+            next.handleIn = {
+              x: axis === 'horizontal' ? 2 * mirrorAxisX - v.handleIn.x : v.handleIn.x,
+              y: axis === 'vertical' ? 2 * mirrorAxisY - v.handleIn.y : v.handleIn.y,
+            };
+          }
+          if (v.handleOut) {
+            next.handleOut = {
+              x: axis === 'horizontal' ? 2 * mirrorAxisX - v.handleOut.x : v.handleOut.x,
+              y: axis === 'vertical' ? 2 * mirrorAxisY - v.handleOut.y : v.handleOut.y,
+            };
+          }
+          return next;
+        });
+
+        const isClosed = this.ctx.model.isElementClosed(el);
+        el.attributes.d = this.ctx.model.compilePathD(el.vertices, isClosed);
+        if (this.ctx.model.isParametricElement(el)) {
+          this.ctx.model.syncParametricAttributes(el);
+        }
+      }
+    });
+
+    if (this.ctx.selectionTool.customPivot) {
+      if (axis === 'horizontal') {
+        this.ctx.selectionTool.customPivot.x = 2 * mirrorAxisX - this.ctx.selectionTool.customPivot.x;
+      } else {
+        this.ctx.selectionTool.customPivot.y = 2 * mirrorAxisY - this.ctx.selectionTool.customPivot.y;
+      }
+    }
+
+    this.ctx.onResetPropertyPanel();
+    this.ctx.onUpdatePropertyPanel(this.ctx.getActiveTool());
+    this.ctx.render();
+    this.ctx.syncToHost();
+  }
 }
+

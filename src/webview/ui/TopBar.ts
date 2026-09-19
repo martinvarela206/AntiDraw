@@ -5,6 +5,7 @@ export interface TopBarCallbacks {
   onUndo?: () => void;
   onRedo?: () => void;
   onAlign: (type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => void;
+  onFlip?: (axis: 'horizontal' | 'vertical') => void;
   onBoolean?: (op: 'union' | 'subtract' | 'intersect' | 'exclude' | 'combine' | 'fragment') => void;
   onZOrder: (action: 'front' | 'forward' | 'backward' | 'back') => void;
   onToggleRulers?: () => void;
@@ -49,6 +50,12 @@ export class TopBar {
         <button class="btn-icon" id="btn-align-bottom" title="Align Bottom">${ToolIcons.alignBottom}</button>
       </div>
 
+      <!-- Flip / Mirror -->
+      <div class="top-bar-group">
+        <button class="btn-icon" id="btn-flip-h" title="Flip Horizontally (Mirror X)">${ToolIcons.flipHorizontal}</button>
+        <button class="btn-icon" id="btn-flip-v" title="Flip Vertically (Mirror Y)">${ToolIcons.flipVertical}</button>
+      </div>
+
       <!-- Z-Ordering -->
       <div class="top-bar-group">
         <button class="btn-icon" id="btn-z-front" title="Bring to Front">${ToolIcons.bringFront}</button>
@@ -82,6 +89,9 @@ export class TopBar {
     this.bindClick('btn-align-top', () => this.callbacks.onAlign('top'));
     this.bindClick('btn-align-middle', () => this.callbacks.onAlign('middle'));
     this.bindClick('btn-align-bottom', () => this.callbacks.onAlign('bottom'));
+
+    this.bindClick('btn-flip-h', () => this.callbacks.onFlip?.('horizontal'));
+    this.bindClick('btn-flip-v', () => this.callbacks.onFlip?.('vertical'));
 
     this.bindClick('btn-z-front', () => this.callbacks.onZOrder('front'));
     this.bindClick('btn-z-forward', () => this.callbacks.onZOrder('forward'));

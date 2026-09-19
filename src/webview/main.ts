@@ -219,6 +219,7 @@ class AntiDrawApp {
         onUndo: () => this.undo(),
         onRedo: () => this.redo(),
         onAlign: (type) => this.handleAlign(type),
+        onFlip: (axis) => this.actionDispatcher.flip(axis),
         onBoolean: (op) => this.handleBoolean(op),
         onZOrder: (action) => this.handleZOrder(action),
         onToggleRulers: () => {
