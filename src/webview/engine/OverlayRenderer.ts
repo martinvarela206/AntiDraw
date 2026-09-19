@@ -5,6 +5,7 @@ import { NodeEditorTool } from './NodeEditorTool.js';
 import { IToolHandler } from '../tools/IToolHandler.js';
 import { ToolType } from '../ui/Toolbar.js';
 import { MarkerHelper, GuideHelper, NodeHelper, GUIDE_ROTATE_LEFT_PATH, GUIDE_ROTATE_RIGHT_PATH } from '../ui/helpers/index.js';
+import { SnappingEngine } from './canvas/SnappingEngine.js';
 
 export interface OverlayRenderContext {
   model: VectorModel;
@@ -261,6 +262,18 @@ export class OverlayRenderer {
     for (const tool of ctx.tools) {
       if (tool.renderOverlay) {
         html += tool.renderOverlay(z);
+      }
+    }
+
+    // 7. Active Snapping Feedback Reticles (Compound Intersections, Vector Edges, Node Snap Halo)
+    const snapResult = SnappingEngine.lastSnapResult;
+    if (snapResult) {
+      if (snapResult.kind === 'intersection') {
+        html += MarkerHelper.renderIntersectionReticle(snapResult.x, snapResult.y, z);
+      } else if (snapResult.kind === 'edge') {
+        html += MarkerHelper.renderEdgeSnapMarker(snapResult.x, snapResult.y, z);
+      } else if (snapResult.kind === 'node') {
+        html += MarkerHelper.renderNodeSnapRing(snapResult.x, snapResult.y, z);
       }
     }
 

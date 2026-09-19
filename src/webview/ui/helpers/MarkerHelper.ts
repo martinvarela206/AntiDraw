@@ -87,4 +87,44 @@ export class MarkerHelper extends BaseHelper {
       </g>
     `;
   }
+
+  /**
+   * Renders a scale-invariant compound intersection reticle (diamond + crosshairs).
+   */
+  public static renderIntersectionReticle(x: number, y: number, zoom: number): string {
+    const inv = BaseHelper.getInverseScale(zoom);
+    return `
+      <g transform="translate(${x}, ${y}) scale(${inv})" pointer-events="none">
+        <line x1="-9" y1="0" x2="9" y2="0" stroke="#f59e0b" stroke-width="1.5" />
+        <line x1="0" y1="-9" x2="0" y2="9" stroke="#f59e0b" stroke-width="1.5" />
+        <rect x="-4.5" y="-4.5" width="9" height="9" transform="rotate(45)" fill="none" stroke="#f59e0b" stroke-width="1.5" />
+        <circle cx="0" cy="0" r="1.5" fill="#fbbf24" />
+      </g>
+    `;
+  }
+
+  /**
+   * Renders a scale-invariant continuous vector edge snapping marker (dashed ring + center).
+   */
+  public static renderEdgeSnapMarker(x: number, y: number, zoom: number): string {
+    const inv = BaseHelper.getInverseScale(zoom);
+    return `
+      <g transform="translate(${x}, ${y}) scale(${inv})" pointer-events="none">
+        <circle cx="0" cy="0" r="5" fill="none" stroke="#8b5cf6" stroke-width="1.5" stroke-dasharray="2 2" />
+        <circle cx="0" cy="0" r="1.5" fill="#8b5cf6" />
+      </g>
+    `;
+  }
+
+  /**
+   * Renders a scale-invariant node snap halo ring.
+   */
+  public static renderNodeSnapRing(x: number, y: number, zoom: number): string {
+    const inv = BaseHelper.getInverseScale(zoom);
+    return `
+      <g transform="translate(${x}, ${y}) scale(${inv})" pointer-events="none">
+        <circle cx="0" cy="0" r="6.5" fill="none" stroke="#06b6d4" stroke-width="1.5" stroke-dasharray="2 1" />
+      </g>
+    `;
+  }
 }

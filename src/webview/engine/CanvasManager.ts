@@ -1,4 +1,4 @@
-import { Point } from './VectorModel.js';
+import { Point, VectorElement } from './VectorModel.js';
 import { GridManager, GridConfig, GridType, GridAlignmentMode } from './canvas/GridManager.js';
 import { GuideManager, GuideLine, GuideGeometry } from './canvas/GuideManager.js';
 import { SnappingEngine, SnappingContext, AngledGuideSnapResult } from './canvas/SnappingEngine.js';
@@ -197,6 +197,12 @@ export class CanvasManager {
 
   public isCanvasSelected: boolean = false;
 
+  public elements: VectorElement[] = [];
+
+  public get lastSnapResult() {
+    return SnappingEngine.lastSnapResult;
+  }
+
   /**
    * Snaps a 2D point against all active geometric features (delegated to SnappingEngine).
    */
@@ -205,9 +211,14 @@ export class CanvasManager {
     otherVertices: Point[] = [],
     origin?: Point,
     viewBoxBounds?: { minX: number; minY: number; width: number; height: number },
-    excludeGuideId?: string
+    excludeGuideId?: string,
+    elements?: VectorElement[]
   ): Point {
-    return SnappingEngine.snapPoint(pt, this, otherVertices, origin, viewBoxBounds, excludeGuideId);
+    const ctx: SnappingContext = {
+      ...this,
+      elements: elements || this.elements,
+    };
+    return SnappingEngine.snapPoint(pt, ctx, otherVertices, origin, viewBoxBounds, excludeGuideId);
   }
 
   /**

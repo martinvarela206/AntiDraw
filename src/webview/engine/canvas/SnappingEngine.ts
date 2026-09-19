@@ -1,7 +1,17 @@
-import { Point } from '../VectorModel.js';
+import { Point, VectorElement } from '../VectorModel.js';
 import { GuideLine } from './GuideManager.js';
 import { GridConfig } from './GridManager.js';
 import { RulerConfig } from '../CanvasManager.js';
+import { EdgeSnappingService } from './EdgeSnappingService.js';
+
+export type SnapKind = 'none' | 'node' | 'edge' | 'intersection' | 'guide' | 'grid' | 'viewbox';
+
+export interface SnapResult {
+  x: number;
+  y: number;
+  kind: SnapKind;
+  targetPt?: Point;
+}
 
 export interface SnappingContext {
   snapThreshold: number;
@@ -18,6 +28,8 @@ export interface SnappingContext {
   guides: GuideLine[];
   grids: GridConfig[];
   rulerConfig: RulerConfig;
+  elements?: VectorElement[];
+  excludeElementIds?: string[];
 }
 
 export interface AngledGuideSnapResult {
@@ -56,6 +68,8 @@ export interface AngledGuideSnapResult {
  *    Evaluates both local cursor snapping and full-line perpendicular proximity sweep to keypoints.
  */
 export class SnappingEngine {
+  public static lastSnapResult: SnapResult | null = null;
+
   /**
    * Snaps a 2D point against all active geometric features according to hierarchy and thresholds.
    */
@@ -71,6 +85,8 @@ export class SnappingEngine {
     let snappedY = pt.y;
     let xSnapped = false;
     let ySnapped = false;
+    let detectedKind: SnapKind = 'none';
+    let targetPt: Point | undefined = undefined;
     const threshold = ctx.snapThreshold / (ctx.zoom || 1);
 
     // 1. Snap to Vector Nodes (Structural, Handles, Positional)
@@ -90,6 +106,8 @@ export class SnappingEngine {
         snappedY = bestVertex.y;
         xSnapped = true;
         ySnapped = true;
+        detectedKind = 'node';
+        targetPt = { x: bestVertex.x, y: bestVertex.y };
       }
     }
 
@@ -139,6 +157,37 @@ export class SnappingEngine {
           snappedY = bestInter.y;
           xSnapped = true;
           ySnapped = true;
+          detectedKind = 'intersection';
+          targetPt = { x: bestInter.x, y: bestInter.y };
+        }
+
+        // Compound Intersections: Guides ∩ Grids & Guides ∩ Vector Contours
+        if ((!xSnapped || !ySnapped) && ctx.elements && ctx.elements.length > 0) {
+          const compInters = EdgeSnappingService.collectCompoundIntersections(
+            pt,
+            ctx.guides,
+            ctx.grids,
+            ctx.elements,
+            excludeGuideId,
+            threshold
+          );
+          let minCompDist = threshold;
+          let bestCompInter: Point | null = null;
+          for (const ci of compInters) {
+            const d = Math.hypot(pt.x - ci.x, pt.y - ci.y);
+            if (d < minCompDist) {
+              minCompDist = d;
+              bestCompInter = ci;
+            }
+          }
+          if (bestCompInter) {
+            snappedX = bestCompInter.x;
+            snappedY = bestCompInter.y;
+            xSnapped = true;
+            ySnapped = true;
+            detectedKind = 'intersection';
+            targetPt = bestCompInter;
+          }
         }
       }
 
@@ -525,6 +574,39 @@ export class SnappingEngine {
         }
       }
     }
+
+    // 5. Continuous Vector Edge Snapping (snapToEdges)
+    if (ctx.snapToEdges && ctx.elements && ctx.elements.length > 0 && (!xSnapped || !ySnapped)) {
+      const edgeCand = EdgeSnappingService.snapToVectorEdges(
+        pt,
+        ctx.elements,
+        ctx.excludeElementIds || [],
+        threshold
+      );
+      if (edgeCand) {
+        snappedX = edgeCand.snappedPt.x;
+        snappedY = edgeCand.snappedPt.y;
+        xSnapped = true;
+        ySnapped = true;
+        detectedKind = 'edge';
+        targetPt = edgeCand.snappedPt;
+      }
+    }
+
+    if (xSnapped || ySnapped) {
+      if (detectedKind === 'none') {
+        detectedKind = 'grid';
+      }
+    }
+
+    SnappingEngine.lastSnapResult = (xSnapped || ySnapped)
+      ? {
+          x: Math.round(snappedX * 100) / 100,
+          y: Math.round(snappedY * 100) / 100,
+          kind: detectedKind,
+          targetPt: targetPt ? { x: Math.round(targetPt.x * 100) / 100, y: Math.round(targetPt.y * 100) / 100 } : undefined,
+        }
+      : null;
 
     return {
       x: Math.round(snappedX * 100) / 100,

@@ -1124,7 +1124,7 @@ class AntiDrawApp {
       x: vb.minX + (this.canvasMgr.rulerConfig.originX || 0),
       y: vb.minY + (this.canvasMgr.rulerConfig.originY || 0),
     };
-    return this.canvasMgr.snapPoint(pt, otherVertices, origin, vb, excludeGuideId);
+    return this.canvasMgr.snapPoint(pt, otherVertices, origin, vb, excludeGuideId, this.model.elements);
   }
 
   private getCanvasPoint(e: PointerEvent | MouseEvent): Point {
