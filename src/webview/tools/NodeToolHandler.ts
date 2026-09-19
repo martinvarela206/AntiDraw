@@ -105,6 +105,18 @@ export class NodeToolHandler implements IToolHandler {
     return this.ctx.model.isElementClosed(el);
   }
 
+  private isParametricHandle(handle: string | null): handle is string {
+    if (!handle) return false;
+    return (
+      handle === 'quadrant' ||
+      handle === 'quadrant-start' ||
+      handle === 'quadrant-end' ||
+      handle === 'ellipse-inner' ||
+      handle === 'star-edge' ||
+      handle.startsWith('corner-')
+    );
+  }
+
   public getQuadrantHandlePoint(el: VectorElement): Point | null {
     return this.parametricController.getQuadrantHandlePoint(el);
   }
@@ -408,12 +420,7 @@ export class NodeToolHandler implements IToolHandler {
         return true;
       }
 
-      if (
-        (this.activeHandle === 'quadrant' ||
-          this.activeHandle === 'ellipse-inner' ||
-          (this.activeHandle && this.activeHandle.startsWith('corner-'))) &&
-        selectedEl
-      ) {
+      if (this.isParametricHandle(this.activeHandle) && selectedEl) {
         const paramMove = this.parametricController.handlePointerMove(
           selectedEl,
           this.activeHandle,
@@ -638,12 +645,7 @@ export class NodeToolHandler implements IToolHandler {
         return true;
       }
 
-      if (
-        (this.activeHandle === 'quadrant' ||
-          this.activeHandle === 'ellipse-inner' ||
-          (this.activeHandle && this.activeHandle.startsWith('corner-'))) &&
-        selectedEl
-      ) {
+      if (this.isParametricHandle(this.activeHandle) && selectedEl) {
         const handled = this.parametricController.handlePointerUp(
           selectedEl,
           this.activeHandle,
