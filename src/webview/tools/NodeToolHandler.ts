@@ -301,12 +301,28 @@ export class NodeToolHandler implements IToolHandler {
       const isClosed = this.isElementClosed(selectedEl);
 
       // 1. Check if clicking on an existing vertex or Bézier handle
-      const hitNode = this.nodeEditorTool.hitTestVertices(
-        selectedEl.vertices,
-        pt,
-        12 / z,
-        this.nodeEditorTool.selectedVertexId
-      );
+      /**
+       * ARCHITECTURAL RATIONALE: Parametric Ellipse & Donut Vertex Immutability (FIX-08)
+       * Why: Parametric ellipses, circles, pies, arcs, and donuts derive their SVG paths and Bézier
+       * approximations analytically via `convertEllipseToVertices` and `compileEllipseD`. Allowing free
+       * manipulation of individual internal Bézier vertices corrupts the mathematical invariants of the
+       * primitive, distorts the contour into an unrecoverable asymmetrical spline, and desynchronizes the
+       * visual shape from inspector properties (such as startAngle, endAngle, innerRatio).
+       * Discarded alternatives:
+       * - Permitting vertex dragging and updating `rx`/`ry`: Fails as soon as the ellipse is a partial pie/arc/donut,
+       *   because vertices no longer map to simple axis-aligned radii and dragging arbitrary vertices warps the contour.
+       * - Free Bézier editing without converting to curves: Corrupts the ghost overlay and breaks parametric handles.
+       * Solution: Primitives with `isEllipse` strictly block vertex hit testing and dragging. To edit free Béziers,
+       * the user must convert the primitive to curves (Ctrl+Q).
+       */
+      const hitNode = !this.ctx.model.isEllipse(selectedEl)
+        ? this.nodeEditorTool.hitTestVertices(
+            selectedEl.vertices,
+            pt,
+            12 / z,
+            this.nodeEditorTool.selectedVertexId
+          )
+        : null;
 
       if (hitNode) {
         const isAdditive = e.shiftKey || e.ctrlKey || e.metaKey;
@@ -624,7 +640,10 @@ export class NodeToolHandler implements IToolHandler {
       const selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
 
       if (this.activeHandle === 'marquee' && selectedEl) {
-        const hitIds = this.marqueeSelector.finishMarquee(selectedEl.vertices || []);
+        const canSelectVertices = !this.ctx.model.isEllipse(selectedEl);
+        const hitIds = canSelectVertices
+          ? this.marqueeSelector.finishMarquee(selectedEl.vertices || [])
+          : [];
         this.activeHandle = null;
         this.initialVertices = [];
         if (hitIds.length > 0) {
