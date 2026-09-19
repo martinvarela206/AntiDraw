@@ -13,8 +13,8 @@ export interface IVectorModelPrimitiveContext {
   isElementClosed(el: VectorElement): boolean;
   isEllipse(el: VectorElement): boolean;
   isRect(el: VectorElement): boolean;
-  compileEllipseD(cx: number, cy: number, rx: number, ry: number, type?: 'ellipse' | 'pie' | 'arc', startAngleDeg?: number, endAngleDeg?: number): string;
-  convertEllipseToVertices(cx: number, cy: number, rx: number, ry: number, type?: 'ellipse' | 'pie' | 'arc', startAngleDeg?: number, endAngleDeg?: number): PathVertex[];
+  compileEllipseD(cx: number, cy: number, rx: number, ry: number, type?: 'ellipse' | 'pie' | 'arc', startAngleDeg?: number, endAngleDeg?: number, innerRatio?: number): string;
+  convertEllipseToVertices(cx: number, cy: number, rx: number, ry: number, type?: 'ellipse' | 'pie' | 'arc', startAngleDeg?: number, endAngleDeg?: number, innerRatio?: number): PathVertex[];
   getRectCorners(el: VectorElement, w?: number, h?: number): any;
   calculateEffectiveCorners(w: number, h: number, corners: any): any;
   convertRectToVertices(x: number, y: number, w: number, h: number, tl: number, tr: number, br: number, bl: number): PathVertex[];
@@ -89,13 +89,15 @@ export class PrimitiveDetector {
       const ry = parseFloat(element.attributes.ry || element.attributes.r || '1');
       const startAngle = parseFloat(element.attributes['data-start-angle'] || '0');
       const endAngle = parseFloat(element.attributes['data-end-angle'] || '360');
+      const innerRatio = parseFloat(element.attributes['data-inner-ratio'] || '0');
 
-      element.attributes.d = ctx.compileEllipseD(cx, cy, rx, ry, ellipseType as 'pie' | 'arc', startAngle, endAngle);
-      element.vertices = ctx.convertEllipseToVertices(cx, cy, rx, ry, ellipseType as 'pie' | 'arc', startAngle, endAngle);
+      element.attributes.d = ctx.compileEllipseD(cx, cy, rx, ry, ellipseType as 'pie' | 'arc', startAngle, endAngle, innerRatio);
+      element.vertices = ctx.convertEllipseToVertices(cx, cy, rx, ry, ellipseType as 'pie' | 'arc', startAngle, endAngle, innerRatio);
       element.isClosed = ellipseType !== 'arc';
       delete element.attributes['data-ellipse-type'];
       delete element.attributes['data-start-angle'];
       delete element.attributes['data-end-angle'];
+      delete element.attributes['data-inner-ratio'];
     }
 
     if (ctx.isRect(element)) {
@@ -900,7 +902,8 @@ export class PrimitiveDetector {
       const ry = parseFloat(el.attributes.ry || el.attributes.r || '1');
       const startAngle = parseFloat(el.attributes['data-start-angle'] || '0');
       const endAngle = parseFloat(el.attributes['data-end-angle'] || '360');
-      el.attributes.d = ctx.compileEllipseD(cx, cy, rx, ry, ellipseType as 'pie' | 'arc', startAngle, endAngle);
+      const innerRatio = parseFloat(el.attributes['data-inner-ratio'] || '0');
+      el.attributes.d = ctx.compileEllipseD(cx, cy, rx, ry, ellipseType as 'pie' | 'arc', startAngle, endAngle, innerRatio);
     }
 
     if (!el.isClosed) {

@@ -24,7 +24,16 @@ export interface IVectorModelSerializerContext {
   getRectCorners(el: VectorElement, w: number, h: number): RectCorners;
   calculateEffectiveCorners(w: number, h: number, corners: RectCorners): { tl: number; tr: number; br: number; bl: number };
   compileRectD(x: number, y: number, w: number, h: number, tl: number, tr: number, br: number, bl: number): string;
-  compileEllipseD(cx: number, cy: number, rx: number, ry: number, type: 'pie' | 'arc', startAngle: number, endAngle: number): string;
+  compileEllipseD(
+    cx: number,
+    cy: number,
+    rx: number,
+    ry: number,
+    type?: 'ellipse' | 'pie' | 'arc',
+    startAngle?: number,
+    endAngle?: number,
+    innerRatio?: number
+  ): string;
   isElementClosed(el: VectorElement): boolean;
   compilePathD(vertices: PathVertex[], isClosed?: boolean): string;
 }
@@ -433,19 +442,32 @@ export class SvgSerializer {
          */
         ctx.syncParametricAttributes(el);
         const cleanAttrs: Record<string, string> = { ...el.attributes };
-        const ellipseType = cleanAttrs['data-ellipse-type'];
+        const ellipseType = (cleanAttrs['data-ellipse-type'] as 'ellipse' | 'pie' | 'arc') || 'ellipse';
+        const innerRatio = parseFloat(cleanAttrs['data-inner-ratio'] || '0');
 
-        if (ellipseType === 'pie' || ellipseType === 'arc') {
+        /**
+         * ARCHITECTURAL RATIONALE: Donut, Rosca Parcial & Arc Path Serialization (FIX-RoscaRender)
+         * Native SVG specifications lack built-in attributes for inner donut radii or arc sectors on <circle> and <ellipse>.
+         * Consequently, whenever an element has data-inner-ratio > 0 (donut/ring or annular sector) or is in 'pie'/'arc' mode,
+         * it MUST be serialized as a compliant <path> utilizing SVG arc commands ('A') and fill-rule="evenodd".
+         * Serializing a full donut (innerRatio > 0) as <ellipse> or <circle> previously caused standard SVG engines and the
+         * AntiDraw canvas parser to completely discard the hole, leaving the real vector visually solid.
+         */
+        if (ellipseType === 'pie' || ellipseType === 'arc' || innerRatio > 0) {
           const cx = parseFloat(cleanAttrs.cx || '0');
           const cy = parseFloat(cleanAttrs.cy || '0');
-          const rx = parseFloat(cleanAttrs.rx || '1');
-          const ry = parseFloat(cleanAttrs.ry || '1');
+          const rx = parseFloat(cleanAttrs.rx || cleanAttrs.r || '1');
+          const ry = parseFloat(cleanAttrs.ry || cleanAttrs.r || '1');
           const startAngle = parseFloat(cleanAttrs['data-start-angle'] || '0');
           const endAngle = parseFloat(cleanAttrs['data-end-angle'] || '360');
 
-          cleanAttrs.d = ctx.compileEllipseD(cx, cy, rx, ry, ellipseType as 'pie' | 'arc', startAngle, endAngle);
+          cleanAttrs.d = ctx.compileEllipseD(cx, cy, rx, ry, ellipseType, startAngle, endAngle, innerRatio);
           cleanAttrs['data-shape'] = 'ellipse';
           cleanAttrs['data-parametric'] = 'true';
+
+          if (innerRatio > 0) {
+            cleanAttrs['fill-rule'] = 'evenodd';
+          }
 
           if (ellipseType === 'arc') {
             cleanAttrs.fill = 'none';

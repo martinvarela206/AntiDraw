@@ -182,7 +182,8 @@ export class TranslateInteraction {
            * Overwriting `el.attributes.d` with generic Bézier cubic approximations (`compilePathD`) degrades
            * geometric precision and causes circular arcs to serialize as freeform spline curves.
            */
-          if (ctx.model.isParametricElement(el) && isPieOrArc) {
+          const innerRatio = parseFloat(el.attributes['data-inner-ratio'] || '0');
+          if (ctx.model.isParametricElement(el) && (isPieOrArc || innerRatio > 0)) {
             const oldCx = parseFloat(el.attributes.cx || '0');
             const oldCy = parseFloat(el.attributes.cy || '0');
             const newCx = Math.round((oldCx + this.ghostDragOffset!.x) * 100) / 100;
@@ -191,10 +192,13 @@ export class TranslateInteraction {
             el.attributes.cy = newCy.toString();
             const rx = parseFloat(el.attributes.rx || el.attributes.r || '1');
             const ry = parseFloat(el.attributes.ry || el.attributes.r || '1');
-            const type = el.attributes['data-ellipse-type'] as 'pie' | 'arc';
+            const type = (el.attributes['data-ellipse-type'] as 'ellipse' | 'pie' | 'arc') || 'ellipse';
             const s = parseFloat(el.attributes['data-start-angle'] || '0');
             const e = parseFloat(el.attributes['data-end-angle'] || '360');
-            el.attributes.d = ctx.model.compileEllipseD(newCx, newCy, rx, ry, type, s, e);
+            el.attributes.d = ctx.model.compileEllipseD(newCx, newCy, rx, ry, type, s, e, innerRatio);
+            if (innerRatio > 0) {
+              el.attributes['fill-rule'] = 'evenodd';
+            }
           } else {
             el.attributes.d = ctx.model.compilePathD(el.vertices, isClosed);
             if (ctx.model.isParametricElement(el)) {

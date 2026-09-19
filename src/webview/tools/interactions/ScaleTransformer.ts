@@ -202,7 +202,8 @@ export class ScaleTransformer {
       const isPieOrArc =
         el.attributes['data-ellipse-type'] === 'pie' || el.attributes['data-ellipse-type'] === 'arc';
 
-      if (isPieOrArc && ctx.model.isParametricElement(el) && initialBox) {
+      const innerRatio = parseFloat(el.attributes['data-inner-ratio'] || '0');
+      if ((isPieOrArc || innerRatio > 0) && ctx.model.isParametricElement(el) && initialBox) {
         const initAttrs = initialAttributesMap.get(id);
         const oldCx = parseFloat((initAttrs && initAttrs.cx) || el.attributes.cx || '0');
         const oldCy = parseFloat((initAttrs && initAttrs.cy) || el.attributes.cy || '0');
@@ -210,7 +211,7 @@ export class ScaleTransformer {
         const oldRy = parseFloat((initAttrs && (initAttrs.ry || initAttrs.r)) || el.attributes.ry || '1');
         const startAngle = parseFloat(el.attributes['data-start-angle'] || '0');
         const endAngle = parseFloat(el.attributes['data-end-angle'] || '360');
-        const type = (el.attributes['data-ellipse-type'] as 'pie' | 'arc') || 'pie';
+        const type = (el.attributes['data-ellipse-type'] as 'ellipse' | 'pie' | 'arc') || 'pie';
 
         const newBox = ctx.selectionTool.getBoundingBox({ ...el, vertices: transformedVerts });
         const oldBox = initialBox;
@@ -226,9 +227,12 @@ export class ScaleTransformer {
           el.attributes.cy = Math.round(newCy * 100) / 100 + '';
           el.attributes.rx = Math.round(newRx * 100) / 100 + '';
           el.attributes.ry = Math.round(newRy * 100) / 100 + '';
-          el.attributes.d = ctx.model.compileEllipseD(newCx, newCy, newRx, newRy, type, startAngle, endAngle);
-          el.vertices = ctx.model.convertEllipseToVertices(newCx, newCy, newRx, newRy, type, startAngle, endAngle);
+          el.attributes.d = ctx.model.compileEllipseD(newCx, newCy, newRx, newRy, type, startAngle, endAngle, innerRatio);
+          el.vertices = ctx.model.convertEllipseToVertices(newCx, newCy, newRx, newRy, type, startAngle, endAngle, innerRatio);
           el.attributes['data-node-types'] = el.vertices.map((v) => v.nodeType).join(',');
+          if (innerRatio > 0) {
+            el.attributes['fill-rule'] = 'evenodd';
+          }
           return;
         }
       }

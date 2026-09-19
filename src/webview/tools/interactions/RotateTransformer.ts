@@ -171,6 +171,7 @@ export class RotateTransformer {
           el.attributes['data-end-angle'] = newEnd.toString();
           const cx = parseFloat(el.attributes.cx || '0');
           const cy = parseFloat(el.attributes.cy || '0');
+          const innerRatio = parseFloat(el.attributes['data-inner-ratio'] || '0');
           el.attributes.d = ctx.model.compileEllipseD(
             cx,
             cy,
@@ -178,7 +179,8 @@ export class RotateTransformer {
             ry,
             el.attributes['data-ellipse-type'] as any,
             newStart,
-            newEnd
+            newEnd,
+            innerRatio
           );
           el.vertices = ctx.model.convertEllipseToVertices(
             cx,
@@ -187,9 +189,13 @@ export class RotateTransformer {
             ry,
             el.attributes['data-ellipse-type'] as any,
             newStart,
-            newEnd
+            newEnd,
+            innerRatio
           );
           el.attributes['data-node-types'] = el.vertices.map((v) => v.nodeType).join(',');
+          if (innerRatio > 0) {
+            el.attributes['fill-rule'] = 'evenodd';
+          }
           return;
         } else {
           ctx.model.convertToCurves(el);
