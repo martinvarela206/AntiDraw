@@ -438,6 +438,42 @@ export class SelectToolHandler implements IToolHandler {
     if (this.transformInteraction.onDoubleClick(this.ctx, pt, this.callbacks)) {
       return true;
     }
+
+    const selectedEls = this.ctx.model.elements.filter((el) => this.ctx.selectionTool.isSelected(el.id));
+    const groupBox = selectedEls.length > 0 ? this.ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 0) : null;
+    const isInsideBox =
+      groupBox &&
+      selectedEls.some((el) => el.attributes['fill'] && el.attributes['fill'] !== 'none') &&
+      pt.x >= groupBox.x &&
+      pt.x <= groupBox.x + groupBox.width &&
+      pt.y >= groupBox.y &&
+      pt.y <= groupBox.y + groupBox.height;
+
+    const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, this.ctx.canvasMgr.zoom);
+    const targetEl = hit ? hit.element : (isInsideBox && selectedEls.length === 1 ? selectedEls[0] : null);
+
+    if (targetEl) {
+      /**
+       * ARCHITECTURAL RATIONALE: CorelDraw Benchmark Direct Double-Click Tool Conmutation (ITEM-06)
+       *
+       * 1. Industrial Parity (CorelDraw Pick Tool <-> Shape Tool):
+       *    In CorelDraw, double-clicking any vector with the Pick Tool immediately switches to the
+       *    Shape Tool (Herramienta Forma / Nodos `node` / 'N') for instantaneous node/vertex editing.
+       *
+       * 2. Seamless Selection & State Synchronization:
+       *    - If the double-clicked vector was not yet selected, it is selected immediately.
+       *    - Sets selectionMode to 'scale' (ready for standard geometry inspection).
+       *    - Switches active tool to 'node' via `ctx.setTool('node')`.
+       *    - Re-renders canvas to deploy node editing overlay with structural and parametric handles.
+       */
+      this.ctx.selectionTool.select(targetEl.id, targetEl);
+      this.ctx.selectionTool.selectionMode = 'scale';
+      this.callbacks.onSelectionChanged?.();
+      this.ctx.setTool('node');
+      this.ctx.render();
+      return true;
+    }
+
     return false;
   }
 

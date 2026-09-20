@@ -739,6 +739,21 @@ export class NodeToolHandler implements IToolHandler {
 
     const z = this.ctx.canvasMgr.zoom || 1;
     if (this.executeDoubleClick(pt, z)) {
+      this.lastDoubleClickHandledTime = now;
+      return true;
+    }
+
+    /**
+     * ARCHITECTURAL RATIONALE: CorelDraw Benchmark Tool Conmutation (Node Tool -> Select Tool - ITEM-06)
+     * When the user double-clicks on empty canvas area away from any node vertex or vector path,
+     * the tool immediately returns to the Selection Tool ('select'), completing the symmetrical
+     * conmutation between Selection and Node tools.
+     */
+    const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, z);
+    if (!hit) {
+      this.lastDoubleClickHandledTime = now;
+      this.ctx.setTool('select');
+      this.ctx.render();
       return true;
     }
 
