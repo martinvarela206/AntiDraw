@@ -43,12 +43,28 @@ export class TranslateInteraction {
     groupBox: any,
     zoom: number
   ): { point: Point; isPickedNode: boolean } {
-    const threshold = 20 / (zoom || 1);
+    const threshold = 24 / (zoom || 1);
     let bestPt: Point = { x: pt.x, y: pt.y };
     let bestDist = threshold;
     let isPickedNode = false;
 
-    if (groupBox) {
+    // 1. High-priority evaluation of real vector nodes, centers, and handles
+    const snappable = NodeCatalogService.collectSnappableNodes(selectedEls, {
+      structural: true,
+      handles: true,
+      positional: true,
+    });
+    for (const p of snappable) {
+      const d = Math.hypot(pt.x - p.x, pt.y - p.y);
+      if (d < bestDist) {
+        bestDist = d;
+        bestPt = p;
+        isPickedNode = true;
+      }
+    }
+
+    // 2. Secondary fallback to bounding box pivot and keypoints
+    if (groupBox && !isPickedNode) {
       const singleEl = selectedEls.length === 1 ? selectedEls[0] : undefined;
       const pivot = ctx.selectionTool.getPivot(groupBox, singleEl);
       const dPivot = Math.hypot(pt.x - pivot.x, pt.y - pivot.y);
@@ -77,20 +93,6 @@ export class TranslateInteraction {
       }
     }
 
-    const snappable = NodeCatalogService.collectSnappableNodes(selectedEls, {
-      structural: true,
-      handles: true,
-      positional: true,
-    });
-    for (const p of snappable) {
-      const d = Math.hypot(pt.x - p.x, pt.y - p.y);
-      if (d < bestDist) {
-        bestDist = d;
-        bestPt = p;
-        isPickedNode = true;
-      }
-    }
-
     return { point: bestPt, isPickedNode };
   }
 
@@ -101,7 +103,21 @@ export class TranslateInteraction {
     groupBox: any,
     zoom: number
   ): boolean {
-    const threshold = 20 / (zoom || 1);
+    const threshold = 24 / (zoom || 1);
+
+    // 1. High-priority evaluation of real vector nodes, centers, and handles
+    const snappable = NodeCatalogService.collectSnappableNodes(selectedEls, {
+      structural: true,
+      handles: true,
+      positional: true,
+    });
+    for (const p of snappable) {
+      if (Math.hypot(pt.x - p.x, pt.y - p.y) <= threshold) {
+        return true;
+      }
+    }
+
+    // 2. Secondary fallback to bounding box pivot and keypoints
     if (groupBox) {
       const singleEl = selectedEls.length === 1 ? selectedEls[0] : undefined;
       const pivot = ctx.selectionTool.getPivot(groupBox, singleEl);
@@ -120,17 +136,6 @@ export class TranslateInteraction {
       ];
       for (const bp of boxPts) {
         if (Math.hypot(pt.x - bp.x, pt.y - bp.y) <= threshold) return true;
-      }
-    }
-
-    const snappable = NodeCatalogService.collectSnappableNodes(selectedEls, {
-      structural: true,
-      handles: true,
-      positional: true,
-    });
-    for (const p of snappable) {
-      if (Math.hypot(pt.x - p.x, pt.y - p.y) <= threshold) {
-        return true;
       }
     }
 
