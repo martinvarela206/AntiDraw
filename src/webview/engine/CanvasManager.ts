@@ -161,7 +161,7 @@ export class CanvasManager {
 
   public snapToViewBox: boolean = false;
   public snapAngular: boolean = false;
-  public snapThreshold: number = 5; // 5px proximity threshold
+  public snapThreshold: number = 8; // 8px comfortable magnetic proximity threshold
 
   public rulerConfig: RulerConfig = {
     unit: 'px',
@@ -205,6 +205,8 @@ export class CanvasManager {
 
   /**
    * Snaps a 2D point against all active geometric features (delegated to SnappingEngine).
+   * Explicitly extracts getters (grids, guides, showGrid, showGuides) to prevent object spread
+   * from dropping prototype accessors as undefined.
    */
   public snapPoint(
     pt: Point,
@@ -212,11 +214,26 @@ export class CanvasManager {
     origin?: Point,
     viewBoxBounds?: { minX: number; minY: number; width: number; height: number },
     excludeGuideId?: string,
-    elements?: VectorElement[]
+    elements?: VectorElement[],
+    excludeElementIds?: string[]
   ): Point {
     const ctx: SnappingContext = {
-      ...this,
+      snapThreshold: this.snapThreshold,
+      zoom: this.zoom || 1,
+      snapToGrid: this.snapToGrid,
+      snapToGuides: this.snapToGuides,
+      snapToVertices: this.snapToVertices,
+      snapToNodes: this.snapToNodes,
+      snapToEdges: this.snapToEdges,
+      snapToViewBox: this.snapToViewBox,
+      snapAngular: this.snapAngular,
+      showGuides: this.showGuides,
+      showGrid: this.showGrid,
+      guides: this.guides || [],
+      grids: this.grids || [],
+      rulerConfig: this.rulerConfig,
       elements: elements || this.elements,
+      excludeElementIds: excludeElementIds,
     };
     return SnappingEngine.snapPoint(pt, ctx, otherVertices, origin, viewBoxBounds, excludeGuideId);
   }

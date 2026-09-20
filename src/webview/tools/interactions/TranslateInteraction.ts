@@ -102,6 +102,55 @@ export class TranslateInteraction {
       }
     }
 
+    /**
+     * ARCHITECTURAL RATIONALE: Interior Body Drag Geometric Anchor Fallback (ITEM-01)
+     * When dragging an element by clicking inside its fill or interior body (farther than threshold from any vertex),
+     * naive approaches set `dragAnchorPt` to the arbitrary floating subpixel mouse coordinate.
+     * Snapping that arbitrary subpixel to the grid results in vertices having fractional grid offsets.
+     * By selecting the nearest structural vertex, corner, or center as `dragAnchorPt` even for interior clicks,
+     * grid snapping aligns actual geometry (vertices and bounding lines) directly onto grid intersections.
+     */
+    if (!isPickedNode) {
+      let nearestFeatureDist = Infinity;
+      let nearestFeaturePt: Point = pt;
+
+      for (const p of snappable) {
+        const d = Math.hypot(pt.x - p.x, pt.y - p.y);
+        if (d < nearestFeatureDist) {
+          nearestFeatureDist = d;
+          nearestFeaturePt = p;
+        }
+      }
+
+      if (groupBox) {
+        const singleEl = selectedEls.length === 1 ? selectedEls[0] : undefined;
+        const pivot = ctx.selectionTool.getPivot(groupBox, singleEl);
+        const dPivot = Math.hypot(pt.x - pivot.x, pt.y - pivot.y);
+        if (dPivot < nearestFeatureDist) {
+          nearestFeatureDist = dPivot;
+          nearestFeaturePt = { x: pivot.x, y: pivot.y };
+        }
+        const boxCorners: Point[] = [
+          { x: groupBox.x, y: groupBox.y },
+          { x: groupBox.x + groupBox.width, y: groupBox.y },
+          { x: groupBox.x, y: groupBox.y + groupBox.height },
+          { x: groupBox.x + groupBox.width, y: groupBox.y + groupBox.height },
+          { x: groupBox.x + groupBox.width / 2, y: groupBox.y + groupBox.height / 2 },
+        ];
+        for (const bp of boxCorners) {
+          const d = Math.hypot(pt.x - bp.x, pt.y - bp.y);
+          if (d < nearestFeatureDist) {
+            nearestFeatureDist = d;
+            nearestFeaturePt = bp;
+          }
+        }
+      }
+
+      if (nearestFeatureDist < Infinity) {
+        bestPt = nearestFeaturePt;
+      }
+    }
+
     return { point: bestPt, isPickedNode };
   }
 

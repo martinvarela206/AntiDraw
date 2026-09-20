@@ -291,11 +291,27 @@ export class SnappingEngine {
     }
 
     // 4. Snap to Parametric Multi-Grids
-    if (ctx.snapToGrid && ctx.showGrid && ctx.grids.length > 0) {
+    if (ctx.snapToGrid) {
       const origX = origin ? origin.x : ctx.rulerConfig.originX;
       const origY = origin ? origin.y : ctx.rulerConfig.originY;
 
-      const activeGrids = ctx.grids.filter((g) => g.visible);
+      // When snapToGrid is active, snap against visible grids or fall back to primary grid definition
+      let activeGrids = (ctx.grids || []).filter((g) => g.visible);
+      if (activeGrids.length === 0) {
+        if (ctx.grids && ctx.grids.length > 0) {
+          activeGrids = [ctx.grids[0]];
+        } else {
+          activeGrids = [
+            {
+              id: 'fallback_grid',
+              type: 'orthogonal',
+              spacing: ctx.rulerConfig?.step || 20,
+              visible: true,
+              alignmentMode: 'origin',
+            } as GridConfig,
+          ];
+        }
+      }
 
       for (const grid of activeGrids) {
         if (xSnapped && ySnapped) break;

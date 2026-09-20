@@ -838,7 +838,8 @@ class AntiDrawApp {
       x: vb.minX + (this.canvasMgr.rulerConfig.originX || 0),
       y: vb.minY + (this.canvasMgr.rulerConfig.originY || 0),
     };
-    return this.canvasMgr.snapPoint(pt, otherVertices, origin, vb, excludeGuideId, this.model.elements);
+    const excludeElementIds = this.selectionTool ? Array.from(this.selectionTool.selectedElementIds) : undefined;
+    return this.canvasMgr.snapPoint(pt, otherVertices, origin, vb, excludeGuideId, this.model.elements, excludeElementIds);
   }
 
   private getCanvasPoint(e: PointerEvent | MouseEvent): Point {
