@@ -161,13 +161,14 @@ export class TransformInteraction {
 
     if (activeHandle === 'rotate' && this.rotationPivot && this.initialElementsMap.size > 0) {
       callbacks.setCursor?.('grabbing');
+      const isConstrained = e.ctrlKey || e.shiftKey;
       const result = RotateTransformer.computeRotation(
         ctx,
         pt,
         this.rotationPivot,
         this.initialRotationAngle,
         this.initialElementsMap,
-        e.shiftKey
+        isConstrained
       );
       this.currentRotationSnappedPt = result.snappedPt;
       this.lastDeltaAngle = result.deltaAngle;
@@ -358,20 +359,67 @@ export class TransformInteraction {
               html += `<rect x="${hPos.x - hHalf}" y="${hPos.y - hHalf}" width="${hSize}" height="${hSize}" fill="#ffffff" stroke="#0284c7" stroke-width="1" rx="${hRx}" vector-effect="non-scaling-stroke" />`;
             });
           } else if (mode === 'rotate') {
-            const rotR = 4 / z;
-
+            /**
+             * ARCHITECTURAL RATIONALE: High-Fidelity Curved Circular Rotation & Skew Handle Iconography (ITEM-07)
+             *
+             * 1. Industrial Parity (CorelDraw Benchmark):
+             *    In CorelDraw, rotation mode replaces standard corner square sizing handles with
+             *    tangential curved circular arrows that visually convey bidirectional angular rotation,
+             *    and midpoint handles with bidirectional linear arrows for skew/shear manipulation.
+             *
+             * 2. Zoom-Invariant Vector Geometry:
+             *    Icons are rendered inside `<g transform="translate(x,y) scale(1/z) rotate(angle)">`,
+             *    ensuring pixel-crisp display at all zoom levels (10% to 3200%) with dark high-contrast
+             *    backing discs that stand out universally over light, dark, or transparent canvases.
+             */
             const rotCorners = [
-              { x: groupBox.x, y: groupBox.y },
-              { x: groupBox.cx, y: groupBox.y },
-              { x: groupBox.x + groupBox.width, y: groupBox.y },
-              { x: groupBox.x, y: groupBox.cy },
-              { x: groupBox.x + groupBox.width, y: groupBox.cy },
-              { x: groupBox.x, y: groupBox.y + groupBox.height },
-              { x: groupBox.cx, y: groupBox.y + groupBox.height },
-              { x: groupBox.x + groupBox.width, y: groupBox.y + groupBox.height },
+              { x: groupBox.x, y: groupBox.y, rot: -45 },
+              { x: groupBox.x + groupBox.width, y: groupBox.y, rot: 45 },
+              { x: groupBox.x + groupBox.width, y: groupBox.y + groupBox.height, rot: 135 },
+              { x: groupBox.x, y: groupBox.y + groupBox.height, rot: -135 },
             ];
             rotCorners.forEach((c) => {
-              html += `<circle cx="${c.x}" cy="${c.y}" r="${rotR}" fill="#f59e0b" stroke="#ffffff" stroke-width="1.2" vector-effect="non-scaling-stroke" style="cursor: grab;" />`;
+              html += `
+                <g class="rotate-corner-handle" transform="translate(${c.x}, ${c.y}) scale(${1 / z}) rotate(${c.rot})" style="cursor: grab;">
+                  <!-- High-contrast dark disc with amber border -->
+                  <circle cx="0" cy="0" r="8.5" fill="#0f172a" fill-opacity="0.88" stroke="#f59e0b" stroke-width="1.2" vector-effect="non-scaling-stroke" />
+                  <!-- Curved circular rotation arc -->
+                  <path d="M -3.8 4.2 A 5.8 5.8 0 0 1 -3.8 -4.2" fill="none" stroke="#fbbf24" stroke-width="1.5" stroke-linecap="round" vector-effect="non-scaling-stroke" />
+                  <!-- Top arrowhead -->
+                  <polygon points="-3.8,-4.2 -6.5,-1.6 -1.2,-2.2" fill="#fbbf24" />
+                  <!-- Bottom arrowhead -->
+                  <polygon points="-3.8,4.2 -1.2,2.2 -6.5,1.6" fill="#fbbf24" />
+                </g>
+              `;
+            });
+
+            // Midpoint handles (Skew / Shear axes)
+            const skewMidpoints = [
+              { x: groupBox.cx, y: groupBox.y, isHoriz: true },
+              { x: groupBox.cx, y: groupBox.y + groupBox.height, isHoriz: true },
+              { x: groupBox.x, y: groupBox.cy, isHoriz: false },
+              { x: groupBox.x + groupBox.width, y: groupBox.cy, isHoriz: false },
+            ];
+            skewMidpoints.forEach((m) => {
+              if (m.isHoriz) {
+                html += `
+                  <g class="rotate-skew-handle" transform="translate(${m.x}, ${m.y}) scale(${1 / z})" style="cursor: ew-resize;">
+                    <circle cx="0" cy="0" r="7.5" fill="#0f172a" fill-opacity="0.88" stroke="#f59e0b" stroke-width="1.2" vector-effect="non-scaling-stroke" />
+                    <line x1="-3.5" y1="0" x2="3.5" y2="0" stroke="#fbbf24" stroke-width="1.4" stroke-linecap="round" vector-effect="non-scaling-stroke" />
+                    <polygon points="-3.5,0 -1.5,-2 -1.5,2" fill="#fbbf24" />
+                    <polygon points="3.5,0 1.5,-2 1.5,2" fill="#fbbf24" />
+                  </g>
+                `;
+              } else {
+                html += `
+                  <g class="rotate-skew-handle" transform="translate(${m.x}, ${m.y}) scale(${1 / z})" style="cursor: ns-resize;">
+                    <circle cx="0" cy="0" r="7.5" fill="#0f172a" fill-opacity="0.88" stroke="#f59e0b" stroke-width="1.2" vector-effect="non-scaling-stroke" />
+                    <line x1="0" y1="-3.5" x2="0" y2="3.5" stroke="#fbbf24" stroke-width="1.4" stroke-linecap="round" vector-effect="non-scaling-stroke" />
+                    <polygon points="0,-3.5 -2,-1.5 2,-1.5" fill="#fbbf24" />
+                    <polygon points="0,3.5 -2,1.5 2,1.5" fill="#fbbf24" />
+                  </g>
+                `;
+              }
             });
           }
         } else {

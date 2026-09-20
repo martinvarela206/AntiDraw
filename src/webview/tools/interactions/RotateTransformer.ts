@@ -78,6 +78,11 @@ export class RotateTransformer {
 
   /**
    * Computes the angular displacement and magnetic snapping for the active pointer position.
+   *
+   * ARCHITECTURAL RATIONALE: CorelDraw Benchmark Angular Restriction with Ctrl (ITEM-07)
+   * In CorelDraw, holding the Ctrl key during interactive rotation constrains the angle strictly
+   * to fixed 15° increments (0°, 15°, 30°, 45°, 60°, ...). Shift key is also supported as an
+   * ergonomic alternative.
    */
   public static computeRotation(
     ctx: ToolContext,
@@ -85,7 +90,7 @@ export class RotateTransformer {
     rotationPivot: Point,
     initialRotationAngle: number,
     initialElementsMap: Map<string, PathVertex[]>,
-    shiftKey: boolean
+    isConstrained: boolean = false
   ): RotateComputeResult {
     const otherVertices: Point[] = [];
     ctx.model.elements.forEach((el) => {
@@ -102,7 +107,7 @@ export class RotateTransformer {
     let rawDelta = currentAngle - initialRotationAngle;
     let deg = (rawDelta * 180) / Math.PI;
 
-    const shouldSnapAngular = shiftKey || (ctx.canvasMgr.snapAngular && !isMagneticallySnapped);
+    const shouldSnapAngular = isConstrained || (ctx.canvasMgr.snapAngular && !isMagneticallySnapped);
     if (shouldSnapAngular) {
       deg = Math.round(deg / 15) * 15;
     } else if (!isMagneticallySnapped) {

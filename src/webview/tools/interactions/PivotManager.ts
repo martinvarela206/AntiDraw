@@ -155,8 +155,20 @@ export class PivotManager {
     }
 
     if (mode !== 'scale') {
-      const pR = 5.5 / z;
-      const tick = 8.5 / z;
+      /**
+       * ARCHITECTURAL RATIONALE: High-Fidelity Optical Crosshair Reticle (Mira con Centro en Pivote - ITEM-07)
+       *
+       * 1. Universal Readability (Dual-Stroke Contrast):
+       *    Renders dual-pass crosshairs with a dark backing stroke (#0f172a at 2.4px) under a vibrant
+       *    foreground stroke (#f59e0b / #0284c7 at 1.2px), guaranteeing razor-sharp visibility on
+       *    dark themes, white backgrounds, and noisy vector drawings.
+       *
+       * 2. CorelDraw Optical Target Benchmark:
+       *    Features an outer optical target ring, an inner dashed concentric ring, and a white bullseye
+       *    center dot, precisely pinpointing the sub-pixel axis of rotation.
+       */
+      const pR = 6.5 / z;
+      const tick = 10.5 / z;
       const pColor = mode === 'rotate' ? '#f59e0b' : '#0284c7';
       const pCursor = 'move';
       const pPointerEvents = 'auto';
@@ -164,10 +176,21 @@ export class PivotManager {
 
       html += `
         <g class="selection-pivot-marker" style="cursor: ${pCursor}; pointer-events: ${pPointerEvents};" opacity="${pOpacity}">
-          <circle cx="${pivot.x}" cy="${pivot.y}" r="${pR}" fill="#ffffff" stroke="${pColor}" stroke-width="1.5" vector-effect="non-scaling-stroke" />
+          <!-- Dark high-contrast backing crosshairs -->
+          <line x1="${pivot.x - tick}" y1="${pivot.y}" x2="${pivot.x + tick}" y2="${pivot.y}" stroke="#0f172a" stroke-width="2.4" vector-effect="non-scaling-stroke" />
+          <line x1="${pivot.x}" y1="${pivot.y - tick}" x2="${pivot.x}" y2="${pivot.y + tick}" stroke="#0f172a" stroke-width="2.4" vector-effect="non-scaling-stroke" />
+
+          <!-- Outer optical reticle ring -->
+          <circle cx="${pivot.x}" cy="${pivot.y}" r="${pR}" fill="#0f172a" fill-opacity="0.7" stroke="${pColor}" stroke-width="1.5" vector-effect="non-scaling-stroke" />
+          <!-- Inner concentric reticle ring -->
+          <circle cx="${pivot.x}" cy="${pivot.y}" r="${pR * 0.52}" fill="none" stroke="${pColor}" stroke-width="0.8" stroke-dasharray="1.5 1.5" vector-effect="non-scaling-stroke" />
+
+          <!-- Foreground precision crosshairs -->
           <line x1="${pivot.x - tick}" y1="${pivot.y}" x2="${pivot.x + tick}" y2="${pivot.y}" stroke="${pColor}" stroke-width="1.2" vector-effect="non-scaling-stroke" />
           <line x1="${pivot.x}" y1="${pivot.y - tick}" x2="${pivot.x}" y2="${pivot.y + tick}" stroke="${pColor}" stroke-width="1.2" vector-effect="non-scaling-stroke" />
-          <circle cx="${pivot.x}" cy="${pivot.y}" r="${1.6 / z}" fill="${pColor}" />
+
+          <!-- Precision center bullseye dot -->
+          <circle cx="${pivot.x}" cy="${pivot.y}" r="${1.8 / z}" fill="#ffffff" stroke="${pColor}" stroke-width="1" />
         </g>
       `;
     }
