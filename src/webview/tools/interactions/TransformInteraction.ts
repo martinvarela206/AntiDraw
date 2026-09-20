@@ -289,45 +289,28 @@ export class TransformInteraction {
    * Encapsulating this in TransformInteraction respects Single Responsibility Principle (SRP)
    * and allows both synthetic double-click gesture detectors and native DOM dblclick events
    * to trigger clean, synchronized state transitions across UI inspectors and canvas overlays.
+  /**
+   * ARCHITECTURAL RATIONALE: CorelDraw Benchmark Scale <-> Rotate Selection Box Conmutation (ITEM-05)
+   * Toggles the selection bounding box directly between 'scale' (8 sizing handles) and 'rotate'
+   * (corner rotation arrows, side skew handles, and central pivot).
+   * Calls ctx.render() to synchronize property panel inspector buttons and canvas overlays simultaneously.
    */
   public toggleSelectionMode(ctx: ToolContext, callbacks: SelectToolCallbacks): void {
-    if (ctx.selectionTool.selectionMode === 'move') {
+    if (ctx.selectionTool.selectionMode === 'rotate') {
       ctx.selectionTool.selectionMode = 'scale';
-    } else if (ctx.selectionTool.selectionMode === 'scale') {
-      ctx.selectionTool.selectionMode = 'rotate';
     } else {
-      ctx.selectionTool.selectionMode = 'move';
+      ctx.selectionTool.selectionMode = 'rotate';
     }
     this.lastToggleTime = Date.now();
     callbacks.onSelectionChanged?.();
-    ctx.renderOverlay();
+    ctx.render();
   }
 
   public onDoubleClick(ctx: ToolContext, pt: Point, callbacks: SelectToolCallbacks): boolean {
-    const now = Date.now();
-    if (now - this.lastToggleTime < 250) {
-      return true; // Debounce if synthetic double-click already handled the transition
-    }
-
     const selectedEls = ctx.model.elements.filter((el) => ctx.selectionTool.isSelected(el.id));
-    const z = ctx.canvasMgr.zoom || 1;
-
     if (selectedEls.length > 0) {
       const groupBox = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 0);
       if (this.pivotManager.resetPivotOnDoubleClick(ctx, pt, groupBox, selectedEls, callbacks)) {
-        return true;
-      }
-
-      const hit = ctx.selectionTool.hitTest(ctx.model.elements, pt, ctx.canvasMgr.zoom);
-      const isInsideBox =
-        groupBox &&
-        pt.x >= groupBox.x &&
-        pt.x <= groupBox.x + groupBox.width &&
-        pt.y >= groupBox.y &&
-        pt.y <= groupBox.y + groupBox.height;
-
-      if ((hit && ctx.selectionTool.isSelected(hit.element.id)) || isInsideBox) {
-        this.toggleSelectionMode(ctx, callbacks);
         return true;
       }
     }

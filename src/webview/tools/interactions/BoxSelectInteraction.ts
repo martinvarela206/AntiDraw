@@ -76,6 +76,9 @@ export class BoxSelectInteraction {
       });
     } else {
       ctx.selectionTool.selectedElementIds = new Set(hitIds);
+      if (hitIds.length > 0) {
+        ctx.selectionTool.selectionMode = 'scale';
+      }
     }
 
     ctx.selectionTool.marqueeRect = null;

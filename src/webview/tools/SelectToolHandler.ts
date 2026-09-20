@@ -60,6 +60,8 @@ export class SelectToolHandler implements IToolHandler {
   public translateInteraction = new TranslateInteraction();
   public transformInteraction = new TransformInteraction();
 
+  public wasAlreadySelectedOnDown: boolean = false;
+  public lastClickUpTime: number = 0;
   private lastClickTime: number = 0;
   private lastClickPt: Point = { x: 0, y: 0 };
 
@@ -72,6 +74,7 @@ export class SelectToolHandler implements IToolHandler {
   public onPointerDown(e: PointerEvent, pt: Point): boolean {
     this.dragStartPt = pt;
     this.isDragging = true;
+    this.wasAlreadySelectedOnDown = false;
 
     // 1. Check Guide Line interactions (controls, rotation arrows, pivot, line body)
     const guideRes = this.guideInteraction.onPointerDown(this.ctx, pt, this.callbacks);
@@ -85,26 +88,8 @@ export class SelectToolHandler implements IToolHandler {
     );
 
     const now = Date.now();
-    const timeSinceLast = now - this.lastClickTime;
-    const isDoubleClick = timeSinceLast < 350 && timeSinceLast > 40 && Math.hypot(pt.x - this.lastClickPt.x, pt.y - this.lastClickPt.y) < 5 / (this.ctx.canvasMgr.zoom || 1);
     this.lastClickTime = now;
     this.lastClickPt = { ...pt };
-
-    if (isDoubleClick && selectedEls.length > 0) {
-      const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, this.ctx.canvasMgr.zoom);
-      const groupBox = this.ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 0);
-      const isInsideBox =
-        groupBox &&
-        pt.x >= groupBox.x &&
-        pt.x <= groupBox.x + groupBox.width &&
-        pt.y >= groupBox.y &&
-        pt.y <= groupBox.y + groupBox.height;
-
-      if ((hit && this.ctx.selectionTool.isSelected(hit.element.id)) || isInsideBox) {
-        this.transformInteraction.toggleSelectionMode(this.ctx, this.callbacks);
-        return true;
-      }
-    }
 
 
 
@@ -307,6 +292,7 @@ export class SelectToolHandler implements IToolHandler {
        *    synthetic double-click alternation when clicking without dragging (handled in onPointerUp).
        */
       if (isHitSelected || isNearAnchor || isInsideBox) {
+        this.wasAlreadySelectedOnDown = true;
         this.activeHandle = 'move';
         this.translateInteraction.start(this.ctx, pt, selectedEls, groupBox);
         this.callbacks.onClearPanelMode?.();
@@ -412,7 +398,27 @@ export class SelectToolHandler implements IToolHandler {
     if (currentHandle === 'move') {
       const moved = this.translateInteraction.onPointerUp(this.ctx, this.callbacks, e);
       if (!moved) {
-        this.lastClickTime = Date.now();
+        const now = Date.now();
+        const timeSinceLastClick = now - this.lastClickUpTime;
+
+        /**
+         * ARCHITECTURAL RATIONALE: Paused Second-Click Selection Box Toggle (CorelDraw Benchmark - ITEM-05)
+         *
+         * 1. Industrial Parity:
+         *    Clicking an object that is ALREADY selected (without dragging and without triggering a
+         *    fast double-click) toggles the selection box between Scale mode (8 sizing handles) and
+         *    Rotate/Skew mode (corner rotation arrows, side skew handles, and central pivot).
+         *
+         * 2. Eliminating Fragile Double-Click Timing:
+         *    Switching between Scale and Rotate no longer requires frantic double-clicking.
+         *    A deliberate, paused second click toggles the modes cleanly and intuitively.
+         */
+        if (this.wasAlreadySelectedOnDown && timeSinceLastClick >= 300) {
+          this.transformInteraction.toggleSelectionMode(this.ctx, this.callbacks);
+        }
+
+        this.lastClickUpTime = now;
+        this.lastClickTime = now;
         this.lastClickPt = { x: pt.x, y: pt.y };
       }
       return true;

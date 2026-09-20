@@ -52,7 +52,7 @@ export class SelectionTool {
    *      exact SVG serialization, and seamless undo/redo snapshotting.
    */
   public customPivot: Point | null = null;
-  public selectionMode: 'move' | 'scale' | 'rotate' = 'move';
+  public selectionMode: 'move' | 'scale' | 'rotate' = 'scale';
   public isAspectRatioLocked: boolean = false;
 
   // Backward compatibility getter & setter
@@ -75,7 +75,7 @@ export class SelectionTool {
   public select(id: string, element?: VectorElement): void {
     if (this.selectedElementIds.size !== 1 || !this.selectedElementIds.has(id)) {
       this.customPivot = null;
-      this.selectionMode = 'move';
+      this.selectionMode = 'scale';
     }
     this.selectedElementIds.clear();
     this.selectedElementIds.add(id);
@@ -98,14 +98,14 @@ export class SelectionTool {
     this.customPivot = null;
     this.selectedElementIds.delete(id);
     if (this.selectedElementIds.size === 0) {
-      this.selectionMode = 'move';
+      this.selectionMode = 'scale';
     }
   }
 
   public deselectAll(): void {
     this.customPivot = null;
     this.selectedElementIds.clear();
-    this.selectionMode = 'move';
+    this.selectionMode = 'scale';
   }
 
   /**
