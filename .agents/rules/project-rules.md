@@ -100,3 +100,9 @@ This file contains rules specific to the AntiDraw project. Rules are written in 
       - *Allowed*: "Calculates visible bounds analytically to prevent layout reflows..."
       - *Allowed*: "Avoids destroying GPU texture cache by validating lastGridCacheKey..."
       - *Prohibited*: "Here you calculate...", "You should ensure that..."
+
+14. **Universal Element & Tool Parity for Shared Behaviors**:
+    - Whenever a bug, defect, or requirement is identified for an interaction, snapping behavior, handle manipulation, or visual feedback on an element or tool:
+      - You MUST NOT patch only that specific element or tool in isolation.
+      - You MUST audit and enforce consistent, identical behavior across ALL parallel and related elements (circles, ellipses, arcs, pies, donuts, rectangles, stars, regular polygons, freeform paths) and across ALL tools and interaction controllers (NodeTool, SelectTool, TranslateInteraction, TransformInteraction, Scale, Rotate).
+      - Any capability or fix applied to one handle, anchor, or landmark must be universally integrated across all handles, anchors, and landmarks.

@@ -58,8 +58,11 @@ export class NodeCatalogService {
         el.tagName === 'ellipse' ||
         el.shapeType === 'circle' ||
         el.shapeType === 'ellipse' ||
-        el.attributes['data-primitive'] === 'ellipse' ||
-        el.attributes['data-primitive'] === 'circle';
+        el.attributes?.['data-shape'] === 'circle' ||
+        el.attributes?.['data-shape'] === 'ellipse' ||
+        el.attributes?.['data-ellipse-type'] !== undefined ||
+        el.attributes?.['data-primitive'] === 'ellipse' ||
+        el.attributes?.['data-primitive'] === 'circle';
       if (isEllipse) {
         const cx = parseFloat(el.attributes.cx || '0');
         const cy = parseFloat(el.attributes.cy || '0');
@@ -108,7 +111,7 @@ export class NodeCatalogService {
             y: cy + ry * Math.sin(eRad),
           });
 
-          // Handles: Inner Hole Handle
+          // Handles: Inner Hole Handle (positioned along mid-angle ray, or at cx,cy if hole is 0)
           if (innerRatio > 0) {
             const isFull = type === 'ellipse' || Math.abs(endAngle - startAngle) >= 360;
             let midAngle: number;
@@ -125,6 +128,9 @@ export class NodeCatalogService {
               x: cx + rx * innerRatio * Math.cos(midRad),
               y: cy + ry * innerRatio * Math.sin(midRad),
             });
+          } else {
+            // When innerRatio <= 0, the inner hole handle is stationed directly at the canonical center
+            pts.push({ x: cx, y: cy });
           }
         }
       }
@@ -133,7 +139,8 @@ export class NodeCatalogService {
       const isRect =
         el.tagName === 'rect' ||
         el.shapeType === 'rect' ||
-        el.attributes['data-primitive'] === 'rect';
+        el.attributes?.['data-shape'] === 'rect' ||
+        el.attributes?.['data-primitive'] === 'rect';
       if (isRect) {
         const x = parseFloat(el.attributes.x || '0');
         const y = parseFloat(el.attributes.y || '0');
@@ -158,28 +165,47 @@ export class NodeCatalogService {
         }
 
         if (includeHandles) {
-          const rxVal = parseFloat(el.attributes.rx || '0');
-          const ryVal = parseFloat(el.attributes.ry || '0');
+          const rxVal = parseFloat(el.attributes.rx || el.attributes['data-corner-tl'] || '0');
+          const ryVal = parseFloat(el.attributes.ry || el.attributes['data-corner-tr'] || '0');
           const r = Math.max(rxVal, ryVal);
-          if (r > 0) {
-            const effR = Math.min(r, w / 2, h / 2);
-            pts.push({ x: x + effR, y: y + effR });
-            pts.push({ x: x + w - effR, y: y + effR });
-            pts.push({ x: x + w - effR, y: y + h - effR });
-            pts.push({ x: x + effR, y: y + h - effR });
-          }
+          const effR = Math.max(14, Math.min(r, w / 3, h / 3));
+          pts.push({ x: x + effR, y: y + effR });
+          pts.push({ x: x + w - effR, y: y + effR });
+          pts.push({ x: x + w - effR, y: y + h - effR });
+          pts.push({ x: x + effR, y: y + h - effR });
         }
       }
 
       // 2. Parametric Handle Nodes & 3. Positional Nodes for Stars & Regular Polygons
-      const isStar = el.attributes['data-primitive'] === 'star' || el.attributes['data-primitive'] === 'polygon';
+      const isStar =
+        el.attributes?.['data-shape'] === 'star' ||
+        el.attributes?.['data-shape'] === 'polygon' ||
+        el.attributes?.['data-primitive'] === 'star' ||
+        el.attributes?.['data-primitive'] === 'polygon';
       if (isStar) {
         const cx = parseFloat(el.attributes.cx || '0');
         const cy = parseFloat(el.attributes.cy || '0');
         const rx = parseFloat(el.attributes.rx || el.attributes.r || '50');
         const ry = parseFloat(el.attributes.ry || el.attributes.r || '50');
-        const points = parseInt(el.attributes['data-star-points'] || '5', 10);
-        const innerRatio = parseFloat(el.attributes['data-star-inner-ratio'] || '0.5');
+        const points = Math.max(
+          3,
+          Math.min(
+            64,
+            parseInt(
+              el.attributes['data-star-points'] ||
+                el.attributes['data-polygon-sides'] ||
+                el.attributes['points'] ||
+                '5',
+              10
+            )
+          )
+        );
+        const regularRatio = Math.cos(Math.PI / points);
+        const innerRatio = parseFloat(
+          el.attributes['data-star-inner-ratio'] ||
+            el.attributes['innerRatio'] ||
+            regularRatio.toString()
+        );
 
         if (includePositional) {
           pts.push({ x: cx, y: cy });
