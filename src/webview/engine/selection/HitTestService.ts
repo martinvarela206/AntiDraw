@@ -5,7 +5,8 @@ export type HandleType =
   | 'nw' | 'n' | 'ne'
   | 'w'  |       'e'
   | 'sw' | 's' | 'se'
-  | 'rotate';
+  | 'rotate'
+  | 'skew-n' | 'skew-s' | 'skew-w' | 'skew-e';
 
 export interface HitTestResult {
   element: VectorElement;
@@ -193,19 +194,29 @@ export class HitTestService {
     mode: 'move' | 'scale' | 'rotate' | 'transform' = 'scale'
   ): HandleType | null {
     if (mode === 'rotate') {
+      // 4 Corner handles for rotation:
       const rotHandles: { type: HandleType; x: number; y: number }[] = [
         { type: 'rotate', x: box.x, y: box.y },
-        { type: 'rotate', x: box.cx, y: box.y },
         { type: 'rotate', x: box.x + box.width, y: box.y },
-        { type: 'rotate', x: box.x, y: box.cy },
-        { type: 'rotate', x: box.x + box.width, y: box.cy },
-        { type: 'rotate', x: box.x, y: box.y + box.height },
-        { type: 'rotate', x: box.cx, y: box.y + box.height },
         { type: 'rotate', x: box.x + box.width, y: box.y + box.height },
+        { type: 'rotate', x: box.x, y: box.y + box.height },
       ];
       for (const h of rotHandles) {
         if (Math.hypot(pt.x - h.x, pt.y - h.y) <= handleRadius) {
           return h.type;
+        }
+      }
+
+      // 4 Midpoint handles for directional skew / shear (ITEM-08):
+      const skewHandles: { type: HandleType; x: number; y: number }[] = [
+        { type: 'skew-n', x: box.cx, y: box.y },
+        { type: 'skew-s', x: box.cx, y: box.y + box.height },
+        { type: 'skew-w', x: box.x, y: box.cy },
+        { type: 'skew-e', x: box.x + box.width, y: box.cy },
+      ];
+      for (const sh of skewHandles) {
+        if (Math.hypot(pt.x - sh.x, pt.y - sh.y) <= handleRadius) {
+          return sh.type;
         }
       }
       return null;

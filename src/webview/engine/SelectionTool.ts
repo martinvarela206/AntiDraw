@@ -221,6 +221,17 @@ export class SelectionTool {
     }
   }
 
+  /**
+   * Transforms custom pivot solidarily with affine shear / skew transformation.
+   */
+  public updatePivotOnSkew(transformPoint: (p: Point) => Point, elements?: VectorElement[]): void {
+    if (!this.customPivot) return;
+    this.customPivot = transformPoint(this.customPivot);
+    if (elements && elements.length === 1) {
+      this.setCustomPivotForElement(elements[0], this.customPivot);
+    }
+  }
+
   public hitTestPivot(box: BoundingBox, pt: Point, radius: number = 8, element?: VectorElement): boolean {
     return HitTestService.hitTestPivot(this.getPivot(box, element), pt, radius);
   }

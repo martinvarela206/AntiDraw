@@ -206,23 +206,32 @@ export class SelectToolHandler implements IToolHandler {
           this.ctx.selectionTool.selectionMode
         );
         if (handle) {
+          if (handle.startsWith('skew-')) {
+            if (!this.transformInteraction.canSkew(selectedEls, this.ctx)) {
+              return true;
+            }
+            this.activeHandle = handle;
+            this.transformInteraction.startSkew(handle, groupBox, selectedEls);
+            this.callbacks.setCursor?.(
+              handle === 'skew-n' || handle === 'skew-s' ? 'ew-resize' : 'ns-resize'
+            );
+            this.ctx.render();
+            return true;
+          }
+
           this.activeHandle = handle;
           if (handle === 'rotate') {
             const singleEl = selectedEls.length === 1 ? selectedEls[0] : undefined;
             const pivot = this.ctx.selectionTool.getPivot(groupBox, singleEl);
-            const rotHandles = [
+            const rotCorners = [
               { x: groupBox.x, y: groupBox.y },
-              { x: groupBox.cx, y: groupBox.y },
               { x: groupBox.x + groupBox.width, y: groupBox.y },
-              { x: groupBox.x, y: groupBox.cy },
-              { x: groupBox.x + groupBox.width, y: groupBox.cy },
-              { x: groupBox.x, y: groupBox.y + groupBox.height },
-              { x: groupBox.cx, y: groupBox.y + groupBox.height },
               { x: groupBox.x + groupBox.width, y: groupBox.y + groupBox.height },
+              { x: groupBox.x, y: groupBox.y + groupBox.height },
             ];
-            let closestHandlePt = rotHandles[0];
+            let closestHandlePt = rotCorners[0];
             let minHDist = Infinity;
-            for (const rh of rotHandles) {
+            for (const rh of rotCorners) {
               const d = Math.hypot(pt.x - rh.x, pt.y - rh.y);
               if (d < minHDist) {
                 minHDist = d;

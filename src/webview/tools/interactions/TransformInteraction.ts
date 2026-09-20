@@ -3,6 +3,7 @@ import { VectorElement, PathVertex, Point } from '../../engine/VectorModel.js';
 import { HandleType } from '../../engine/SelectionTool.js';
 import { ScaleTransformer } from './ScaleTransformer.js';
 import { RotateTransformer } from './RotateTransformer.js';
+import { SkewTransformer } from './SkewTransformer.js';
 import { PivotManager } from './PivotManager.js';
 import { GradientGizmoController } from './GradientGizmoController.js';
 import type { SelectToolCallbacks } from '../SelectToolHandler.js';
@@ -66,6 +67,10 @@ export class TransformInteraction {
   public initialBoxPadding: number = 0;
   public ghostTransformMap: Map<string, PathVertex[]> = new Map();
 
+  public lastSkewTransformFn: ((p: Point) => Point) | null = null;
+  public currentSkewParallelogram: Point[] | null = null;
+  public currentSkewAngleDeg: number = 0;
+
   /**
    * ARCHITECTURAL RATIONALE: Zero-Clearance Tight Selection Box Hit-Testing
    * 1. Exact Alignment with Geometry Extents:
@@ -87,6 +92,12 @@ export class TransformInteraction {
       }
       const h = ctx.selectionTool.hitTestHandle(box, pt, 12 / z, 18 / z, 'rotate');
       if (h === 'rotate') return 'grab';
+      if (h === 'skew-n' || h === 'skew-s' || h === 'skew-w' || h === 'skew-e') {
+        if (!SkewTransformer.canSkewElements(selectedEls, ctx)) {
+          return 'not-allowed';
+        }
+        return (h === 'skew-n' || h === 'skew-s') ? 'ew-resize' : 'ns-resize';
+      }
     } else {
       const h = ctx.selectionTool.hitTestHandle(box, pt, 12 / z, 18 / z, 'transform');
       if (h) {
@@ -140,6 +151,25 @@ export class TransformInteraction {
     this.ghostTransformMap = init.ghostTransformMap;
   }
 
+  public canSkew(selectedEls: VectorElement[], ctx: ToolContext): boolean {
+    return SkewTransformer.canSkewElements(selectedEls, ctx);
+  }
+
+  public startSkew(
+    handle: string,
+    groupBox: any,
+    selectedEls: VectorElement[]
+  ): void {
+    const init = SkewTransformer.initSkew(groupBox, selectedEls);
+    this.initialBox = init.initialBox;
+    this.initialElementsMap = init.initialElementsMap;
+    this.initialAttributesMap = init.initialAttributesMap;
+    this.ghostTransformMap = init.ghostTransformMap;
+    this.currentSkewParallelogram = null;
+    this.currentSkewAngleDeg = 0;
+    this.lastSkewTransformFn = null;
+  }
+
   public onPointerMove(
     ctx: ToolContext,
     pt: Point,
@@ -173,6 +203,34 @@ export class TransformInteraction {
       this.currentRotationSnappedPt = result.snappedPt;
       this.lastDeltaAngle = result.deltaAngle;
       this.ghostTransformMap = result.ghostMap;
+      ctx.renderOverlay();
+      return true;
+    }
+
+    if (activeHandle.startsWith('skew-') && this.initialBox && this.initialElementsMap.size > 0) {
+      callbacks.setCursor?.(
+        activeHandle === 'skew-n' || activeHandle === 'skew-s' ? 'ew-resize' : 'ns-resize'
+      );
+      const isConstrained = e.ctrlKey || e.shiftKey;
+      const isSymmetric = e.altKey;
+      const selectedEls = ctx.model.elements.filter((el) => ctx.selectionTool.isSelected(el.id));
+      const singleEl = selectedEls.length === 1 ? selectedEls[0] : undefined;
+      const pivot = ctx.selectionTool.getPivot(this.initialBox, singleEl);
+      const result = SkewTransformer.computeSkew(
+        ctx,
+        pt,
+        dragStartPt,
+        activeHandle,
+        this.initialBox,
+        this.initialElementsMap,
+        isConstrained,
+        isSymmetric,
+        pivot
+      );
+      this.ghostTransformMap = result.ghostMap;
+      this.currentSkewAngleDeg = result.skewAngleDeg;
+      this.currentSkewParallelogram = result.parallelogramCorners;
+      this.lastSkewTransformFn = result.transformPoint;
       ctx.renderOverlay();
       return true;
     }
@@ -215,7 +273,16 @@ export class TransformInteraction {
     if (activeHandle && activeHandle !== 'move' && this.ghostTransformMap.size > 0) {
       ctx.pushUndo();
       const selectedEls = ctx.model.elements.filter((el) => ctx.selectionTool.isSelected(el.id));
-      if (activeHandle === 'rotate') {
+      if (activeHandle.startsWith('skew-')) {
+        if (this.lastSkewTransformFn) {
+          SkewTransformer.applySkewCommit(
+            ctx,
+            this.ghostTransformMap,
+            this.lastSkewTransformFn,
+            selectedEls
+          );
+        }
+      } else if (activeHandle === 'rotate') {
         if (this.rotationPivot) {
           RotateTransformer.applyRotateCommit(
             ctx,
@@ -244,6 +311,9 @@ export class TransformInteraction {
       this.rotationPivot = null;
       this.currentRotationSnappedPt = null;
       this.currentScaleSnappedPt = null;
+      this.currentSkewParallelogram = null;
+      this.currentSkewAngleDeg = 0;
+      this.lastSkewTransformFn = null;
       callbacks.onSelectionChanged?.();
       ctx.syncToHost();
       ctx.render();
@@ -268,6 +338,9 @@ export class TransformInteraction {
       this.rotationPivot = null;
       this.currentRotationSnappedPt = null;
       this.currentScaleSnappedPt = null;
+      this.currentSkewParallelogram = null;
+      this.currentSkewAngleDeg = 0;
+      this.lastSkewTransformFn = null;
       handled = true;
     }
 
@@ -394,6 +467,7 @@ export class TransformInteraction {
             });
 
             // Midpoint handles (Skew / Shear axes)
+            const canSkew = SkewTransformer.canSkewElements(selectedEls, ctx);
             const skewMidpoints = [
               { x: groupBox.cx, y: groupBox.y, isHoriz: true },
               { x: groupBox.cx, y: groupBox.y + groupBox.height, isHoriz: true },
@@ -401,22 +475,31 @@ export class TransformInteraction {
               { x: groupBox.x + groupBox.width, y: groupBox.cy, isHoriz: false },
             ];
             skewMidpoints.forEach((m) => {
+              const handleCursor = canSkew ? (m.isHoriz ? 'ew-resize' : 'ns-resize') : 'not-allowed';
+              const strokeColor = canSkew ? '#f59e0b' : '#64748b';
+              const arrowColor = canSkew ? '#fbbf24' : '#64748b';
+              const titleText = canSkew
+                ? 'Arrastrar para inclinar / sesgar (Ctrl: pasos de 15°, Alt: simétrico)'
+                : 'Las primitivas paramétricas rígidas requieren conversión a curvas (Ctrl+Q) para inclinarse';
+
               if (m.isHoriz) {
                 html += `
-                  <g class="rotate-skew-handle" transform="translate(${m.x}, ${m.y}) scale(${1 / z})" style="cursor: ew-resize;">
-                    <circle cx="0" cy="0" r="7.5" fill="#0f172a" fill-opacity="0.88" stroke="#f59e0b" stroke-width="1.2" vector-effect="non-scaling-stroke" />
-                    <line x1="-3.5" y1="0" x2="3.5" y2="0" stroke="#fbbf24" stroke-width="1.4" stroke-linecap="round" vector-effect="non-scaling-stroke" />
-                    <polygon points="-3.5,0 -1.5,-2 -1.5,2" fill="#fbbf24" />
-                    <polygon points="3.5,0 1.5,-2 1.5,2" fill="#fbbf24" />
+                  <g class="rotate-skew-handle" transform="translate(${m.x}, ${m.y}) scale(${1 / z})" style="cursor: ${handleCursor};">
+                    <title>${titleText}</title>
+                    <circle cx="0" cy="0" r="7.5" fill="#0f172a" fill-opacity="0.88" stroke="${strokeColor}" stroke-width="1.2" vector-effect="non-scaling-stroke" />
+                    <line x1="-3.5" y1="0" x2="3.5" y2="0" stroke="${arrowColor}" stroke-width="1.4" stroke-linecap="round" vector-effect="non-scaling-stroke" />
+                    <polygon points="-3.5,0 -1.5,-2 -1.5,2" fill="${arrowColor}" />
+                    <polygon points="3.5,0 1.5,-2 1.5,2" fill="${arrowColor}" />
                   </g>
                 `;
               } else {
                 html += `
-                  <g class="rotate-skew-handle" transform="translate(${m.x}, ${m.y}) scale(${1 / z})" style="cursor: ns-resize;">
-                    <circle cx="0" cy="0" r="7.5" fill="#0f172a" fill-opacity="0.88" stroke="#f59e0b" stroke-width="1.2" vector-effect="non-scaling-stroke" />
-                    <line x1="0" y1="-3.5" x2="0" y2="3.5" stroke="#fbbf24" stroke-width="1.4" stroke-linecap="round" vector-effect="non-scaling-stroke" />
-                    <polygon points="0,-3.5 -2,-1.5 2,-1.5" fill="#fbbf24" />
-                    <polygon points="0,3.5 -2,1.5 2,1.5" fill="#fbbf24" />
+                  <g class="rotate-skew-handle" transform="translate(${m.x}, ${m.y}) scale(${1 / z})" style="cursor: ${handleCursor};">
+                    <title>${titleText}</title>
+                    <circle cx="0" cy="0" r="7.5" fill="#0f172a" fill-opacity="0.88" stroke="${strokeColor}" stroke-width="1.2" vector-effect="non-scaling-stroke" />
+                    <line x1="0" y1="-3.5" x2="0" y2="3.5" stroke="${arrowColor}" stroke-width="1.4" stroke-linecap="round" vector-effect="non-scaling-stroke" />
+                    <polygon points="0,-3.5 -2,-1.5 2,-1.5" fill="${arrowColor}" />
+                    <polygon points="0,3.5 -2,1.5 2,1.5" fill="${arrowColor}" />
                   </g>
                 `;
               }
@@ -474,7 +557,7 @@ export class TransformInteraction {
     }
 
     // Ghost dashed bounding box during interactive scaling
-    if (activeHandle && activeHandle !== 'move' && activeHandle !== 'rotate' && this.ghostTransformMap.size > 0) {
+    if (activeHandle && activeHandle !== 'move' && activeHandle !== 'rotate' && !activeHandle.startsWith('skew-') && this.ghostTransformMap.size > 0) {
       let gMinX = Infinity, gMinY = Infinity, gMaxX = -Infinity, gMaxY = -Infinity;
       this.ghostTransformMap.forEach((gVerts) => {
         gVerts.forEach((v) => {
@@ -487,6 +570,13 @@ export class TransformInteraction {
       if (gMinX !== Infinity) {
         html += `<rect x="${gMinX}" y="${gMinY}" width="${Math.max(gMaxX - gMinX, 1)}" height="${Math.max(gMaxY - gMinY, 1)}" fill="none" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="4 4" vector-effect="non-scaling-stroke" />`;
       }
+    }
+
+    // Ghost dashed parallelogram during interactive skew
+    if (activeHandle && activeHandle.startsWith('skew-') && this.currentSkewParallelogram) {
+      html += SkewTransformer.renderGhostParallelogram(this.currentSkewParallelogram);
+      const badgeAnchor = this.currentSkewParallelogram[0] || { x: 0, y: 0 };
+      html += SkewTransformer.renderAngleBadge(this.currentSkewAngleDeg, badgeAnchor, z);
     }
 
     if (activeHandle === 'rotate' && this.rotationPivot && selectedEls.length > 0) {
