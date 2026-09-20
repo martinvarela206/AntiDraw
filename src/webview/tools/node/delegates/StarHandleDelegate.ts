@@ -91,14 +91,46 @@ export class StarHandleDelegate {
     const points = this.starPoints;
     const regularRatio = Math.cos(Math.PI / points);
 
+    const midAngleRad = -Math.PI / 2 + Math.PI / points;
+    const cosMid = Math.cos(midAngleRad);
+    const sinMid = Math.sin(midAngleRad);
+
     const dx = usePt.x - cx;
     const dy = usePt.y - cy;
-    const D = Math.sqrt((dx / rx) ** 2 + (dy / ry) ** 2);
+    const denom = (rx * cosMid) ** 2 + (ry * sinMid) ** 2;
+    const rawRatio = Math.max(
+      0.05,
+      Math.min(2.0, (dx * rx * cosMid + dy * ry * sinMid) / (denom > 0 ? denom : 1))
+    );
 
-    let ratio = Math.max(0.05, Math.min(2.0, D));
+    // Candidate star edge handle along the radial ray
+    const H_cand: Point = {
+      x: cx + rx * rawRatio * cosMid,
+      y: cy + ry * rawRatio * sinMid,
+    };
+
+    const otherNodes = this.ctx.getOtherVertices([selectedEl.id]);
+    otherNodes.push({ x: cx, y: cy });
+    for (let i = 0; i < points; i++) {
+      const a = -Math.PI / 2 + (2 * Math.PI * i) / points;
+      otherNodes.push({ x: cx + rx * Math.cos(a), y: cy + ry * Math.sin(a) });
+    }
+
+    const snappedH = this.ctx.snapPoint(H_cand, otherNodes);
+    const isSnapped = Math.abs(snappedH.x - H_cand.x) > 1e-4 || Math.abs(snappedH.y - H_cand.y) > 1e-4;
+
+    let ratio = rawRatio;
     const snapThreshold = 0.04;
     if (Math.abs(ratio - regularRatio) <= snapThreshold) {
       ratio = regularRatio;
+    } else if (isSnapped) {
+      const snapDx = snappedH.x - cx;
+      const snapDy = snappedH.y - cy;
+      const projRatio = (snapDx * rx * cosMid + snapDy * ry * sinMid) / (denom > 0 ? denom : 1);
+      ratio = Math.max(0.05, Math.min(2.0, projRatio));
+      if (Math.abs(ratio - regularRatio) <= snapThreshold) {
+        ratio = regularRatio;
+      }
     } else if (isShift || isCtrl) {
       ratio = Math.round(ratio * 20) / 20;
     } else {

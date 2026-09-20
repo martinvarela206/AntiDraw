@@ -198,19 +198,40 @@ export class EllipseHandleDelegate {
       let deg = (rad * 180) / Math.PI;
       if (deg < 0) deg += 360;
 
-      if (isShift || isCtrl) {
-        deg = Math.round(deg / 15) * 15;
+      // Candidate handle position along the circumference
+      const H_cand: Point = {
+        x: cx + rx * Math.cos(rad),
+        y: cy + ry * Math.sin(rad),
+      };
+
+      const otherNodes = this.ctx.getOtherVertices([selectedEl.id]);
+      otherNodes.push({ x: cx, y: cy });
+      for (const r of [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]) {
+        otherNodes.push({ x: cx + rx * Math.cos(r), y: cy + ry * Math.sin(r) });
+      }
+
+      const snappedH = this.ctx.snapPoint(H_cand, otherNodes);
+      const isSnapped = Math.abs(snappedH.x - H_cand.x) > 1e-4 || Math.abs(snappedH.y - H_cand.y) > 1e-4;
+
+      if (isSnapped) {
+        const snapRad = Math.atan2((snappedH.y - cy) / ry, (snappedH.x - cx) / rx);
+        deg = (snapRad * 180) / Math.PI;
+        if (deg < 0) deg += 360;
       } else {
-        const snapTol = 4;
-        for (const cardinal of [0, 90, 180, 270]) {
-          const diff = Math.abs(((deg - cardinal + 540) % 360) - 180);
-          if (diff <= snapTol) {
-            deg = cardinal;
-            break;
+        if (isShift || isCtrl) {
+          deg = Math.round(deg / 15) * 15;
+        } else {
+          const snapTol = 4;
+          for (const cardinal of [0, 90, 180, 270]) {
+            const diff = Math.abs(((deg - cardinal + 540) % 360) - 180);
+            if (diff <= snapTol) {
+              deg = cardinal;
+              break;
+            }
           }
         }
+        deg = Math.round(deg * 10) / 10;
       }
-      deg = Math.round(deg * 10) / 10;
 
       let startAngle = this.quadrantGhostStartAngle;
       let endAngle = this.quadrantGhostEndAngle;
@@ -268,17 +289,72 @@ export class EllipseHandleDelegate {
       const rx = Math.max(1, this.quadrantRadii.rx);
       const ry = Math.max(1, this.quadrantRadii.ry);
 
+      // Determine radial angle of the inner hole handle
+      const isFull =
+        this.quadrantGhostMode === 'ellipse' ||
+        Math.abs(this.quadrantGhostEndAngle - this.quadrantGhostStartAngle) >= 360;
+      let midAngle: number;
+      if (isFull) {
+        midAngle = 0;
+      } else {
+        let sweep = this.quadrantGhostEndAngle - this.quadrantGhostStartAngle;
+        while (sweep < 0) sweep += 360;
+        while (sweep > 360) sweep -= 360;
+        midAngle = this.quadrantGhostStartAngle + sweep / 2;
+      }
+      const midRad = (midAngle * Math.PI) / 180;
+      const cosMid = Math.cos(midRad);
+      const sinMid = Math.sin(midRad);
+
       const dx = usePt.x - cx;
       const dy = usePt.y - cy;
-      const D = Math.sqrt((dx / rx) ** 2 + (dy / ry) ** 2);
-      let ratio = Math.max(0, Math.min(0.95, D));
+      const denom = (rx * cosMid) ** 2 + (ry * sinMid) ** 2;
+      // Raw unconstrained ratio along the ray
+      const rawRatio = Math.max(
+        0,
+        Math.min(0.95, (dx * rx * cosMid + dy * ry * sinMid) / (denom > 0 ? denom : 1))
+      );
 
-      if (ratio < 0.05) {
+      // Candidate handle position along the ray
+      const H_cand: Point = {
+        x: cx + rx * rawRatio * cosMid,
+        y: cy + ry * rawRatio * sinMid,
+      };
+
+      // Collect snapping landmarks: other elements, active center, and boundary quadrants
+      const otherNodes = this.ctx.getOtherVertices([selectedEl.id]);
+      otherNodes.push({ x: cx, y: cy });
+      for (const r of [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]) {
+        otherNodes.push({ x: cx + rx * Math.cos(r), y: cy + ry * Math.sin(r) });
+      }
+
+      const snappedH = this.ctx.snapPoint(H_cand, otherNodes);
+      const isSnapped = Math.abs(snappedH.x - H_cand.x) > 1e-4 || Math.abs(snappedH.y - H_cand.y) > 1e-4;
+
+      let ratio = rawRatio;
+      const zoom = this.ctx.canvasMgr?.zoom || 1;
+      const centerThreshold = 14 / zoom;
+
+      if (
+        Math.hypot(usePt.x - cx, usePt.y - cy) <= centerThreshold ||
+        Math.hypot(snappedH.x - cx, snappedH.y - cy) <= centerThreshold
+      ) {
+        // Snapped directly to center: solid circle with no inner hole
         ratio = 0;
-      } else if (isShift || isCtrl) {
-        ratio = Math.round(ratio * 20) / 20;
+      } else if (isSnapped) {
+        // Project the snapped coordinate onto the radial ray to maintain exact grid intersection
+        const snapDx = snappedH.x - cx;
+        const snapDy = snappedH.y - cy;
+        const projRatio = (snapDx * rx * cosMid + snapDy * ry * sinMid) / (denom > 0 ? denom : 1);
+        ratio = Math.max(0, Math.min(0.95, projRatio));
       } else {
-        ratio = Math.round(ratio * 100) / 100;
+        if (ratio < 0.05) {
+          ratio = 0;
+        } else if (isShift || isCtrl) {
+          ratio = Math.round(ratio * 20) / 20;
+        } else {
+          ratio = Math.round(ratio * 100) / 100;
+        }
       }
 
       this.ellipseInnerGhostRatio = ratio;

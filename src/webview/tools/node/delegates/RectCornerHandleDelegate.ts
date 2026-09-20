@@ -121,10 +121,46 @@ export class RectCornerHandleDelegate {
     }
 
     rawRadiusPx = Math.max(0, Math.min(maxRadius, rawRadiusPx));
-    if (isShift || isCtrl) {
-      rawRadiusPx = Math.round(rawRadiusPx / 5) * 5;
+
+    // Candidate corner handle point along the corner inset diagonal
+    let H_cand: Point = { x: 0, y: 0 };
+    if (cornerKey === 'tl') {
+      H_cand = { x: x + rawRadiusPx, y: y + rawRadiusPx };
+    } else if (cornerKey === 'tr') {
+      H_cand = { x: x + w - rawRadiusPx, y: y + rawRadiusPx };
+    } else if (cornerKey === 'br') {
+      H_cand = { x: x + w - rawRadiusPx, y: y + h - rawRadiusPx };
+    } else if (cornerKey === 'bl') {
+      H_cand = { x: x + rawRadiusPx, y: y + h - rawRadiusPx };
+    }
+
+    const otherNodes = this.ctx.getOtherVertices([selectedEl.id]);
+    otherNodes.push({ x: x + w / 2, y: y + h / 2 });
+    otherNodes.push({ x, y }, { x: x + w, y }, { x: x + w, y: y + h }, { x, y: y + h });
+
+    const snappedH = this.ctx.snapPoint(H_cand, otherNodes);
+    const isSnapped = Math.abs(snappedH.x - H_cand.x) > 1e-4 || Math.abs(snappedH.y - H_cand.y) > 1e-4;
+
+    if (isSnapped) {
+      if (cornerKey === 'tl') {
+        const rX = Math.abs(snappedH.x - H_cand.x) > 1e-4 ? snappedH.x - x : snappedH.y - y;
+        rawRadiusPx = Math.max(0, Math.min(maxRadius, rX));
+      } else if (cornerKey === 'tr') {
+        const rX = Math.abs(snappedH.x - H_cand.x) > 1e-4 ? x + w - snappedH.x : snappedH.y - y;
+        rawRadiusPx = Math.max(0, Math.min(maxRadius, rX));
+      } else if (cornerKey === 'br') {
+        const rX = Math.abs(snappedH.x - H_cand.x) > 1e-4 ? x + w - snappedH.x : y + h - snappedH.y;
+        rawRadiusPx = Math.max(0, Math.min(maxRadius, rX));
+      } else if (cornerKey === 'bl') {
+        const rX = Math.abs(snappedH.x - H_cand.x) > 1e-4 ? snappedH.x - x : y + h - snappedH.y;
+        rawRadiusPx = Math.max(0, Math.min(maxRadius, rX));
+      }
     } else {
-      rawRadiusPx = Math.round(rawRadiusPx * 10) / 10;
+      if (isShift || isCtrl) {
+        rawRadiusPx = Math.round(rawRadiusPx / 5) * 5;
+      } else {
+        rawRadiusPx = Math.round(rawRadiusPx * 10) / 10;
+      }
     }
 
     const isIndependent = isAlt || this.rectGhostCorners.mode === 'independent';

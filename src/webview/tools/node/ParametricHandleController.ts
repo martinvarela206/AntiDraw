@@ -125,27 +125,21 @@ export class ParametricHandleController {
     isCtrl: boolean,
     isAlt: boolean
   ): { handled: boolean; ghostNodeVertices?: PathVertex[] } | null {
-    // Collect magnetic landmarks from other elements and fixed quadrants of active element
-    const otherNodes = this.ctx.getOtherVertices([selectedEl.id]);
-    if (this.ctx.model.isEllipse(selectedEl)) {
-      const cx = parseFloat(selectedEl.attributes.cx || '0');
-      const cy = parseFloat(selectedEl.attributes.cy || '0');
-      const rx = parseFloat(selectedEl.attributes.rx || selectedEl.attributes.r || '1');
-      const ry = parseFloat(selectedEl.attributes.ry || selectedEl.attributes.r || '1');
-      for (const r of [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]) {
-        otherNodes.push({ x: cx + rx * Math.cos(r), y: cy + ry * Math.sin(r) });
-      }
-    }
-    const snappedPt = this.ctx.snapPoint(pt, otherNodes);
-    const usePt = snappedPt || pt;
-
-    const ellipseMove = this.ellipseDelegate.handlePointerMove(selectedEl, activeHandle, usePt, isShift, isCtrl);
+    /**
+     * ARCHITECTURAL RATIONALE: Manifold-Accurate Handle Snapping (SOLID / SRP)
+     * Raw pointer coordinates `pt` are passed directly to each specialized delegate.
+     * Each delegate computes its own 1D/2D candidate handle coordinate (on the circumference,
+     * along the radial ray, or along the corner diagonal) and invokes `ctx.snapPoint(H_cand)`
+     * directly against the snapping engine, guaranteeing exact intersection and line snapping
+     * without premature Cartesian distortion.
+     */
+    const ellipseMove = this.ellipseDelegate.handlePointerMove(selectedEl, activeHandle, pt, isShift, isCtrl);
     if (ellipseMove) return ellipseMove;
 
-    const rectMove = this.rectDelegate.handlePointerMove(selectedEl, activeHandle, usePt, isShift, isCtrl, isAlt);
+    const rectMove = this.rectDelegate.handlePointerMove(selectedEl, activeHandle, pt, isShift, isCtrl, isAlt);
     if (rectMove) return rectMove;
 
-    const starMove = this.starDelegate.handlePointerMove(selectedEl, activeHandle, usePt, isShift, isCtrl);
+    const starMove = this.starDelegate.handlePointerMove(selectedEl, activeHandle, pt, isShift, isCtrl);
     if (starMove) return starMove;
 
     return null;
