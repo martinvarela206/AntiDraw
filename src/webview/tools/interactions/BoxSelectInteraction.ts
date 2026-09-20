@@ -17,9 +17,9 @@ import type { SelectToolCallbacks } from '../SelectToolHandler.js';
 export class BoxSelectInteraction {
   public marqueeStartPt: Point | null = null;
 
-  public start(pt: Point, ctx: ToolContext, isDeselect: boolean): void {
+  public start(pt: Point, ctx: ToolContext, isToggle: boolean): void {
     this.marqueeStartPt = pt;
-    ctx.selectionTool.isDeselectMarquee = isDeselect;
+    ctx.selectionTool.isToggleMarquee = isToggle;
     ctx.render();
   }
 
@@ -46,15 +46,27 @@ export class BoxSelectInteraction {
       ctx.selectionTool.marqueeRect
     );
 
-    if (ctx.selectionTool.isDeselectMarquee) {
-      hitIds.forEach((id) => ctx.selectionTool.deselect(id));
-    } else if (e.ctrlKey || e.metaKey) {
-      hitIds.forEach((id) => ctx.selectionTool.selectedElementIds.add(id));
+    const isToggle = ctx.selectionTool.isToggleMarquee || e.shiftKey;
+    if (isToggle) {
+      /**
+       * ARCHITECTURAL RATIONALE: Conmutative (Additive/Subtractive) Selection with Shift
+       * Toggles the selection state for all elements within the marquee:
+       * - If an element is already selected, it is deselected.
+       * - If an element is not selected, it is added to the selection.
+       */
+      hitIds.forEach((id) => {
+        if (ctx.selectionTool.selectedElementIds.has(id)) {
+          ctx.selectionTool.deselect(id);
+        } else {
+          ctx.selectionTool.selectedElementIds.add(id);
+        }
+      });
     } else {
       ctx.selectionTool.selectedElementIds = new Set(hitIds);
     }
 
     ctx.selectionTool.marqueeRect = null;
+    ctx.selectionTool.isToggleMarquee = false;
     ctx.selectionTool.isDeselectMarquee = false;
     this.marqueeStartPt = null;
     callbacks.onSelectionChanged?.();
@@ -65,6 +77,7 @@ export class BoxSelectInteraction {
   public cancel(ctx: ToolContext): boolean {
     if (ctx.selectionTool.marqueeRect || this.marqueeStartPt) {
       ctx.selectionTool.marqueeRect = null;
+      ctx.selectionTool.isToggleMarquee = false;
       ctx.selectionTool.isDeselectMarquee = false;
       this.marqueeStartPt = null;
       return true;
@@ -75,7 +88,9 @@ export class BoxSelectInteraction {
   public renderOverlay(ctx: ToolContext): string {
     if (!ctx.selectionTool.marqueeRect) return '';
     const m = ctx.selectionTool.marqueeRect;
-    const isDesel = ctx.selectionTool.isDeselectMarquee;
-    return `<rect x="${m.x}" y="${m.y}" width="${m.width}" height="${m.height}" fill="${isDesel ? 'rgba(239, 68, 68, 0.12)' : 'rgba(59, 130, 246, 0.12)'}" stroke="${isDesel ? '#ef4444' : '#3b82f6'}" stroke-width="1" stroke-dasharray="4 2" vector-effect="non-scaling-stroke" />`;
+    const isToggle = ctx.selectionTool.isToggleMarquee;
+    const fill = isToggle ? 'rgba(16, 185, 129, 0.12)' : 'rgba(59, 130, 246, 0.12)';
+    const stroke = isToggle ? '#10b981' : '#3b82f6';
+    return `<rect x="${m.x}" y="${m.y}" width="${m.width}" height="${m.height}" fill="${fill}" stroke="${stroke}" stroke-width="1" stroke-dasharray="4 2" vector-effect="non-scaling-stroke" />`;
   }
 }

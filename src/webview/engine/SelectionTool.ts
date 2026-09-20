@@ -22,6 +22,7 @@ export class SelectionTool {
   public hoveredElementId: string | null = null;
   public hoverTolerance: number = 3.0; // 3px diameter stroke tolerance
   public marqueeRect: { x: number; y: number; width: number; height: number } | null = null;
+  public isToggleMarquee: boolean = false;
   public isDeselectMarquee: boolean = false;
 
   /**

@@ -108,8 +108,20 @@ export class SelectToolHandler implements IToolHandler {
 
 
 
-    // 3. Modifier-based selection (Ctrl: Toggle select/deselect; Shift: Deselect)
-    if (e.ctrlKey || e.metaKey) {
+    /**
+     * ARCHITECTURAL RATIONALE: Universal Shift-Based Conmutative Multi-Selection (Benchmark CorelDraw / Ai / Figma)
+     *
+     * 1. Parity and Muscle Memory:
+     *    In professional vector suites (CorelDraw, Illustrator, Figma, Inkscape), `Shift` is the universal
+     *    modifier for multi-selection. Using `Ctrl` for selection violated muscle memory and conflicted with
+     *    CorelDraw's orthogonal constraint and child-pick mechanics.
+     *
+     * 2. Conmutative (Toggle) Semantics:
+     *    - Shift + Clic on an unselected element: adds it to the active selection.
+     *    - Shift + Clic on an already selected element: deselects it without affecting other selected items.
+     *    - Shift + Marquee Drag: toggles selection state for all elements intersected by the marquee box.
+     */
+    if (e.shiftKey) {
       const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, this.ctx.canvasMgr.zoom);
       if (hit) {
         this.ctx.selectionTool.toggleSelect(hit.element.id);
@@ -118,23 +130,7 @@ export class SelectToolHandler implements IToolHandler {
         this.ctx.render();
         return true;
       } else {
-        // Ctrl + Drag on canvas: Marquee selection that adds to selection
-        this.activeHandle = 'marquee';
-        this.boxSelectInteraction.start(pt, this.ctx, false);
-        return true;
-      }
-    }
-
-    if (e.shiftKey) {
-      const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, this.ctx.canvasMgr.zoom);
-      if (hit) {
-        this.ctx.selectionTool.deselect(hit.element.id);
-        this.callbacks.onClearPanelMode?.();
-        this.callbacks.onSelectionChanged?.();
-        this.ctx.render();
-        return true;
-      } else {
-        // Shift + Drag on canvas: Deselect marquee
+        // Shift + Drag on empty canvas: conmutative marquee selection (toggle selection state of hit items)
         this.activeHandle = 'marquee';
         this.boxSelectInteraction.start(pt, this.ctx, true);
         return true;
