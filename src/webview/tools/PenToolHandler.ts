@@ -261,9 +261,9 @@ export class PenToolHandler implements IToolHandler {
           html += `<circle cx="${firstV.x}" cy="${firstV.y}" r="${8 / z}" fill="none" stroke="#10b981" stroke-width="2" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
         } else {
           html += `
-            <g opacity="0.95">
-              <circle cx="${targetPt.x}" cy="${targetPt.y}" r="${5 / z}" fill="rgba(56, 189, 248, 0.35)" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />
-              <circle cx="${targetPt.x}" cy="${targetPt.y}" r="${1.5 / z}" fill="#ffffff" />
+            <g opacity="0.95" pointer-events="none">
+              <circle cx="${targetPt.x}" cy="${targetPt.y}" r="${3.5 / z}" fill="rgba(56, 189, 248, 0.35)" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />
+              <circle cx="${targetPt.x}" cy="${targetPt.y}" r="${1.2 / z}" fill="#ffffff" />
             </g>
           `;
         }
@@ -288,11 +288,11 @@ export class PenToolHandler implements IToolHandler {
         }
       });
     } else if (this.ctx.getActiveTool() === 'pen' && this.penHoverPoint) {
-      // First ghost point preview under cursor before first click
+      // First ghost point preview under cursor before first click (zoom-independent screen size)
       html += `
-        <g opacity="0.95">
-          <circle cx="${this.penHoverPoint.x}" cy="${this.penHoverPoint.y}" r="${5 / z}" fill="rgba(56, 189, 248, 0.35)" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />
-          <circle cx="${this.penHoverPoint.x}" cy="${this.penHoverPoint.y}" r="${1.5 / z}" fill="#ffffff" />
+        <g opacity="0.95" pointer-events="none">
+          <circle cx="${this.penHoverPoint.x}" cy="${this.penHoverPoint.y}" r="${3.5 / z}" fill="rgba(56, 189, 248, 0.35)" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />
+          <circle cx="${this.penHoverPoint.x}" cy="${this.penHoverPoint.y}" r="${1.2 / z}" fill="#ffffff" />
         </g>
       `;
     }

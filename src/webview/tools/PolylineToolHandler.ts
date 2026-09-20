@@ -237,9 +237,9 @@ export class PolylineToolHandler implements IToolHandler {
           html += `<circle cx="${firstV.x}" cy="${firstV.y}" r="${8 / z}" fill="none" stroke="#10b981" stroke-width="2" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
         } else {
           html += `
-            <g opacity="0.9">
-              <circle cx="${targetPt.x}" cy="${targetPt.y}" r="${4.5 / z}" fill="#38bdf8" fill-opacity="0.35" stroke="#38bdf8" stroke-width="1.5" vector-effect="non-scaling-stroke" />
-              <circle cx="${targetPt.x}" cy="${targetPt.y}" r="${1.5 / z}" fill="#ffffff" />
+            <g opacity="0.9" pointer-events="none">
+              <circle cx="${targetPt.x}" cy="${targetPt.y}" r="${3.5 / z}" fill="#38bdf8" fill-opacity="0.35" stroke="#38bdf8" stroke-width="1.5" vector-effect="non-scaling-stroke" />
+              <circle cx="${targetPt.x}" cy="${targetPt.y}" r="${1.2 / z}" fill="#ffffff" />
             </g>
           `;
         }
@@ -254,11 +254,23 @@ export class PolylineToolHandler implements IToolHandler {
         }
       });
     } else if (this.ctx.getActiveTool() === 'polyline' && this.polylineHoverPoint) {
-      // First point preview under cursor before first click
+      /**
+       * ARCHITECTURAL RATIONALE: Zoom-Independent Physical Screen-Pixel Reticle (FIX-PolylineCursor)
+       *
+       * 1. Resolution & ViewBox Independence:
+       *    In compact ViewBoxes (e.g. 16x16 or 32x32 icon canvases), unscaled SVG radii (e.g. r=5)
+       *    occupy massive proportions (over 30% of the entire canvas). Scaling the reticle inversely
+       *    by the current zoom level (`r = 3.5 / z` with center dot `r = 1.2 / z`) preserves a constant,
+       *    compact physical screen footprint (7px diameter) regardless of camera magnification (5% to 3200%).
+       *
+       * 2. Event Pass-Through:
+       *    Explicit `pointer-events="none"` guarantees that hover and click target coordinates pass directly
+       *    to the underlying canvas and grid snapping subsystem without cursor interception.
+       */
       html += `
-        <g opacity="0.9">
-          <circle cx="${this.polylineHoverPoint.x}" cy="${this.polylineHoverPoint.y}" r="5" fill="#10b981" fill-opacity="0.35" stroke="#10b981" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />
-          <circle cx="${this.polylineHoverPoint.x}" cy="${this.polylineHoverPoint.y}" r="1.5" fill="#ffffff" />
+        <g opacity="0.9" pointer-events="none">
+          <circle cx="${this.polylineHoverPoint.x}" cy="${this.polylineHoverPoint.y}" r="${3.5 / z}" fill="#10b981" fill-opacity="0.3" stroke="#10b981" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />
+          <circle cx="${this.polylineHoverPoint.x}" cy="${this.polylineHoverPoint.y}" r="${1.2 / z}" fill="#ffffff" />
         </g>
       `;
     }
