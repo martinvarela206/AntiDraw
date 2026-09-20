@@ -4,6 +4,7 @@ import type { SelectToolCallbacks } from '../SelectToolHandler.js';
 import { NodeCatalogService } from '../../engine/selection/NodeCatalogService.js';
 import { BaseHelper } from '../../ui/helpers/index.js';
 import { SnappingEngine } from '../../engine/canvas/SnappingEngine.js';
+import { VectorCloneHelper } from '../../engine/selection/VectorCloneHelper.js';
 
 /**
  * TranslateInteraction
@@ -16,8 +17,14 @@ import { SnappingEngine } from '../../engine/canvas/SnappingEngine.js';
  * 2. Ghost Translation & Snapping:
  *    Maintains non-destructive ghost offsets (`ghostDragOffset`) during active dragging,
  *    updating DOM overlay outlines at 60fps without corrupting document state.
- * 3. Atomic Undo & Host Synchronization:
- *    On pointer release, commits translated coordinates in a single undo step and
+ * 3. Orthogonal Constraint & Duplicate Modifiers (ITEM-03):
+ *    - `Ctrl`: Constrains translation strictly to the dominant axis (0° horizontal or 90° vertical),
+ *      suppressing cross-axis snapping to prevent diagonal jumps.
+ *    - `Alt`: Activates interactive duplication mode (`isDuplicateMode`), displaying a 'copy' cursor,
+ *      rendering a '+' badge indicator, and creating independent cloned vector elements on release.
+ *    - `Ctrl + Alt`: Combines orthogonal constraint with vector duplication.
+ * 4. Atomic Undo & Host Synchronization:
+ *    On pointer release, commits translated coordinates (or cloned elements) in a single undo step and
  *    synchronizes element metadata and custom pivot positions solidarily.
  */
 export class TranslateInteraction {
@@ -26,6 +33,8 @@ export class TranslateInteraction {
   public ghostDragOffset: Point | null = null;
   public dragAnchorPt: Point = { x: 0, y: 0 };
   public isAnchorPicked: boolean = false;
+  public isDuplicateMode: boolean = false;
+  public isOrthogonal: boolean = false;
 
   /**
    * ARCHITECTURAL RATIONALE: Proximity Anchor Detection (FIX-05)
@@ -153,6 +162,8 @@ export class TranslateInteraction {
     this.dragAnchorPt = anchorInfo.point;
     this.isAnchorPicked = anchorInfo.isPickedNode;
     this.initialElementsMap.clear();
+    this.isDuplicateMode = false;
+    this.isOrthogonal = false;
     selectedEls.forEach((el) => {
       if (el.vertices) {
         this.initialElementsMap.set(
@@ -168,102 +179,181 @@ export class TranslateInteraction {
   public onPointerMove(
     ctx: ToolContext,
     pt: Point,
-    dragStartPt: Point
+    dragStartPt: Point,
+    e?: PointerEvent,
+    callbacks?: SelectToolCallbacks
   ): boolean {
     if (this.initialElementsMap.size === 0) return false;
 
     const dx = pt.x - dragStartPt.x;
     const dy = pt.y - dragStartPt.y;
 
+    this.isOrthogonal = !!(e && e.ctrlKey);
+    this.isDuplicateMode = !!(e && e.altKey);
+
+    if (callbacks?.setCursor) {
+      callbacks.setCursor(this.isDuplicateMode ? 'copy' : 'move');
+    }
+
     // Collect other unselected nodes (structural, handles, positional)
     const otherVertices = ctx.getOtherVertices(Array.from(ctx.selectionTool.selectedElementIds));
 
-    // Compute target position of the anchor and snap it
-    const rawTarget: Point = { x: this.dragAnchorPt.x + dx, y: this.dragAnchorPt.y + dy };
-    const snappedTarget = ctx.snapPoint(rawTarget, otherVertices);
-    const effectiveDx = snappedTarget.x - this.dragAnchorPt.x;
-    const effectiveDy = snappedTarget.y - this.dragAnchorPt.y;
+    /**
+     * ARCHITECTURAL RATIONALE: Strict Orthogonal Constraint on Translation (Ctrl / Ctrl+Alt)
+     * When Ctrl is active, movement is projected strictly onto the dominant Cartesian axis (0° or 90°):
+     * - If |dx| >= |dy|, vertical delta is locked to 0. Snapping is performed with target Y fixed to anchor Y,
+     *   and the resulting vertical delta is clamped to 0 to prevent cross-axis jump.
+     * - If |dy| > |dx|, horizontal delta is locked to 0 with equivalent X clamping.
+     */
+    if (this.isOrthogonal) {
+      if (Math.abs(dx) >= Math.abs(dy)) {
+        const rawTarget: Point = { x: this.dragAnchorPt.x + dx, y: this.dragAnchorPt.y };
+        const snappedTarget = ctx.snapPoint(rawTarget, otherVertices);
+        this.ghostDragOffset = { x: snappedTarget.x - this.dragAnchorPt.x, y: 0 };
+      } else {
+        const rawTarget: Point = { x: this.dragAnchorPt.x, y: this.dragAnchorPt.y + dy };
+        const snappedTarget = ctx.snapPoint(rawTarget, otherVertices);
+        this.ghostDragOffset = { x: 0, y: snappedTarget.y - this.dragAnchorPt.y };
+      }
+    } else {
+      const rawTarget: Point = { x: this.dragAnchorPt.x + dx, y: this.dragAnchorPt.y + dy };
+      const snappedTarget = ctx.snapPoint(rawTarget, otherVertices);
+      this.ghostDragOffset = {
+        x: snappedTarget.x - this.dragAnchorPt.x,
+        y: snappedTarget.y - this.dragAnchorPt.y,
+      };
+    }
 
-    this.ghostDragOffset = { x: effectiveDx, y: effectiveDy };
     ctx.renderOverlay();
     return true;
   }
 
   public onPointerUp(
     ctx: ToolContext,
-    callbacks: SelectToolCallbacks
+    callbacks: SelectToolCallbacks,
+    e?: PointerEvent
   ): boolean {
     if (!this.ghostDragOffset) {
       this.initialElementsMap.clear();
       this.initialBox = null;
+      this.isDuplicateMode = false;
+      this.isOrthogonal = false;
       return false;
+    }
+
+    // Retain duplication mode if Alt is held at pointer release
+    if (e && e.altKey) {
+      this.isDuplicateMode = true;
     }
 
     let hasChanges = false;
     if (this.ghostDragOffset.x !== 0 || this.ghostDragOffset.y !== 0) {
       ctx.pushUndo();
       const selectedEls = ctx.model.elements.filter((el) => ctx.selectionTool.isSelected(el.id));
-      this.initialElementsMap.forEach((origVerts, id) => {
-        const el = ctx.model.elements.find((e) => e.id === id);
-        if (el) {
-          el.vertices = origVerts.map((v) => ({
-            ...v,
-            x: v.x + this.ghostDragOffset!.x,
-            y: v.y + this.ghostDragOffset!.y,
-            handleIn: v.handleIn
-              ? { x: v.handleIn.x + this.ghostDragOffset!.x, y: v.handleIn.y + this.ghostDragOffset!.y }
-              : undefined,
-            handleOut: v.handleOut
-              ? { x: v.handleOut.x + this.ghostDragOffset!.x, y: v.handleOut.y + this.ghostDragOffset!.y }
-              : undefined,
-          }));
-          const isClosed = ctx.model.isElementClosed(el);
-          const isPieOrArc = el.attributes['data-ellipse-type'] === 'pie' || el.attributes['data-ellipse-type'] === 'arc';
 
-          /**
-           * ARCHITECTURAL RATIONALE: Faithful Arc Compilation on Translation (FIX-23)
-           * When moving active vectors in selection mode, parametric arc and pie primitives must retain
-           * their canonical SVG arc commands ('A') via `compileEllipseD`.
-           * Overwriting `el.attributes.d` with generic Bézier cubic approximations (`compilePathD`) degrades
-           * geometric precision and causes circular arcs to serialize as freeform spline curves.
-           */
-          const innerRatio = parseFloat(el.attributes['data-inner-ratio'] || '0');
-          if (ctx.model.isParametricElement(el) && (isPieOrArc || innerRatio > 0)) {
-            const oldCx = parseFloat(el.attributes.cx || '0');
-            const oldCy = parseFloat(el.attributes.cy || '0');
-            const newCx = Math.round((oldCx + this.ghostDragOffset!.x) * 100) / 100;
-            const newCy = Math.round((oldCy + this.ghostDragOffset!.y) * 100) / 100;
-            el.attributes.cx = newCx.toString();
-            el.attributes.cy = newCy.toString();
-            const rx = parseFloat(el.attributes.rx || el.attributes.r || '1');
-            const ry = parseFloat(el.attributes.ry || el.attributes.r || '1');
-            const type = (el.attributes['data-ellipse-type'] as 'ellipse' | 'pie' | 'arc') || 'ellipse';
-            const s = parseFloat(el.attributes['data-start-angle'] || '0');
-            const e = parseFloat(el.attributes['data-end-angle'] || '360');
-            el.attributes.d = ctx.model.compileEllipseD(newCx, newCy, rx, ry, type, s, e, innerRatio);
-            if (innerRatio > 0) {
-              el.attributes['fill-rule'] = 'evenodd';
-            }
-          } else {
-            el.attributes.d = ctx.model.compilePathD(el.vertices, isClosed);
-            if (ctx.model.isParametricElement(el)) {
-              ctx.model.syncParametricAttributes(el);
+      if (this.isDuplicateMode) {
+        /**
+         * ARCHITECTURAL RATIONALE: Interactive Drag Duplication (Alt + Drag / Ctrl + Alt + Drag)
+         *
+         * 1. Non-destructive In-Place Preservation:
+         *    Original source elements remain untouched at their initial geometry, matching professional
+         *    standards (CorelDraw, Illustrator, Figma).
+         *
+         * 2. Comprehensive ID & SVG Reference Regeneration:
+         *    Cloned elements receive unique element and vertex IDs (`el_${timestamp}_${rand}`, `v_${timestamp}_${rand}`).
+         *    Internal SVG filter and gradient references are dynamically remapped to prevent cross-element
+         *    rendering anomalies.
+         *
+         * 3. Selection Hand-off & Fluent Workflow:
+         *    The selection switches to the newly generated clone(s), allowing subsequent drag or property adjustments
+         *    immediately without deselecting.
+         */
+        const clonedElements: VectorElement[] = [];
+        const newIds: string[] = [];
+
+        selectedEls.forEach((srcEl) => {
+          const clone = VectorCloneHelper.cloneWithOffset(srcEl, this.ghostDragOffset!, ctx.model);
+          clonedElements.push(clone);
+          newIds.push(clone.id);
+        });
+
+        clonedElements.forEach((c) => ctx.model.elements.push(c));
+
+        ctx.selectionTool.deselectAll();
+        newIds.forEach((id) => ctx.selectionTool.selectedElementIds.add(id));
+
+        // Compensate gradients for cloned elements
+        clonedElements.forEach((el) => {
+          if (el.attributes['data-gradient']) {
+            const box = ctx.selectionTool.getBoundingBox(el);
+            if (box) {
+              ctx.selectionTool.compensateGradientOnTranslate(el, this.ghostDragOffset!.x, this.ghostDragOffset!.y, box);
             }
           }
-        }
-      });
-      // Translate custom pivot solidarily with moved vectors
-      ctx.selectionTool.updatePivotOnTranslate(this.ghostDragOffset.x, this.ghostDragOffset.y, selectedEls);
+        });
+      } else {
+        this.initialElementsMap.forEach((origVerts, id) => {
+          const el = ctx.model.elements.find((e) => e.id === id);
+          if (el) {
+            el.vertices = origVerts.map((v) => ({
+              ...v,
+              x: v.x + this.ghostDragOffset!.x,
+              y: v.y + this.ghostDragOffset!.y,
+              handleIn: v.handleIn
+                ? { x: v.handleIn.x + this.ghostDragOffset!.x, y: v.handleIn.y + this.ghostDragOffset!.y }
+                : undefined,
+              handleOut: v.handleOut
+                ? { x: v.handleOut.x + this.ghostDragOffset!.x, y: v.handleOut.y + this.ghostDragOffset!.y }
+                : undefined,
+            }));
+            const isClosed = ctx.model.isElementClosed(el);
+            const isPieOrArc = el.attributes['data-ellipse-type'] === 'pie' || el.attributes['data-ellipse-type'] === 'arc';
 
-      // Compensate gradients for elements with lockPosition === false
-      selectedEls.forEach((el) => {
-        if (el.attributes['data-gradient']) {
-          const box = ctx.selectionTool.getBoundingBox(el);
-          if (box) {
-            ctx.selectionTool.compensateGradientOnTranslate(el, this.ghostDragOffset!.x, this.ghostDragOffset!.y, box);
+            /**
+             * ARCHITECTURAL RATIONALE: Faithful Arc Compilation on Translation (FIX-23)
+             * When moving active vectors in selection mode, parametric arc and pie primitives must retain
+             * their canonical SVG arc commands ('A') via `compileEllipseD`.
+             * Overwriting `el.attributes.d` with generic Bézier cubic approximations (`compilePathD`) degrades
+             * geometric precision and causes circular arcs to serialize as freeform spline curves.
+             */
+            const innerRatio = parseFloat(el.attributes['data-inner-ratio'] || '0');
+            if (ctx.model.isParametricElement(el) && (isPieOrArc || innerRatio > 0)) {
+              const oldCx = parseFloat(el.attributes.cx || '0');
+              const oldCy = parseFloat(el.attributes.cy || '0');
+              const newCx = Math.round((oldCx + this.ghostDragOffset!.x) * 100) / 100;
+              const newCy = Math.round((oldCy + this.ghostDragOffset!.y) * 100) / 100;
+              el.attributes.cx = newCx.toString();
+              el.attributes.cy = newCy.toString();
+              const rx = parseFloat(el.attributes.rx || el.attributes.r || '1');
+              const ry = parseFloat(el.attributes.ry || el.attributes.r || '1');
+              const type = (el.attributes['data-ellipse-type'] as 'ellipse' | 'pie' | 'arc') || 'ellipse';
+              const s = parseFloat(el.attributes['data-start-angle'] || '0');
+              const e = parseFloat(el.attributes['data-end-angle'] || '360');
+              el.attributes.d = ctx.model.compileEllipseD(newCx, newCy, rx, ry, type, s, e, innerRatio);
+              if (innerRatio > 0) {
+                el.attributes['fill-rule'] = 'evenodd';
+              }
+            } else {
+              el.attributes.d = ctx.model.compilePathD(el.vertices, isClosed);
+              if (ctx.model.isParametricElement(el)) {
+                ctx.model.syncParametricAttributes(el);
+              }
+            }
           }
-        }
-      });
+        });
+        // Translate custom pivot solidarily with moved vectors
+        ctx.selectionTool.updatePivotOnTranslate(this.ghostDragOffset.x, this.ghostDragOffset.y, selectedEls);
+
+        // Compensate gradients for elements with lockPosition === false
+        selectedEls.forEach((el) => {
+          if (el.attributes['data-gradient']) {
+            const box = ctx.selectionTool.getBoundingBox(el);
+            if (box) {
+              ctx.selectionTool.compensateGradientOnTranslate(el, this.ghostDragOffset!.x, this.ghostDragOffset!.y, box);
+            }
+          }
+        });
+      }
 
       hasChanges = true;
     }
@@ -271,6 +361,8 @@ export class TranslateInteraction {
     this.ghostDragOffset = null;
     this.initialElementsMap.clear();
     this.initialBox = null;
+    this.isDuplicateMode = false;
+    this.isOrthogonal = false;
 
     if (hasChanges) {
       callbacks.onSelectionChanged?.();
@@ -286,6 +378,8 @@ export class TranslateInteraction {
       this.ghostDragOffset = null;
       this.initialElementsMap.clear();
       this.initialBox = null;
+      this.isDuplicateMode = false;
+      this.isOrthogonal = false;
       return true;
     }
     return false;
@@ -325,11 +419,23 @@ export class TranslateInteraction {
     const strokeColor = isSnapped ? '#00f0ff' : '#38bdf8';
     const centerColor = isSnapped ? '#00f0ff' : '#0284c7';
 
+    // Duplicate badge indicator when dragging with Alt
+    let badgeHtml = '';
+    if (this.isDuplicateMode) {
+      badgeHtml = `
+        <g transform="translate(10, -10)">
+          <circle cx="0" cy="0" r="6" fill="#22c55e" stroke="#ffffff" stroke-width="1.5" />
+          <path d="M-3 0 L3 0 M0 -3 L0 3" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" />
+        </g>
+      `;
+    }
+
     html += `
       <g transform="translate(${curAnchorX}, ${curAnchorY}) scale(${inv})" pointer-events="none">
         <circle cx="0" cy="0" r="${haloRingR}" fill="none" stroke="${strokeColor}" stroke-width="1.5" stroke-dasharray="3 2" />
         ${isSnapped ? `<circle cx="0" cy="0" r="13" fill="none" stroke="#00f0ff" stroke-width="1" opacity="0.4" />` : ''}
         <circle cx="0" cy="0" r="2.5" fill="${centerColor}" />
+        ${badgeHtml}
       </g>
     `;
 

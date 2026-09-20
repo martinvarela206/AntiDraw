@@ -377,7 +377,7 @@ export class SelectToolHandler implements IToolHandler {
     }
 
     if (this.activeHandle === 'move') {
-      return this.translateInteraction.onPointerMove(this.ctx, pt, this.dragStartPt);
+      return this.translateInteraction.onPointerMove(this.ctx, pt, this.dragStartPt, e, this.callbacks);
     }
 
     // Otherwise, handle scale, rotate, pivot, gradient transformations
@@ -410,7 +410,7 @@ export class SelectToolHandler implements IToolHandler {
     }
 
     if (currentHandle === 'move') {
-      const moved = this.translateInteraction.onPointerUp(this.ctx, this.callbacks);
+      const moved = this.translateInteraction.onPointerUp(this.ctx, this.callbacks, e);
       if (!moved) {
         this.lastClickTime = Date.now();
         this.lastClickPt = { x: pt.x, y: pt.y };
