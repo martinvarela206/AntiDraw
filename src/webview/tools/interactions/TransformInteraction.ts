@@ -186,6 +186,7 @@ export class TransformInteraction {
         initialBoxPadding: this.initialBoxPadding,
         initialElementsMap: this.initialElementsMap,
         shiftKey: e.shiftKey,
+        altKey: e.altKey,
         ctrlKey: e.ctrlKey,
       });
       this.currentScaleSnappedPt = result.snappedPt;

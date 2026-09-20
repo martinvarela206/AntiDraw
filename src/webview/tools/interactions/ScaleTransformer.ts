@@ -10,6 +10,7 @@ export interface ScaleComputeContext {
   initialBoxPadding: number;
   initialElementsMap: Map<string, PathVertex[]>;
   shiftKey: boolean;
+  altKey: boolean;
   ctrlKey: boolean;
 }
 
@@ -158,7 +159,15 @@ export class ScaleTransformer {
       opts.initialBox
     );
 
-    const isProportional = ctx.selectionTool.isAspectRatioLocked || opts.ctrlKey;
+    /**
+     * ARCHITECTURAL RATIONALE: Universal Scale Modifiers (Benchmark CorelDraw / Ai / Figma)
+     * - Shift: Enforces 1:1 proportional aspect ratio lock.
+     * - Alt: Scales symmetrically from center/pivot.
+     * - Alt + Shift: Symmetrical concentric scaling maintaining 1:1 aspect ratio.
+     * - Default (no modifiers): Free directional scaling anchored to opposing edge/corner.
+     */
+    const isProportional = ctx.selectionTool.isAspectRatioLocked || opts.shiftKey;
+    const isFromCenter = opts.altKey;
     const ghostMap = new Map<string, PathVertex[]>();
 
     opts.initialElementsMap.forEach((origVerts, id) => {
@@ -169,7 +178,7 @@ export class ScaleTransformer {
         effectiveDx,
         effectiveDy,
         opts.initialBoxPadding,
-        opts.shiftKey,
+        isFromCenter,
         isProportional
       );
       ghostMap.set(id, transformed);
