@@ -24,6 +24,7 @@ export class SelectionTool {
   public marqueeRect: { x: number; y: number; width: number; height: number } | null = null;
   public isToggleMarquee: boolean = false;
   public isDeselectMarquee: boolean = false;
+  public isTouchingMarquee: boolean = false;
 
   /**
    * ARCHITECTURAL RATIONALE: Vector-Relative Rotation Pivot Lifecyle & Persistence
@@ -280,9 +281,10 @@ export class SelectionTool {
 
   public hitTestMarquee(
     elements: VectorElement[],
-    marquee: { x: number; y: number; width: number; height: number }
+    marquee: { x: number; y: number; width: number; height: number },
+    touching: boolean = false
   ): string[] {
-    return HitTestService.hitTestMarquee(elements, marquee);
+    return HitTestService.hitTestMarquee(elements, marquee, touching);
   }
 
   public hitTest(

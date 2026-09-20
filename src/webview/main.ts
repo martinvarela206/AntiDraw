@@ -513,6 +513,7 @@ class AntiDrawApp {
       cancelCurrentAction: () => this.cancelCurrentAction(),
       pushUndo: () => this.pushUndo(),
       render: () => this.render(),
+      renderOverlay: () => this.renderOverlay(),
       syncToHost: () => this.syncToHost(),
       syncMetadataToHost: () => this.syncMetadataToHost(),
     });

@@ -239,11 +239,25 @@ export class HitTestService {
   }
 
   /**
-   * Evaluates strict 100% containment of elements within a rectangular marquee.
+   * ARCHITECTURAL RATIONALE: CorelDraw Benchmark Selection Marquee (Enclosed vs. Touching)
+   *
+   * 1. Parity & Industrial Standard:
+   *    In CorelDraw, the standard marquee drag selects ONLY objects completely enclosed
+   *    within the selection rectangle (`touching = false`). This prevents accidental selection
+   *    of large background shapes or neighboring vectors in dense illustrations.
+   *
+   * 2. Touching Mode via Modifier (`Alt`):
+   *    Holding `Alt` activates touching/crossing mode (`touching = true`), where any vector whose
+   *    bounding geometry intersects or grazes the marquee boundary is immediately selected.
+   *
+   * 3. Geometric AABB Intersection vs. Containment:
+   *    - Enclosed: `box.x >= mLeft && bRight <= mRight && box.y >= mTop && bBottom <= mBottom`
+   *    - Touching: `box.x <= mRight && bRight >= mLeft && box.y <= mBottom && bBottom >= mTop`
    */
   public static hitTestMarquee(
     elements: VectorElement[],
-    marquee: { x: number; y: number; width: number; height: number }
+    marquee: { x: number; y: number; width: number; height: number },
+    touching: boolean = false
   ): string[] {
     const hits: string[] = [];
     const mLeft = Math.min(marquee.x, marquee.x + marquee.width);
@@ -258,15 +272,28 @@ export class HitTestService {
       const bRight = box.x + box.width;
       const bBottom = box.y + box.height;
 
-      // Strict containment: bounding box must be 100% inside marquee selection
-      const isInside =
-        box.x >= mLeft &&
-        bRight <= mRight &&
-        box.y >= mTop &&
-        bBottom <= mBottom;
+      if (touching) {
+        // Touching / Cruce criterion: element bounding box intersects the marquee rectangle
+        const isTouching =
+          box.x <= mRight &&
+          bRight >= mLeft &&
+          box.y <= mBottom &&
+          bBottom >= mTop;
 
-      if (isInside) {
-        hits.push(el.id);
+        if (isTouching) {
+          hits.push(el.id);
+        }
+      } else {
+        // Strict containment: bounding box must be 100% inside marquee selection (Default CorelDraw)
+        const isInside =
+          box.x >= mLeft &&
+          bRight <= mRight &&
+          box.y >= mTop &&
+          bBottom <= mBottom;
+
+        if (isInside) {
+          hits.push(el.id);
+        }
       }
     });
 

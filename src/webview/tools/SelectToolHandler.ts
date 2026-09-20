@@ -132,7 +132,7 @@ export class SelectToolHandler implements IToolHandler {
       } else {
         // Shift + Drag on empty canvas: conmutative marquee selection (toggle selection state of hit items)
         this.activeHandle = 'marquee';
-        this.boxSelectInteraction.start(pt, this.ctx, true);
+        this.boxSelectInteraction.start(pt, this.ctx, true, e.altKey);
         return true;
       }
     }
@@ -326,7 +326,7 @@ export class SelectToolHandler implements IToolHandler {
     this.ctx.canvasMgr.activeGuideTransformId = null;
     this.nodeEditorTool.selectedVertexId = null;
     this.activeHandle = 'marquee';
-    this.boxSelectInteraction.start(pt, this.ctx, false);
+    this.boxSelectInteraction.start(pt, this.ctx, false, e.altKey);
     this.callbacks.onClearPanelMode?.();
     this.callbacks.onSelectionChanged?.();
     this.ctx.canvasMgr.isCanvasSelected = true;
@@ -373,7 +373,7 @@ export class SelectToolHandler implements IToolHandler {
     }
 
     if (this.activeHandle === 'marquee') {
-      return this.boxSelectInteraction.onPointerMove(this.ctx, pt);
+      return this.boxSelectInteraction.onPointerMove(this.ctx, pt, e.altKey);
     }
 
     if (this.activeHandle === 'move') {

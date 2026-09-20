@@ -34,6 +34,7 @@ export interface KeyboardControllerContext {
   cancelCurrentAction: () => void;
   pushUndo: () => void;
   render: () => void;
+  renderOverlay: () => void;
   syncToHost: () => void;
   syncMetadataToHost: () => void;
 }
@@ -69,10 +70,18 @@ export class KeyboardShortcutController {
 
   private handleKeyUp(e: KeyboardEvent): void {
     if (e.key === 'Shift') this.isShiftPressed = false;
+    if (e.key === 'Alt' && this.ctx.selectionTool.marqueeRect) {
+      this.ctx.selectionTool.isTouchingMarquee = false;
+      this.ctx.renderOverlay();
+    }
   }
 
   private handleKeyDown(e: KeyboardEvent): void {
     if (e.key === 'Shift') this.isShiftPressed = true;
+    if (e.key === 'Alt' && this.ctx.selectionTool.marqueeRect) {
+      this.ctx.selectionTool.isTouchingMarquee = true;
+      this.ctx.renderOverlay();
+    }
 
     if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'SELECT') return;
 
