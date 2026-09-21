@@ -768,7 +768,13 @@ export class TransformInteraction {
         if (el) {
           const isClosed = ctx.model.isElementClosed(el);
           const d = ctx.model.compilePathD(gVerts, isClosed);
-          html += `<path d="${d}" fill="rgba(99, 102, 241, 0.45)" stroke="#6366f1" stroke-width="3" stroke-dasharray="5 3" vector-effect="non-scaling-stroke" />`;
+          /**
+           * ARCHITECTURAL RATIONALE: Open Path Topological Cleanliness in Transform Ghosts
+           * Setting `fill="none"` when `!isClosed` prevents spurious solid chord fills
+           * when transforming open polylines, lines, or open Bézier splines (scale, rotate, skew, distort).
+           */
+          const ghostFill = isClosed ? 'rgba(99, 102, 241, 0.45)' : 'none';
+          html += `<path d="${d}" fill="${ghostFill}" stroke="#6366f1" stroke-width="3" stroke-dasharray="5 3" vector-effect="non-scaling-stroke" />`;
           gVerts.forEach((gv) => {
             html += `<circle cx="${gv.x}" cy="${gv.y}" r="${3.5 / z}" fill="#a5b4fc" stroke="#4338ca" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
           });
