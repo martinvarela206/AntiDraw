@@ -1,7 +1,9 @@
 const esbuild = require('esbuild');
+const { syncIcons } = require('./scripts/sync-icons.js');
 const isWatch = process.argv.includes('--watch');
 
 async function main() {
+  syncIcons();
   const extensionCtx = await esbuild.context({
     entryPoints: ['src/extension.ts'],
     bundle: true,
