@@ -106,3 +106,26 @@ This file contains rules specific to the AntiDraw project. Rules are written in 
       - You MUST NOT patch only that specific element or tool in isolation.
       - You MUST audit and enforce consistent, identical behavior across ALL parallel and related elements (circles, ellipses, arcs, pies, donuts, rectangles, stars, regular polygons, freeform paths) and across ALL tools and interaction controllers (NodeTool, SelectTool, TranslateInteraction, TransformInteraction, Scale, Rotate).
       - Any capability or fix applied to one handle, anchor, or landmark must be universally integrated across all handles, anchors, and landmarks.
+
+---
+
+## Capability Preservation, Non-Regression & Pre-Overwrite Protocols
+
+15. **Non-Regression & Existing Capability Invariant**:
+    - All existing features, interactions, shortcuts, visual feedback, undo/redo integrations, and mathematical/snapping behaviors are immutable invariants unless the user prompt explicitly requests their removal or replacement.
+    - Implementing a new feature, fixing a bug, or performing code refactoring MUST NEVER degrade, silence, or delete an existing capability.
+
+16. **Pre-Modification Impact & Overwrite Warning Protocol**:
+    - Whenever a code change, refactoring, or architectural restructuring could potentially overwrite, suppress, shadow, or alter any existing functionality that was NOT explicitly requested for replacement in the prompt:
+      - Execution MUST PAUSE before writing code or committing changes.
+      - An explicit, clear warning MUST be issued to the user explaining:
+        1. The existing capability at risk of modification or overwrite.
+        2. The technical conflict or overlap (e.g. event precedence collision, state conflict, interface incompatibility).
+        3. Viable non-destructive architectural alternatives.
+      - The user's explicit decision MUST be obtained before proceeding.
+
+17. **Architectural Anti-Regression Safeguards**:
+    - **Prototype & Getter Preservation**: Never use shallow object spreads (`{ ...this }`, `Object.assign({}, instance)`) when passing manager or service contexts to engines or sub-handlers. Spread syntax strips prototype getters (such as `get grids()`, `get guides()`), resulting in silent `undefined` values and catastrophic feature loss without compile-time errors. Always pass instance references directly or map properties explicitly.
+    - **Decoupling Presentation from Computation**: Algorithmic services (snapping calculations, geometric transforms, hit-testing, projection) must never condition their execution on visual presentation flags (e.g., coupling `snapToGrid` to `showGrid`) unless specifically dictated by design specifications.
+    - **Event Cascade & Hit-Testing Precedence Invariants**: When adding interactions, handlers, or bounding-box modes, ensure new event listeners or hit tests do not swallow, shadow, or preempt base interactions (canvas dragging, node selection, element translation) without fallback delegation.
+    - **Universal Consumer Audit on Shared Contracts**: When altering shared interfaces, context contracts (`ToolContext`, `SnappingContext`), or services (`HistoryService`, `CanvasManager`), inspect all consumer tools and handlers to guarantee complete operational parity and zero regression.
