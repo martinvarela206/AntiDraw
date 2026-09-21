@@ -64,6 +64,7 @@ export class SelectToolHandler implements IToolHandler {
   public lastClickUpTime: number = 0;
   private lastClickTime: number = 0;
   private lastClickPt: Point = { x: 0, y: 0 };
+  private lastDoubleClickHandledTime: number = 0;
 
   constructor(
     private ctx: ToolContext,
@@ -88,6 +89,23 @@ export class SelectToolHandler implements IToolHandler {
     );
 
     const now = Date.now();
+    const timeSinceLast = now - this.lastClickTime;
+    const z = this.ctx.canvasMgr.zoom || 1;
+    const distSinceLast = Math.hypot(pt.x - this.lastClickPt.x, pt.y - this.lastClickPt.y);
+
+    /**
+     * ARCHITECTURAL RATIONALE: Synthetic Fast Double-Click Tool Conmutation (ITEM-03)
+     * Detects fast double-clicks (<400ms, <=12/zoom) directly during pointerdown before mouseup/dblclick
+     * to eliminate event loss from overlay DOM re-rendering and setPointerCapture timing quirks.
+     */
+    if (timeSinceLast < 400 && distSinceLast <= 12 / z && !e.shiftKey) {
+      this.lastClickTime = 0;
+      this.lastClickPt = { x: 0, y: 0 };
+      if (this.onDoubleClick(e as any, pt)) {
+        return true;
+      }
+    }
+
     this.lastClickTime = now;
     this.lastClickPt = { ...pt };
 
@@ -441,6 +459,12 @@ export class SelectToolHandler implements IToolHandler {
   }
 
   public onDoubleClick(e: MouseEvent, pt: Point): boolean {
+    const now = Date.now();
+    if (now - this.lastDoubleClickHandledTime < 300) {
+      return true;
+    }
+    this.lastDoubleClickHandledTime = now;
+
     if (this.guideInteraction.onDoubleClick(this.ctx, pt, this.callbacks)) {
       return true;
     }

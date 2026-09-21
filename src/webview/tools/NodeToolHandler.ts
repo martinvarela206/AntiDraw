@@ -164,29 +164,17 @@ export class NodeToolHandler implements IToolHandler {
 
     const isClosed = this.isElementClosed(selectedEl);
 
-    // ARCHITECTURAL RATIONALE: Parametric Element Free Node Edit Lock vs Polyline/Polygon (FEAT-04)
-    // Parametric primitives (<rect>, <circle>, <ellipse>, <line>) strictly prohibit free node insertion
-    // or free vertex deletion. The user must explicitly convert to curves (Ctrl+Q) before subdividing.
-    // In contrast, <polyline> and <polygon> natively represent arbitrary sequences of straight points,
-    // so vertex addition (along segments) and deletion (>= 2 for polyline, >= 3 for polygon) are allowed,
-    // keeping them as native <polyline>/<polygon> with their `points` attribute updated without Béziers.
+    /**
+     * ARCHITECTURAL RATIONALE: Parametric Element Double-Click Delegation (ITEM-03 CorelDraw Parity)
+     * Parametric primitives (<rect>, <circle>, <ellipse>, <line>) have dedicated parametric handles
+     * and do not permit free node insertion or vertex deletion without prior conversion to curves (Ctrl+Q).
+     * By returning `false` here instead of launching an intrusive modal prompt, double-clicking on a
+     * parametric primitive cleanly delegates to tool conmutation, switching back to the Selection Tool ('select')
+     * without interrupting user workflow or breaking rapid symmetrical toggle sequences.
+     */
     const isPoly = this.ctx.model.isPolyline(selectedEl) || this.ctx.model.isPolygon(selectedEl);
     if (this.ctx.model.isParametricElement(selectedEl) && !isPoly) {
-      ConfirmationModal.confirm({
-        title: 'Convertir Primitiva a Curvas',
-        message: `La figura <${selectedEl.shapeType || selectedEl.tagName}> es una primitiva paramétrica.`,
-        details: 'Para insertar, editar o eliminar vértices libres con la herramienta de Nodos, es necesario convertirla a curvas de Bézier. ¿Deseas convertirla ahora?',
-        confirmText: 'Convertir a Curvas',
-        cancelText: 'Cancelar',
-      }).then((confirmed) => {
-        if (confirmed) {
-          this.ctx.pushUndo();
-          this.ctx.model.convertToCurves(selectedEl);
-          this.ctx.render();
-          this.ctx.syncToHost();
-        }
-      });
-      return true;
+      return false;
     }
 
     // 1. Double-click on existing vertex -> Delete vertex
@@ -273,19 +261,16 @@ export class NodeToolHandler implements IToolHandler {
       }
 
       /**
-       * ARCHITECTURAL RATIONALE: Synthetic Double-Click on Empty Canvas (ITEM-02 CorelDraw Parity)
-       * Native DOM 'dblclick' events are notoriously dropped by browsers when DOM overlays re-render
-       * or when pointer capture is engaged on pointerdown/pointerup.
-       * Detecting double-click directly during the pointerdown sequence ensures immediate, reliable
-       * conmutation back to the Selection Tool ('select') when clicking empty canvas space.
+       * ARCHITECTURAL RATIONALE: Symmetrical Tool Conmutation (Node Tool -> Select Tool - ITEM-03)
+       * When executeDoubleClick does not handle vertex deletion or insertion, any double click
+       * (whether on empty canvas space, element body, or parametric primitive) cleanly conmoves
+       * back to the Selection Tool ('select'), completing bidirectional symmetry with SelectToolHandler.
+       * Eliminates accidental conversion modal popups on parametric primitives during fast toggle clicks.
        */
-      const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, z);
-      if (!hit) {
-        this.lastDoubleClickHandledTime = now;
-        this.ctx.setTool('select');
-        this.ctx.render();
-        return true;
-      }
+      this.lastDoubleClickHandledTime = now;
+      this.ctx.setTool('select');
+      this.ctx.render();
+      return true;
     }
 
     this.lastClickTime = now;
@@ -760,20 +745,15 @@ export class NodeToolHandler implements IToolHandler {
     }
 
     /**
-     * ARCHITECTURAL RATIONALE: CorelDraw Benchmark Tool Conmutation (Node Tool -> Select Tool - ITEM-06)
-     * When the user double-clicks on empty canvas area away from any node vertex or vector path,
-     * the tool immediately returns to the Selection Tool ('select'), completing the symmetrical
-     * conmutation between Selection and Node tools.
+     * ARCHITECTURAL RATIONALE: CorelDraw Benchmark Tool Conmutation (Node Tool -> Select Tool - ITEM-03)
+     * When the user double-clicks on empty canvas area, on an element body, or on a parametric primitive,
+     * the tool immediately returns to the Selection Tool ('select'), completing symmetrical conmutation
+     * between Selection and Node tools without prompting unwanted conversion modals.
      */
-    const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, z);
-    if (!hit) {
-      this.lastDoubleClickHandledTime = now;
-      this.ctx.setTool('select');
-      this.ctx.render();
-      return true;
-    }
-
-    return false;
+    this.lastDoubleClickHandledTime = now;
+    this.ctx.setTool('select');
+    this.ctx.render();
+    return true;
   }
 
   public cancel(): boolean {
