@@ -101,6 +101,7 @@ import { PathGeometryCompiler, formatNum } from './geometry/PathGeometryCompiler
 import { RectPrimitive } from './primitives/RectPrimitive.js';
 import { EllipsePrimitive } from './primitives/EllipsePrimitive.js';
 import { PrimitiveDetector } from './primitives/PrimitiveDetector.js';
+import type { CompanionMetadata } from '../bridge/VsCodeBridge.js';
 
 export {
   STANDARD_MARKERS_INNER_XML,
@@ -126,10 +127,10 @@ export class VectorModel {
 
   /**
    * Parses an SVG document string and populates the model canvas, custom defs, and vector elements.
-   * Delegated to SvgSerializer.
+   * Fuses companion metadata to rehydrate full parametric editor state.
    */
-  public loadSvgString(svgText: string): void {
-    SvgSerializer.loadSvgString(svgText, this);
+  public loadSvgString(svgText: string, companionMetadata?: CompanionMetadata | null): void {
+    SvgSerializer.loadSvgString(svgText, this, companionMetadata);
   }
 
   /**

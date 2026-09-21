@@ -39,6 +39,7 @@ export interface CompanionMetadata {
   shapeConfig?: any;
   undoStack?: string[];
   redoStack?: string[];
+  elements?: Record<string, Record<string, string>>;
   [key: string]: any;
 }
 

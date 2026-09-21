@@ -56,6 +56,7 @@ export {
 import { SvgMarkerCatalog } from './SvgMarkerCatalog.js';
 export { SvgDeserializer } from './SvgDeserializer.js';
 import { SvgDeserializer } from './SvgDeserializer.js';
+import type { CompanionMetadata } from '../../bridge/VsCodeBridge.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Dedicated SVG Serialization & Deserialization Service (SvgSerializer)
@@ -75,14 +76,24 @@ import { SvgDeserializer } from './SvgDeserializer.js';
  *    Exports native SVG primitives (<rect>, <ellipse>, <circle>, <line>, <polyline>, <polygon>)
  *    where standard-compliant, falling back cleanly to <path> with parametric metadata when
  *    complex non-uniform corner radii or partial arcs are configured.
+ *
+ * 5. Strict W3C SVG Attribute Sanitization (Rule 18 / FIX-SVG-01):
+ *    All proprietary editor attributes prefixed with 'data-' (e.g. data-shape, data-parametric,
+ *    data-corner-*, data-ellipse-type, data-inner-ratio, data-gradient, data-node-types, etc.)
+ *    are strictly excluded from output SVG element tags. They are persisted exclusively to
+ *    the companion .json file.
  */
 export class SvgSerializer {
   /**
    * Parses an SVG document string and populates the model canvas, custom defs, and vector elements.
    * Delegated to SvgDeserializer to adhere to Single Responsibility Principle (SRP).
    */
-  public static loadSvgString(svgText: string, ctx: IVectorModelSerializerContext): void {
-    SvgDeserializer.loadSvgString(svgText, ctx);
+  public static loadSvgString(
+    svgText: string,
+    ctx: IVectorModelSerializerContext,
+    companionMetadata?: CompanionMetadata | null
+  ): void {
+    SvgDeserializer.loadSvgString(svgText, ctx, companionMetadata);
   }
 
   /**
@@ -426,6 +437,22 @@ export class SvgSerializer {
       svg += `  </defs>\n`;
     }
 
+    /**
+     * ARCHITECTURAL RATIONALE: Strict W3C SVG Cleanliness & Companion JSON Isolation (Rule 18 / FIX-SVG-01)
+     * All non-standard attributes prefixed with 'data-' (e.g. data-shape, data-parametric,
+     * data-corner-*, data-ellipse-type, data-inner-ratio, data-gradient, data-node-types, etc.)
+     * are strictly excluded from output SVG element tags. They are persisted exclusively to
+     * the companion .json file, maintaining pure standard W3C compliant SVG.
+     */
+    const serializeCleanAttrs = (attrs: Record<string, string>): string => {
+      let res = '';
+      for (const [key, val] of Object.entries(attrs)) {
+        if (key.startsWith('data-')) continue;
+        res += ` ${key}="${escapeXml(val)}"`;
+      }
+      return res;
+    };
+
     ctx.elements.forEach((el) => {
       // HISTORICAL ARCHITECTURE (FIX-19): Guarantee attributes.id strictly reflects model el.id upon serialization
       el.attributes.id = el.id;
@@ -436,8 +463,7 @@ export class SvgSerializer {
          * Preserves original SVG primitives (<rect>, <ellipse>, <circle>, <line>, <polyline>, <polygon>)
          * in the output SVG document without converting them to path commands.
          * For parametric ellipse in 'pie' or 'arc' mode: native SVG lacks start/end angle attributes,
-         * so AntiDraw serializes them as compliant <path> carrying parametric metadata (data-shape="ellipse",
-         * data-parametric="true", data-ellipse-type, data-start-angle, data-end-angle, cx, cy, rx, ry),
+         * so AntiDraw serializes them as compliant <path> carrying parametric metadata in companion JSON,
          * guaranteeing standard SVG renderers display the wedge or arc without losing re-editability.
          */
         ctx.syncParametricAttributes(el);
@@ -474,19 +500,14 @@ export class SvgSerializer {
             delete cleanAttrs['data-gradient'];
           }
 
-          svg += `  <path`;
-          for (const [key, val] of Object.entries(cleanAttrs)) {
-            svg += ` ${key}="${escapeXml(val)}"`;
-          }
-          svg += ` />\n`;
+          svg += `  <path${serializeCleanAttrs(cleanAttrs)} />\n`;
         } else if (ctx.isRect(el)) {
           /**
            * ARCHITECTURAL RATIONALE: Native Parametric Rect Serialization (FEAT-03)
            * When all 4 corner radii are uniform and measured in pixels, serialize as native
            * SVG <rect x="..." y="..." width="..." height="..." rx="..." ry="..." />.
            * When corners have independent radii or percentage units, native SVG <rect> cannot
-           * express them; serialize as compliant <path> carrying parametric rect metadata
-           * (data-shape="rect", data-parametric="true", data-corner-radius, data-corner-unit, data-corner-mode, x, y, width, height)
+           * express them; serialize as compliant <path> carrying parametric rect geometry,
            * guaranteeing standard SVG renderers display the exact corner geometry without losing re-editability in AntiDraw.
            */
           const x = parseFloat(cleanAttrs.x || '0');
@@ -501,39 +522,26 @@ export class SvgSerializer {
             cleanAttrs.ry = corners.tl.toString();
             delete cleanAttrs.d;
             delete cleanAttrs['data-node-types'];
-            svg += `  <rect`;
-            for (const [key, val] of Object.entries(cleanAttrs)) {
-              svg += ` ${key}="${escapeXml(val)}"`;
-            }
-            svg += ` />\n`;
+            svg += `  <rect${serializeCleanAttrs(cleanAttrs)} />\n`;
           } else {
             const eff = ctx.calculateEffectiveCorners(w, h, corners);
             cleanAttrs.d = ctx.compileRectD(x, y, w, h, eff.tl, eff.tr, eff.br, eff.bl);
             cleanAttrs['data-shape'] = 'rect';
             cleanAttrs['data-parametric'] = 'true';
             delete cleanAttrs['data-node-types'];
-            svg += `  <path`;
-            for (const [key, val] of Object.entries(cleanAttrs)) {
-              svg += ` ${key}="${escapeXml(val)}"`;
-            }
-            svg += ` />\n`;
+            svg += `  <path${serializeCleanAttrs(cleanAttrs)} />\n`;
           }
         } else if (cleanAttrs['data-shape'] === 'star') {
           /**
            * ARCHITECTURAL RATIONALE: Native Parametric Star Serialization (FEAT-07)
-           * Native SVG lacks a <star> element; serialize as compliant <path> carrying parametric metadata
-           * (data-shape="star", data-parametric="true", data-star-points, data-star-inner-ratio, cx, cy, rx, ry),
+           * Native SVG lacks a <star> element; serialize as compliant <path> carrying parametric metadata in companion JSON,
            * guaranteeing standard SVG renderers display the exact polygon without losing re-editability in AntiDraw.
            */
           cleanAttrs.d = ctx.compilePathD(el.vertices || [], true);
           cleanAttrs['data-shape'] = 'star';
           cleanAttrs['data-parametric'] = 'true';
           delete cleanAttrs['data-node-types'];
-          svg += `  <path`;
-          for (const [key, val] of Object.entries(cleanAttrs)) {
-            svg += ` ${key}="${escapeXml(val)}"`;
-          }
-          svg += ` />\n`;
+          svg += `  <path${serializeCleanAttrs(cleanAttrs)} />\n`;
         } else {
           delete cleanAttrs.d;
           delete cleanAttrs['data-node-types'];
@@ -543,16 +551,12 @@ export class SvgSerializer {
             delete cleanAttrs['data-gradient'];
           }
 
-          svg += `  <${el.tagName}`;
-          for (const [key, val] of Object.entries(cleanAttrs)) {
-            svg += ` ${key}="${escapeXml(val)}"`;
-          }
-          svg += ` />\n`;
+          svg += `  <${el.tagName}${serializeCleanAttrs(cleanAttrs)} />\n`;
         }
       } else {
         if (el.vertices && el.vertices.length > 0) {
           el.attributes.d = ctx.compilePathD(el.vertices, el.isClosed);
-          // Persist nodeType for each vertex so re-parsing restores it reliably
+          // Persist nodeType for each vertex in memory so companion metadata captures it
           el.attributes['data-node-types'] = el.vertices.map((v) => v.nodeType).join(',');
         }
 
@@ -567,11 +571,7 @@ export class SvgSerializer {
           delete el.attributes['data-gradient'];
         }
 
-        svg += `  <${el.tagName}`;
-        for (const [key, val] of Object.entries(el.attributes)) {
-          svg += ` ${key}="${escapeXml(val)}"`;
-        }
-        svg += ` />\n`;
+        svg += `  <${el.tagName}${serializeCleanAttrs(el.attributes)} />\n`;
       }
     });
 

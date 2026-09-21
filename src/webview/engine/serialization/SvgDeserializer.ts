@@ -5,6 +5,7 @@ import {
   VectorElement,
 } from '../VectorModel.js';
 import { IVectorModelSerializerContext } from './SvgSerializer.js';
+import type { CompanionMetadata } from '../../bridge/VsCodeBridge.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Dedicated SVG Deserialization Service (SvgDeserializer)
@@ -29,12 +30,22 @@ import { IVectorModelSerializerContext } from './SvgSerializer.js';
  * 5. Open Vector Fill Restriction (FIX-13):
  *    Prevents browser-simulated straight-line chord fills on open paths by forcing fill='none'
  *    unless explicitly closed.
+ *
+ * 6. Companion JSON State Fusion (Rule 18 / FIX-SVG-01):
+ *    Reconstructs full parametric and proprietary element state (data-shape, data-parametric,
+ *    data-node-types, data-gradient, etc.) by fusing clean W3C SVG markup with metadata.elements
+ *    persisted in the companion JSON file.
  */
 export class SvgDeserializer {
   /**
    * Parses an SVG document string and populates the model canvas, custom defs, and vector elements.
+   * Fuses companion metadata into element attributes to rehydrate full parametric editor state.
    */
-  public static loadSvgString(svgText: string, ctx: IVectorModelSerializerContext): void {
+  public static loadSvgString(
+    svgText: string,
+    ctx: IVectorModelSerializerContext,
+    companionMetadata?: CompanionMetadata | null
+  ): void {
     if (!svgText || !svgText.trim()) {
       ctx.createDefaultCanvas();
       return;
@@ -241,6 +252,11 @@ export class SvgDeserializer {
             attrs.id = elementId;
           }
           usedIds.add(elementId);
+
+          // Rehydrate proprietary attributes from companion JSON metadata (Rule 18 / FIX-SVG-01)
+          if (companionMetadata?.elements && companionMetadata.elements[elementId]) {
+            Object.assign(attrs, companionMetadata.elements[elementId]);
+          }
 
           const elem: VectorElement = {
             id: elementId,

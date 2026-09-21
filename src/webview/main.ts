@@ -473,7 +473,7 @@ class AntiDrawApp {
         this.canvasMgr.guides = [];
       }
 
-      this.model.loadSvgString(payload.text);
+      this.model.loadSvgString(payload.text, payload.metadata);
       this.applyCanvasSize();
       this.render();
       if (!this.hasInitialCentered) {
@@ -717,6 +717,19 @@ class AntiDrawApp {
    *    all workspace customizations survive session restarts without polluting the vector graphic.
    */
   private syncMetadataToHost(): void {
+    const elementsMetadata: Record<string, Record<string, string>> = {};
+    for (const el of this.model.elements) {
+      const elData: Record<string, string> = {};
+      for (const [k, v] of Object.entries(el.attributes)) {
+        if (k.startsWith('data-')) {
+          elData[k] = v;
+        }
+      }
+      if (Object.keys(elData).length > 0) {
+        elementsMetadata[el.id] = elData;
+      }
+    }
+
     this.vscodeBridge.updateMetadata({
       grids: this.canvasMgr.grids,
       guides: this.canvasMgr.guides,
@@ -740,6 +753,7 @@ class AntiDrawApp {
       cameraOffset: this.viewportCtrl ? { x: this.viewportCtrl.cameraOffset.x, y: this.viewportCtrl.cameraOffset.y } : undefined,
       isAspectRatioLocked: this.selectionTool.isAspectRatioLocked,
       elementPivots: Object.fromEntries(this.selectionTool.elementPivots),
+      elements: elementsMetadata,
     });
   }
 
