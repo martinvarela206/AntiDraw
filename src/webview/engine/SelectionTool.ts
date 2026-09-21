@@ -54,6 +54,15 @@ export class SelectionTool {
   public customPivot: Point | null = null;
   public selectionMode: 'move' | 'scale' | 'rotate' = 'scale';
   public isAspectRatioLocked: boolean = false;
+  /**
+   * ARCHITECTURAL RATIONALE: Proportional Scale Locks (Figma K Parity / FEAT-TRANS-01)
+   * - scaleStroke: When true (padlock locked), multiplies stroke-width by the uniform scaling factor.
+   *   When false (default vector behavior), preserves the original stroke-width.
+   * - scaleCorners: When true (padlock locked), multiplies parametric rectangle corner radii by the uniform scaling factor.
+   *   When false (default vector behavior), preserves constant absolute pixel corner radii.
+   */
+  public scaleStroke: boolean = false;
+  public scaleCorners: boolean = false;
 
   // Backward compatibility getter & setter
   public get selectedElementId(): string | null {

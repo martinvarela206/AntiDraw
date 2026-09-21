@@ -464,6 +464,12 @@ class AntiDrawApp {
         if (payload.metadata.isAspectRatioLocked !== undefined) {
           this.selectionTool.isAspectRatioLocked = payload.metadata.isAspectRatioLocked;
         }
+        if (payload.metadata.scaleStroke !== undefined) {
+          this.selectionTool.scaleStroke = payload.metadata.scaleStroke;
+        }
+        if (payload.metadata.scaleCorners !== undefined) {
+          this.selectionTool.scaleCorners = payload.metadata.scaleCorners;
+        }
         if (payload.metadata.elementPivots) {
           this.selectionTool.elementPivots = new Map(Object.entries(payload.metadata.elementPivots));
         }
@@ -752,6 +758,8 @@ class AntiDrawApp {
       zoom: this.canvasMgr.zoom,
       cameraOffset: this.viewportCtrl ? { x: this.viewportCtrl.cameraOffset.x, y: this.viewportCtrl.cameraOffset.y } : undefined,
       isAspectRatioLocked: this.selectionTool.isAspectRatioLocked,
+      scaleStroke: this.selectionTool.scaleStroke,
+      scaleCorners: this.selectionTool.scaleCorners,
       elementPivots: Object.fromEntries(this.selectionTool.elementPivots),
       elements: elementsMetadata,
     });

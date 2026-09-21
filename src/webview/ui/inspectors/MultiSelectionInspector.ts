@@ -52,6 +52,13 @@ export class MultiSelectionInspector {
             <button class="prop-input" id="btn-multi-mode-rotate" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'rotate' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Modo Rotación: muestra tiradores de giro y permite reubicar libremente el centro de rotación">↻ Rotar</button>
           </div>
         </div>
+        <div class="prop-row" style="margin-top:2px;">
+          <span class="prop-label" style="font-size:11px;">Escalar</span>
+          <div style="display:flex; gap:6px; flex:1; align-items:center;">
+            <button class="prop-input" id="btn-multi-lock-scale-stroke" style="flex:1; padding:2px 4px; display:flex; justify-content:center; align-items:center; gap:4px; cursor:pointer; font-size:11px; ${selectionTool.scaleStroke ? 'background:var(--accent-color); color:#ffffff;' : 'background:transparent;'} border:1px solid var(--border-color);" title="Escalar grosor de trazo proporcionalmente al redimensionar (candado cerrado = escala, abierto = fijo)">${selectionTool.scaleStroke ? '🔒' : '🔓'} Trazo</button>
+            <button class="prop-input" id="btn-multi-lock-scale-corners" style="flex:1; padding:2px 4px; display:flex; justify-content:center; align-items:center; gap:4px; cursor:pointer; font-size:11px; ${selectionTool.scaleCorners ? 'background:var(--accent-color); color:#ffffff;' : 'background:transparent;'} border:1px solid var(--border-color);" title="Escalar radios de esquinas paramétricas proporcionalmente al redimensionar (candado cerrado = escala, abierto = fijo)">${selectionTool.scaleCorners ? '🔒' : '🔓'} Esquinas</button>
+          </div>
+        </div>
         <div class="prop-row">
           <span class="prop-label">Pivot</span>
           <input type="number" class="prop-input" id="multi-pivot-x" value="${Math.round(multiPivot.x)}" title="Coordenada X del pivote de rotación grupal" />
@@ -241,6 +248,20 @@ export class MultiSelectionInspector {
     });
     btnMultiModeRotate?.addEventListener('click', () => {
       selectionTool.selectionMode = 'rotate';
+      callbacks.onRenderOverlay?.();
+      onReRender();
+    });
+
+    const btnMultiLockStroke = container.querySelector<HTMLButtonElement>('#btn-multi-lock-scale-stroke');
+    btnMultiLockStroke?.addEventListener('click', () => {
+      selectionTool.scaleStroke = !selectionTool.scaleStroke;
+      callbacks.onRenderOverlay?.();
+      onReRender();
+    });
+
+    const btnMultiLockCorners = container.querySelector<HTMLButtonElement>('#btn-multi-lock-scale-corners');
+    btnMultiLockCorners?.addEventListener('click', () => {
+      selectionTool.scaleCorners = !selectionTool.scaleCorners;
       callbacks.onRenderOverlay?.();
       onReRender();
     });

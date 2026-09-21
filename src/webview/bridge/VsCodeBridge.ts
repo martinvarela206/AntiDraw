@@ -40,6 +40,8 @@ export interface CompanionMetadata {
   undoStack?: string[];
   redoStack?: string[];
   elements?: Record<string, Record<string, string>>;
+  scaleStroke?: boolean;
+  scaleCorners?: boolean;
   [key: string]: any;
 }
 

@@ -38,6 +38,13 @@ export class GeometryInspector {
             <button class="prop-input" id="btn-mode-rotate" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'rotate' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Modo Rotar: Girar elementos interactivamente">↻</button>
           </div>
         </div>
+        <div class="prop-row" style="margin-top:2px;">
+          <span class="prop-label" style="font-size:11px;">Escalar</span>
+          <div style="display:flex; gap:6px; flex:1; align-items:center;">
+            <button class="prop-input" id="btn-lock-scale-stroke" style="flex:1; padding:2px 4px; display:flex; justify-content:center; align-items:center; gap:4px; cursor:pointer; font-size:11px; ${selectionTool.scaleStroke ? 'background:var(--accent-color); color:#ffffff;' : 'background:transparent;'} border:1px solid var(--border-color);" title="Escalar grosor de trazo proporcionalmente al redimensionar (candado cerrado = escala, abierto = fijo)">${selectionTool.scaleStroke ? '🔒' : '🔓'} Trazo</button>
+            <button class="prop-input" id="btn-lock-scale-corners" style="flex:1; padding:2px 4px; display:flex; justify-content:center; align-items:center; gap:4px; cursor:pointer; font-size:11px; ${selectionTool.scaleCorners ? 'background:var(--accent-color); color:#ffffff;' : 'background:transparent;'} border:1px solid var(--border-color);" title="Escalar radios de esquinas paramétricas proporcionalmente al redimensionar (candado cerrado = escala, abierto = fijo)">${selectionTool.scaleCorners ? '🔒' : '🔓'} Esquinas</button>
+          </div>
+        </div>
         <div class="prop-row">
           <span class="prop-label">X</span>
           <input type="number" step="any" class="prop-input" id="el-x" value="${x}" />
@@ -178,6 +185,24 @@ export class GeometryInspector {
         lockBtn.addEventListener('click', () => {
           selectionTool.isAspectRatioLocked = !selectionTool.isAspectRatioLocked;
           callbacks.onRenderOverlay?.(); // Trigger save and UI update via main event loop
+          onReRender();
+        });
+      }
+
+      const lockStrokeBtn = container.querySelector<HTMLButtonElement>('#btn-lock-scale-stroke');
+      if (lockStrokeBtn) {
+        lockStrokeBtn.addEventListener('click', () => {
+          selectionTool.scaleStroke = !selectionTool.scaleStroke;
+          callbacks.onRenderOverlay?.();
+          onReRender();
+        });
+      }
+
+      const lockCornersBtn = container.querySelector<HTMLButtonElement>('#btn-lock-scale-corners');
+      if (lockCornersBtn) {
+        lockCornersBtn.addEventListener('click', () => {
+          selectionTool.scaleCorners = !selectionTool.scaleCorners;
+          callbacks.onRenderOverlay?.();
           onReRender();
         });
       }

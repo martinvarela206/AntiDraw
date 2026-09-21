@@ -171,6 +171,9 @@ export class ScaleTransformer {
     const ghostMap = new Map<string, PathVertex[]>();
 
     opts.initialElementsMap.forEach((origVerts, id) => {
+      const el = ctx.model.elements.find((e) => e.id === id);
+      const isRect = el ? ctx.model.isRect(el) : false;
+
       const transformed = ctx.selectionTool.transformVertices(
         origVerts,
         opts.initialBox,
@@ -181,6 +184,35 @@ export class ScaleTransformer {
         isFromCenter,
         isProportional
       );
+
+      /**
+       * ARCHITECTURAL RATIONALE: Unscaled Corner Radius Ghost Stabilization
+       * When scaleCorners is false (padlock unlocked, default vector behavior):
+       * Reconstructs the rectangle ghost topology directly using its exact original pixel corner
+       * radii so the preview does not display false corner stretching during drag.
+       */
+      if (isRect && !ctx.selectionTool.scaleCorners && el) {
+        const tempBox = ctx.selectionTool.getBoundingBox({ ...el, vertices: transformed });
+        if (tempBox && tempBox.width > 0 && tempBox.height > 0) {
+          const corners = ctx.model.getRectCorners(el, tempBox.width, tempBox.height);
+          if (corners.unit === 'px') {
+            const eff = ctx.model.calculateEffectiveCorners(tempBox.width, tempBox.height, corners);
+            const rectVerts = ctx.model.convertRectToVertices(
+              tempBox.x,
+              tempBox.y,
+              tempBox.width,
+              tempBox.height,
+              eff.tl,
+              eff.tr,
+              eff.br,
+              eff.bl
+            );
+            ghostMap.set(id, rectVerts);
+            return;
+          }
+        }
+      }
+
       ghostMap.set(id, transformed);
     });
 
@@ -253,6 +285,73 @@ export class ScaleTransformer {
     if (newBox) {
       ctx.selectionTool.updatePivotOnScale(initialBox, newBox, selectedEls);
     }
+
+    const oldBox = initialBox;
+    const scaleX = oldBox && oldBox.width > 0 && newBox ? newBox.width / oldBox.width : 1;
+    const scaleY = oldBox && oldBox.height > 0 && newBox ? newBox.height / oldBox.height : 1;
+    const uniformScale = Math.sqrt(Math.abs(scaleX * scaleY));
+
+    /**
+     * ARCHITECTURAL RATIONALE: Proportional Stroke Width Scaling (Figma K Parity / FEAT-TRANS-01)
+     * When ctx.selectionTool.scaleStroke is true (padlock closed):
+     * Multiplies the base stroke-width by the uniform scaling factor uniformScale.
+     * When false (padlock open, default):
+     * The stroke-width remains invariant regardless of element dimension scaling.
+     */
+    if (ctx.selectionTool.scaleStroke && uniformScale > 0.0001) {
+      selectedEls.forEach((el) => {
+        const initAttrs = initialAttributesMap.get(el.id);
+        const oldStrokeStr = (initAttrs && initAttrs['stroke-width']) || el.attributes['stroke-width'];
+        if (oldStrokeStr !== undefined) {
+          const oldStroke = parseFloat(oldStrokeStr) || 1;
+          const newStroke = Math.max(0.1, Math.round(oldStroke * uniformScale * 100) / 100);
+          el.attributes['stroke-width'] = newStroke.toString();
+        }
+      });
+    }
+
+    /**
+     * ARCHITECTURAL RATIONALE: Parametric Rectangle Corner Scaling (FEAT-TRANS-01)
+     * When ctx.selectionTool.scaleCorners is true (padlock closed):
+     * Multiplies absolute pixel corner radii by the uniform scaling factor.
+     * When false (padlock open, default):
+     * Preserves the absolute pixel corner radii exactly without elongation or distortion.
+     */
+    selectedEls.forEach((el) => {
+      if (ctx.model.isRect(el)) {
+        const initAttrs = initialAttributesMap.get(el.id);
+        const elBox = ctx.selectionTool.getBoundingBox(el);
+        if (elBox && elBox.width > 0 && elBox.height > 0) {
+          const corners = ctx.model.getRectCorners(el, elBox.width, elBox.height);
+          if (corners.unit === 'px') {
+            const factor = ctx.selectionTool.scaleCorners ? uniformScale : 1;
+            const initCorners = initAttrs ? ctx.model.parseCornersFromAttrs(initAttrs, elBox.width, elBox.height) : corners;
+            const newTl = Math.round(initCorners.tl * factor * 100) / 100;
+            const newTr = Math.round(initCorners.tr * factor * 100) / 100;
+            const newBr = Math.round(initCorners.br * factor * 100) / 100;
+            const newBl = Math.round(initCorners.bl * factor * 100) / 100;
+
+            if (corners.mode === 'uniform') {
+              el.attributes['data-corner-radius'] = newTl.toString();
+              el.attributes.rx = newTl.toString();
+              el.attributes.ry = newTl.toString();
+            } else {
+              el.attributes['data-corner-radius'] = `${newTl},${newTr},${newBr},${newBl}`;
+              el.attributes['data-corner-tl'] = newTl.toString();
+              el.attributes['data-corner-tr'] = newTr.toString();
+              el.attributes['data-corner-br'] = newBr.toString();
+              el.attributes['data-corner-bl'] = newBl.toString();
+            }
+
+            const eff = ctx.model.calculateEffectiveCorners(elBox.width, elBox.height, { ...corners, tl: newTl, tr: newTr, br: newBr, bl: newBl });
+            el.attributes.d = ctx.model.compileRectD(elBox.x, elBox.y, elBox.width, elBox.height, eff.tl, eff.tr, eff.br, eff.bl);
+            el.vertices = ctx.model.convertRectToVertices(elBox.x, elBox.y, elBox.width, elBox.height, eff.tl, eff.tr, eff.br, eff.bl);
+            el.attributes['data-node-types'] = el.vertices.map((v) => v.nodeType).join(',');
+            ctx.model.syncParametricAttributes(el);
+          }
+        }
+      }
+    });
 
     // Compensate gradients for elements with lockScale === false (FIX-FillLocks)
     selectedEls.forEach((el) => {
