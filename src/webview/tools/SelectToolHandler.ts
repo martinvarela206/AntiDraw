@@ -483,7 +483,21 @@ export class SelectToolHandler implements IToolHandler {
       return true;
     }
 
-    return false;
+    /**
+     * ARCHITECTURAL RATIONALE: Empty Canvas Double-Click Selection Reset (ITEM-02)
+     * Double-clicking on empty workspace area cleanly clears all active element and guide selections,
+     * resetting selection state deterministically.
+     */
+    const hadAny = this.ctx.selectionTool.selectedElementIds.size > 0 || this.ctx.canvasMgr.selectedGuideId !== null;
+    this.ctx.selectionTool.deselectAll();
+    this.ctx.canvasMgr.selectedGuideId = null;
+    this.ctx.canvasMgr.activeGuideTransformId = null;
+    this.callbacks.onClearPanelMode?.();
+    this.callbacks.onSelectionChanged?.();
+    if (hadAny) {
+      this.ctx.render();
+    }
+    return true;
   }
 
   public cancel(): boolean {

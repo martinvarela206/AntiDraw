@@ -268,6 +268,22 @@ export class NodeToolHandler implements IToolHandler {
       this.lastClickTime = 0;
       this.lastClickPt = { x: 0, y: 0 };
       if (this.executeDoubleClick(pt, z)) {
+        this.lastDoubleClickHandledTime = now;
+        return true;
+      }
+
+      /**
+       * ARCHITECTURAL RATIONALE: Synthetic Double-Click on Empty Canvas (ITEM-02 CorelDraw Parity)
+       * Native DOM 'dblclick' events are notoriously dropped by browsers when DOM overlays re-render
+       * or when pointer capture is engaged on pointerdown/pointerup.
+       * Detecting double-click directly during the pointerdown sequence ensures immediate, reliable
+       * conmutation back to the Selection Tool ('select') when clicking empty canvas space.
+       */
+      const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, z);
+      if (!hit) {
+        this.lastDoubleClickHandledTime = now;
+        this.ctx.setTool('select');
+        this.ctx.render();
         return true;
       }
     }

@@ -364,16 +364,21 @@ export class TransformInteraction {
    * and allows both synthetic double-click gesture detectors and native DOM dblclick events
    * to trigger clean, synchronized state transitions across UI inspectors and canvas overlays.
   /**
-   * ARCHITECTURAL RATIONALE: CorelDraw Benchmark Scale <-> Rotate Selection Box Conmutation (ITEM-05)
-   * Toggles the selection bounding box directly between 'scale' (8 sizing handles) and 'rotate'
-   * (corner rotation arrows, side skew handles, and central pivot).
-   * Calls ctx.render() to synchronize property panel inspector buttons and canvas overlays simultaneously.
+   * ARCHITECTURAL RATIONALE: Universal 3-Mode Cyclic Conmutation (ITEM-02 CorelDraw Benchmark)
+   * A deliberate second paused click (>=300ms) without dragging cycles through all 3 selection states:
+   * 1. 'scale': 8 bounding box resize handles for geometric sizing and aspect scaling.
+   * 2. 'rotate': 4 corner curved rotation arrows, 4 edge skew arrows, and central arbitrary pivot.
+   * 3. 'move': Bounding box outline without perimeter handles, exposing all real structural vertices
+   *    and landmarks (rendered by OverlayRenderer) for direct magnetic snapping anchor picking.
+   * Cycles deterministically: scale -> rotate -> move -> scale.
    */
   public toggleSelectionMode(ctx: ToolContext, callbacks: SelectToolCallbacks): void {
-    if (ctx.selectionTool.selectionMode === 'rotate') {
-      ctx.selectionTool.selectionMode = 'scale';
-    } else {
+    if (ctx.selectionTool.selectionMode === 'scale') {
       ctx.selectionTool.selectionMode = 'rotate';
+    } else if (ctx.selectionTool.selectionMode === 'rotate') {
+      ctx.selectionTool.selectionMode = 'move';
+    } else {
+      ctx.selectionTool.selectionMode = 'scale';
     }
     this.lastToggleTime = Date.now();
     callbacks.onSelectionChanged?.();
@@ -406,11 +411,12 @@ export class TransformInteraction {
       const groupBox = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 0);
       if (groupBox) {
         const mode = ctx.selectionTool.selectionMode;
-        const boxStroke = mode === 'rotate' ? '#f59e0b' : '#38bdf8';
+        const boxStroke = mode === 'rotate' ? '#f59e0b' : mode === 'move' ? '#10b981' : '#38bdf8';
         
-        if (mode !== 'move') {
-          html += `<rect x="${groupBox.x}" y="${groupBox.y}" width="${groupBox.width}" height="${groupBox.height}" fill="none" stroke="${boxStroke}" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke" />`;
+        // Render bounding box outline across all modes, visually distinguishing states by hue
+        html += `<rect x="${groupBox.x}" y="${groupBox.y}" width="${groupBox.width}" height="${groupBox.height}" fill="none" stroke="${boxStroke}" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke" />`;
 
+        if (mode !== 'move') {
           const rotOffset = 18 / z;
 
           if (mode === 'scale') {
