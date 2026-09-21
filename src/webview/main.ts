@@ -447,13 +447,20 @@ class AntiDrawApp {
             se: { x: groupBox.x + groupBox.width, y: groupBox.y + groupBox.height },
             sw: { x: groupBox.x, y: groupBox.y + groupBox.height },
           };
-          const updatedQuad = DistortTransformer.resetCorner(
-            this.toolCtx,
-            cornerKey,
-            selectedEls,
-            groupBox,
-            quad
-          );
+          const cornersToReset = (this.selectionTool.selectedDistortCorners && this.selectionTool.selectedDistortCorners.size > 1)
+            ? Array.from(this.selectionTool.selectedDistortCorners)
+            : [cornerKey];
+          let updatedQuad: QuadCorners | null = quad;
+          for (const ck of cornersToReset) {
+            const res = DistortTransformer.resetCorner(
+              this.toolCtx,
+              ck,
+              selectedEls,
+              groupBox,
+              updatedQuad
+            );
+            if (res) updatedQuad = res;
+          }
           if (updatedQuad) {
             this.selectionTool.currentDistortQuad = updatedQuad;
             this.propertyPanel.update(null, 'select');

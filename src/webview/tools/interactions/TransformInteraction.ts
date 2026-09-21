@@ -73,6 +73,7 @@ export class TransformInteraction {
   public lastSkewTransformFn: ((p: Point) => Point) | null = null;
   public currentSkewParallelogram: Point[] | null = null;
   public currentSkewAngleDeg: number = 0;
+  public initialDistortQuad: QuadCorners | null = null;
   public currentDistortQuad: QuadCorners | null = null;
 
   /**
@@ -136,6 +137,7 @@ export class TransformInteraction {
     this.initialElementsMap = init.initialElementsMap;
     this.initialAttributesMap = init.initialAttributesMap;
     this.ghostTransformMap = init.ghostTransformMap;
+    this.initialDistortQuad = { ...init.initialQuad };
     if (!this.currentDistortQuad) {
       this.currentDistortQuad = init.initialQuad;
     }
@@ -264,8 +266,8 @@ export class TransformInteraction {
 
     if (activeHandle.startsWith('distort-') && this.initialBox && this.initialElementsMap.size > 0) {
       callbacks.setCursor?.('crosshair');
-      if (!this.currentDistortQuad) {
-        this.currentDistortQuad = {
+      if (!this.initialDistortQuad) {
+        this.initialDistortQuad = {
           nw: { x: this.initialBox.x, y: this.initialBox.y },
           ne: { x: this.initialBox.x + this.initialBox.width, y: this.initialBox.y },
           se: { x: this.initialBox.x + this.initialBox.width, y: this.initialBox.y + this.initialBox.height },
@@ -277,8 +279,14 @@ export class TransformInteraction {
         pt,
         activeHandle,
         this.initialBox,
-        this.currentDistortQuad,
-        this.initialElementsMap
+        this.initialDistortQuad,
+        this.initialElementsMap,
+        {
+          shiftKey: e.shiftKey,
+          altKey: e.altKey,
+          ctrlKey: e.ctrlKey,
+          selectedCorners: ctx.selectionTool.selectedDistortCorners,
+        }
       );
       this.ghostTransformMap = result.ghostMap;
       this.currentDistortQuad = result.quad;
@@ -440,6 +448,7 @@ export class TransformInteraction {
       this.currentSkewParallelogram = null;
       this.currentSkewAngleDeg = 0;
       this.lastSkewTransformFn = null;
+      this.initialDistortQuad = null;
       this.currentDistortQuad = null;
       ctx.selectionTool.currentDistortQuad = null;
       callbacks.onSelectionChanged?.();
@@ -454,6 +463,7 @@ export class TransformInteraction {
     this.rotationPivot = null;
     this.currentRotationSnappedPt = null;
     this.currentScaleSnappedPt = null;
+    this.initialDistortQuad = null;
     this.currentDistortQuad = null;
     ctx.selectionTool.currentDistortQuad = null;
     return false;
@@ -471,6 +481,7 @@ export class TransformInteraction {
       this.currentSkewParallelogram = null;
       this.currentSkewAngleDeg = 0;
       this.lastSkewTransformFn = null;
+      this.initialDistortQuad = null;
       this.currentDistortQuad = null;
       ctx.selectionTool.currentDistortQuad = null;
       handled = true;
@@ -588,15 +599,17 @@ export class TransformInteraction {
             ];
 
             const activeCornerKey = ctx.selectionTool.activeDistortCorner || 'nw';
+            const selectedCorners = ctx.selectionTool.selectedDistortCorners;
             corners.forEach((c) => {
-              const isActive = c.key === activeCornerKey;
-              const fillCol = isActive ? '#8b5cf6' : '#0f172a';
-              const strokeCol = isActive ? '#c4b5fd' : '#a78bfa';
+              const isSelected = selectedCorners ? selectedCorners.has(c.key as any) : (c.key === activeCornerKey);
+              const fillCol = isSelected ? '#8b5cf6' : '#0f172a';
+              const strokeCol = isSelected ? '#c4b5fd' : '#a78bfa';
+              const strokeWidth = isSelected ? '2' : '1.4';
               html += `
                 <g class="distort-corner-handle" transform="translate(${c.x}, ${c.y}) scale(${1 / z})" style="cursor: crosshair;">
-                  <title>${c.title}</title>
-                  <polygon points="0,-7 7,0 0,7 -7,0" fill="${fillCol}" fill-opacity="0.92" stroke="${strokeCol}" stroke-width="1.4" vector-effect="non-scaling-stroke" />
-                  <circle cx="0" cy="0" r="2" fill="#ffffff" />
+                  <title>${c.title}${isSelected ? ' (Seleccionada)' : ''}</title>
+                  <polygon points="0,-7 7,0 0,7 -7,0" fill="${fillCol}" fill-opacity="0.92" stroke="${strokeCol}" stroke-width="${strokeWidth}" vector-effect="non-scaling-stroke" />
+                  <circle cx="0" cy="0" r="${isSelected ? 2.5 : 2}" fill="#ffffff" />
                 </g>
               `;
             });

@@ -102,14 +102,20 @@ export class DistortTransformer {
     pt: Point,
     activeHandle: string,
     initialBox: BoundingBox,
-    currentQuad: QuadCorners,
-    initialElementsMap: Map<string, PathVertex[]>
+    initialQuad: QuadCorners,
+    initialElementsMap: Map<string, PathVertex[]>,
+    modifiers: {
+      shiftKey?: boolean;
+      altKey?: boolean;
+      ctrlKey?: boolean;
+      selectedCorners?: Set<string>;
+    } = {}
   ): DistortComputeResult {
     const cornerKey = activeHandle.replace('distort-', '') as keyof QuadCorners;
     if (!['nw', 'ne', 'se', 'sw'].includes(cornerKey)) {
       return {
         ghostMap: new Map(),
-        quad: currentQuad,
+        quad: initialQuad,
         snappedPt: null,
         homography: null,
       };
@@ -120,19 +126,82 @@ export class DistortTransformer {
     const targetPt: Point = { x: pt.x, y: pt.y };
     const snappedPt = ctx.snapPoint(targetPt, otherVertices);
 
+    let dx = snappedPt.x - initialQuad[cornerKey].x;
+    let dy = snappedPt.y - initialQuad[cornerKey].y;
+
+    // 1. Shift Modifier: Restrict to dominant orthogonal axis (FEAT-TRANS-03)
+    if (modifiers.shiftKey) {
+      if (Math.abs(dx) >= Math.abs(dy)) {
+        dy = 0;
+      } else {
+        dx = 0;
+      }
+    }
+
     const candidateQuad: QuadCorners = {
-      nw: { ...currentQuad.nw },
-      ne: { ...currentQuad.ne },
-      se: { ...currentQuad.se },
-      sw: { ...currentQuad.sw },
+      nw: { ...initialQuad.nw },
+      ne: { ...initialQuad.ne },
+      se: { ...initialQuad.se },
+      sw: { ...initialQuad.sw },
     };
-    candidateQuad[cornerKey] = { x: snappedPt.x, y: snappedPt.y };
+
+    // 2. Ctrl Modifier: Concentric 4-Corner Symmetric Perspective Projection (FEAT-TRANS-03)
+    if (modifiers.ctrlKey) {
+      const sx = cornerKey === 'nw' || cornerKey === 'sw' ? 1 : -1;
+      const sy = cornerKey === 'nw' || cornerKey === 'ne' ? 1 : -1;
+      const effDx = dx * sx;
+      const effDy = dy * sy;
+
+      candidateQuad.nw = { x: initialQuad.nw.x + effDx, y: initialQuad.nw.y + effDy };
+      candidateQuad.ne = { x: initialQuad.ne.x - effDx, y: initialQuad.ne.y + effDy };
+      candidateQuad.se = { x: initialQuad.se.x - effDx, y: initialQuad.se.y - effDy };
+      candidateQuad.sw = { x: initialQuad.sw.x + effDx, y: initialQuad.sw.y - effDy };
+    } else if (modifiers.selectedCorners && modifiers.selectedCorners.size > 1 && modifiers.selectedCorners.has(cornerKey)) {
+      // 3. Multi-Corner Selection: translate all selected corners coordinatedly (FEAT-TRANS-03)
+      modifiers.selectedCorners.forEach((k) => {
+        const cKey = k as keyof QuadCorners;
+        if (candidateQuad[cKey]) {
+          candidateQuad[cKey] = {
+            x: initialQuad[cKey].x + dx,
+            y: initialQuad[cKey].y + dy,
+          };
+        }
+      });
+    } else if (modifiers.altKey) {
+      // 4. Alt Modifier: Symmetric Perspective Reflection (narrowing edge while opposite edge/base stays fixed)
+      candidateQuad[cornerKey] = {
+        x: initialQuad[cornerKey].x + dx,
+        y: initialQuad[cornerKey].y + dy,
+      };
+
+      if (Math.abs(dx) >= Math.abs(dy)) {
+        // Horizontal edge perspective: opposite corner along horizontal edge reflects dx symmetrically
+        const oppHKey: keyof QuadCorners = cornerKey === 'nw' ? 'ne' : cornerKey === 'ne' ? 'nw' : cornerKey === 'se' ? 'sw' : 'se';
+        candidateQuad[oppHKey] = {
+          x: initialQuad[oppHKey].x - dx,
+          y: initialQuad[oppHKey].y + dy,
+        };
+      } else {
+        // Vertical edge perspective: opposite corner along vertical edge reflects dy symmetrically
+        const oppVKey: keyof QuadCorners = cornerKey === 'nw' ? 'sw' : cornerKey === 'sw' ? 'nw' : cornerKey === 'ne' ? 'se' : 'ne';
+        candidateQuad[oppVKey] = {
+          x: initialQuad[oppVKey].x + dx,
+          y: initialQuad[oppVKey].y - dy,
+        };
+      }
+    } else {
+      // 5. Default Free Distort: moves only the active corner freely, preserving the other 3 corners
+      candidateQuad[cornerKey] = {
+        x: initialQuad[cornerKey].x + dx,
+        y: initialQuad[cornerKey].y + dy,
+      };
+    }
 
     // Numerical stability safeguard: reject non-convex or self-intersecting quads
     if (!ProjectiveHomography.isConvex(candidateQuad)) {
       return {
         ghostMap: new Map(),
-        quad: currentQuad,
+        quad: initialQuad,
         snappedPt,
         homography: null,
       };

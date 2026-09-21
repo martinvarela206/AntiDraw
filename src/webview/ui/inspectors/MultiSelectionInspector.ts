@@ -70,13 +70,20 @@ export class MultiSelectionInspector {
         ${(() => {
           if (selectionTool.selectionMode !== 'distort' || !groupBox) return '';
           const activeKey = selectionTool.activeDistortCorner || 'nw';
-          let cX = groupBox.x;
-          let cY = groupBox.y;
-          if (activeKey === 'ne') { cX = groupBox.x + groupBox.width; cY = groupBox.y; }
-          else if (activeKey === 'se') { cX = groupBox.x + groupBox.width; cY = groupBox.y + groupBox.height; }
-          else if (activeKey === 'sw') { cX = groupBox.x; cY = groupBox.y + groupBox.height; }
+          const quad = selectionTool.currentDistortQuad;
+          let cX = quad ? quad[activeKey].x : groupBox.x;
+          let cY = quad ? quad[activeKey].y : groupBox.y;
+          if (!quad) {
+            if (activeKey === 'ne') { cX = groupBox.x + groupBox.width; cY = groupBox.y; }
+            else if (activeKey === 'se') { cX = groupBox.x + groupBox.width; cY = groupBox.y + groupBox.height; }
+            else if (activeKey === 'sw') { cX = groupBox.x; cY = groupBox.y + groupBox.height; }
+          }
           cX = Math.round(cX * 10) / 10;
           cY = Math.round(cY * 10) / 10;
+          const isCornerSelected = (k: string) =>
+            selectionTool.selectedDistortCorners
+              ? selectionTool.selectedDistortCorners.has(k as any) || activeKey === k
+              : activeKey === k;
           return `
           <div style="border-top:1px solid var(--border-color); padding-top:6px; margin-top:6px;">
             <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
@@ -86,10 +93,10 @@ export class MultiSelectionInspector {
             <div class="prop-row" style="margin-top:4px;">
               <span class="prop-label" style="font-size:11px;">Esquina</span>
               <div style="display:flex; gap:3px; flex:1;">
-                <button class="prop-input btn-distort-corner" data-corner="nw" style="flex:1; padding:2px; font-size:10px; ${activeKey === 'nw' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Esquina Noroeste (Superior Izquierda)">NO</button>
-                <button class="prop-input btn-distort-corner" data-corner="ne" style="flex:1; padding:2px; font-size:10px; ${activeKey === 'ne' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Esquina Noreste (Superior Derecha)">NE</button>
-                <button class="prop-input btn-distort-corner" data-corner="se" style="flex:1; padding:2px; font-size:10px; ${activeKey === 'se' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Esquina Sureste (Inferior Derecha)">SE</button>
-                <button class="prop-input btn-distort-corner" data-corner="sw" style="flex:1; padding:2px; font-size:10px; ${activeKey === 'sw' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Esquina Suroeste (Inferior Izquierda)">SO</button>
+                <button class="prop-input btn-distort-corner" data-corner="nw" style="flex:1; padding:2px; font-size:10px; ${isCornerSelected('nw') ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Esquina Noroeste (Superior Izquierda) - Shift+clic para multiselección">NO</button>
+                <button class="prop-input btn-distort-corner" data-corner="ne" style="flex:1; padding:2px; font-size:10px; ${isCornerSelected('ne') ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Esquina Noreste (Superior Derecha) - Shift+clic para multiselección">NE</button>
+                <button class="prop-input btn-distort-corner" data-corner="se" style="flex:1; padding:2px; font-size:10px; ${isCornerSelected('se') ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Esquina Sureste (Inferior Derecha) - Shift+clic para multiselección">SE</button>
+                <button class="prop-input btn-distort-corner" data-corner="sw" style="flex:1; padding:2px; font-size:10px; ${isCornerSelected('sw') ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Esquina Suroeste (Inferior Izquierda) - Shift+clic para multiselección">SO</button>
               </div>
             </div>
             <div class="prop-row">
@@ -302,9 +309,19 @@ export class MultiSelectionInspector {
 
     const btnDistortCorners = container.querySelectorAll<HTMLButtonElement>('.btn-distort-corner');
     btnDistortCorners.forEach((btn) => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e: MouseEvent) => {
         const corner = btn.getAttribute('data-corner') as 'nw' | 'ne' | 'se' | 'sw';
         if (corner) {
+          if (e.shiftKey) {
+            if (selectionTool.selectedDistortCorners.has(corner)) {
+              selectionTool.selectedDistortCorners.delete(corner);
+            } else {
+              selectionTool.selectedDistortCorners.add(corner);
+            }
+          } else {
+            selectionTool.selectedDistortCorners.clear();
+            selectionTool.selectedDistortCorners.add(corner);
+          }
           selectionTool.activeDistortCorner = corner;
           callbacks.onRenderOverlay?.();
           onReRender();

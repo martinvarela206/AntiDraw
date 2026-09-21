@@ -56,6 +56,7 @@ export class SelectionTool {
   public customPivot: Point | null = null;
   public selectionMode: 'move' | 'scale' | 'rotate' | 'distort' = 'scale';
   public activeDistortCorner: 'nw' | 'ne' | 'se' | 'sw' = 'nw';
+  public selectedDistortCorners: Set<'nw' | 'ne' | 'se' | 'sw'> = new Set(['nw']);
   public currentDistortQuad: QuadCorners | null = null;
   public isAspectRatioLocked: boolean = false;
   /**
