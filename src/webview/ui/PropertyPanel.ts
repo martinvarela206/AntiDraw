@@ -58,9 +58,12 @@ import { ShapeDefaultsInspector } from './inspectors/ShapeDefaultsInspector.js';
 import { NodeInspector } from './inspectors/NodeInspector.js';
 import { MultiSelectionInspector } from './inspectors/MultiSelectionInspector.js';
 import { StrokeInspector, StrokeInspectorProps } from './inspectors/StrokeInspector.js';
+import { QuickHelpInspector } from './inspectors/QuickHelpInspector.js';
 
 export class PropertyPanel {
   private container: HTMLElement;
+  private inspectorContainer!: HTMLElement;
+  private quickHelpContainer!: HTMLElement;
   private model: VectorModel;
   private selectionTool: SelectionTool;
   private activeVertex: PathVertex | null = null;
@@ -93,10 +96,32 @@ export class PropertyPanel {
     callbacks: PropertyPanelCallbacks
   ) {
     this.container = container;
+    this.ensureContainers();
     this.model = model;
     this.selectionTool = selectionTool;
     this.callbacks = callbacks;
     this.renderPanel();
+  }
+
+  private ensureContainers(): void {
+    if (
+      !this.inspectorContainer ||
+      !this.quickHelpContainer ||
+      !this.container.contains(this.inspectorContainer) ||
+      !this.container.contains(this.quickHelpContainer)
+    ) {
+      this.container.innerHTML = `
+        <div class="property-inspector-content" id="property-inspector-content"></div>
+        <div class="property-quick-help" id="property-quick-help"></div>
+      `;
+      this.inspectorContainer = this.container.querySelector('#property-inspector-content')!;
+      this.quickHelpContainer = this.container.querySelector('#property-quick-help')!;
+    }
+  }
+
+  private renderQuickHelp(isGuideOrRuler: boolean = false): void {
+    this.ensureContainers();
+    QuickHelpInspector.render(this.quickHelpContainer, this.activeTool, isGuideOrRuler);
   }
 
   public update(
@@ -160,13 +185,17 @@ export class PropertyPanel {
     this.gridAlignmentMode = gridAlignmentMode;
     if (grids.length > 0) this.grids = grids;
     if (guides.length > 0) this.guides = guides;
+    this.ensureContainers();
     this.renderRulerProperties(config);
+    this.renderQuickHelp(true);
   }
 
   public showGuideSettings(guide: GuideLine): void {
     this.currentPanelMode = 'guide';
     this.activeGuide = guide;
+    this.ensureContainers();
     this.renderGuideProperties(guide);
+    this.renderQuickHelp(true);
   }
 
   /**
@@ -193,9 +222,13 @@ export class PropertyPanel {
    *    consistently presents the Canvas & ViewBox properties (presets, W/H, minX/minY, bg color, grid-ruler alignment).
    */
   private renderPanel(): void {
+    this.ensureContainers();
+
     const selectedEls = this.model.elements.filter(
       (e) => this.selectionTool.isSelected(e.id)
     );
+
+    let isGuideOrRuler = false;
 
     // 1. HIGHEST PRIORITY: Active Vector Element Selection
     if (selectedEls.length > 0) {
@@ -225,60 +258,46 @@ export class PropertyPanel {
         this.currentPanelMode = 'multi';
         this.renderMultiElementProperties(selectedEls);
       }
-      return;
-    }
-
-    // Stroke Tool Active without elements selected
-    if (this.activeTool === 'stroke') {
+    } else if (this.activeTool === 'stroke') {
+      // Stroke Tool Active without elements selected
       this.currentPanelMode = 'stroke';
       this.renderStrokeEmptyState();
-      return;
-    }
-
-    // 2. Guide Line Selection
-    if (this.activeGuide) {
+    } else if (this.activeGuide) {
+      // 2. Guide Line Selection
       this.currentPanelMode = 'guide';
       this.activeRulerConfig = null;
+      isGuideOrRuler = true;
       this.renderGuideProperties(this.activeGuide);
-      return;
-    }
-
-    // 3. Ruler Corner Active
-    if (this.currentPanelMode === 'ruler' && this.activeRulerConfig) {
+    } else if (this.currentPanelMode === 'ruler' && this.activeRulerConfig) {
+      // 3. Ruler Corner Active
+      isGuideOrRuler = true;
       this.renderRulerProperties(this.activeRulerConfig);
-      return;
-    }
-
-    // 4. In-Progress Interactive Path Creation
-    if (this.activeTool === 'polyline' && this.polylineVertexCount > 0) {
+    } else if (this.activeTool === 'polyline' && this.polylineVertexCount > 0) {
+      // 4. In-Progress Interactive Path Creation
       this.currentPanelMode = 'polyline';
       this.renderPolylineProperties();
-      return;
-    }
-
-    if (this.activeTool === 'pen' && this.penVertexCount > 0) {
+    } else if (this.activeTool === 'pen' && this.penVertexCount > 0) {
       this.currentPanelMode = 'pen';
       this.renderPenProperties();
-      return;
-    }
-
-    // 5. Active Shape Tool Creation Settings (No vectors selected)
-    if (['rect', 'circle', 'ellipse', 'line', 'polygon', 'star'].includes(this.activeTool)) {
+    } else if (['rect', 'circle', 'ellipse', 'line', 'polygon', 'star'].includes(this.activeTool)) {
+      // 5. Active Shape Tool Creation Settings (No vectors selected)
       this.currentPanelMode = 'shape';
       this.renderShapeToolProperties();
-      return;
+    } else {
+      // 6. Default Base State: Canvas & ViewBox Properties
+      this.currentPanelMode = 'canvas';
+      this.renderCanvasProperties();
     }
 
-    // 6. Default Base State: Canvas & ViewBox Properties
-    this.currentPanelMode = 'canvas';
-    this.renderCanvasProperties();
+    this.renderQuickHelp(isGuideOrRuler);
   }
 
   // Render Ruler Configuration Properties
   private renderRulerProperties(config: RulerConfig): void {
+    this.ensureContainers();
     RulerGuideInspector.renderRulerSettings(
       config,
-      this.container,
+      this.inspectorContainer,
       this.model,
       this.gridAlignmentMode,
       this.grids,
@@ -294,12 +313,13 @@ export class PropertyPanel {
 
   // Render Guide Line Properties
   private renderGuideProperties(guide: GuideLine): void {
-    RulerGuideInspector.renderGuideSettings(guide, this.container, this.callbacks);
+    this.ensureContainers();
+    RulerGuideInspector.renderGuideSettings(guide, this.inspectorContainer, this.callbacks);
   }
 
   // Render Pen Tool options & next-node-type configuration
   private renderPenProperties(): void {
-    this.container.innerHTML = `
+    this.inspectorContainer.innerHTML = `
       <div class="panel-section">
         <div class="panel-title">Bézier Curve Tool (P)</div>
         <div class="prop-row">
@@ -387,7 +407,7 @@ export class PropertyPanel {
     const hasEnoughVerts = this.polylineVertexCount >= 2;
     const canClose = this.polylineVertexCount >= 3;
 
-    this.container.innerHTML = `
+    this.inspectorContainer.innerHTML = `
       <div class="panel-section">
         <div class="panel-title">Polyline Tool (Y)</div>
         <div class="prop-row">
@@ -431,7 +451,7 @@ export class PropertyPanel {
   // Render properties when a shape tool is active and no element is selected
   private renderShapeToolProperties(): void {
     ShapeDefaultsInspector.render(
-      this.container,
+      this.inspectorContainer,
       this.activeTool,
       this.shapeConfig,
       this.callbacks
@@ -441,7 +461,7 @@ export class PropertyPanel {
   // Render properties when multiple elements are selected
   private renderMultiElementProperties(elements: VectorElement[]): void {
     MultiSelectionInspector.render(
-      this.container,
+      this.inspectorContainer,
       elements,
       this.model,
       this.selectionTool,
@@ -455,13 +475,13 @@ export class PropertyPanel {
    * Preserves 60fps responsiveness during node dragging without reflow.
    */
   private updateNodePropertiesInPlace(v: PathVertex): void {
-    NodeInspector.updateInPlace(this.container, v);
+    NodeInspector.updateInPlace(this.inspectorContainer, v);
   }
 
   // Render Canvas & ViewBox Properties
   private renderCanvasProperties(): void {
     CanvasInspector.render(
-      this.container,
+      this.inspectorContainer,
       this.model,
       this.gridAlignmentMode,
       this.callbacks,
@@ -550,7 +570,7 @@ export class PropertyPanel {
       ? this.model.detectPrimitiveFromPath(el)
       : null;
 
-    this.container.innerHTML = `
+    this.inspectorContainer.innerHTML = `
       ${GeometryInspector.renderHtml(el, this.model, this.selectionTool, box, pivot, isClosed, detectedPrimitive)}
 
       ${PrimitiveInspector.renderElementPrimitives(el, this.model, box)}
@@ -582,7 +602,7 @@ export class PropertyPanel {
     `;
 
     GeometryInspector.bindEvents(
-      this.container,
+      this.inspectorContainer,
       el,
       this.model,
       this.selectionTool,
@@ -593,7 +613,7 @@ export class PropertyPanel {
     );
 
     PrimitiveInspector.bindElementPrimitives(
-      this.container,
+      this.inspectorContainer,
       el,
       this.model,
       this.selectionTool,
@@ -603,7 +623,7 @@ export class PropertyPanel {
     );
 
     AppearanceInspector.bindEvents(
-      this.container,
+      this.inspectorContainer,
       el,
       this.model,
       isClosed,
@@ -614,7 +634,7 @@ export class PropertyPanel {
     );
 
     StrokeInspector.bindEvents(
-      this.container,
+      this.inspectorContainer,
       el,
       this.model,
       this.callbacks,
@@ -628,12 +648,12 @@ export class PropertyPanel {
     this.bindMouseDown('btn-prop-bool-combine-single', () => this.callbacks.onBoolean && this.callbacks.onBoolean('combine'));
     this.bindMouseDown('btn-prop-bool-fragment-single', () => this.callbacks.onBoolean && this.callbacks.onBoolean('fragment'));
 
-    EffectsInspector.bindEvents(this.container, el, ds, is, this.callbacks);
+    EffectsInspector.bindEvents(this.inspectorContainer, el, ds, is, this.callbacks);
   }
 
   // Render Stroke Tool Empty State (No vector selected)
   private renderStrokeEmptyState(): void {
-    this.container.innerHTML = `
+    this.inspectorContainer.innerHTML = `
       <div class="panel-section">
         <div class="panel-title">Stroke Tool (Herramienta Trazo - T)</div>
         <div style="font-size:11px; color:var(--text-muted); line-height:1.5; margin-top:6px;">
@@ -715,7 +735,7 @@ export class PropertyPanel {
 
     const strokeProps = this.getStrokeProps(el);
 
-    this.container.innerHTML = `
+    this.inspectorContainer.innerHTML = `
       ${GeometryInspector.renderHtml(el, this.model, this.selectionTool, box, pivot, isClosed, detectedPrimitive)}
 
       ${PrimitiveInspector.renderElementPrimitives(el, this.model, box)}
@@ -724,7 +744,7 @@ export class PropertyPanel {
     `;
 
     GeometryInspector.bindEvents(
-      this.container,
+      this.inspectorContainer,
       el,
       this.model,
       this.selectionTool,
@@ -735,7 +755,7 @@ export class PropertyPanel {
     );
 
     PrimitiveInspector.bindElementPrimitives(
-      this.container,
+      this.inspectorContainer,
       el,
       this.model,
       this.selectionTool,
@@ -745,7 +765,7 @@ export class PropertyPanel {
     );
 
     StrokeInspector.bindEvents(
-      this.container,
+      this.inspectorContainer,
       el,
       this.model,
       this.callbacks,
@@ -755,8 +775,8 @@ export class PropertyPanel {
 
   // Render Node Properties for single selected vertex
   private renderNodeProperties(el: VectorElement, v: PathVertex): void {
-    this.container.innerHTML = NodeInspector.renderHtml(el, v);
-    NodeInspector.bindEvents(this.container, this.callbacks);
+    this.inspectorContainer.innerHTML = NodeInspector.renderHtml(el, v);
+    NodeInspector.bindEvents(this.inspectorContainer, this.callbacks);
   }
 
     /**
@@ -771,7 +791,7 @@ export class PropertyPanel {
    *    e.stopPropagation() prevents the event from reaching canvas pointer listeners.
    */
   private bindMouseDown(id: string, fn: () => void): void {
-    const el = this.container.querySelector(`#${id}`);
+    const el = this.inspectorContainer.querySelector(`#${id}`);
     if (el) {
       el.addEventListener('mousedown', (e: Event) => {
         e.preventDefault();
