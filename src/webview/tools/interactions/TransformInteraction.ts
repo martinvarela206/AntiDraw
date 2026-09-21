@@ -6,6 +6,7 @@ import { RotateTransformer } from './RotateTransformer.js';
 import { SkewTransformer } from './SkewTransformer.js';
 import { PivotManager } from './PivotManager.js';
 import { GradientGizmoController } from './GradientGizmoController.js';
+import { ConfirmationModal } from '../../ui/ConfirmationModal.js';
 import type { SelectToolCallbacks } from '../SelectToolHandler.js';
 
 /**
@@ -284,6 +285,70 @@ export class TransformInteraction {
         }
       } else if (activeHandle === 'rotate') {
         if (this.rotationPivot) {
+          /**
+           * ARCHITECTURAL RATIONALE: Mandatory Confirmation Before Parametric Primitive Destructuring (ITEM-04)
+           * SVG primitives (<rect>, <circle>, <ellipse>, <line>, <polygon>, <star>) carry high-level parametric
+           * metadata (corner radius, radial bounds, quadrant angles). Rotating them requires converting them to
+           * freeform Bézier paths (<path>), which is an irreversible structural destructuring.
+           * A mandatory modal confirmation guarantees explicit user consent before any parametric conversion occurs.
+           * If cancelled, the rotation is aborted cleanly and the primitive remains in its pristine parametric state.
+           */
+          const willDestructureParametric = Math.abs(this.lastDeltaAngle) > 0.01 && selectedEls.some((el) => {
+            if (!ctx.model.isParametricElement(el)) return false;
+            const isPieOrArc =
+              el.attributes['data-ellipse-type'] === 'pie' || el.attributes['data-ellipse-type'] === 'arc';
+            const rx = parseFloat(el.attributes.rx || el.attributes.r || '1');
+            const ry = parseFloat(el.attributes.ry || el.attributes.r || '1');
+            if (isPieOrArc && Math.abs(rx - ry) < 0.5) return false;
+            return true;
+          });
+
+          if (willDestructureParametric) {
+            const ghostMapCopy = new Map(this.ghostTransformMap);
+            const pivotCopy = { ...this.rotationPivot };
+            const deltaAngleCopy = this.lastDeltaAngle;
+            const initialElementsCopy = new Map(this.initialElementsMap);
+            const initialBoxCopy = this.initialBox ? { ...this.initialBox } : null;
+
+            this.ghostTransformMap.clear();
+            this.initialElementsMap.clear();
+            this.initialBox = null;
+            this.rotationPivot = null;
+            this.currentRotationSnappedPt = null;
+            this.currentScaleSnappedPt = null;
+            this.currentSkewParallelogram = null;
+            this.currentSkewAngleDeg = 0;
+            this.lastSkewTransformFn = null;
+            ctx.renderOverlay();
+
+            ConfirmationModal.confirm({
+              title: 'Convertir Primitiva a Curvas',
+              message: 'La rotación de esta figura paramétrica requiere convertirla a curvas de Bézier.',
+              details: 'Las figuras paramétricas nativas en SVG no admiten rotación angular libre sin perder sus parámetros nativos (como radios o esquinas redondeadas). ¿Deseas convertir a curvas y aplicar la rotación?',
+              confirmText: 'Convertir y Rotar',
+              cancelText: 'Cancelar',
+            }).then((confirmed) => {
+              if (confirmed) {
+                ctx.pushUndo();
+                RotateTransformer.applyRotateCommit(
+                  ctx,
+                  ghostMapCopy,
+                  pivotCopy,
+                  deltaAngleCopy,
+                  initialElementsCopy,
+                  initialBoxCopy,
+                  selectedEls
+                );
+                callbacks.onSelectionChanged?.();
+                ctx.syncToHost();
+                ctx.render();
+              } else {
+                ctx.render();
+              }
+            });
+            return true;
+          }
+
           RotateTransformer.applyRotateCommit(
             ctx,
             this.ghostTransformMap,
