@@ -98,7 +98,13 @@ export class NodeOverlayBuilder {
   ): string {
     const isClosed = this.ctx.model.isElementClosed(el);
     const d = this.ctx.model.compilePathD(ghostVertices, isClosed);
-    let html = `<path d="${d}" fill="rgba(56, 189, 248, 0.15)" stroke="#38bdf8" stroke-width="2" stroke-dasharray="4 3" vector-effect="non-scaling-stroke" />`;
+    /**
+     * ARCHITECTURAL RATIONALE: Open Path Topological Cleanliness
+     * Setting `fill="none"` when `!isClosed` prevents spurious triangular or polygonal chord fills
+     * when editing open polylines, lines, or unclosed Bézier splines.
+     */
+    const ghostFill = isClosed ? 'rgba(56, 189, 248, 0.15)' : 'none';
+    let html = `<path d="${d}" fill="${ghostFill}" stroke="#38bdf8" stroke-width="2" stroke-dasharray="4 3" vector-effect="non-scaling-stroke" />`;
 
     // Endpoint Fusion Halo when hovering near opposite endpoint on open path
     if (!isClosed && ghostVertices.length >= 2) {
@@ -111,9 +117,17 @@ export class NodeOverlayBuilder {
       }
     }
 
+    const selSeg = this.nodeEditorTool.selectedSegmentIdx;
+    const segV1Id = selSeg !== null && selSeg >= 0 && selSeg < ghostVertices.length ? ghostVertices[selSeg].id : null;
+    const nextSegIdx = selSeg !== null ? (isClosed ? (selSeg + 1) % ghostVertices.length : selSeg + 1) : -1;
+    const segV2Id = nextSegIdx >= 0 && nextSegIdx < ghostVertices.length ? ghostVertices[nextSegIdx].id : null;
+
     ghostVertices.forEach((gv) => {
       const isSelected =
-        gv.id === this.nodeEditorTool.selectedVertexId || marqueeSelector.isVertexSelected(gv.id);
+        gv.id === this.nodeEditorTool.selectedVertexId ||
+        marqueeSelector.isVertexSelected(gv.id) ||
+        gv.id === segV1Id ||
+        gv.id === segV2Id;
       if (isSelected) {
         html += `<circle cx="${gv.x}" cy="${gv.y}" r="${6 / z}" fill="none" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
         html += `<circle cx="${gv.x}" cy="${gv.y}" r="${4 / z}" fill="#38bdf8" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;

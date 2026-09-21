@@ -958,11 +958,20 @@ export class NodeToolHandler implements IToolHandler {
       html += this.overlayBuilder.renderSelectedSegment(selectedEls[0], z);
     }
 
-    // 2. Parametric Drag Ghosts (Quadrant, Ellipse-Inner, Rect Corner)
-    if (this.activeHandle) {
+    /**
+     * ARCHITECTURAL RATIONALE: Selective Handle Ghost Dispatch (FIX-NodePreview)
+     * Differentiates parametric shape controls (quadrants, inner donuts, rounded corners, star tips)
+     * from standard vector topology manipulation (vertex, handleIn, handleOut, segment).
+     *
+     * Evaluating `if (this.activeHandle)` previously intercepted 'vertex', 'handleIn', 'handleOut',
+     * and 'segment' drags, mistakenly routing them into `parametricController.renderGhostOverlay`.
+     * Because parametric delegates do not handle generic topology nodes, they returned empty markup,
+     * completely suppressing `renderGhostPath` and hiding node movement feedback during polyline/path drag.
+     */
+    if (this.isParametricHandle(this.activeHandle)) {
       html += this.parametricController.renderGhostOverlay(this.activeHandle, z);
     } else if (this.ghostNodeVertices && selectedEls.length > 0) {
-      // 3. Ghost Path & Node Handles during Drag
+      // 3. Ghost Path & Node Handles during Drag (Polylines, Polygons, Freeform Paths, Lines, Primitives)
       html += this.overlayBuilder.renderGhostPath(
         selectedEls[0],
         this.ghostNodeVertices,
