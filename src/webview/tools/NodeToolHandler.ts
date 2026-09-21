@@ -8,7 +8,7 @@ import { NodeMarqueeSelector } from './node/NodeMarqueeSelector.js';
 import { NodeOverlayBuilder } from './node/NodeOverlayBuilder.js';
 
 export interface NodeToolCallbacks {
-  onNodeSelected?: (vertex: PathVertex, element: VectorElement) => void;
+  onNodeSelected?: (vertex: PathVertex, element: VectorElement, selectedCount?: number) => void;
   onDeselectNode?: () => void;
 }
 
@@ -88,6 +88,7 @@ export class NodeToolHandler implements IToolHandler {
   public get rectGhostActiveCorner(): 'tl' | 'tr' | 'br' | 'bl' { return this.parametricController.rectGhostActiveCorner; }
   public set rectGhostActiveCorner(val: 'tl' | 'tr' | 'br' | 'bl') { this.parametricController.rectGhostActiveCorner = val; }
 
+  public pendingSingleVertexId: string | null = null;
   private lastClickTime: number = 0;
   private lastClickPt: Point = { x: 0, y: 0 };
   private lastDoubleClickHandledTime: number = 0;
@@ -99,6 +100,8 @@ export class NodeToolHandler implements IToolHandler {
     this.parametricController = new ParametricHandleController(ctx);
     this.marqueeSelector = new NodeMarqueeSelector();
     this.overlayBuilder = new NodeOverlayBuilder(ctx, nodeEditorTool);
+    // Unify single source of truth for selected vertex IDs
+    this.nodeEditorTool.selectedVertexIds = this.marqueeSelector.selectedVertexIds;
   }
 
   private isElementClosed(el: VectorElement): boolean {
@@ -326,9 +329,43 @@ export class NodeToolHandler implements IToolHandler {
         : null;
 
       if (hitNode) {
-        const isAdditive = e.shiftKey || e.ctrlKey || e.metaKey;
-        this.marqueeSelector.selectVertex(hitNode.vertex.id, isAdditive);
-        this.nodeEditorTool.selectedVertexId = hitNode.vertex.id;
+        const isShift = e.shiftKey;
+        const isCtrl = e.ctrlKey || e.metaKey;
+        const isAdditive = isShift || isCtrl;
+        const wasAlreadySelected = this.marqueeSelector.isVertexSelected(hitNode.vertex.id);
+
+        /**
+         * ARCHITECTURAL RATIONALE: Multi-Vertex Selection Preservation & Shift Toggle
+         * 1. Shift / Ctrl Toggle:
+         *    If the clicked vertex is already selected, Shift+click removes it from the set (toggle-off).
+         *    If unselected, Shift+click appends it without clearing other selections.
+         * 2. Drag Preparation for Multi-Selection:
+         *    When a user clicks on an already-selected vertex WITHOUT modifier keys, the multi-selection
+         *    must NOT be destroyed on mousedown. The entire group must remain selected so that dragging
+         *    moves all selected nodes solidarily.
+         *    If the interaction ends as a simple click without dragging (pointerup with displacement <= 4px),
+         *    selection is then narrowed to this single clicked vertex.
+         */
+        if (isAdditive) {
+          this.marqueeSelector.selectVertex(hitNode.vertex.id, true, true);
+          this.pendingSingleVertexId = null;
+          if (this.marqueeSelector.isVertexSelected(hitNode.vertex.id)) {
+            this.nodeEditorTool.selectedVertexId = hitNode.vertex.id;
+          } else {
+            const remaining = Array.from(this.marqueeSelector.selectedVertexIds);
+            this.nodeEditorTool.selectedVertexId = remaining.length > 0 ? remaining[remaining.length - 1] : null;
+          }
+        } else {
+          if (wasAlreadySelected && this.marqueeSelector.selectedVertexIds.size > 1) {
+            this.pendingSingleVertexId = hitNode.vertex.id;
+            this.nodeEditorTool.selectedVertexId = hitNode.vertex.id;
+          } else {
+            this.pendingSingleVertexId = null;
+            this.marqueeSelector.selectVertex(hitNode.vertex.id, false);
+            this.nodeEditorTool.selectedVertexId = hitNode.vertex.id;
+          }
+        }
+
         this.nodeEditorTool.selectedHandleType = hitNode.type;
         this.nodeEditorTool.selectedSegmentIdx = null;
         this.activeHandle = hitNode.type;
@@ -337,8 +374,14 @@ export class NodeToolHandler implements IToolHandler {
         this.ghostNodeVertices = null;
         this.isDragging = true;
 
-        if (this.callbacks.onNodeSelected) {
-          this.callbacks.onNodeSelected(hitNode.vertex, selectedEl);
+        if (this.callbacks.onNodeSelected && this.nodeEditorTool.selectedVertexId) {
+          const activeV = selectedEl.vertices.find((v) => v.id === this.nodeEditorTool.selectedVertexId);
+          if (activeV) {
+            const selCount = Math.max(1, this.marqueeSelector.selectedVertexIds.size);
+            this.callbacks.onNodeSelected(activeV, selectedEl, selCount);
+          }
+        } else if (!this.nodeEditorTool.selectedVertexId && this.callbacks.onDeselectNode) {
+          this.callbacks.onDeselectNode();
         }
         this.ctx.render();
         return true;
@@ -422,6 +465,7 @@ export class NodeToolHandler implements IToolHandler {
       const z = this.ctx.canvasMgr.zoom || 1;
       if (Math.hypot(pt.x - this.dragStartPt.x, pt.y - this.dragStartPt.y) > 4 / z) {
         this.lastClickTime = 0;
+        this.pendingSingleVertexId = null;
       }
 
       const selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
@@ -471,8 +515,15 @@ export class NodeToolHandler implements IToolHandler {
           this.marqueeSelector.selectedVertexIds.size > 1 &&
           this.marqueeSelector.isVertexSelected(this.nodeEditorTool.selectedVertexId)
         ) {
-          const dx = snappedPt.x - this.dragStartPt.x;
-          const dy = snappedPt.y - this.dragStartPt.y;
+          let dx = snappedPt.x - this.dragStartPt.x;
+          let dy = snappedPt.y - this.dragStartPt.y;
+          if (isShift) {
+            if (Math.abs(dx) > Math.abs(dy)) {
+              dy = 0;
+            } else {
+              dx = 0;
+            }
+          }
           this.ghostNodeVertices = this.initialVertices.map((v) => {
             if (this.marqueeSelector.isVertexSelected(v.id)) {
               return {
@@ -633,6 +684,26 @@ export class NodeToolHandler implements IToolHandler {
       this.isDragging = false;
       const selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
 
+      /**
+       * ARCHITECTURAL RATIONALE: Multi-Selection Narrowing on Click
+       * When the user clicks an already-selected node without dragging (displacement <= 4px),
+       * the pending single vertex isolates and narrows the multi-selection down to that single vertex.
+       */
+      if (this.pendingSingleVertexId) {
+        this.marqueeSelector.selectVertex(this.pendingSingleVertexId, false);
+        this.nodeEditorTool.selectedVertexId = this.pendingSingleVertexId;
+        this.pendingSingleVertexId = null;
+        this.activeHandle = null;
+        this.initialVertices = [];
+        this.ghostNodeVertices = null;
+        if (selectedEl && this.callbacks.onNodeSelected) {
+          const v = selectedEl.vertices?.find((vert) => vert.id === this.nodeEditorTool.selectedVertexId);
+          if (v) this.callbacks.onNodeSelected(v, selectedEl, 1);
+        }
+        this.ctx.render();
+        return true;
+      }
+
       if (this.activeHandle === 'marquee' && selectedEl) {
         const canSelectVertices = !this.ctx.model.isEllipse(selectedEl);
         const hitIds = canSelectVertices
@@ -640,12 +711,14 @@ export class NodeToolHandler implements IToolHandler {
           : [];
         this.activeHandle = null;
         this.initialVertices = [];
-        if (hitIds.length > 0) {
-          this.nodeEditorTool.selectedVertexId = hitIds[0];
+        const selCount = this.marqueeSelector.selectedVertexIds.size;
+        if (selCount > 0) {
+          const firstSelectedId = Array.from(this.marqueeSelector.selectedVertexIds)[0];
+          this.nodeEditorTool.selectedVertexId = firstSelectedId;
           this.nodeEditorTool.selectedHandleType = 'vertex';
-          const v = selectedEl.vertices?.find((vert) => vert.id === hitIds[0]);
+          const v = selectedEl.vertices?.find((vert) => vert.id === firstSelectedId);
           if (v && this.callbacks.onNodeSelected) {
-            this.callbacks.onNodeSelected(v, selectedEl);
+            this.callbacks.onNodeSelected(v, selectedEl, selCount);
           }
         } else if (!this.marqueeSelector.isAdditive) {
           this.nodeEditorTool.selectedVertexId = null;
@@ -706,7 +779,8 @@ export class NodeToolHandler implements IToolHandler {
         if (this.nodeEditorTool.selectedVertexId && this.callbacks.onNodeSelected) {
           const activeV = selectedEl.vertices.find((v) => v.id === this.nodeEditorTool.selectedVertexId);
           if (activeV) {
-            this.callbacks.onNodeSelected(activeV, selectedEl);
+            const selCount = Math.max(1, this.marqueeSelector.selectedVertexIds.size);
+            this.callbacks.onNodeSelected(activeV, selectedEl, selCount);
           }
         }
 
@@ -758,6 +832,7 @@ export class NodeToolHandler implements IToolHandler {
 
   public cancel(): boolean {
     let handled = false;
+    this.pendingSingleVertexId = null;
     if (this.parametricController.cancel()) handled = true;
     if (this.ghostNodeVertices || this.isDragging || this.marqueeSelector.isMarqueeActive()) {
       this.ghostNodeVertices = null;
@@ -775,6 +850,7 @@ export class NodeToolHandler implements IToolHandler {
   }
 
   public deactivate(): void {
+    this.pendingSingleVertexId = null;
     this.parametricController.cancel();
     this.ghostNodeVertices = null;
     this.initialVertices = [];
@@ -787,15 +863,19 @@ export class NodeToolHandler implements IToolHandler {
   }
 
   public deleteSelectedVertex(): boolean {
-    if (!this.nodeEditorTool.selectedVertexId) return false;
+    const selectedIds = new Set(this.marqueeSelector.selectedVertexIds);
+    if (this.nodeEditorTool.selectedVertexId) {
+      selectedIds.add(this.nodeEditorTool.selectedVertexId);
+    }
+    if (selectedIds.size === 0) return false;
     const selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
-    if (!selectedEl) return false;
+    if (!selectedEl || !selectedEl.vertices) return false;
     const isPoly = this.ctx.model.isPolyline(selectedEl) || this.ctx.model.isPolygon(selectedEl);
     if (this.ctx.model.isParametricElement(selectedEl) && !isPoly) return false;
     const minVerts = selectedEl.tagName === 'polygon' ? 3 : 2;
-    if (selectedEl.vertices && selectedEl.vertices.length > minVerts) {
+    if (selectedEl.vertices.length - selectedIds.size >= minVerts) {
       this.ctx.pushUndo();
-      selectedEl.vertices = this.nodeEditorTool.deleteVertex(selectedEl.vertices, this.nodeEditorTool.selectedVertexId);
+      selectedEl.vertices = this.nodeEditorTool.deleteVertices(selectedEl.vertices, selectedIds);
       const isClosed = this.isElementClosed(selectedEl);
       selectedEl.attributes.d = this.ctx.model.compilePathD(selectedEl.vertices, isClosed);
       selectedEl.attributes['data-node-types'] = selectedEl.vertices.map((v) => v.nodeType).join(',');
@@ -803,6 +883,10 @@ export class NodeToolHandler implements IToolHandler {
         this.ctx.model.syncParametricAttributes(selectedEl);
       }
       this.nodeEditorTool.selectedVertexId = null;
+      this.marqueeSelector.clearSelection();
+      if (this.callbacks.onDeselectNode) {
+        this.callbacks.onDeselectNode();
+      }
       if (this.ctx.applyCanvasSize) this.ctx.applyCanvasSize();
       this.ctx.render();
       this.ctx.syncToHost();
@@ -877,7 +961,11 @@ export class NodeToolHandler implements IToolHandler {
   public handleNodeTypeChange(type: NodeType): void {
     const selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
     if (!selectedEl || this.ctx.model.isParametricElement(selectedEl)) return;
-    if (selectedEl.vertices && this.nodeEditorTool.selectedVertexId) {
+    const idsToChange = new Set(this.marqueeSelector.selectedVertexIds);
+    if (this.nodeEditorTool.selectedVertexId) {
+      idsToChange.add(this.nodeEditorTool.selectedVertexId);
+    }
+    if (selectedEl.vertices && idsToChange.size > 0) {
       this.ctx.pushUndo();
       const isClosed = this.isElementClosed(selectedEl);
       /**
@@ -886,12 +974,16 @@ export class NodeToolHandler implements IToolHandler {
        * Passing `isClosed` allows `setNodeType` to cyclically resolve P_prev and P_next across
        * index 0 and index N-1, ensuring exact secant tangency for closed loops (rectangles, polygons, closed Béziers).
        */
-      selectedEl.vertices = this.nodeEditorTool.setNodeType(
-        selectedEl.vertices,
-        this.nodeEditorTool.selectedVertexId,
-        type,
-        isClosed
-      );
+      let currentVerts = selectedEl.vertices;
+      for (const vertexId of idsToChange) {
+        currentVerts = this.nodeEditorTool.setNodeType(
+          currentVerts,
+          vertexId,
+          type,
+          isClosed
+        );
+      }
+      selectedEl.vertices = currentVerts;
       selectedEl.attributes.d = this.ctx.model.compilePathD(selectedEl.vertices, isClosed);
       selectedEl.attributes['data-node-types'] = selectedEl.vertices.map((v) => v.nodeType).join(',');
 

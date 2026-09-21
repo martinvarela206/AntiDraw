@@ -190,8 +190,19 @@ class AntiDrawApp {
     this.polylineToolHandler = new PolylineToolHandler(toolCtx);
     this.penToolHandler = new PenToolHandler(toolCtx);
     this.nodeToolHandler = new NodeToolHandler(toolCtx, this.nodeEditorTool, {
-      onNodeSelected: (vertex, _element) => {
-        this.propertyPanel.update(vertex, 'node');
+      onNodeSelected: (vertex, _element, selectedCount = 1) => {
+        this.propertyPanel.update(
+          vertex,
+          'node',
+          this.penToolHandler.penNodeType,
+          this.penToolHandler.vertexCount,
+          null,
+          this.polylineToolHandler.vertexCount,
+          this.canvasMgr.gridAlignmentMode,
+          this.canvasMgr.grids,
+          this.canvasMgr.guides,
+          selectedCount
+        );
       },
       onDeselectNode: () => {
         this.propertyPanel.resetPanelMode();
@@ -1490,6 +1501,7 @@ class AntiDrawApp {
       this.rulerView.setCornerActive(false);
     }
 
+    const selNodeCount = Math.max(1, this.nodeEditorTool.selectedVertexIds?.size || 1);
     this.propertyPanel.update(
       selectedV,
       this.toolbar.activeTool,
@@ -1499,7 +1511,8 @@ class AntiDrawApp {
       this.polylineToolHandler.vertexCount,
       this.canvasMgr.gridAlignmentMode,
       this.canvasMgr.grids,
-      this.canvasMgr.guides
+      this.canvasMgr.guides,
+      selNodeCount
     );
   }
 

@@ -102,13 +102,19 @@ export class NodeMarqueeSelector {
   }
 
   /**
-   * Directly sets or adds a vertex to the selection set.
+   * Directly sets, adds, or toggles a vertex in the selection set.
    */
-  public selectVertex(id: string, additive: boolean = false): void {
+  public selectVertex(id: string, additive: boolean = false, toggle: boolean = false): void {
     if (!additive) {
       this.selectedVertexIds.clear();
+      this.selectedVertexIds.add(id);
+      return;
     }
-    this.selectedVertexIds.add(id);
+    if (toggle && this.selectedVertexIds.has(id)) {
+      this.selectedVertexIds.delete(id);
+    } else {
+      this.selectedVertexIds.add(id);
+    }
   }
 
   /**

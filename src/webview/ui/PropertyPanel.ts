@@ -67,6 +67,7 @@ export class PropertyPanel {
   private model: VectorModel;
   private selectionTool: SelectionTool;
   private activeVertex: PathVertex | null = null;
+  public selectedNodeCount: number = 1;
   private activeTool: string = 'select';
   public penNodeType: NodeType = 'asymmetric';
   public penVertexCount: number = 0;
@@ -133,9 +134,11 @@ export class PropertyPanel {
     polylineVertexCount: number = 0,
     gridAlignmentMode: GridAlignmentMode = 'origin',
     grids: GridConfig[] = [],
-    guides: GuideLine[] = []
+    guides: GuideLine[] = [],
+    selectedNodeCount: number = 1
   ): void {
     this.activeVertex = selectedVertex;
+    this.selectedNodeCount = selectedNodeCount;
     this.activeTool = activeTool;
     this.penNodeType = penNodeType;
     this.penVertexCount = penVertexCount;
@@ -236,11 +239,11 @@ export class PropertyPanel {
       this.activeRulerConfig = null;
 
       if (this.activeVertex && selectedEls.length === 1 && this.activeTool === 'node') {
-        if (this.currentPanelMode === 'node') {
+        if (this.currentPanelMode === 'node' && this.selectedNodeCount <= 1) {
           // Panel already shows node properties — update in place without destroying DOM
           this.updateNodePropertiesInPlace(this.activeVertex);
         } else {
-          this.renderNodeProperties(selectedEls[0], this.activeVertex);
+          this.renderNodeProperties(selectedEls[0], this.activeVertex, this.selectedNodeCount);
           this.currentPanelMode = 'node';
         }
       } else if (this.activeTool === 'stroke') {
@@ -773,9 +776,9 @@ export class PropertyPanel {
     );
   }
 
-  // Render Node Properties for single selected vertex
-  private renderNodeProperties(el: VectorElement, v: PathVertex): void {
-    this.inspectorContainer.innerHTML = NodeInspector.renderHtml(el, v);
+  // Render Node Properties for single or multiple selected vertices
+  private renderNodeProperties(el: VectorElement, v: PathVertex, selectedCount: number = 1): void {
+    this.inspectorContainer.innerHTML = NodeInspector.renderHtml(el, v, selectedCount);
     NodeInspector.bindEvents(this.inspectorContainer, this.callbacks);
   }
 

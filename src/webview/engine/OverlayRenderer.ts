@@ -245,7 +245,9 @@ export class OverlayRenderer {
           const isParametric = ctx.model.isParametricElement(el);
 
           el.vertices.forEach((v) => {
-            const isSelectedVertex = isNodeMode && v.id === selectedVertexId;
+            const isSelectedVertex =
+              isNodeMode &&
+              (v.id === selectedVertexId || ctx.nodeEditorTool.selectedVertexIds?.has(v.id));
             html += NodeHelper.renderVertex({
               x: v.x,
               y: v.y,

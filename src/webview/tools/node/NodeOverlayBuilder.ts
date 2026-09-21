@@ -35,16 +35,23 @@ export class NodeOverlayBuilder {
   public renderIdleBezierHandles(el: VectorElement, z: number): string {
     if (!el.vertices || this.ctx.model.isParametricElement(el)) return '';
     const verts = el.vertices;
-    const selectedIdx = verts.findIndex((v) => v.id === this.nodeEditorTool.selectedVertexId);
-    if (selectedIdx < 0) return '';
+    const selectedIds = new Set(this.nodeEditorTool.selectedVertexIds || []);
+    if (this.nodeEditorTool.selectedVertexId) {
+      selectedIds.add(this.nodeEditorTool.selectedVertexId);
+    }
+    if (selectedIds.size === 0) return '';
 
     const isClosed = this.ctx.model.isElementClosed(el);
     const showHandlesFor = new Set<number>();
-    showHandlesFor.add(selectedIdx);
-    const prevIdx = selectedIdx > 0 ? selectedIdx - 1 : isClosed ? verts.length - 1 : -1;
-    if (prevIdx >= 0) showHandlesFor.add(prevIdx);
-    const nextIdx = selectedIdx < verts.length - 1 ? selectedIdx + 1 : isClosed ? 0 : -1;
-    if (nextIdx >= 0) showHandlesFor.add(nextIdx);
+    verts.forEach((v, idx) => {
+      if (selectedIds.has(v.id)) {
+        showHandlesFor.add(idx);
+        const prevIdx = idx > 0 ? idx - 1 : isClosed ? verts.length - 1 : -1;
+        if (prevIdx >= 0) showHandlesFor.add(prevIdx);
+        const nextIdx = idx < verts.length - 1 ? idx + 1 : isClosed ? 0 : -1;
+        if (nextIdx >= 0) showHandlesFor.add(nextIdx);
+      }
+    });
 
     const bHandleR = 3.5 / z;
     let html = '';

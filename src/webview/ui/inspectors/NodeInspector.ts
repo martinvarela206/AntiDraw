@@ -16,9 +16,10 @@ import { bindInspectorMouseDown } from './CanvasInspector.js';
  */
 export class NodeInspector {
   /**
-   * Generates HTML markup for single selected vertex properties.
+   * Generates HTML markup for single or multi-selected vertex properties.
    */
-  public static renderHtml(el: VectorElement, v: PathVertex): string {
+  public static renderHtml(el: VectorElement, v: PathVertex, selectedCount: number = 1): string {
+    const isMulti = selectedCount > 1;
     const isSharp = v.nodeType === 'sharp' || (!v.handleIn && !v.handleOut);
     const isClosed =
       el.isClosed ??
@@ -28,7 +29,8 @@ export class NodeInspector {
 
     return `
       <div class="panel-section">
-        <div class="panel-title">Vertex Coordinates</div>
+        <div class="panel-title">${isMulti ? `${selectedCount} Nodos Seleccionados` : 'Vertex Coordinates'}</div>
+        ${!isMulti ? `
         <div class="prop-row">
           <span class="prop-label">Position X</span>
           <input type="number" class="prop-input" id="node-pos-x" value="${Math.round(v.x)}" readonly />
@@ -37,20 +39,25 @@ export class NodeInspector {
           <span class="prop-label">Position Y</span>
           <input type="number" class="prop-input" id="node-pos-y" value="${Math.round(v.y)}" readonly />
         </div>
+        ` : `
+        <div style="font-size:11px; color:var(--text-muted); line-height:1.5;">
+          Moviendo y editando ${selectedCount} vértices solidariamente.
+        </div>
+        `}
       </div>
       <div class="panel-section">
-        <div class="panel-title">Node Type</div>
+        <div class="panel-title">Node Type ${isMulti ? '(Lote)' : ''}</div>
         <div class="prop-row" style="justify-content: flex-start; gap: 8px;">
-          <button class="btn-icon ${isSharp ? 'active' : ''}" id="btn-node-sharp" title="Sin tiradores (Cúspide / Recto)">
+          <button class="btn-icon ${isSharp && !isMulti ? 'active' : ''}" id="btn-node-sharp" title="Sin tiradores (Cúspide / Recto)">
             ${ToolIcons.nodeSharp}
           </button>
-          <button class="btn-icon ${!isSharp && v.nodeType === 'asymmetric' ? 'active' : ''}" id="btn-node-asym" title="Asymmetric Node (Independent Handles)">
+          <button class="btn-icon ${!isSharp && !isMulti && v.nodeType === 'asymmetric' ? 'active' : ''}" id="btn-node-asym" title="Asymmetric Node (Independent Handles)">
             ${ToolIcons.nodeAsymmetric}
           </button>
-          <button class="btn-icon ${!isSharp && v.nodeType === 'smooth' ? 'active' : ''}" id="btn-node-smooth" title="Uniform / Smooth Node">
+          <button class="btn-icon ${!isSharp && !isMulti && v.nodeType === 'smooth' ? 'active' : ''}" id="btn-node-smooth" title="Uniform / Smooth Node">
             ${ToolIcons.nodeSmooth}
           </button>
-          <button class="btn-icon ${!isSharp && v.nodeType === 'symmetric' ? 'active' : ''}" id="btn-node-sym" title="Symmetric Node">
+          <button class="btn-icon ${!isSharp && !isMulti && v.nodeType === 'symmetric' ? 'active' : ''}" id="btn-node-sym" title="Symmetric Node">
             ${ToolIcons.nodeSymmetric}
           </button>
         </div>
@@ -65,9 +72,11 @@ export class NodeInspector {
           ` : `
             <div style="font-size:11px; color:var(--text-muted); text-align:center; padding: 3px 0;">✓ Contorno cerrado (Z)</div>
           `}
+          ${!isMulti ? `
           <button class="prop-input" id="btn-split-node" style="cursor:pointer; background:var(--bg-active); text-align:center;">
             ${ToolIcons.splitNode} Split Node into 2 Vertices
           </button>
+          ` : ''}
         </div>
       </div>
       <div class="panel-section">

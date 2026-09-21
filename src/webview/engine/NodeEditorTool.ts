@@ -9,9 +9,59 @@ export interface SelectedNodeRef {
 
 export class NodeEditorTool {
   public selectedVertexId: string | null = null;
+  public selectedVertexIds: Set<string> = new Set();
   public selectedSegmentIdx: number | null = null;
   public selectedHandleType: 'vertex' | 'handleIn' | 'handleOut' | null = null;
   public fusionThreshold: number = 8.0; // Proximity distance in px to auto-fuse endpoints
+
+  /**
+   * Tests whether a specific vertex ID is part of the active selection set.
+   */
+  public isVertexSelected(id: string): boolean {
+    return this.selectedVertexIds.has(id);
+  }
+
+  /**
+   * Selects, adds, or toggles a vertex within the active selection set.
+   */
+  public selectVertex(id: string, additive: boolean = false, toggle: boolean = false): void {
+    if (!additive) {
+      this.selectedVertexIds.clear();
+      this.selectedVertexIds.add(id);
+      this.selectedVertexId = id;
+      return;
+    }
+
+    if (toggle && this.selectedVertexIds.has(id)) {
+      this.selectedVertexIds.delete(id);
+      if (this.selectedVertexId === id) {
+        const remaining = Array.from(this.selectedVertexIds);
+        this.selectedVertexId = remaining.length > 0 ? remaining[remaining.length - 1] : null;
+      }
+    } else {
+      this.selectedVertexIds.add(id);
+      this.selectedVertexId = id;
+    }
+  }
+
+  /**
+   * Deselects a specific vertex and updates the primary selected vertex ID.
+   */
+  public deselectVertex(id: string): void {
+    this.selectedVertexIds.delete(id);
+    if (this.selectedVertexId === id) {
+      const remaining = Array.from(this.selectedVertexIds);
+      this.selectedVertexId = remaining.length > 0 ? remaining[remaining.length - 1] : null;
+    }
+  }
+
+  /**
+   * Clears the entire vertex selection.
+   */
+  public clearVertexSelection(): void {
+    this.selectedVertexIds.clear();
+    this.selectedVertexId = null;
+  }
 
   /**
    * ARCHITECTURAL RATIONALE: Anchor vs. Handle Hit Priority and Collapsed Handle Immunity
@@ -728,6 +778,23 @@ export class NodeEditorTool {
     }
 
     return updated;
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Batch Vertex Deletion with Topology Preservation
+   * Iteratively deletes a collection of selected vertices while preserving subpath origins
+   * and curvature continuity. Stops when the path is reduced to a single vertex.
+   */
+  public deleteVertices(vertices: PathVertex[], vertexIds: Set<string> | string[]): PathVertex[] {
+    const idsToDelete = vertexIds instanceof Set ? vertexIds : new Set(vertexIds);
+    if (idsToDelete.size === 0) return vertices;
+
+    let current = [...vertices];
+    for (const id of idsToDelete) {
+      if (current.length <= 1) break;
+      current = this.deleteVertex(current, id);
+    }
+    return current;
   }
 
   /**
