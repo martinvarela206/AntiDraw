@@ -75,9 +75,34 @@ export const ToolIcons = {
     <line x1="8" y1="11" x2="14" y2="11"/>
   </svg>`,
 
-  ruler: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8">
-    <path d="M21.3 8.7l-6-6a2 2 0 0 0-2.8 0L3.2 12a2 2 0 0 0 0 2.8l6 6c.8.8 2 .8 2.8 0l9.3-9.3c.8-.8.8-2 0-2.8z"/>
-    <path d="M7.5 10.5l2-2M10.5 13.5l3-3M13.5 16.5l2-2M16.5 19.5l3-3"/>
+  ruler: `<svg viewBox="0 0 32 32" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="1,31 13,31 12.9,12.89 30.94,12.99 31,1 1,1" />
+    <line x1="15" y1="12" x2="15" y2="7" />
+    <line x1="21" y1="12" x2="21" y2="5" />
+    <line x1="27" y1="12" x2="27" y2="7" />
+    <line x1="12" y1="15" x2="7" y2="15" />
+    <line x1="12" y1="27" x2="7" y2="27" />
+    <line x1="12" y1="21" x2="4" y2="21" />
+  </svg>`,
+
+  rulers: `<svg viewBox="0 0 32 32" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="1,31 13,31 12.9,12.89 30.94,12.99 31,1 1,1" />
+    <line x1="15" y1="12" x2="15" y2="7" />
+    <line x1="21" y1="12" x2="21" y2="5" />
+    <line x1="27" y1="12" x2="27" y2="7" />
+    <line x1="12" y1="15" x2="7" y2="15" />
+    <line x1="12" y1="27" x2="7" y2="27" />
+    <line x1="12" y1="21" x2="4" y2="21" />
+  </svg>`,
+
+  rulerCorner: `<svg viewBox="0 0 32 32" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="1,31 13,31 12.9,12.89 30.94,12.99 31,1 1,1" />
+    <line x1="15" y1="12" x2="15" y2="7" />
+    <line x1="21" y1="12" x2="21" y2="5" />
+    <line x1="27" y1="12" x2="27" y2="7" />
+    <line x1="12" y1="15" x2="7" y2="15" />
+    <line x1="12" y1="27" x2="7" y2="27" />
+    <line x1="12" y1="21" x2="4" y2="21" />
   </svg>`,
 
   grid: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5">

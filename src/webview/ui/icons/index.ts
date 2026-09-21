@@ -1,5 +1,6 @@
 import DoubleArrowLeftRotateSvg from '../../assets/icons/double_arrow_vertical_left_rotate.svg';
 import DoubleArrowRightRotateSvg from '../../assets/icons/double_arrow_vertical_right_rotate.svg';
+import RulersSvg from '../../assets/icons/rulers.svg';
 
 /**
  * ARCHITECTURAL RATIONALE: Centralized UI Icon Registry & SVG Asset Pipeline
@@ -17,6 +18,7 @@ import DoubleArrowRightRotateSvg from '../../assets/icons/double_arrow_vertical_
 export const ICONS = {
   doubleArrowLeftRotate: DoubleArrowLeftRotateSvg,
   doubleArrowRightRotate: DoubleArrowRightRotateSvg,
+  rulers: RulersSvg,
 } as const;
 
 export type IconName = keyof typeof ICONS;

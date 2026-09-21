@@ -6,6 +6,7 @@ import { Toolbar, ToolType } from './Toolbar.js';
 import { TopBar, TopBarCallbacks } from './TopBar.js';
 import { RulerView, RulerViewCallbacks } from './RulerView.js';
 import { PropertyPanel, PropertyPanelCallbacks } from './PropertyPanel.js';
+import { ToolIcons } from '../icons/ToolIcons.js';
 
 export interface AppLayoutConfig {
   canvasMgr: CanvasManager;
@@ -61,10 +62,7 @@ export class AppLayoutManager {
       <div class="left-toolbar" id="left-toolbar"></div>
       <div class="canvas-container" id="canvas-container">
         <div class="ruler-corner" id="ruler-corner" title="Drag to set (0,0) Origin | Click for Ruler Settings | Double-click to Reset Origin">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 3H3v18h18V3z"/>
-            <path d="M3 9h6M3 15h4M9 3v6M15 3v4"/>
-          </svg>
+          ${ToolIcons.rulerCorner}
         </div>
         <div class="ruler-top-container" id="ruler-top-container">
           <canvas class="ruler-canvas" id="ruler-top-canvas"></canvas>
