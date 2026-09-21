@@ -8,6 +8,8 @@ import { OverlayRenderer } from './engine/OverlayRenderer.js';
 import { VsCodeBridge } from './bridge/VsCodeBridge.js';
 import { NodeCatalogService } from './engine/selection/NodeCatalogService.js';
 import { ToolContext } from './tools/IToolHandler.js';
+import { DistortTransformer } from './tools/interactions/DistortTransformer.js';
+import { QuadCorners } from './engine/geometry/ProjectiveHomography.js';
 import { SelectToolHandler } from './tools/SelectToolHandler.js';
 import { ShapeToolHandler } from './tools/ShapeToolHandler.js';
 import { PolylineToolHandler } from './tools/PolylineToolHandler.js';
@@ -37,6 +39,7 @@ class AntiDrawApp {
   private polylineToolHandler!: PolylineToolHandler;
   private penToolHandler!: PenToolHandler;
   private nodeToolHandler!: NodeToolHandler;
+  private toolCtx!: ToolContext;
 
   private model: VectorModel = new VectorModel();
   private selectionTool: SelectionTool = new SelectionTool();
@@ -159,6 +162,7 @@ class AntiDrawApp {
       applyCanvasSize: () => this.applyCanvasSize(),
       isPointerOverRuler: (clientX, clientY, orientation) => this.rulerView?.isPointOverRuler(clientX, clientY, orientation) ?? false,
     };
+    this.toolCtx = toolCtx;
     this.selectToolHandler = new SelectToolHandler(toolCtx, this.nodeEditorTool, {
       onSelectionChanged: () => {
         this.propertyPanel.update(null, 'select');
@@ -406,6 +410,75 @@ class AntiDrawApp {
         onStrokeToPath: () => this.handleStrokeToPath(),
         onConvertToCurves: (_el) => this.handleConvertToCurves(),
         onPushUndo: () => this.pushUndo(),
+        onDistortCornerChange: (cornerKey, coord) => {
+          const selectedEls = this.model.elements.filter((el) => this.selectionTool.isSelected(el.id));
+          if (selectedEls.length === 0) return;
+          const groupBox = this.selectionTool.getGroupSelectionBoundingBox(selectedEls, 0);
+          if (!groupBox) return;
+          const quad: QuadCorners = this.selectionTool.currentDistortQuad || {
+            nw: { x: groupBox.x, y: groupBox.y },
+            ne: { x: groupBox.x + groupBox.width, y: groupBox.y },
+            se: { x: groupBox.x + groupBox.width, y: groupBox.y + groupBox.height },
+            sw: { x: groupBox.x, y: groupBox.y + groupBox.height },
+          };
+          const updatedQuad = DistortTransformer.setCornerCoordinate(
+            this.toolCtx,
+            cornerKey,
+            coord,
+            selectedEls,
+            groupBox,
+            quad
+          );
+          if (updatedQuad) {
+            this.selectionTool.currentDistortQuad = updatedQuad;
+            this.propertyPanel.update(null, 'select');
+            this.render();
+            this.syncToHost();
+          }
+        },
+        onResetDistortCorner: (cornerKey) => {
+          const selectedEls = this.model.elements.filter((el) => this.selectionTool.isSelected(el.id));
+          if (selectedEls.length === 0) return;
+          const groupBox = this.selectionTool.getGroupSelectionBoundingBox(selectedEls, 0);
+          if (!groupBox) return;
+          const quad: QuadCorners = this.selectionTool.currentDistortQuad || {
+            nw: { x: groupBox.x, y: groupBox.y },
+            ne: { x: groupBox.x + groupBox.width, y: groupBox.y },
+            se: { x: groupBox.x + groupBox.width, y: groupBox.y + groupBox.height },
+            sw: { x: groupBox.x, y: groupBox.y + groupBox.height },
+          };
+          const updatedQuad = DistortTransformer.resetCorner(
+            this.toolCtx,
+            cornerKey,
+            selectedEls,
+            groupBox,
+            quad
+          );
+          if (updatedQuad) {
+            this.selectionTool.currentDistortQuad = updatedQuad;
+            this.propertyPanel.update(null, 'select');
+            this.render();
+            this.syncToHost();
+          }
+        },
+        onResetAllDistortCorners: () => {
+          const selectedEls = this.model.elements.filter((el) => this.selectionTool.isSelected(el.id));
+          if (selectedEls.length === 0) return;
+          const restoredQuad = DistortTransformer.resetAllCorners(this.toolCtx, selectedEls);
+          this.selectionTool.currentDistortQuad = restoredQuad;
+          this.propertyPanel.update(null, 'select');
+          this.render();
+          this.syncToHost();
+        },
+        onResetSkew: () => {
+          const selectedEls = this.model.elements.filter((el) => this.selectionTool.isSelected(el.id));
+          if (selectedEls.length === 0) return;
+          DistortTransformer.resetAllCorners(this.toolCtx, selectedEls);
+          this.selectionTool.currentDistortQuad = null;
+          this.propertyPanel.update(null, 'select');
+          this.render();
+          this.syncToHost();
+        },
       },
     });
 

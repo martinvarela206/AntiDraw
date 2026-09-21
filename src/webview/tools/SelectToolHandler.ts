@@ -257,6 +257,16 @@ export class SelectToolHandler implements IToolHandler {
             return true;
           }
 
+          if (handle.startsWith('distort-')) {
+            this.activeHandle = handle;
+            this.ctx.selectionTool.activeDistortCorner = handle.replace('distort-', '') as any;
+            this.transformInteraction.startDistort(handle, groupBox, selectedEls);
+            this.callbacks.setCursor?.('crosshair');
+            this.callbacks.onSelectionChanged?.();
+            this.ctx.renderOverlay();
+            return true;
+          }
+
           this.activeHandle = handle;
           if (handle === 'rotate') {
             const singleEl = selectedEls.length === 1 ? selectedEls[0] : undefined;

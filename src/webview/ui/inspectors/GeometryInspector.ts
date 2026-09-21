@@ -36,6 +36,7 @@ export class GeometryInspector {
             <button class="prop-input" id="btn-mode-move" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'move' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Modo Mover: Mover elementos y anclar vértices">✛</button>
             <button class="prop-input" id="btn-mode-scale" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'scale' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Modo Escalar: Redimensionar con 8 tiradores">⤡</button>
             <button class="prop-input" id="btn-mode-rotate" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'rotate' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Modo Rotar: Girar elementos interactivamente">↻</button>
+            <button class="prop-input" id="btn-mode-distort" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'distort' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Modo Deformar: Deformación libre de esquinas y cizalla">▱</button>
           </div>
         </div>
         <div class="prop-row" style="margin-top:2px;">
@@ -65,6 +66,47 @@ export class GeometryInspector {
           <input type="number" class="prop-input" id="el-pivot-y" value="${Math.round(pivot.y)}" title="Coordenada Y del pivote de rotación" />
           <button class="prop-input" id="btn-reset-pivot" style="width:auto; padding:2px 8px; cursor:pointer;" title="Restablecer pivote al centro del elemento">⟲</button>
         </div>
+        ${(() => {
+          if (selectionTool.selectionMode !== 'distort') return '';
+          const activeKey = selectionTool.activeDistortCorner || 'nw';
+          let cX = x;
+          let cY = y;
+          if (activeKey === 'ne') { cX = x + w; cY = y; }
+          else if (activeKey === 'se') { cX = x + w; cY = y + h; }
+          else if (activeKey === 'sw') { cX = x; cY = y + h; }
+          cX = Math.round(cX * 10) / 10;
+          cY = Math.round(cY * 10) / 10;
+          return `
+          <div style="border-top:1px solid var(--border-color); padding-top:6px; margin-top:6px;">
+            <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
+              <span>Deformación Libre</span>
+              <span style="font-size:10px; opacity:0.7;">Homografía 2D</span>
+            </div>
+            <div class="prop-row" style="margin-top:4px;">
+              <span class="prop-label" style="font-size:11px;">Esquina</span>
+              <div style="display:flex; gap:3px; flex:1;">
+                <button class="prop-input btn-distort-corner" data-corner="nw" style="flex:1; padding:2px; font-size:10px; ${activeKey === 'nw' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Esquina Noroeste (Superior Izquierda)">NO</button>
+                <button class="prop-input btn-distort-corner" data-corner="ne" style="flex:1; padding:2px; font-size:10px; ${activeKey === 'ne' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Esquina Noreste (Superior Derecha)">NE</button>
+                <button class="prop-input btn-distort-corner" data-corner="se" style="flex:1; padding:2px; font-size:10px; ${activeKey === 'se' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Esquina Sureste (Inferior Derecha)">SE</button>
+                <button class="prop-input btn-distort-corner" data-corner="sw" style="flex:1; padding:2px; font-size:10px; ${activeKey === 'sw' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Esquina Suroeste (Inferior Izquierda)">SO</button>
+              </div>
+            </div>
+            <div class="prop-row">
+              <span class="prop-label">X</span>
+              <input type="number" step="any" class="prop-input" id="distort-corner-x" value="${cX}" />
+              <span class="prop-label" style="width:20px; text-align:right;">Y</span>
+              <input type="number" step="any" class="prop-input" id="distort-corner-y" value="${cY}" />
+            </div>
+            <div class="prop-row" style="margin-top:4px; gap:4px;">
+              <button class="prop-input" id="btn-reset-active-corner" style="flex:1; padding:4px; cursor:pointer; font-size:11px;" title="Restaurar la posición original ortogonal de la esquina seleccionada">⟲ Esquina</button>
+              <button class="prop-input" id="btn-reset-all-corners" style="flex:1; padding:4px; cursor:pointer; font-size:11px;" title="Restaurar todas las esquinas a la forma ortogonal original">⟲ Todas</button>
+            </div>
+            <div class="prop-row" style="margin-top:6px; border-top:1px dashed var(--border-color); padding-top:4px;">
+              <span class="prop-label" style="font-size:11px;">Cizalla</span>
+              <button class="prop-input" id="btn-reset-skew" style="flex:1; padding:2px 4px; cursor:pointer; font-size:11px;" title="Restaurar inclinación / cizallamiento a su estado original">⟲ Restaurar Cizalla</button>
+            </div>
+          </div>`;
+        })()}
         <div class="prop-row">
           <span class="prop-label">Nodes</span>
           <span style="font-weight:600; color:var(--text-main); font-size:12px;">${el.vertices ? el.vertices.length : 0} nodes (${isClosed ? 'closed' : 'open'})</span>
@@ -333,6 +375,7 @@ export class GeometryInspector {
     const btnModeMove = container.querySelector<HTMLButtonElement>('#btn-mode-move');
     const btnModeScale = container.querySelector<HTMLButtonElement>('#btn-mode-scale');
     const btnModeRotate = container.querySelector<HTMLButtonElement>('#btn-mode-rotate');
+    const btnModeDistort = container.querySelector<HTMLButtonElement>('#btn-mode-distort');
     
     btnModeMove?.addEventListener('click', () => {
       selectionTool.selectionMode = 'move';
@@ -348,6 +391,50 @@ export class GeometryInspector {
       selectionTool.selectionMode = 'rotate';
       callbacks.onRenderOverlay?.();
       onReRender();
+    });
+    btnModeDistort?.addEventListener('click', () => {
+      selectionTool.selectionMode = 'distort';
+      callbacks.onRenderOverlay?.();
+      onReRender();
+    });
+
+    const btnDistortCorners = container.querySelectorAll<HTMLButtonElement>('.btn-distort-corner');
+    btnDistortCorners.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const corner = btn.getAttribute('data-corner') as 'nw' | 'ne' | 'se' | 'sw';
+        if (corner) {
+          selectionTool.activeDistortCorner = corner;
+          callbacks.onRenderOverlay?.();
+          onReRender();
+        }
+      });
+    });
+
+    const distortX = container.querySelector<HTMLInputElement>('#distort-corner-x');
+    const distortY = container.querySelector<HTMLInputElement>('#distort-corner-y');
+    const applyDistortCoord = () => {
+      const valX = parseFloat(distortX?.value || '');
+      const valY = parseFloat(distortY?.value || '');
+      if (!isNaN(valX) && !isNaN(valY)) {
+        callbacks.onDistortCornerChange?.(selectionTool.activeDistortCorner || 'nw', { x: valX, y: valY });
+      }
+    };
+    distortX?.addEventListener('change', applyDistortCoord);
+    distortY?.addEventListener('change', applyDistortCoord);
+
+    const btnResetActiveCorner = container.querySelector<HTMLButtonElement>('#btn-reset-active-corner');
+    btnResetActiveCorner?.addEventListener('click', () => {
+      callbacks.onResetDistortCorner?.(selectionTool.activeDistortCorner || 'nw');
+    });
+
+    const btnResetAllCorners = container.querySelector<HTMLButtonElement>('#btn-reset-all-corners');
+    btnResetAllCorners?.addEventListener('click', () => {
+      callbacks.onResetAllDistortCorners?.();
+    });
+
+    const btnResetSkew = container.querySelector<HTMLButtonElement>('#btn-reset-skew');
+    btnResetSkew?.addEventListener('click', () => {
+      callbacks.onResetSkew?.();
     });
 
     const btnConvertToPath = container.querySelector<HTMLButtonElement>('#btn-convert-to-path');

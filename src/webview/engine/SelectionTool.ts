@@ -4,10 +4,12 @@ import { PathGeometryCompiler } from './geometry/PathGeometryCompiler.js';
 import { StrokeOutlineGenerator } from './boolean/StrokeOutlineGenerator.js';
 import { BoundingBox, BoundingBoxCalculator } from './geometry/BoundingBoxCalculator.js';
 import { HandleType, HitTestResult, HitTestService } from './selection/HitTestService.js';
+import { QuadCorners } from './geometry/ProjectiveHomography.js';
 import type { Polygon } from 'polygon-clipping';
 
 export { BoundingBox, BoundingBoxCalculator } from './geometry/BoundingBoxCalculator.js';
 export { HandleType, HitTestResult, HitTestService } from './selection/HitTestService.js';
+export { QuadCorners } from './geometry/ProjectiveHomography.js';
 
 export interface DragState {
   initialElement: VectorElement;
@@ -52,7 +54,9 @@ export class SelectionTool {
    *      exact SVG serialization, and seamless undo/redo snapshotting.
    */
   public customPivot: Point | null = null;
-  public selectionMode: 'move' | 'scale' | 'rotate' = 'scale';
+  public selectionMode: 'move' | 'scale' | 'rotate' | 'distort' = 'scale';
+  public activeDistortCorner: 'nw' | 'ne' | 'se' | 'sw' = 'nw';
+  public currentDistortQuad: QuadCorners | null = null;
   public isAspectRatioLocked: boolean = false;
   /**
    * ARCHITECTURAL RATIONALE: Proportional Scale Locks (Figma K Parity / FEAT-TRANS-01)
@@ -320,9 +324,10 @@ export class SelectionTool {
     pt: Point,
     handleRadius: number = 12,
     rotateOffset: number = 20,
-    mode: 'move' | 'scale' | 'rotate' | 'transform' = 'scale'
+    mode: 'move' | 'scale' | 'rotate' | 'distort' | 'transform' = 'scale',
+    currentQuad?: QuadCorners | null
   ): HandleType | null {
-    return HitTestService.hitTestHandle(box, pt, handleRadius, rotateOffset, mode);
+    return HitTestService.hitTestHandle(box, pt, handleRadius, rotateOffset, mode, currentQuad || this.currentDistortQuad);
   }
 
   // Resize / Scale vector element vertices based on drag handle movement

@@ -1,4 +1,4 @@
-import { VectorModel, VectorElement, PathVertex, NodeType, DropShadowConfig, InnerShadowConfig, GradientConfig, GradientStop, RectCorners } from '../engine/VectorModel.js';
+import { VectorModel, VectorElement, PathVertex, NodeType, DropShadowConfig, InnerShadowConfig, GradientConfig, GradientStop, RectCorners, Point } from '../engine/VectorModel.js';
 import { SelectionTool, BoundingBox } from '../engine/SelectionTool.js';
 import { GuideLine, RulerConfig, ShapeToolConfig, GridAlignmentMode, GridConfig, GridType } from '../engine/CanvasManager.js';
 import { ToolIcons } from '../icons/ToolIcons.js';
@@ -37,6 +37,13 @@ export interface PropertyPanelCallbacks {
    * Converts a parametric primitive to freeform Bézier curves (Ctrl+Q).
    */
   onConvertToCurves?: (el: VectorElement) => void;
+  /**
+   * Free Distort (Homography) callbacks for numerical corner placement and resets.
+   */
+  onDistortCornerChange?: (cornerKey: 'nw' | 'ne' | 'se' | 'sw', coord: Point) => void;
+  onResetDistortCorner?: (cornerKey: 'nw' | 'ne' | 'se' | 'sw') => void;
+  onResetAllDistortCorners?: () => void;
+  onResetSkew?: () => void;
 }
 
 export { ViewBoxPreset, VIEWBOX_PRESETS } from './inspectors/CanvasInspector.js';

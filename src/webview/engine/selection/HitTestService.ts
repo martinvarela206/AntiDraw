@@ -1,12 +1,14 @@
 import { VectorElement, PathVertex, Point } from '../VectorModel.js';
 import { BoundingBox, BoundingBoxCalculator } from '../geometry/BoundingBoxCalculator.js';
+import { QuadCorners } from '../geometry/ProjectiveHomography.js';
 
 export type HandleType =
   | 'nw' | 'n' | 'ne'
   | 'w'  |       'e'
   | 'sw' | 's' | 'se'
   | 'rotate'
-  | 'skew-n' | 'skew-s' | 'skew-w' | 'skew-e';
+  | 'skew-n' | 'skew-s' | 'skew-w' | 'skew-e'
+  | 'distort-nw' | 'distort-ne' | 'distort-se' | 'distort-sw';
 
 export interface HitTestResult {
   element: VectorElement;
@@ -191,8 +193,45 @@ export class HitTestService {
     pt: Point,
     handleRadius: number = 12,
     rotateOffset: number = 20,
-    mode: 'move' | 'scale' | 'rotate' | 'transform' = 'scale'
+    mode: 'move' | 'scale' | 'rotate' | 'distort' | 'transform' = 'scale',
+    currentQuad?: QuadCorners | null
   ): HandleType | null {
+    if (mode === 'distort') {
+      const q = currentQuad || {
+        nw: { x: box.x, y: box.y },
+        ne: { x: box.x + box.width, y: box.y },
+        se: { x: box.x + box.width, y: box.y + box.height },
+        sw: { x: box.x, y: box.y + box.height },
+      };
+
+      // 4 Corner distort diamond handles
+      const distortHandles: { type: HandleType; x: number; y: number }[] = [
+        { type: 'distort-nw', x: q.nw.x, y: q.nw.y },
+        { type: 'distort-ne', x: q.ne.x, y: q.ne.y },
+        { type: 'distort-se', x: q.se.x, y: q.se.y },
+        { type: 'distort-sw', x: q.sw.x, y: q.sw.y },
+      ];
+      for (const dh of distortHandles) {
+        if (Math.hypot(pt.x - dh.x, pt.y - dh.y) <= handleRadius) {
+          return dh.type;
+        }
+      }
+
+      // 4 Midpoint handles for directional skewing
+      const skewHandles: { type: HandleType; x: number; y: number }[] = [
+        { type: 'skew-n', x: (q.nw.x + q.ne.x) / 2, y: (q.nw.y + q.ne.y) / 2 },
+        { type: 'skew-s', x: (q.sw.x + q.se.x) / 2, y: (q.sw.y + q.se.y) / 2 },
+        { type: 'skew-w', x: (q.nw.x + q.sw.x) / 2, y: (q.nw.y + q.sw.y) / 2 },
+        { type: 'skew-e', x: (q.ne.x + q.se.x) / 2, y: (q.ne.y + q.se.y) / 2 },
+      ];
+      for (const sh of skewHandles) {
+        if (Math.hypot(pt.x - sh.x, pt.y - sh.y) <= handleRadius) {
+          return sh.type;
+        }
+      }
+      return null;
+    }
+
     if (mode === 'rotate') {
       // 4 Corner handles for rotation:
       const rotHandles: { type: HandleType; x: number; y: number }[] = [

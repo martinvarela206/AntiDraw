@@ -4,6 +4,8 @@ import { HandleType } from '../../engine/SelectionTool.js';
 import { ScaleTransformer } from './ScaleTransformer.js';
 import { RotateTransformer } from './RotateTransformer.js';
 import { SkewTransformer } from './SkewTransformer.js';
+import { DistortTransformer } from './DistortTransformer.js';
+import { QuadCorners } from '../../engine/geometry/ProjectiveHomography.js';
 import { PivotManager } from './PivotManager.js';
 import { GradientGizmoController } from './GradientGizmoController.js';
 import { ConfirmationModal } from '../../ui/ConfirmationModal.js';
@@ -71,6 +73,7 @@ export class TransformInteraction {
   public lastSkewTransformFn: ((p: Point) => Point) | null = null;
   public currentSkewParallelogram: Point[] | null = null;
   public currentSkewAngleDeg: number = 0;
+  public currentDistortQuad: QuadCorners | null = null;
 
   /**
    * ARCHITECTURAL RATIONALE: Zero-Clearance Tight Selection Box Hit-Testing
@@ -86,7 +89,14 @@ export class TransformInteraction {
     const box = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 0);
     if (!box) return null;
 
-    if (ctx.selectionTool.selectionMode === 'rotate') {
+    if (ctx.selectionTool.selectionMode === 'distort') {
+      const h = ctx.selectionTool.hitTestHandle(box, pt, 12 / z, 18 / z, 'distort', this.currentDistortQuad);
+      if (h) {
+        if (h.startsWith('distort-')) return 'crosshair';
+        if (h === 'skew-n' || h === 'skew-s') return 'ew-resize';
+        if (h === 'skew-w' || h === 'skew-e') return 'ns-resize';
+      }
+    } else if (ctx.selectionTool.selectionMode === 'rotate') {
       const singleEl = selectedEls.length === 1 ? selectedEls[0] : undefined;
       if (ctx.selectionTool.hitTestPivot(box, pt, 8 / z, singleEl)) {
         return 'move';
@@ -113,6 +123,22 @@ export class TransformInteraction {
     if (gradCursor) return gradCursor;
 
     return null;
+  }
+
+  public startDistort(
+    handle: string,
+    groupBox: any,
+    selectedEls: VectorElement[]
+  ): void {
+    const init = DistortTransformer.initDistort(groupBox, selectedEls);
+    this.initialBox = init.initialBox;
+    this.initialBoxPadding = 0;
+    this.initialElementsMap = init.initialElementsMap;
+    this.initialAttributesMap = init.initialAttributesMap;
+    this.ghostTransformMap = init.ghostTransformMap;
+    if (!this.currentDistortQuad) {
+      this.currentDistortQuad = init.initialQuad;
+    }
   }
 
   public startScale(
@@ -236,6 +262,32 @@ export class TransformInteraction {
       return true;
     }
 
+    if (activeHandle.startsWith('distort-') && this.initialBox && this.initialElementsMap.size > 0) {
+      callbacks.setCursor?.('crosshair');
+      if (!this.currentDistortQuad) {
+        this.currentDistortQuad = {
+          nw: { x: this.initialBox.x, y: this.initialBox.y },
+          ne: { x: this.initialBox.x + this.initialBox.width, y: this.initialBox.y },
+          se: { x: this.initialBox.x + this.initialBox.width, y: this.initialBox.y + this.initialBox.height },
+          sw: { x: this.initialBox.x, y: this.initialBox.y + this.initialBox.height },
+        };
+      }
+      const result = DistortTransformer.computeCornerDistort(
+        ctx,
+        pt,
+        activeHandle,
+        this.initialBox,
+        this.currentDistortQuad,
+        this.initialElementsMap
+      );
+      this.ghostTransformMap = result.ghostMap;
+      this.currentDistortQuad = result.quad;
+      ctx.selectionTool.currentDistortQuad = result.quad;
+      this.currentScaleSnappedPt = result.snappedPt;
+      ctx.renderOverlay();
+      return true;
+    }
+
     // Scaling with directional handle Snap To (Snapping to grid, guidelines, artboard bounds, and unselected vertices)
     if (this.initialBox && activeHandle !== 'move' && this.initialElementsMap.size > 0) {
       const result = ScaleTransformer.computeGhostScale(ctx, {
@@ -274,7 +326,16 @@ export class TransformInteraction {
     if (activeHandle && activeHandle !== 'move' && this.ghostTransformMap.size > 0) {
       ctx.pushUndo();
       const selectedEls = ctx.model.elements.filter((el) => ctx.selectionTool.isSelected(el.id));
-      if (activeHandle.startsWith('skew-')) {
+      if (activeHandle.startsWith('distort-')) {
+        if (this.initialBox) {
+          DistortTransformer.applyDistortCommit(
+            ctx,
+            this.ghostTransformMap,
+            selectedEls,
+            this.initialBox
+          );
+        }
+      } else if (activeHandle.startsWith('skew-')) {
         if (this.lastSkewTransformFn) {
           SkewTransformer.applySkewCommit(
             ctx,
@@ -379,6 +440,8 @@ export class TransformInteraction {
       this.currentSkewParallelogram = null;
       this.currentSkewAngleDeg = 0;
       this.lastSkewTransformFn = null;
+      this.currentDistortQuad = null;
+      ctx.selectionTool.currentDistortQuad = null;
       callbacks.onSelectionChanged?.();
       ctx.syncToHost();
       ctx.render();
@@ -391,6 +454,8 @@ export class TransformInteraction {
     this.rotationPivot = null;
     this.currentRotationSnappedPt = null;
     this.currentScaleSnappedPt = null;
+    this.currentDistortQuad = null;
+    ctx.selectionTool.currentDistortQuad = null;
     return false;
   }
 
@@ -406,6 +471,8 @@ export class TransformInteraction {
       this.currentSkewParallelogram = null;
       this.currentSkewAngleDeg = 0;
       this.lastSkewTransformFn = null;
+      this.currentDistortQuad = null;
+      ctx.selectionTool.currentDistortQuad = null;
       handled = true;
     }
 
@@ -423,24 +490,21 @@ export class TransformInteraction {
   public lastToggleTime: number = 0;
 
   /**
-   * ARCHITECTURAL RATIONALE: Encapsulated Selection Mode Toggle (FIX-22)
-   * Alternates between 'transform' (scale/bounding box resize handles) and 'rotate' (rotation handles & pivot).
-   * Encapsulating this in TransformInteraction respects Single Responsibility Principle (SRP)
-   * and allows both synthetic double-click gesture detectors and native DOM dblclick events
-   * to trigger clean, synchronized state transitions across UI inspectors and canvas overlays.
-  /**
-   * ARCHITECTURAL RATIONALE: Universal 3-Mode Cyclic Conmutation (ITEM-02 CorelDraw Benchmark)
-   * A deliberate second paused click (>=300ms) without dragging cycles through all 3 selection states:
+   * ARCHITECTURAL RATIONALE: Universal 4-Mode Cyclic Conmutation (FEAT-TRANS-02 / CorelDraw Benchmark)
+   * A deliberate second paused click (>=300ms) without dragging cycles through all 4 selection states:
    * 1. 'scale': 8 bounding box resize handles for geometric sizing and aspect scaling.
    * 2. 'rotate': 4 corner curved rotation arrows, 4 edge skew arrows, and central arbitrary pivot.
-   * 3. 'move': Bounding box outline without perimeter handles, exposing all real structural vertices
+   * 3. 'distort': 4 corner diamond deformation handles and 4 edge skew handles for free projective homography.
+   * 4. 'move': Bounding box outline without perimeter handles, exposing all real structural vertices
    *    and landmarks (rendered by OverlayRenderer) for direct magnetic snapping anchor picking.
-   * Cycles deterministically: scale -> rotate -> move -> scale.
+   * Cycles deterministically: scale -> rotate -> distort -> move -> scale.
    */
   public toggleSelectionMode(ctx: ToolContext, callbacks: SelectToolCallbacks): void {
     if (ctx.selectionTool.selectionMode === 'scale') {
       ctx.selectionTool.selectionMode = 'rotate';
     } else if (ctx.selectionTool.selectionMode === 'rotate') {
+      ctx.selectionTool.selectionMode = 'distort';
+    } else if (ctx.selectionTool.selectionMode === 'distort') {
       ctx.selectionTool.selectionMode = 'move';
     } else {
       ctx.selectionTool.selectionMode = 'scale';
@@ -476,10 +540,12 @@ export class TransformInteraction {
       const groupBox = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 0);
       if (groupBox) {
         const mode = ctx.selectionTool.selectionMode;
-        const boxStroke = mode === 'rotate' ? '#f59e0b' : mode === 'move' ? '#10b981' : '#38bdf8';
+        const boxStroke = mode === 'distort' ? '#8b5cf6' : mode === 'rotate' ? '#f59e0b' : mode === 'move' ? '#10b981' : '#38bdf8';
         
-        // Render bounding box outline across all modes, visually distinguishing states by hue
-        html += `<rect x="${groupBox.x}" y="${groupBox.y}" width="${groupBox.width}" height="${groupBox.height}" fill="none" stroke="${boxStroke}" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke" />`;
+        // Render bounding box outline across scale/rotate/move modes, visually distinguishing states by hue
+        if (mode !== 'distort') {
+          html += `<rect x="${groupBox.x}" y="${groupBox.y}" width="${groupBox.width}" height="${groupBox.height}" fill="none" stroke="${boxStroke}" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke" />`;
+        }
 
         if (mode !== 'move') {
           const rotOffset = 18 / z;
@@ -501,6 +567,72 @@ export class TransformInteraction {
             const hRx = 1 / z;
             handles.forEach((hPos) => {
               html += `<rect x="${hPos.x - hHalf}" y="${hPos.y - hHalf}" width="${hSize}" height="${hSize}" fill="#ffffff" stroke="#0284c7" stroke-width="1" rx="${hRx}" vector-effect="non-scaling-stroke" />`;
+            });
+          } else if (mode === 'distort') {
+            const q = this.currentDistortQuad || {
+              nw: { x: groupBox.x, y: groupBox.y },
+              ne: { x: groupBox.x + groupBox.width, y: groupBox.y },
+              se: { x: groupBox.x + groupBox.width, y: groupBox.y + groupBox.height },
+              sw: { x: groupBox.x, y: groupBox.y + groupBox.height },
+            };
+
+            // Render quadrilateral bounding boundary
+            html += `<polygon points="${q.nw.x},${q.nw.y} ${q.ne.x},${q.ne.y} ${q.se.x},${q.se.y} ${q.sw.x},${q.sw.y}" fill="none" stroke="#8b5cf6" stroke-width="1.2" stroke-dasharray="3 3" vector-effect="non-scaling-stroke" />`;
+
+            // 4 Corner distort diamond handles
+            const corners: { key: string; x: number; y: number; title: string }[] = [
+              { key: 'nw', x: q.nw.x, y: q.nw.y, title: 'Esquina Noroeste (Arrastrar para deformar libremente)' },
+              { key: 'ne', x: q.ne.x, y: q.ne.y, title: 'Esquina Noreste (Arrastrar para deformar libremente)' },
+              { key: 'se', x: q.se.x, y: q.se.y, title: 'Esquina Sureste (Arrastrar para deformar libremente)' },
+              { key: 'sw', x: q.sw.x, y: q.sw.y, title: 'Esquina Suroeste (Arrastrar para deformar libremente)' },
+            ];
+
+            const activeCornerKey = ctx.selectionTool.activeDistortCorner || 'nw';
+            corners.forEach((c) => {
+              const isActive = c.key === activeCornerKey;
+              const fillCol = isActive ? '#8b5cf6' : '#0f172a';
+              const strokeCol = isActive ? '#c4b5fd' : '#a78bfa';
+              html += `
+                <g class="distort-corner-handle" transform="translate(${c.x}, ${c.y}) scale(${1 / z})" style="cursor: crosshair;">
+                  <title>${c.title}</title>
+                  <polygon points="0,-7 7,0 0,7 -7,0" fill="${fillCol}" fill-opacity="0.92" stroke="${strokeCol}" stroke-width="1.4" vector-effect="non-scaling-stroke" />
+                  <circle cx="0" cy="0" r="2" fill="#ffffff" />
+                </g>
+              `;
+            });
+
+            // 4 Midpoint handles (Directional Skew / Shear)
+            const midpoints = [
+              { x: (q.nw.x + q.ne.x) / 2, y: (q.nw.y + q.ne.y) / 2, isHoriz: true },
+              { x: (q.sw.x + q.se.x) / 2, y: (q.sw.y + q.se.y) / 2, isHoriz: true },
+              { x: (q.nw.x + q.sw.x) / 2, y: (q.nw.y + q.sw.y) / 2, isHoriz: false },
+              { x: (q.ne.x + q.se.x) / 2, y: (q.ne.y + q.se.y) / 2, isHoriz: false },
+            ];
+            midpoints.forEach((m) => {
+              const handleCursor = m.isHoriz ? 'ew-resize' : 'ns-resize';
+              const strokeColor = '#8b5cf6';
+              const arrowColor = '#a78bfa';
+              if (m.isHoriz) {
+                html += `
+                  <g class="distort-skew-handle" transform="translate(${m.x}, ${m.y}) scale(${1 / z})" style="cursor: ${handleCursor};">
+                    <title>Arrastrar para inclinar / sesgar eje horizontal</title>
+                    <circle cx="0" cy="0" r="7" fill="#0f172a" fill-opacity="0.9" stroke="${strokeColor}" stroke-width="1.2" vector-effect="non-scaling-stroke" />
+                    <line x1="-3.2" y1="0" x2="3.2" y2="0" stroke="${arrowColor}" stroke-width="1.4" stroke-linecap="round" vector-effect="non-scaling-stroke" />
+                    <polygon points="-3.2,0 -1.2,-1.8 -1.2,1.8" fill="${arrowColor}" />
+                    <polygon points="3.2,0 1.2,-1.8 1.2,1.8" fill="${arrowColor}" />
+                  </g>
+                `;
+              } else {
+                html += `
+                  <g class="distort-skew-handle" transform="translate(${m.x}, ${m.y}) scale(${1 / z})" style="cursor: ${handleCursor};">
+                    <title>Arrastrar para inclinar / sesgar eje vertical</title>
+                    <circle cx="0" cy="0" r="7" fill="#0f172a" fill-opacity="0.9" stroke="${strokeColor}" stroke-width="1.2" vector-effect="non-scaling-stroke" />
+                    <line x1="0" y1="-3.2" x2="0" y2="3.2" stroke="${arrowColor}" stroke-width="1.4" stroke-linecap="round" vector-effect="non-scaling-stroke" />
+                    <polygon points="0,-3.2 -1.8,-1.2 1.8,-1.2" fill="${arrowColor}" />
+                    <polygon points="0,3.2 -1.8,1.2 1.8,1.2" fill="${arrowColor}" />
+                  </g>
+                `;
+              }
             });
           } else if (mode === 'rotate') {
             /**
@@ -596,6 +728,10 @@ export class TransformInteraction {
           if (this.currentRotationSnappedPt) {
             html += `<line x1="${pivot.x}" y1="${pivot.y}" x2="${this.currentRotationSnappedPt.x}" y2="${this.currentRotationSnappedPt.y}" stroke="#10b981" stroke-width="1.2" stroke-dasharray="3 2" opacity="0.9" vector-effect="non-scaling-stroke" />`;
           }
+        }
+
+        if (activeHandle?.startsWith('distort-') && this.currentScaleSnappedPt) {
+          html += `<circle cx="${this.currentScaleSnappedPt.x}" cy="${this.currentScaleSnappedPt.y}" r="${6 / z}" fill="none" stroke="#10b981" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
         }
       }
 
