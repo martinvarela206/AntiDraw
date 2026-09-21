@@ -497,11 +497,7 @@ export class PropertyPanel {
   // Render Single Element Properties
   private renderElementProperties(el: VectorElement): void {
     const isClosed = this.model.isElementClosed(el);
-    let fill = isClosed ? (el.attributes['fill'] || 'none') : 'none';
-    if (!isClosed) {
-      el.attributes['fill'] = 'none';
-      delete el.attributes['fill-rule'];
-    }
+    let fill = el.attributes['fill'] || 'none';
 
     const box = this.selectionTool.getBoundingBox(el);
     const x = box ? Math.round(box.x) : 0;

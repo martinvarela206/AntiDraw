@@ -64,46 +64,56 @@ export class AppearanceInspector {
     fillType: 'solid' | 'linear' | 'radial' | 'none',
     gradientCss: string
   ): string {
+    const hasFill = fill !== 'none' && fill !== '' && fillType !== 'none';
+
     return `
       <div class="panel-section">
         <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
-          <span>Fill (Relleno)</span>
-          ${!isClosed ? '<span style="font-size:10px; color:#94a3b8; font-weight:normal; text-transform:none;">Trazado abierto</span>' : ''}
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span>Fill (Relleno)</span>
+            ${!isClosed ? '<span style="font-size:10px; color:#94a3b8; font-weight:normal; text-transform:none;">(Abierto)</span>' : ''}
+          </div>
+          <div style="display:flex; gap:4px; align-items:center;">
+            ${hasFill ? `
+              <button class="prop-input" id="btn-remove-fill" style="cursor:pointer; width:auto; padding:1px 6px; font-size:11px; color:#ef4444;" title="Quitar relleno (establecer fill='none')">− Quitar</button>
+            ` : `
+              <button class="prop-input" id="btn-add-fill" style="cursor:pointer; width:auto; padding:1px 6px; font-size:11px; color:#10b981; font-weight:600;" title="Añadir relleno sólido">+ Añadir</button>
+            `}
+          </div>
         </div>
-        ${!isClosed ? `
-        <div class="prop-row">
-          <span class="prop-label">Type</span>
-          <select class="prop-input" id="el-fill-type" disabled style="cursor:not-allowed; opacity:0.6;" title="Los vectores abiertos no admiten relleno. Cierra el trazado formalmente para habilitar el relleno.">
-            <option value="none" selected>None (Trazado abierto)</option>
-          </select>
-        </div>
-        <div style="font-size:11px; color:#94a3b8; margin-top:4px; line-height:1.4;">
-          Los vectores abiertos tienen el relleno bloqueado a <code>none</code> para evitar cierres simulados.
-        </div>
-        <div style="margin-top:6px;">
-          <button class="prop-input" id="btn-prop-close-path" style="width:100%; cursor:pointer; background:#3b82f6; color:#fff; text-align:center; font-weight:600; padding:4px 8px; font-size:11px;" title="Cerrar trazado formalmente uniendo extremos libres con Z">Cerrar Trazado (Z)</button>
-        </div>
-        ` : `
+
         <div class="prop-row">
           <span class="prop-label">Type</span>
           <select class="prop-input" id="el-fill-type" style="cursor:pointer;">
-            <option value="solid" ${fillType === 'solid' ? 'selected' : ''}>Solid Color</option>
-            <option value="linear" ${fillType === 'linear' ? 'selected' : ''}>Linear Gradient</option>
-            <option value="radial" ${fillType === 'radial' ? 'selected' : ''}>Radial Gradient</option>
-            <option value="none" ${fillType === 'none' ? 'selected' : ''}>None</option>
+            <option value="none" ${!hasFill ? 'selected' : ''}>None (Sin relleno)</option>
+            <option value="solid" ${hasFill && fillType === 'solid' ? 'selected' : ''}>Solid Color</option>
+            <option value="linear" ${hasFill && fillType === 'linear' ? 'selected' : ''}>Linear Gradient</option>
+            <option value="radial" ${hasFill && fillType === 'radial' ? 'selected' : ''}>Radial Gradient</option>
           </select>
         </div>
 
+        ${!hasFill ? `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px; padding:6px 8px; background:rgba(255,255,255,0.02); border:1px dashed var(--border-color); border-radius:4px;">
+          <span style="font-size:11px; color:#94a3b8;">Sin relleno (fill="none")</span>
+          <div style="display:flex; gap:4px;">
+            ${!isClosed ? `<button class="prop-input" id="btn-prop-close-path" style="cursor:pointer; background:#3b82f6; color:#fff; font-weight:600; padding:2px 6px; font-size:10px;" title="Cerrar trazado formalmente uniendo extremos libres con Z">Cerrar (Z)</button>` : ''}
+            <button class="prop-input" id="btn-add-fill-body" style="cursor:pointer; background:var(--accent-color); color:#fff; font-weight:600; padding:2px 6px; font-size:10px;" title="Añadir color de relleno sólido">+ Añadir Relleno</button>
+          </div>
+        </div>
+        ` : ''}
+
         <!-- Solid Fill Container -->
-        <div id="fill-solid-controls" style="${fillType === 'solid' ? '' : 'display: none;'}">
+        <div id="fill-solid-controls" style="${hasFill && fillType === 'solid' ? '' : 'display: none;'}">
           <div class="prop-row">
             <span class="prop-label">Color</span>
             <div class="color-picker-row">
               <input type="color" class="color-swatch" id="el-fill-color" value="${fill === 'none' || fill.startsWith('url') ? '#4f46e5' : fill}" />
-              <input type="text" class="prop-input" id="el-fill-hex" value="${fill.startsWith('url') ? '#4f46e5' : fill}" />
+              <input type="text" class="prop-input" id="el-fill-hex" value="${fill.startsWith('url') || fill === 'none' ? '#4f46e5' : fill}" />
             </div>
           </div>
         </div>
+
+        <!-- Gradient Controls Container -->
 
         <!-- Gradient Controls Container -->
         <div id="fill-gradient-controls" style="${fillType === 'linear' || fillType === 'radial' ? '' : 'display: none;'} margin-top: 6px;">
@@ -299,7 +309,6 @@ export class AppearanceInspector {
               </div>
             </div>
           </div>
-          `}
         </div>
       </div>
     `;
@@ -331,17 +340,68 @@ export class AppearanceInspector {
       return `linear-gradient(90deg, ${stopsStr})`;
     };
 
-    const applyFillChanges = () => {
-      if (!isClosed) {
+    const btnRemoveFill = container.querySelector<HTMLButtonElement>('#btn-remove-fill');
+    if (btnRemoveFill) {
+      btnRemoveFill.addEventListener('click', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
         el.attributes['fill'] = 'none';
         delete el.attributes['data-gradient'];
-      } else if (fillType === 'none') {
+        callbacks.onUpdateElement(el);
+        onReRender();
+      });
+    }
+
+    const btnAddFill = container.querySelector<HTMLButtonElement>('#btn-add-fill');
+    const btnAddFillBody = container.querySelector<HTMLButtonElement>('#btn-add-fill-body');
+    const onAddFillClicked = () => {
+      if (callbacks.onPushUndo) callbacks.onPushUndo();
+      if (!isClosed && el.vertices && el.vertices.length > 2) {
+        if (callbacks.onClosePath) {
+          callbacks.onClosePath();
+        } else {
+          el.isClosed = true;
+          el.attributes.d = model.compilePathD(el.vertices, true);
+        }
+      }
+      el.attributes['fill'] = elFillColor?.value || '#4f46e5';
+      delete el.attributes['data-gradient'];
+      callbacks.onUpdateElement(el);
+      onReRender();
+    };
+    if (btnAddFill) btnAddFill.addEventListener('click', onAddFillClicked);
+    if (btnAddFillBody) btnAddFillBody.addEventListener('click', onAddFillClicked);
+
+    const btnClosePath = container.querySelector<HTMLButtonElement>('#btn-prop-close-path');
+    if (btnClosePath) {
+      btnClosePath.addEventListener('click', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        if (callbacks.onClosePath) {
+          callbacks.onClosePath();
+        } else if (el.vertices && el.vertices.length > 2) {
+          el.isClosed = true;
+          el.attributes.d = model.compilePathD(el.vertices, true);
+          callbacks.onUpdateElement(el);
+          onReRender();
+        }
+      });
+    }
+
+    const applyFillChanges = () => {
+      if (fillType === 'none') {
         el.attributes['fill'] = 'none';
         delete el.attributes['data-gradient'];
       } else if (fillType === 'solid') {
+        if (!isClosed && el.vertices && el.vertices.length > 2) {
+          el.isClosed = true;
+          el.attributes.d = model.compilePathD(el.vertices, true);
+        }
         el.attributes['fill'] = elFillColor?.value || '#4f46e5';
         delete el.attributes['data-gradient'];
       } else {
+        if (!isClosed && el.vertices && el.vertices.length > 2) {
+          el.isClosed = true;
+          el.attributes.d = model.compilePathD(el.vertices, true);
+        }
         grad.type = fillType === 'radial' ? 'radial' : 'linear';
         el.attributes['data-gradient'] = JSON.stringify(grad);
         el.attributes['fill'] = `url(#ad-grad-${el.id})`;
@@ -375,10 +435,17 @@ export class AppearanceInspector {
       if (delStopBtn) delStopBtn.disabled = grad.stops.length <= 2;
     };
 
-    if (fillTypeSelect && isClosed) {
+    if (fillTypeSelect) {
       fillTypeSelect.addEventListener('change', () => {
         if (callbacks.onPushUndo) callbacks.onPushUndo();
         fillType = fillTypeSelect.value as any;
+        if (fillType === 'none') {
+          el.attributes['fill'] = 'none';
+          delete el.attributes['data-gradient'];
+          callbacks.onUpdateElement(el);
+          onReRender();
+          return;
+        }
         if (solidControls) solidControls.style.display = fillType === 'solid' ? '' : 'none';
         if (gradControls) gradControls.style.display = (fillType === 'linear' || fillType === 'radial') ? '' : 'none';
         if (angleRow) angleRow.style.display = fillType === 'linear' ? '' : 'none';
@@ -392,10 +459,11 @@ export class AppearanceInspector {
           grad.rotation = grad.rotation ?? 0;
         }
         applyFillChanges();
+        onReRender();
       });
     }
 
-    if (elFillColor && isClosed) {
+    if (elFillColor) {
       elFillColor.addEventListener('input', () => {
         if (fillType === 'solid') {
           el.attributes['fill'] = elFillColor.value;
@@ -407,7 +475,7 @@ export class AppearanceInspector {
         if (callbacks.onPushUndo) callbacks.onPushUndo();
       });
     }
-    if (elFillHex && isClosed) {
+    if (elFillHex) {
       elFillHex.addEventListener('change', () => {
         if (fillType === 'solid') {
           if (callbacks.onPushUndo) callbacks.onPushUndo();

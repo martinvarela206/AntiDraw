@@ -89,13 +89,16 @@ export class MultiSelectionInspector {
       <div class="panel-section">
         <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
           <span>Batch Fill</span>
-          ${!hasClosedElements ? '<span style="font-size:10px; color:#94a3b8; font-weight:normal; text-transform:none;">(Solo elementos cerrados)</span>' : ''}
+          <div style="display:flex; gap:4px; align-items:center;">
+            <button class="prop-input" id="btn-batch-add-fill" style="cursor:pointer; width:auto; padding:1px 6px; font-size:11px; color:#10b981; font-weight:600;" title="Añadir relleno a todos los elementos seleccionados">+ Añadir</button>
+            <button class="prop-input" id="btn-batch-remove-fill" style="cursor:pointer; width:auto; padding:1px 6px; font-size:11px; color:#ef4444;" title="Quitar relleno de todos los elementos seleccionados (fill='none')">− Quitar</button>
+          </div>
         </div>
         <div class="prop-row">
           <span class="prop-label">Color</span>
           <div class="color-picker-row">
-            <input type="color" class="color-swatch" id="batch-fill-color" value="#4f46e5" ${!hasClosedElements ? 'disabled' : ''} />
-            <input type="text" class="prop-input" id="batch-fill-hex" value="#4f46e5" ${!hasClosedElements ? 'disabled style="opacity:0.6; cursor:not-allowed;" title="Ningún elemento seleccionado es un trazado cerrado"' : ''} />
+            <input type="color" class="color-swatch" id="batch-fill-color" value="#4f46e5" />
+            <input type="text" class="prop-input" id="batch-fill-hex" value="#4f46e5" />
           </div>
         </div>
       </div>
@@ -156,14 +159,47 @@ export class MultiSelectionInspector {
     bindInspectorMouseDown(container, 'btn-prop-bool-combine', () => callbacks.onBoolean && callbacks.onBoolean('combine'));
     bindInspectorMouseDown(container, 'btn-prop-bool-fragment', () => callbacks.onBoolean && callbacks.onBoolean('fragment'));
 
+    const btnBatchAddFill = container.querySelector<HTMLButtonElement>('#btn-batch-add-fill');
+    const btnBatchRemoveFill = container.querySelector<HTMLButtonElement>('#btn-batch-remove-fill');
+
+    if (btnBatchAddFill) {
+      btnBatchAddFill.addEventListener('click', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        const col = bFillHex?.value || '#4f46e5';
+        elements.forEach((el) => {
+          if (!model.isElementClosed(el) && el.vertices && el.vertices.length > 2) {
+            el.isClosed = true;
+            el.attributes.d = model.compilePathD(el.vertices, true);
+          }
+          el.attributes['fill'] = col;
+          delete el.attributes['data-gradient'];
+        });
+        callbacks.onUpdateElement(elements[0]);
+        onReRender();
+      });
+    }
+
+    if (btnBatchRemoveFill) {
+      btnBatchRemoveFill.addEventListener('click', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        elements.forEach((el) => {
+          el.attributes['fill'] = 'none';
+          delete el.attributes['data-gradient'];
+        });
+        callbacks.onUpdateElement(elements[0]);
+        onReRender();
+      });
+    }
+
     if (bFillColor) {
       bFillColor.addEventListener('input', () => {
         elements.forEach((el) => {
-          if (model.isElementClosed(el)) {
-            el.attributes['fill'] = bFillColor.value;
-          } else {
-            el.attributes['fill'] = 'none';
+          if (!model.isElementClosed(el) && el.vertices && el.vertices.length > 2) {
+            el.isClosed = true;
+            el.attributes.d = model.compilePathD(el.vertices, true);
           }
+          el.attributes['fill'] = bFillColor.value;
+          delete el.attributes['data-gradient'];
         });
         if (bFillHex) bFillHex.value = bFillColor.value;
         callbacks.onUpdateElement(elements[0]);
@@ -171,12 +207,14 @@ export class MultiSelectionInspector {
     }
     if (bFillHex) {
       bFillHex.addEventListener('change', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
         elements.forEach((el) => {
-          if (model.isElementClosed(el)) {
-            el.attributes['fill'] = bFillHex.value;
-          } else {
-            el.attributes['fill'] = 'none';
+          if (!model.isElementClosed(el) && el.vertices && el.vertices.length > 2) {
+            el.isClosed = true;
+            el.attributes.d = model.compilePathD(el.vertices, true);
           }
+          el.attributes['fill'] = bFillHex.value;
+          delete el.attributes['data-gradient'];
         });
         if (bFillColor) bFillColor.value = bFillHex.value;
         callbacks.onUpdateElement(elements[0]);
