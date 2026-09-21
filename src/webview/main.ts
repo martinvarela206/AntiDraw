@@ -122,9 +122,11 @@ class AntiDrawApp {
     this.historyService = new HistoryService({
       model: this.model,
       selectionTool: this.selectionTool,
+      canvasMgr: this.canvasMgr,
       onResetPropertyPanel: () => this.propertyPanel.resetPanelMode(),
       render: () => this.render(),
       syncToHost: () => this.syncToHost(),
+      syncMetadataToHost: () => this.syncMetadataToHost(),
     });
   }
 
@@ -1195,6 +1197,7 @@ class AntiDrawApp {
           x: Math.round(snappedPt.x),
           y: Math.round(snappedPt.y),
         };
+        this.pushUndo();
         const newG = this.canvasMgr.addGuide(
           this.dragGuideOrientation,
           pos,

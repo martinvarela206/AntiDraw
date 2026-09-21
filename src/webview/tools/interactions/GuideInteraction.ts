@@ -378,6 +378,7 @@ export class GuideInteraction {
         }
 
         if (shouldDelete) {
+          ctx.pushUndo();
           ctx.canvasMgr.removeGuide(g.id);
           callbacks.onClearPanelMode?.();
           ctx.render();
@@ -394,7 +395,31 @@ export class GuideInteraction {
     if (this.ghostGuideState && ctx.canvasMgr.selectedGuideId) {
       const g = ctx.canvasMgr.getGuide(ctx.canvasMgr.selectedGuideId);
       if (g) {
-        Object.assign(g, this.ghostGuideState);
+        if (this.guideInitialState) {
+          const init = this.guideInitialState;
+          const cur = this.ghostGuideState;
+          const changed =
+            init.position !== cur.position ||
+            init.angle !== cur.angle ||
+            init.pivotX !== cur.pivotX ||
+            init.pivotY !== cur.pivotY ||
+            init.orientation !== cur.orientation;
+
+          /**
+           * ARCHITECTURAL RATIONALE: Undo/Redo Integration for Guideline Transformations (ITEM-05)
+           * When moving, rotating, or displacing the pivot of a guideline, temporarily reverts to
+           * the pre-drag geometry snapshot to record a clean undo step before committing the new state.
+           */
+          if (changed) {
+            Object.assign(g, init);
+            ctx.pushUndo();
+            Object.assign(g, cur);
+          } else {
+            Object.assign(g, cur);
+          }
+        } else {
+          Object.assign(g, this.ghostGuideState);
+        }
         callbacks.onGuideSelected?.(g);
       }
     }

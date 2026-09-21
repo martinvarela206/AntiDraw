@@ -81,12 +81,28 @@ export class PivotManager {
     callbacks: SelectToolCallbacks
   ): boolean {
     const selectedEls = ctx.model.elements.filter((el) => ctx.selectionTool.isSelected(el.id));
+    const oldP = this.initialPivot;
+    const newP = ctx.selectionTool.customPivot;
+    const changed = !oldP || !newP || Math.abs(oldP.x - newP.x) > 0.001 || Math.abs(oldP.y - newP.y) > 0.001;
+
+    /**
+     * ARCHITECTURAL RATIONALE: Undo/Redo Integration for Rotation Pivot (ITEM-05)
+     * Temporarily restores the pre-drag pivot to record a clean undo transaction snapshot
+     * before committing the new pivot position and serializing to metadata.
+     */
+    if (changed) {
+      ctx.selectionTool.customPivot = oldP;
+      ctx.pushUndo();
+      ctx.selectionTool.customPivot = newP;
+    }
+
     if (selectedEls.length === 1 && ctx.selectionTool.customPivot) {
       ctx.selectionTool.setCustomPivotForElement(selectedEls[0], ctx.selectionTool.customPivot);
       ctx.syncToHost();
     }
     this.initialPivot = null;
     callbacks.onSelectionChanged?.();
+    callbacks.syncMetadataToHost?.();
     ctx.renderOverlay();
     return true;
   }
@@ -116,8 +132,10 @@ export class PivotManager {
     const z = ctx.canvasMgr.zoom || 1;
     const singleEl = selectedEls.length === 1 ? selectedEls[0] : undefined;
     if (groupBox && ctx.selectionTool.hitTestPivot(groupBox, pt, 10 / z, singleEl)) {
+      ctx.pushUndo();
       ctx.selectionTool.resetPivot(singleEl);
       callbacks.onSelectionChanged?.();
+      callbacks.syncMetadataToHost?.();
       ctx.syncToHost();
       ctx.renderOverlay();
       return true;

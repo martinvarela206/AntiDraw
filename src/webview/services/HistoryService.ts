@@ -1,12 +1,22 @@
-import { VectorModel } from '../engine/VectorModel.js';
+import { VectorModel, VectorElement, Point } from '../engine/VectorModel.js';
 import { SelectionTool } from '../engine/SelectionTool.js';
+import { CanvasManager, GuideLine } from '../engine/CanvasManager.js';
+
+export interface HistorySnapshot {
+  elements: VectorElement[];
+  guides?: GuideLine[];
+  elementPivots?: [string, Point][];
+  customPivot?: Point | null;
+}
 
 export interface HistoryServiceContext {
   model: VectorModel;
   selectionTool: SelectionTool;
+  canvasMgr: CanvasManager;
   onResetPropertyPanel: () => void;
   render: () => void;
   syncToHost: () => void;
+  syncMetadataToHost?: () => void;
 }
 
 /**
@@ -16,11 +26,17 @@ export interface HistoryServiceContext {
  *    Decouples undo/redo stack persistence, transaction snapshotting, depth limiting,
  *    and state restoration from the visual and event-dispatching layers of AntiDrawApp.
  *
- * 2. Immutable Deep-State Snapshotting:
- *    Stores deep JSON snapshots of `VectorElement[]` to guarantee total structural
- *    isolation between canvas manipulation frames without in-place mutation side-effects.
+ * 2. Unified Canvas & Metadata Deep Snapshotting (ITEM-05):
+ *    In addition to VectorElement[], history snapshots encapsulate companion canvas state:
+ *    - `guides`: Metric guidelines, orientations, angles, and custom guideline pivots.
+ *    - `customPivot` & `elementPivots`: Arbitrary rotation centers and solidary object anchors.
+ *    Restoring snapshots synchronizes both the active DOM representation and host companion metadata (.json).
  *
- * 3. Bounded Memory Consumption:
+ * 3. Backward Compatible Parser:
+ *    Handles legacy array-only snapshot strings seamlessly while transparently persisting the unified
+ *    multi-subsystem state container.
+ *
+ * 4. Bounded Memory Consumption:
  *    Maintains a FIFO sliding window (`maxHistory = 20`) to eliminate unbounded memory growth
  *    during intensive vector workflows while supporting metadata serialization across sessions.
  */
@@ -47,9 +63,18 @@ export class HistoryService {
     return this.redoStack;
   }
 
+  private createSnapshot(): HistorySnapshot {
+    return {
+      elements: JSON.parse(JSON.stringify(this.ctx.model.elements)),
+      guides: JSON.parse(JSON.stringify(this.ctx.canvasMgr.guides)),
+      elementPivots: Array.from(this.ctx.selectionTool.elementPivots.entries()),
+      customPivot: this.ctx.selectionTool.customPivot ? { ...this.ctx.selectionTool.customPivot } : null,
+    };
+  }
+
   public pushUndo(): void {
-    const state = JSON.stringify(this.ctx.model.elements);
-    this.undoStack.push(state);
+    const snapshot = this.createSnapshot();
+    this.undoStack.push(JSON.stringify(snapshot));
     if (this.undoStack.length > this.maxHistory) {
       this.undoStack.shift();
     }
@@ -58,28 +83,45 @@ export class HistoryService {
 
   public undo(): boolean {
     if (this.undoStack.length === 0) return false;
-    const currentState = JSON.stringify(this.ctx.model.elements);
-    this.redoStack.push(currentState);
-    const prevState = this.undoStack.pop()!;
-    this.ctx.model.elements = JSON.parse(prevState);
-    this.ctx.selectionTool.deselectAll();
-    this.ctx.onResetPropertyPanel();
-    this.ctx.render();
-    this.ctx.syncToHost();
+    const currentSnapshot = this.createSnapshot();
+    this.redoStack.push(JSON.stringify(currentSnapshot));
+    const prevStateStr = this.undoStack.pop()!;
+    this.applySnapshot(prevStateStr);
     return true;
   }
 
   public redo(): boolean {
     if (this.redoStack.length === 0) return false;
-    const currentState = JSON.stringify(this.ctx.model.elements);
-    this.undoStack.push(currentState);
-    const nextState = this.redoStack.pop()!;
-    this.ctx.model.elements = JSON.parse(nextState);
+    const currentSnapshot = this.createSnapshot();
+    this.undoStack.push(JSON.stringify(currentSnapshot));
+    const nextStateStr = this.redoStack.pop()!;
+    this.applySnapshot(nextStateStr);
+    return true;
+  }
+
+  private applySnapshot(stateStr: string): void {
+    const parsed = JSON.parse(stateStr);
+    if (Array.isArray(parsed)) {
+      this.ctx.model.elements = parsed;
+    } else {
+      this.ctx.model.elements = parsed.elements || [];
+      if (parsed.guides) {
+        this.ctx.canvasMgr.guides = parsed.guides;
+      }
+      if (parsed.elementPivots) {
+        this.ctx.selectionTool.elementPivots = new Map(parsed.elementPivots);
+      }
+      if (parsed.customPivot !== undefined) {
+        this.ctx.selectionTool.customPivot = parsed.customPivot;
+      }
+    }
     this.ctx.selectionTool.deselectAll();
+    this.ctx.canvasMgr.selectedGuideId = null;
+    this.ctx.canvasMgr.activeGuideTransformId = null;
     this.ctx.onResetPropertyPanel();
     this.ctx.render();
     this.ctx.syncToHost();
-    return true;
+    this.ctx.syncMetadataToHost?.();
   }
 
   public loadFromMetadata(metadata: { undoStack?: unknown; redoStack?: unknown }): void {
