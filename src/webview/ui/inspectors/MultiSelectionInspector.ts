@@ -4,6 +4,7 @@ import { ToolIcons } from '../../icons/ToolIcons.js';
 import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
 import { bindInspectorMouseDown } from './CanvasInspector.js';
 import { degreesToMiterLimit } from './AppearanceInspector.js';
+import { DistortInspectorControls } from './DistortInspectorControls.js';
 
 /**
  * MultiSelectionInspector
@@ -28,6 +29,13 @@ export class MultiSelectionInspector {
     const groupBox = selectionTool.getGroupSelectionBoundingBox(elements);
     const multiPivot = groupBox ? selectionTool.getPivot(groupBox) : { x: 0, y: 0 };
     const hasClosedElements = elements.some((el) => model.isElementClosed(el));
+
+    const firstOp = elements[0]?.attributes['opacity'] !== undefined ? parseFloat(elements[0].attributes['opacity']) : 1;
+    const allSameOpacity = elements.every((el) => {
+      const op = el.attributes['opacity'] !== undefined ? parseFloat(el.attributes['opacity']) : 1;
+      return Math.abs(op - firstOp) < 0.01;
+    });
+    const multiOpacityPct = allSameOpacity ? Math.round(Math.max(0, Math.min(1, isNaN(firstOp) ? 1 : firstOp)) * 100) : 100;
 
     container.innerHTML = `
       <div class="panel-section">
@@ -67,54 +75,15 @@ export class MultiSelectionInspector {
           <input type="number" class="prop-input" id="multi-pivot-y" value="${Math.round(multiPivot.y)}" title="Coordenada Y del pivote de rotación grupal" />
           <button class="prop-input" id="btn-multi-reset-pivot" style="width:auto; padding:2px 8px; cursor:pointer;" title="Restablecer pivote al centro de la selección">⟲</button>
         </div>
-        ${(() => {
-          if (selectionTool.selectionMode !== 'distort' || !groupBox) return '';
-          const activeKey = selectionTool.activeDistortCorner || 'nw';
-          const quad = selectionTool.currentDistortQuad;
-          let cX = quad ? quad[activeKey].x : groupBox.x;
-          let cY = quad ? quad[activeKey].y : groupBox.y;
-          if (!quad) {
-            if (activeKey === 'ne') { cX = groupBox.x + groupBox.width; cY = groupBox.y; }
-            else if (activeKey === 'se') { cX = groupBox.x + groupBox.width; cY = groupBox.y + groupBox.height; }
-            else if (activeKey === 'sw') { cX = groupBox.x; cY = groupBox.y + groupBox.height; }
-          }
-          cX = Math.round(cX * 10) / 10;
-          cY = Math.round(cY * 10) / 10;
-          const isCornerSelected = (k: string) =>
-            selectionTool.selectedDistortCorners
-              ? selectionTool.selectedDistortCorners.has(k as any) || activeKey === k
-              : activeKey === k;
-          return `
-          <div style="border-top:1px solid var(--border-color); padding-top:6px; margin-top:6px;">
-            <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
-              <span>Deformación Libre</span>
-              <span style="font-size:10px; opacity:0.7;">Homografía 2D</span>
-            </div>
-            <div class="prop-row" style="margin-top:4px;">
-              <span class="prop-label" style="font-size:11px;">Esquina</span>
-              <div style="display:flex; gap:3px; flex:1;">
-                <button class="prop-input btn-distort-corner" data-corner="nw" style="flex:1; padding:2px; font-size:10px; ${isCornerSelected('nw') ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Esquina Noroeste (Superior Izquierda) - Shift+clic para multiselección">NO</button>
-                <button class="prop-input btn-distort-corner" data-corner="ne" style="flex:1; padding:2px; font-size:10px; ${isCornerSelected('ne') ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Esquina Noreste (Superior Derecha) - Shift+clic para multiselección">NE</button>
-                <button class="prop-input btn-distort-corner" data-corner="se" style="flex:1; padding:2px; font-size:10px; ${isCornerSelected('se') ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Esquina Sureste (Inferior Derecha) - Shift+clic para multiselección">SE</button>
-                <button class="prop-input btn-distort-corner" data-corner="sw" style="flex:1; padding:2px; font-size:10px; ${isCornerSelected('sw') ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Esquina Suroeste (Inferior Izquierda) - Shift+clic para multiselección">SO</button>
-              </div>
-            </div>
-            <div class="prop-row">
-              <span class="prop-label">X</span>
-              <input type="number" step="any" class="prop-input" id="multi-distort-corner-x" value="${cX}" />
-              <span class="prop-label" style="width:20px; text-align:right;">Y</span>
-              <input type="number" step="any" class="prop-input" id="multi-distort-corner-y" value="${cY}" />
-            </div>
-            <div class="prop-row" style="margin-top:4px; gap:4px;">
-              <button class="prop-input" id="btn-multi-reset-active-corner" style="flex:1; padding:4px; cursor:pointer; font-size:11px;" title="Restaurar la posición original ortogonal de la esquina seleccionada">⟲ Esquina</button>
-              <button class="prop-input" id="btn-multi-reset-all-corners" style="flex:1; padding:4px; cursor:pointer; font-size:11px;" title="Restaurar todas las esquinas a la forma ortogonal original">⟲ Todas</button>
-            </div>
-            <div class="prop-row" style="margin-top:6px; border-top:1px dashed var(--border-color); padding-top:4px;">
-              <span class="prop-label" style="font-size:11px;">Cizalla</span>
-              <button class="prop-input" id="btn-multi-reset-skew" style="flex:1; padding:2px 4px; cursor:pointer; font-size:11px;" title="Restaurar inclinación / cizallamiento a su estado original">⟲ Restaurar Cizalla</button>
-            </div>
-          </div>`;
-        })()}
+        <div class="prop-row">
+          <span class="prop-label">Opacity</span>
+          <input type="range" class="prop-input" id="multi-opacity-slider" min="0" max="100" step="1" value="${multiOpacityPct}" style="flex:1; cursor:pointer; margin:0 4px;" title="Opacidad de los elementos seleccionados (0% a 100%)" />
+          <div style="display:flex; align-items:center; gap:2px; width:54px;">
+            <input type="number" class="prop-input" id="multi-opacity" min="0" max="100" step="1" value="${multiOpacityPct}" style="width:36px; padding:2px 4px; text-align:right;" title="Porcentaje de opacidad grupal (0 - 100)" />
+            <span style="font-size:11px; color:var(--text-muted); font-weight:600;">%</span>
+          </div>
+        </div>
+        ${groupBox ? DistortInspectorControls.renderHtml(selectionTool, groupBox.x, groupBox.y, groupBox.width, groupBox.height, 'multi-') : ''}
       </div>
 
       <div class="panel-section">
@@ -307,54 +276,45 @@ export class MultiSelectionInspector {
       onReRender();
     });
 
-    const btnDistortCorners = container.querySelectorAll<HTMLButtonElement>('.btn-distort-corner');
-    btnDistortCorners.forEach((btn) => {
-      btn.addEventListener('click', (e: MouseEvent) => {
-        const corner = btn.getAttribute('data-corner') as 'nw' | 'ne' | 'se' | 'sw';
-        if (corner) {
-          if (e.shiftKey) {
-            if (selectionTool.selectedDistortCorners.has(corner)) {
-              selectionTool.selectedDistortCorners.delete(corner);
-            } else {
-              selectionTool.selectedDistortCorners.add(corner);
-            }
-          } else {
-            selectionTool.selectedDistortCorners.clear();
-            selectionTool.selectedDistortCorners.add(corner);
+    const multiOpacity = container.querySelector<HTMLInputElement>('#multi-opacity');
+    const multiOpacitySlider = container.querySelector<HTMLInputElement>('#multi-opacity-slider');
+    if (multiOpacity && multiOpacitySlider) {
+      multiOpacitySlider.addEventListener('input', () => {
+        const val = Math.max(0, Math.min(100, Math.round(parseFloat(multiOpacitySlider.value) || 0)));
+        multiOpacity.value = val.toString();
+        const strVal = val === 100 ? '1' : (val / 100).toString();
+        elements.forEach((el) => {
+          el.attributes['opacity'] = strVal;
+          const svgEl = document.getElementById(el.id);
+          if (svgEl) {
+            if (val === 100) svgEl.removeAttribute('opacity');
+            else svgEl.setAttribute('opacity', strVal);
           }
-          selectionTool.activeDistortCorner = corner;
-          callbacks.onRenderOverlay?.();
-          onReRender();
-        }
+        });
       });
-    });
+      multiOpacitySlider.addEventListener('change', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        callbacks.onUpdateElement(elements[0]);
+      });
+      multiOpacity.addEventListener('change', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        const val = Math.max(0, Math.min(100, Math.round(parseFloat(multiOpacity.value) || 0)));
+        multiOpacity.value = val.toString();
+        multiOpacitySlider.value = val.toString();
+        const strVal = val === 100 ? '1' : (val / 100).toString();
+        elements.forEach((el) => {
+          el.attributes['opacity'] = strVal;
+          const svgEl = document.getElementById(el.id);
+          if (svgEl) {
+            if (val === 100) svgEl.removeAttribute('opacity');
+            else svgEl.setAttribute('opacity', strVal);
+          }
+        });
+        callbacks.onUpdateElement(elements[0]);
+      });
+    }
 
-    const distortX = container.querySelector<HTMLInputElement>('#multi-distort-corner-x');
-    const distortY = container.querySelector<HTMLInputElement>('#multi-distort-corner-y');
-    const applyDistortCoord = () => {
-      const valX = parseFloat(distortX?.value || '');
-      const valY = parseFloat(distortY?.value || '');
-      if (!isNaN(valX) && !isNaN(valY)) {
-        callbacks.onDistortCornerChange?.(selectionTool.activeDistortCorner || 'nw', { x: valX, y: valY });
-      }
-    };
-    distortX?.addEventListener('change', applyDistortCoord);
-    distortY?.addEventListener('change', applyDistortCoord);
-
-    const btnResetActiveCorner = container.querySelector<HTMLButtonElement>('#btn-multi-reset-active-corner');
-    btnResetActiveCorner?.addEventListener('click', () => {
-      callbacks.onResetDistortCorner?.(selectionTool.activeDistortCorner || 'nw');
-    });
-
-    const btnResetAllCorners = container.querySelector<HTMLButtonElement>('#btn-multi-reset-all-corners');
-    btnResetAllCorners?.addEventListener('click', () => {
-      callbacks.onResetAllDistortCorners?.();
-    });
-
-    const btnResetSkew = container.querySelector<HTMLButtonElement>('#btn-multi-reset-skew');
-    btnResetSkew?.addEventListener('click', () => {
-      callbacks.onResetSkew?.();
-    });
+    DistortInspectorControls.bindEvents(container, selectionTool, callbacks, onReRender, 'multi-');
 
     const btnMultiLockStroke = container.querySelector<HTMLButtonElement>('#btn-multi-lock-scale-stroke');
     btnMultiLockStroke?.addEventListener('click', () => {
