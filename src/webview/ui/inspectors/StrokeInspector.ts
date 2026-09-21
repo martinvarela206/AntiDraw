@@ -72,17 +72,38 @@ export class StrokeInspector {
 
     const isCustomMarkerColor = markerColor && markerColor !== 'context-stroke';
     const markerColorDisplay = isCustomMarkerColor ? markerColor : (stroke === 'none' ? '#ffffff' : stroke);
+    const hasStroke = stroke !== 'none' && stroke !== '' && stroke !== undefined && strokeWidth !== '0';
 
     return `
       <div class="panel-section">
-        <div class="panel-title">Stroke (Trazo)</div>
-        <div class="prop-row">
-          <span class="prop-label">Color</span>
-          <div class="color-picker-row">
-            <input type="color" class="color-swatch" id="el-stroke-color" value="${stroke === 'none' ? '#ffffff' : stroke}" />
-            <input type="text" class="prop-input" id="el-stroke-hex" value="${stroke}" />
+        <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span>Stroke (Trazo)</span>
+            ${!hasStroke ? '<span class="badge" style="font-size:10px; color:#94a3b8; font-weight:normal; text-transform:none;">(Sin trazo)</span>' : ''}
+          </div>
+          <div style="display:flex; gap:4px; align-items:center;">
+            ${hasStroke ? `
+              <button class="prop-input" id="btn-remove-stroke" style="cursor:pointer; width:auto; padding:1px 6px; font-size:11px; color:#ef4444;" title="Quitar trazo (establecer stroke='none')">− Quitar</button>
+            ` : `
+              <button class="prop-input" id="btn-add-stroke" style="cursor:pointer; width:auto; padding:1px 6px; font-size:11px; color:#10b981; font-weight:600;" title="Añadir trazo de 1px">+ Añadir</button>
+            `}
           </div>
         </div>
+
+        ${!hasStroke ? `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px; padding:6px 8px; background:rgba(255,255,255,0.02); border:1px dashed var(--border-color); border-radius:4px;">
+          <span style="font-size:11px; color:#94a3b8;">Sin borde (stroke="none")</span>
+          <button class="prop-input" id="btn-add-stroke-body" style="cursor:pointer; background:var(--accent-color); color:#fff; font-weight:600; padding:2px 8px; font-size:11px;" title="Añadir trazo de 1px">+ Añadir Borde</button>
+        </div>
+        ` : `
+        <div id="stroke-active-controls">
+          <div class="prop-row">
+            <span class="prop-label">Color</span>
+            <div class="color-picker-row">
+              <input type="color" class="color-swatch" id="el-stroke-color" value="${stroke === 'none' ? '#000000' : stroke}" />
+              <input type="text" class="prop-input" id="el-stroke-hex" value="${stroke === 'none' ? '#000000' : stroke}" />
+            </div>
+          </div>
         <div class="prop-row">
           <span class="prop-label">Width</span>
           <input type="number" class="prop-input" id="el-stroke-width" value="${strokeWidth}" min="0" step="0.5" />
@@ -178,6 +199,8 @@ export class StrokeInspector {
             ⤹ Convertir Trazo a Vector
           </button>
         </div>
+        </div>
+        `}
       </div>
     `;
   }
@@ -196,9 +219,38 @@ export class StrokeInspector {
     const elStrokeCap = container.querySelector<HTMLSelectElement>('#el-stroke-cap');
     const elStrokeJoin = container.querySelector<HTMLSelectElement>('#el-stroke-join');
 
+    const btnRemoveStroke = container.querySelector<HTMLButtonElement>('#btn-remove-stroke');
+    if (btnRemoveStroke) {
+      btnRemoveStroke.addEventListener('click', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        el.attributes['stroke'] = 'none';
+        callbacks.onUpdateElement(el);
+        onReRender();
+      });
+    }
+
+    const btnAddStroke = container.querySelector<HTMLButtonElement>('#btn-add-stroke');
+    const btnAddStrokeBody = container.querySelector<HTMLButtonElement>('#btn-add-stroke-body');
+    const onAddStrokeClicked = () => {
+      if (callbacks.onPushUndo) callbacks.onPushUndo();
+      const newStroke = el.attributes['stroke'] && el.attributes['stroke'] !== 'none' ? el.attributes['stroke'] : '#000000';
+      el.attributes['stroke'] = newStroke;
+      const currentW = parseFloat(el.attributes['stroke-width'] || '0');
+      if (currentW <= 0) {
+        el.attributes['stroke-width'] = '1';
+      }
+      callbacks.onUpdateElement(el);
+      onReRender();
+    };
+    if (btnAddStroke) btnAddStroke.addEventListener('click', onAddStrokeClicked);
+    if (btnAddStrokeBody) btnAddStrokeBody.addEventListener('click', onAddStrokeClicked);
+
     if (elStrokeColor) {
       elStrokeColor.addEventListener('input', () => {
         el.attributes['stroke'] = elStrokeColor.value;
+        if (!el.attributes['stroke-width'] || parseFloat(el.attributes['stroke-width']) <= 0) {
+          el.attributes['stroke-width'] = '1';
+        }
         if (elStrokeHex) elStrokeHex.value = elStrokeColor.value;
         callbacks.onUpdateElement(el);
       });
@@ -209,7 +261,11 @@ export class StrokeInspector {
 
     if (elStrokeHex) {
       elStrokeHex.addEventListener('change', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
         el.attributes['stroke'] = elStrokeHex.value;
+        if (!el.attributes['stroke-width'] || parseFloat(el.attributes['stroke-width']) <= 0) {
+          el.attributes['stroke-width'] = '1';
+        }
         if (elStrokeColor) elStrokeColor.value = elStrokeHex.value;
         callbacks.onUpdateElement(el);
       });

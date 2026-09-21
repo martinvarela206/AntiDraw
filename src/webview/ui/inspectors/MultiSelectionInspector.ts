@@ -104,7 +104,13 @@ export class MultiSelectionInspector {
       </div>
 
       <div class="panel-section">
-        <div class="panel-title">Batch Stroke</div>
+        <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
+          <span>Batch Stroke</span>
+          <div style="display:flex; gap:4px; align-items:center;">
+            <button class="prop-input" id="btn-batch-add-stroke" style="cursor:pointer; width:auto; padding:1px 6px; font-size:11px; color:#10b981; font-weight:600;" title="Añadir trazo de 1px a todos los elementos seleccionados">+ Añadir</button>
+            <button class="prop-input" id="btn-batch-remove-stroke" style="cursor:pointer; width:auto; padding:1px 6px; font-size:11px; color:#ef4444;" title="Quitar trazo de todos los elementos seleccionados (stroke='none')">− Quitar</button>
+          </div>
+        </div>
         <div class="prop-row">
           <span class="prop-label">Color</span>
           <div class="color-picker-row">
@@ -220,16 +226,74 @@ export class MultiSelectionInspector {
         callbacks.onUpdateElement(elements[0]);
       });
     }
+    const btnBatchAddStroke = container.querySelector<HTMLButtonElement>('#btn-batch-add-stroke');
+    const btnBatchRemoveStroke = container.querySelector<HTMLButtonElement>('#btn-batch-remove-stroke');
+
+    if (btnBatchAddStroke) {
+      btnBatchAddStroke.addEventListener('click', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        const col = bStrokeHex?.value || '#000000';
+        const width = bStrokeWidth?.value && parseFloat(bStrokeWidth.value) > 0 ? bStrokeWidth.value : '1';
+        elements.forEach((el) => {
+          el.attributes['stroke'] = col;
+          el.attributes['stroke-width'] = width;
+          const svgEl = document.getElementById(el.id);
+          if (svgEl) {
+            svgEl.setAttribute('stroke', col);
+            svgEl.setAttribute('stroke-width', width);
+          }
+        });
+        callbacks.onUpdateElement(elements[0]);
+        onReRender();
+      });
+    }
+
+    if (btnBatchRemoveStroke) {
+      btnBatchRemoveStroke.addEventListener('click', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        elements.forEach((el) => {
+          el.attributes['stroke'] = 'none';
+          const svgEl = document.getElementById(el.id);
+          if (svgEl) {
+            svgEl.setAttribute('stroke', 'none');
+          }
+        });
+        callbacks.onUpdateElement(elements[0]);
+        onReRender();
+      });
+    }
+
     if (bStrokeColor) {
       bStrokeColor.addEventListener('input', () => {
-        elements.forEach((el) => { el.attributes['stroke'] = bStrokeColor.value; });
+        elements.forEach((el) => {
+          el.attributes['stroke'] = bStrokeColor.value;
+          if (!el.attributes['stroke-width'] || parseFloat(el.attributes['stroke-width']) <= 0) {
+            el.attributes['stroke-width'] = bStrokeWidth?.value || '1';
+          }
+          const svgEl = document.getElementById(el.id);
+          if (svgEl) {
+            svgEl.setAttribute('stroke', bStrokeColor.value);
+            svgEl.setAttribute('stroke-width', el.attributes['stroke-width']);
+          }
+        });
         if (bStrokeHex) bStrokeHex.value = bStrokeColor.value;
         callbacks.onUpdateElement(elements[0]);
       });
     }
     if (bStrokeHex) {
       bStrokeHex.addEventListener('change', () => {
-        elements.forEach((el) => { el.attributes['stroke'] = bStrokeHex.value; });
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        elements.forEach((el) => {
+          el.attributes['stroke'] = bStrokeHex.value;
+          if (!el.attributes['stroke-width'] || parseFloat(el.attributes['stroke-width']) <= 0) {
+            el.attributes['stroke-width'] = bStrokeWidth?.value || '1';
+          }
+          const svgEl = document.getElementById(el.id);
+          if (svgEl) {
+            svgEl.setAttribute('stroke', bStrokeHex.value);
+            svgEl.setAttribute('stroke-width', el.attributes['stroke-width']);
+          }
+        });
         if (bStrokeColor) bStrokeColor.value = bStrokeHex.value;
         callbacks.onUpdateElement(elements[0]);
       });
