@@ -70,6 +70,13 @@ export class ContextMenuController {
         this.ctx.propertyPanel.update(null, this.ctx.toolbar.activeTool);
         this.ctx.render();
       }
+    } else {
+      // Right-clicked on empty canvas space: dismiss active context menu and clear selection
+      this.ctx.contextMenu.hide();
+      this.ctx.selectionTool.deselectAll();
+      this.ctx.propertyPanel.resetPanelMode();
+      this.ctx.render();
+      return;
     }
 
     const selectedEls = this.ctx.model.elements.filter((el) => this.ctx.selectionTool.isSelected(el.id));

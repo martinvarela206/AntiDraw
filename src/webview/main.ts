@@ -677,6 +677,7 @@ class AntiDrawApp {
 
     // Pointer events on Canvas Scroll Area (delegating interaction for guides extending outside canvasWrapper)
     this.canvasScrollArea.addEventListener('pointerdown', (e: PointerEvent) => {
+      this.contextMenu?.hide();
       if (e.button === 2) {
         e.preventDefault();
         this.cancelCurrentAction();
@@ -1069,6 +1070,7 @@ class AntiDrawApp {
   }
 
   private onPointerDown(e: PointerEvent): void {
+    this.contextMenu?.hide();
     if (e.button === 2) {
       e.preventDefault();
       e.stopPropagation();

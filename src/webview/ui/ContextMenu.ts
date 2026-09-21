@@ -33,11 +33,26 @@ export class ContextMenu {
     this.element.style.display = 'none';
     document.body.appendChild(this.element);
 
-    window.addEventListener('pointerdown', (e) => {
-      if (this.isVisible() && !this.element.contains(e.target as Node)) {
-        this.hide();
-      }
-    });
+    /**
+     * ARCHITECTURAL RATIONALE: Window Pointerdown Capture Phase for Menu Dismissal (FIX)
+     *
+     * 1. Child elements such as #canvas-wrapper invoke e.stopPropagation() in their pointerdown handlers
+     *    to isolate canvas transformations and prevent viewport scrolling collisions.
+     * 2. When listening in bubble phase, e.stopPropagation() halted event traversal before reaching window,
+     *    preventing click-outside detection from firing when clicking the canvas.
+     * 3. Registering this listener in the CAPTURE phase (useCapture = true) guarantees global interception
+     *    at the root window before any descendant can halt event propagation, reliably dismissing the
+     *    floating context menu on any outside pointer gesture.
+     */
+    window.addEventListener(
+      'pointerdown',
+      (e) => {
+        if (this.isVisible() && !this.element.contains(e.target as Node)) {
+          this.hide();
+        }
+      },
+      true
+    );
 
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && this.isVisible()) {
