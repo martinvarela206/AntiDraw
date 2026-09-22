@@ -48,7 +48,6 @@ import rectSvg from '../assets/icons/rect.svg';
 import redoSvg from '../assets/icons/redo.svg';
 import rulerSvg from '../assets/icons/ruler.svg';
 import rulerCornerSvg from '../assets/icons/ruler_corner.svg';
-import rulersSvg from '../assets/icons/rulers.svg';
 import selectSvg from '../assets/icons/select.svg';
 import sendBackSvg from '../assets/icons/send_back.svg';
 import sendBackwardSvg from '../assets/icons/send_backward.svg';
@@ -103,7 +102,6 @@ export const ToolIcons = {
   redo: redoSvg,
   ruler: rulerSvg,
   rulerCorner: rulerCornerSvg,
-  rulers: rulersSvg,
   select: selectSvg,
   sendBack: sendBackSvg,
   sendBackward: sendBackwardSvg,

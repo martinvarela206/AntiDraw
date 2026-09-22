@@ -47,7 +47,6 @@ import RectSvg from '../../assets/icons/rect.svg';
 import RedoSvg from '../../assets/icons/redo.svg';
 import RulerSvg from '../../assets/icons/ruler.svg';
 import RulerCornerSvg from '../../assets/icons/ruler_corner.svg';
-import RulersSvg from '../../assets/icons/rulers.svg';
 import SelectSvg from '../../assets/icons/select.svg';
 import SendBackSvg from '../../assets/icons/send_back.svg';
 import SendBackwardSvg from '../../assets/icons/send_backward.svg';
@@ -102,7 +101,6 @@ export const ICONS = {
   redo: RedoSvg,
   ruler: RulerSvg,
   rulerCorner: RulerCornerSvg,
-  rulers: RulersSvg,
   select: SelectSvg,
   sendBack: SendBackSvg,
   sendBackward: SendBackwardSvg,
