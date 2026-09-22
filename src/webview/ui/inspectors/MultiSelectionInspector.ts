@@ -96,9 +96,10 @@ export class MultiSelectionInspector {
         </div>
         <div class="prop-row">
           <span class="prop-label">Color</span>
-          <div class="color-picker-row">
+          <div class="color-picker-row" style="display:flex; gap:4px; align-items:center;">
             <input type="color" class="color-swatch" id="batch-fill-color" value="#4f46e5" />
-            <input type="text" class="prop-input" id="batch-fill-hex" value="#4f46e5" />
+            <input type="text" class="prop-input" id="batch-fill-hex" value="#4f46e5" placeholder="#hex o currentColor" style="flex:1;" />
+            <button class="prop-input" id="btn-batch-fill-currentcolor" style="cursor:pointer; width:auto; padding:2px 6px; font-size:10px; font-weight:600; color:#94a3b8;" title="Aplicar currentColor como relleno a todos los elementos seleccionados">currentColor</button>
           </div>
         </div>
       </div>
@@ -113,9 +114,10 @@ export class MultiSelectionInspector {
         </div>
         <div class="prop-row">
           <span class="prop-label">Color</span>
-          <div class="color-picker-row">
+          <div class="color-picker-row" style="display:flex; gap:4px; align-items:center;">
             <input type="color" class="color-swatch" id="batch-stroke-color" value="#000000" />
-            <input type="text" class="prop-input" id="batch-stroke-hex" value="#000000" />
+            <input type="text" class="prop-input" id="batch-stroke-hex" value="#000000" placeholder="#hex o currentColor" style="flex:1;" />
+            <button class="prop-input" id="btn-batch-stroke-currentcolor" style="cursor:pointer; width:auto; padding:2px 6px; font-size:10px; font-weight:600; color:#94a3b8;" title="Aplicar currentColor como borde a todos los elementos seleccionados">currentColor</button>
           </div>
         </div>
         <div class="prop-row">
@@ -167,6 +169,7 @@ export class MultiSelectionInspector {
 
     const btnBatchAddFill = container.querySelector<HTMLButtonElement>('#btn-batch-add-fill');
     const btnBatchRemoveFill = container.querySelector<HTMLButtonElement>('#btn-batch-remove-fill');
+    const btnBatchFillCurrentColor = container.querySelector<HTMLButtonElement>('#btn-batch-fill-currentcolor');
 
     if (btnBatchAddFill) {
       btnBatchAddFill.addEventListener('click', () => {
@@ -197,6 +200,23 @@ export class MultiSelectionInspector {
       });
     }
 
+    if (btnBatchFillCurrentColor) {
+      btnBatchFillCurrentColor.addEventListener('click', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        elements.forEach((el) => {
+          if (!model.isElementClosed(el) && el.vertices && el.vertices.length > 2) {
+            el.isClosed = true;
+            el.attributes.d = model.compilePathD(el.vertices, true);
+          }
+          el.attributes['fill'] = 'currentColor';
+          delete el.attributes['data-gradient'];
+        });
+        if (bFillHex) bFillHex.value = 'currentColor';
+        callbacks.onUpdateElement(elements[0]);
+        onReRender();
+      });
+    }
+
     if (bFillColor) {
       bFillColor.addEventListener('input', () => {
         elements.forEach((el) => {
@@ -214,20 +234,24 @@ export class MultiSelectionInspector {
     if (bFillHex) {
       bFillHex.addEventListener('change', () => {
         if (callbacks.onPushUndo) callbacks.onPushUndo();
+        const val = bFillHex.value.trim();
+        const finalColor = val.toLowerCase() === 'currentcolor' ? 'currentColor' : (val.startsWith('#') || val === 'none' ? val : `#${val}`);
         elements.forEach((el) => {
           if (!model.isElementClosed(el) && el.vertices && el.vertices.length > 2) {
             el.isClosed = true;
             el.attributes.d = model.compilePathD(el.vertices, true);
           }
-          el.attributes['fill'] = bFillHex.value;
+          el.attributes['fill'] = finalColor;
           delete el.attributes['data-gradient'];
         });
-        if (bFillColor) bFillColor.value = bFillHex.value;
+        if (bFillColor && finalColor !== 'currentColor' && finalColor !== 'none') bFillColor.value = finalColor;
         callbacks.onUpdateElement(elements[0]);
+        onReRender();
       });
     }
     const btnBatchAddStroke = container.querySelector<HTMLButtonElement>('#btn-batch-add-stroke');
     const btnBatchRemoveStroke = container.querySelector<HTMLButtonElement>('#btn-batch-remove-stroke');
+    const btnBatchStrokeCurrentColor = container.querySelector<HTMLButtonElement>('#btn-batch-stroke-currentcolor');
 
     if (btnBatchAddStroke) {
       btnBatchAddStroke.addEventListener('click', () => {
@@ -263,6 +287,27 @@ export class MultiSelectionInspector {
       });
     }
 
+    if (btnBatchStrokeCurrentColor) {
+      btnBatchStrokeCurrentColor.addEventListener('click', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        const width = bStrokeWidth?.value && parseFloat(bStrokeWidth.value) > 0 ? bStrokeWidth.value : '1';
+        elements.forEach((el) => {
+          el.attributes['stroke'] = 'currentColor';
+          if (!el.attributes['stroke-width'] || parseFloat(el.attributes['stroke-width']) <= 0) {
+            el.attributes['stroke-width'] = width;
+          }
+          const svgEl = document.getElementById(el.id);
+          if (svgEl) {
+            svgEl.setAttribute('stroke', 'currentColor');
+            svgEl.setAttribute('stroke-width', el.attributes['stroke-width']);
+          }
+        });
+        if (bStrokeHex) bStrokeHex.value = 'currentColor';
+        callbacks.onUpdateElement(elements[0]);
+        onReRender();
+      });
+    }
+
     if (bStrokeColor) {
       bStrokeColor.addEventListener('input', () => {
         elements.forEach((el) => {
@@ -283,19 +328,22 @@ export class MultiSelectionInspector {
     if (bStrokeHex) {
       bStrokeHex.addEventListener('change', () => {
         if (callbacks.onPushUndo) callbacks.onPushUndo();
+        const val = bStrokeHex.value.trim();
+        const finalStroke = val.toLowerCase() === 'currentcolor' ? 'currentColor' : (val.startsWith('#') || val === 'none' ? val : `#${val}`);
         elements.forEach((el) => {
-          el.attributes['stroke'] = bStrokeHex.value;
+          el.attributes['stroke'] = finalStroke;
           if (!el.attributes['stroke-width'] || parseFloat(el.attributes['stroke-width']) <= 0) {
             el.attributes['stroke-width'] = bStrokeWidth?.value || '1';
           }
           const svgEl = document.getElementById(el.id);
           if (svgEl) {
-            svgEl.setAttribute('stroke', bStrokeHex.value);
+            svgEl.setAttribute('stroke', finalStroke);
             svgEl.setAttribute('stroke-width', el.attributes['stroke-width']);
           }
         });
-        if (bStrokeColor) bStrokeColor.value = bStrokeHex.value;
+        if (bStrokeColor && finalStroke !== 'currentColor' && finalStroke !== 'none') bStrokeColor.value = finalStroke;
         callbacks.onUpdateElement(elements[0]);
+        onReRender();
       });
     }
     if (bStrokeWidth) {

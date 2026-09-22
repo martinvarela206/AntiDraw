@@ -64,6 +64,7 @@ export class AppearanceInspector {
     fillType: 'solid' | 'linear' | 'radial' | 'none',
     gradientCss: string
   ): string {
+    const isCurrentColor = fill === 'currentColor';
     const hasFill = fill !== 'none' && fill !== '' && fillType !== 'none';
 
     return `
@@ -106,9 +107,10 @@ export class AppearanceInspector {
         <div id="fill-solid-controls" style="${hasFill && fillType === 'solid' ? '' : 'display: none;'}">
           <div class="prop-row">
             <span class="prop-label">Color</span>
-            <div class="color-picker-row">
-              <input type="color" class="color-swatch" id="el-fill-color" value="${fill === 'none' || fill.startsWith('url') ? '#4f46e5' : fill}" />
-              <input type="text" class="prop-input" id="el-fill-hex" value="${fill.startsWith('url') || fill === 'none' ? '#4f46e5' : fill}" />
+            <div class="color-picker-row" style="display:flex; gap:4px; align-items:center;">
+              <input type="color" class="color-swatch" id="el-fill-color" value="${isCurrentColor ? '#000000' : (fill === 'none' || fill.startsWith('url') ? '#4f46e5' : fill)}" ${isCurrentColor ? 'disabled title="Color dinámico (currentColor)"' : ''} />
+              <input type="text" class="prop-input" id="el-fill-hex" value="${fill.startsWith('url') || fill === 'none' ? '#4f46e5' : fill}" placeholder="#hex o currentColor" style="flex:1;" />
+              <button class="prop-input ${isCurrentColor ? 'active' : ''}" id="btn-fill-currentcolor" style="cursor:pointer; width:auto; padding:2px 6px; font-size:10px; font-weight:600; ${isCurrentColor ? 'background:#3b82f6; color:#fff;' : 'color:#94a3b8;'}" title="Conmutar currentColor (hereda dinámicamente el color de texto del contexto)">currentColor</button>
             </div>
           </div>
         </div>
@@ -463,25 +465,50 @@ export class AppearanceInspector {
       });
     }
 
+    const btnFillCurrentColor = container.querySelector<HTMLButtonElement>('#btn-fill-currentcolor');
+    if (btnFillCurrentColor) {
+      btnFillCurrentColor.addEventListener('click', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        if (el.attributes['fill'] === 'currentColor') {
+          el.attributes['fill'] = '#000000';
+        } else {
+          el.attributes['fill'] = 'currentColor';
+          delete el.attributes['data-gradient'];
+        }
+        callbacks.onUpdateElement(el);
+        onReRender();
+      });
+    }
+
     if (elFillColor) {
       elFillColor.addEventListener('input', () => {
         if (fillType === 'solid') {
           el.attributes['fill'] = elFillColor.value;
+          delete el.attributes['data-gradient'];
           if (elFillHex) elFillHex.value = elFillColor.value;
           callbacks.onUpdateElement(el);
         }
       });
       elFillColor.addEventListener('change', () => {
         if (callbacks.onPushUndo) callbacks.onPushUndo();
+        onReRender();
       });
     }
     if (elFillHex) {
       elFillHex.addEventListener('change', () => {
         if (fillType === 'solid') {
+          const val = elFillHex.value.trim();
+          if (val.toLowerCase() === 'currentcolor') {
+            el.attributes['fill'] = 'currentColor';
+            delete el.attributes['data-gradient'];
+          } else {
+            el.attributes['fill'] = val.startsWith('#') || val === 'none' ? val : `#${val}`;
+            delete el.attributes['data-gradient'];
+            if (elFillColor) elFillColor.value = el.attributes['fill'];
+          }
           if (callbacks.onPushUndo) callbacks.onPushUndo();
-          el.attributes['fill'] = elFillHex.value;
-          if (elFillColor) elFillColor.value = elFillHex.value;
           callbacks.onUpdateElement(el);
+          onReRender();
         }
       });
     }
