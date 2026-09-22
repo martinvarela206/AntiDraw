@@ -44,6 +44,7 @@ export interface PropertyPanelCallbacks {
   onResetDistortCorner?: (cornerKey: 'nw' | 'ne' | 'se' | 'sw') => void;
   onResetAllDistortCorners?: () => void;
   onResetSkew?: () => void;
+  syncMetadataToHost?: () => void;
 }
 
 export { ViewBoxPreset, VIEWBOX_PRESETS } from './inspectors/CanvasInspector.js';

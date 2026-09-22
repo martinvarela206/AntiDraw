@@ -409,8 +409,40 @@ export class SvgSerializer {
    * Serializes the model canvas and elements into an XML-compliant SVG string.
    */
   public static toSvgString(ctx: IVectorModelSerializerContext): string {
-    const { width, height, viewBox, backgroundColor } = ctx.canvas;
-    let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${viewBox}" style="background-color: ${backgroundColor};">\n`;
+    const {
+      width,
+      height,
+      viewBox,
+      backgroundColor,
+      preserveAspectRatio,
+      svgFill,
+      svgStroke,
+      svgStrokeWidth,
+      svgStrokeLinecap,
+      svgStrokeLinejoin,
+    } = ctx.canvas;
+
+    let rootAttrs = `xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${viewBox}"`;
+    if (preserveAspectRatio && preserveAspectRatio !== 'xMidYMid meet') {
+      rootAttrs += ` preserveAspectRatio="${escapeXml(preserveAspectRatio)}"`;
+    }
+    if (svgFill) {
+      rootAttrs += ` fill="${escapeXml(svgFill)}"`;
+    }
+    if (svgStroke) {
+      rootAttrs += ` stroke="${escapeXml(svgStroke)}"`;
+    }
+    if (svgStrokeWidth) {
+      rootAttrs += ` stroke-width="${escapeXml(svgStrokeWidth)}"`;
+    }
+    if (svgStrokeLinecap) {
+      rootAttrs += ` stroke-linecap="${escapeXml(svgStrokeLinecap)}"`;
+    }
+    if (svgStrokeLinejoin) {
+      rootAttrs += ` stroke-linejoin="${escapeXml(svgStrokeLinejoin)}"`;
+    }
+
+    let svg = `<svg ${rootAttrs} style="background-color: ${backgroundColor};">\n`;
 
     // Detect if any vector element makes use of SVG marker terminations
     const hasMarkers = ctx.elements.some(

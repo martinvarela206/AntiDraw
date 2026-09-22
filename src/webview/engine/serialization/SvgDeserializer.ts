@@ -82,10 +82,30 @@ export class SvgDeserializer {
         bg = svgEl.getAttribute('background-color')!;
       }
 
+      const parAttr = svgEl.getAttribute('preserveAspectRatio');
+      const rootFill = svgEl.getAttribute('fill') || '';
+      const rootStroke = svgEl.getAttribute('stroke') || '';
+      const rootStrokeWidth = svgEl.getAttribute('stroke-width') || '';
+      const rootStrokeLinecap = svgEl.getAttribute('stroke-linecap') || '';
+      const rootStrokeLinejoin = svgEl.getAttribute('stroke-linejoin') || '';
+
       ctx.canvas.width = width;
       ctx.canvas.height = height;
       ctx.canvas.viewBox = viewBox;
       ctx.canvas.backgroundColor = bg;
+      ctx.canvas.preserveAspectRatio = parAttr || 'xMidYMid meet';
+      ctx.canvas.svgFill = rootFill;
+      ctx.canvas.svgStroke = rootStroke;
+      ctx.canvas.svgStrokeWidth = rootStrokeWidth;
+      ctx.canvas.svgStrokeLinecap = rootStrokeLinecap;
+      ctx.canvas.svgStrokeLinejoin = rootStrokeLinejoin;
+
+      if (companionMetadata?.canvas?.currentColor) {
+        ctx.canvas.currentColor = companionMetadata.canvas.currentColor;
+      } else if (!ctx.canvas.currentColor) {
+        ctx.canvas.currentColor = '#000000';
+      }
+
       ctx.elements.length = 0;
 
       // Strict Defs Sanitization & Orphaned Comments Elimination (FIX-20)

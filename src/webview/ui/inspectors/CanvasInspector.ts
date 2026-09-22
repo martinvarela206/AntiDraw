@@ -89,7 +89,7 @@ export class CanvasInspector {
       </div>
 
       <div class="panel-section">
-        <div class="panel-title">ViewBox (Artboard Frame)</div>
+        <div class="panel-title">ViewBox &amp; Escalado</div>
         <div class="prop-row">
           <span class="prop-label">X</span>
           <input type="number" class="prop-input" id="vb-minx" value="${vb.minX}" />
@@ -104,7 +104,65 @@ export class CanvasInspector {
         </div>
         <div class="prop-row">
           <span class="prop-label">Raw</span>
-          <input type="text" class="prop-input" id="canvas-viewbox" value="${canvas.viewBox}" title="Format: minX minY width height" />
+          <input type="text" class="prop-input" id="canvas-viewbox" value="${canvas.viewBox}" title="Formato: minX minY width height" />
+        </div>
+        <div class="prop-row">
+          <span class="prop-label" title="preserveAspectRatio: Ajuste de relación de aspecto del viewBox">Aspect</span>
+          <select class="prop-input" id="canvas-preserve-aspect" style="cursor:pointer;">
+            <option value="none" ${canvas.preserveAspectRatio === 'none' ? 'selected' : ''}>none (Deformar)</option>
+            <option value="xMidYMid meet" ${!canvas.preserveAspectRatio || canvas.preserveAspectRatio === 'xMidYMid meet' ? 'selected' : ''}>xMidYMid meet (Contener centrado)</option>
+            <option value="xMinYMin meet" ${canvas.preserveAspectRatio === 'xMinYMin meet' ? 'selected' : ''}>xMinYMin meet (Contener arriba-izq)</option>
+            <option value="xMaxYMax meet" ${canvas.preserveAspectRatio === 'xMaxYMax meet' ? 'selected' : ''}>xMaxYMax meet (Contener abajo-der)</option>
+            <option value="xMidYMid slice" ${canvas.preserveAspectRatio === 'xMidYMid slice' ? 'selected' : ''}>xMidYMid slice (Cubrir centrado)</option>
+            <option value="xMinYMin slice" ${canvas.preserveAspectRatio === 'xMinYMin slice' ? 'selected' : ''}>xMinYMin slice (Cubrir arriba-izq)</option>
+            <option value="xMaxYMax slice" ${canvas.preserveAspectRatio === 'xMaxYMax slice' ? 'selected' : ''}>xMaxYMax slice (Cubrir abajo-der)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <div class="panel-title">Visualización de currentColor</div>
+        <div class="prop-row">
+          <span class="prop-label" title="Color con el que se visualiza currentColor en el lienzo de AntiDraw">Color</span>
+          <div class="color-picker-row" style="display:flex; gap:4px; align-items:center;">
+            <input type="color" class="color-swatch" id="canvas-currentcolor-color" value="${canvas.currentColor || '#000000'}" />
+            <input type="text" class="prop-input" id="canvas-currentcolor-hex" value="${canvas.currentColor || '#000000'}" style="flex:1;" />
+            <button class="prop-input" id="btn-reset-canvas-currentcolor" style="width:26px; height:24px; padding:0; display:flex; align-items:center; justify-content:center; cursor:pointer;" title="Restablecer color de previsualización a negro (#000000)">⟲</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <div class="panel-title">Atributos Raíz SVG (&lt;svg&gt;)</div>
+        <div class="prop-row">
+          <span class="prop-label" title="Atributo fill predeterminado del elemento raíz <svg>">Root Fill</span>
+          <input type="text" class="prop-input" id="canvas-svg-fill" value="${canvas.svgFill || ''}" placeholder="none, currentColor, #hex" />
+        </div>
+        <div class="prop-row">
+          <span class="prop-label" title="Atributo stroke predeterminado del elemento raíz <svg>">Root Stroke</span>
+          <input type="text" class="prop-input" id="canvas-svg-stroke" value="${canvas.svgStroke || ''}" placeholder="none, currentColor, #hex" />
+        </div>
+        <div class="prop-row">
+          <span class="prop-label" title="Atributo stroke-width predeterminado del elemento raíz <svg>">Root Width</span>
+          <input type="number" class="prop-input" id="canvas-svg-strokewidth" value="${canvas.svgStrokeWidth || ''}" min="0" step="0.5" placeholder="1.5" />
+        </div>
+        <div class="prop-row">
+          <span class="prop-label" title="Atributo stroke-linecap predeterminado del elemento raíz <svg>">Linecap</span>
+          <select class="prop-input" id="canvas-svg-linecap" style="cursor:pointer;">
+            <option value="" ${!canvas.svgStrokeLinecap ? 'selected' : ''}>Sin definir (por defecto)</option>
+            <option value="butt" ${canvas.svgStrokeLinecap === 'butt' ? 'selected' : ''}>butt</option>
+            <option value="round" ${canvas.svgStrokeLinecap === 'round' ? 'selected' : ''}>round</option>
+            <option value="square" ${canvas.svgStrokeLinecap === 'square' ? 'selected' : ''}>square</option>
+          </select>
+        </div>
+        <div class="prop-row">
+          <span class="prop-label" title="Atributo stroke-linejoin predeterminado del elemento raíz <svg>">Linejoin</span>
+          <select class="prop-input" id="canvas-svg-linejoin" style="cursor:pointer;">
+            <option value="" ${!canvas.svgStrokeLinejoin ? 'selected' : ''}>Sin definir (por defecto)</option>
+            <option value="miter" ${canvas.svgStrokeLinejoin === 'miter' ? 'selected' : ''}>miter</option>
+            <option value="round" ${canvas.svgStrokeLinejoin === 'round' ? 'selected' : ''}>round</option>
+            <option value="bevel" ${canvas.svgStrokeLinejoin === 'bevel' ? 'selected' : ''}>bevel</option>
+          </select>
         </div>
       </div>
 
@@ -140,6 +198,15 @@ export class CanvasInspector {
     const vbWidth = container.querySelector<HTMLInputElement>('#vb-width');
     const vbHeight = container.querySelector<HTMLInputElement>('#vb-height');
     const viewBoxInput = container.querySelector<HTMLInputElement>('#canvas-viewbox');
+    const preserveAspectInput = container.querySelector<HTMLSelectElement>('#canvas-preserve-aspect');
+    const ccColor = container.querySelector<HTMLInputElement>('#canvas-currentcolor-color');
+    const ccHex = container.querySelector<HTMLInputElement>('#canvas-currentcolor-hex');
+    const btnResetCc = container.querySelector<HTMLButtonElement>('#btn-reset-canvas-currentcolor');
+    const svgFillInput = container.querySelector<HTMLInputElement>('#canvas-svg-fill');
+    const svgStrokeInput = container.querySelector<HTMLInputElement>('#canvas-svg-stroke');
+    const svgStrokeWidthInput = container.querySelector<HTMLInputElement>('#canvas-svg-strokewidth');
+    const svgLinecapInput = container.querySelector<HTMLSelectElement>('#canvas-svg-linecap');
+    const svgLinejoinInput = container.querySelector<HTMLSelectElement>('#canvas-svg-linejoin');
     const bgColor = container.querySelector<HTMLInputElement>('#canvas-bg-color');
     const bgHex = container.querySelector<HTMLInputElement>('#canvas-bg-hex');
 
@@ -247,6 +314,67 @@ export class CanvasInspector {
         if (vbWidth) vbWidth.value = updatedVb.width.toString();
         if (vbHeight) vbHeight.value = updatedVb.height.toString();
         checkPresetOrCustom();
+        callbacks.onUpdateCanvas();
+      });
+    }
+
+    if (preserveAspectInput) {
+      preserveAspectInput.addEventListener('change', () => {
+        model.canvas.preserveAspectRatio = preserveAspectInput.value;
+        callbacks.onUpdateCanvas();
+        onReRender();
+      });
+    }
+
+    const updateCurrentColor = (val: string) => {
+      model.canvas.currentColor = val;
+      if (ccColor) ccColor.value = val.startsWith('#') ? val : '#000000';
+      if (ccHex) ccHex.value = val;
+      callbacks.syncMetadataToHost?.();
+      callbacks.onUpdateCanvas();
+      onReRender();
+    };
+
+    if (ccColor) {
+      ccColor.addEventListener('input', () => updateCurrentColor(ccColor.value));
+    }
+    if (ccHex) {
+      ccHex.addEventListener('change', () => {
+        const v = ccHex.value.trim();
+        updateCurrentColor(v.startsWith('#') ? v : `#${v}`);
+      });
+    }
+    if (btnResetCc) {
+      btnResetCc.addEventListener('click', () => updateCurrentColor('#000000'));
+    }
+
+    if (svgFillInput) {
+      svgFillInput.addEventListener('change', () => {
+        model.canvas.svgFill = svgFillInput.value.trim();
+        callbacks.onUpdateCanvas();
+      });
+    }
+    if (svgStrokeInput) {
+      svgStrokeInput.addEventListener('change', () => {
+        model.canvas.svgStroke = svgStrokeInput.value.trim();
+        callbacks.onUpdateCanvas();
+      });
+    }
+    if (svgStrokeWidthInput) {
+      svgStrokeWidthInput.addEventListener('change', () => {
+        model.canvas.svgStrokeWidth = svgStrokeWidthInput.value.trim();
+        callbacks.onUpdateCanvas();
+      });
+    }
+    if (svgLinecapInput) {
+      svgLinecapInput.addEventListener('change', () => {
+        model.canvas.svgStrokeLinecap = svgLinecapInput.value;
+        callbacks.onUpdateCanvas();
+      });
+    }
+    if (svgLinejoinInput) {
+      svgLinejoinInput.addEventListener('change', () => {
+        model.canvas.svgStrokeLinejoin = svgLinejoinInput.value;
         callbacks.onUpdateCanvas();
       });
     }

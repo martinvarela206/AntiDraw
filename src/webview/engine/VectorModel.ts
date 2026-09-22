@@ -47,6 +47,13 @@ export interface CanvasSettings {
   height: number;
   viewBox: string;
   backgroundColor: string;
+  currentColor?: string;
+  preserveAspectRatio?: string;
+  svgFill?: string;
+  svgStroke?: string;
+  svgStrokeWidth?: string;
+  svgStrokeLinecap?: string;
+  svgStrokeLinejoin?: string;
 }
 
 export interface DropShadowConfig {
@@ -118,6 +125,8 @@ export class VectorModel {
     height: 600,
     viewBox: '0 0 800 600',
     backgroundColor: '#ffffff',
+    currentColor: '#000000',
+    preserveAspectRatio: 'xMidYMid meet',
   };
 
   public elements: VectorElement[] = [];

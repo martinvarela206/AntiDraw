@@ -338,6 +338,7 @@ class AntiDrawApp {
           this.render();
           this.syncToHost();
         },
+        syncMetadataToHost: () => this.syncMetadataToHost(),
         onNodeTypeChange: (type) => this.nodeToolHandler.handleNodeTypeChange(type),
         onSplitNode: () => this.nodeToolHandler.handleSplitNode(),
         onClosePath: () => this.nodeToolHandler.handleCloseOpenPath(),
@@ -853,6 +854,7 @@ class AntiDrawApp {
       scaleStroke: this.selectionTool.scaleStroke,
       scaleCorners: this.selectionTool.scaleCorners,
       elementPivots: Object.fromEntries(this.selectionTool.elementPivots),
+      canvas: { currentColor: this.model.canvas.currentColor },
       elements: elementsMetadata,
     });
   }
@@ -1468,7 +1470,7 @@ class AntiDrawApp {
     bgRect.setAttribute('height', vb.height.toString());
     bgRect.setAttribute('fill', this.model.canvas.backgroundColor || '#ffffff');
     this.svgCanvas.appendChild(bgRect);
-    this.svgCanvas.style.color = '#000000';
+    this.svgCanvas.style.color = this.model.canvas.currentColor || '#000000';
 
     // 2. Render all vector elements
     const tempSvg = document.createElement('div');
