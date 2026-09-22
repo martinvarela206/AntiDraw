@@ -1,4 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-    <rect x="4" y="4" width="11" height="11" fill="currentColor" fill-opacity="0.5"/>
-    <rect x="9" y="9" width="11" height="11" fill="currentColor" fill-opacity="0.5"/>
-  </svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" style="background-color: #ffffff00;">
+  <polygon id="el_poly_mubu1uch" fill="#ffffff" stroke="#ffffff" stroke-width="1" points="14,6 14,2 2,2 2,14 6,14 6,6" />
+  <polygon id="el_poly_mubu0fb7" fill="#ffffff" stroke="#ffffff" stroke-width="1" points="10,18 18,18 18,10 22,10 22,22 10,22" />
+  <rect id="el_mubturit" fill="#ffffff00" stroke="#ffffff" stroke-width="1" x="8" y="8" width="8" height="8" rx="0" ry="0" stroke-dasharray="2" />
+</svg>
