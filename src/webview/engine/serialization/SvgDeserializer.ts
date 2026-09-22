@@ -135,16 +135,90 @@ export class SvgDeserializer {
         ctx.customDefs = '';
       }
 
-      // Parse child vector elements
+      /**
+       * ARCHITECTURAL RATIONALE: W3C SVG Presentation Attribute Cascading Inheritance (FIX-CASCADING-ATTRS)
+       * In W3C SVG 1.1 / 2.0 specifications, presentation attributes (fill, stroke, stroke-width,
+       * opacity, etc.) declared on <svg> or container <g> elements automatically inherit down to child
+       * vector elements unless overridden explicitly on the child or via inline style.
+       * Extracting inheritable attributes and recursing through <g> containers prevents imported
+       * SVG icons (e.g. grid.svg, Feather, Heroicons) from defaulting to solid black fills and invisible
+       * 0-width strokes on child <rect> and <line> elements.
+       */
+      const INHERITABLE_PRESENTATION_ATTRS = [
+        'fill',
+        'fill-opacity',
+        'fill-rule',
+        'stroke',
+        'stroke-width',
+        'stroke-linecap',
+        'stroke-linejoin',
+        'stroke-miterlimit',
+        'stroke-dasharray',
+        'stroke-dashoffset',
+        'stroke-opacity',
+        'opacity',
+        'color',
+      ];
+
+      const extractPresentationAttrs = (el: Element): Record<string, string> => {
+        const res: Record<string, string> = {};
+        for (const a of INHERITABLE_PRESENTATION_ATTRS) {
+          if (el.hasAttribute(a)) {
+            res[a] = el.getAttribute(a)!;
+          }
+        }
+        const style = el.getAttribute('style');
+        if (style) {
+          const decls = style.split(';');
+          for (const d of decls) {
+            const colon = d.indexOf(':');
+            if (colon > 0) {
+              const prop = d.substring(0, colon).trim().toLowerCase();
+              const val = d.substring(colon + 1).trim();
+              if (INHERITABLE_PRESENTATION_ATTRS.includes(prop) && val) {
+                res[prop] = val;
+              }
+            }
+          }
+        }
+        return res;
+      };
+
+      const rootInheritedAttrs = extractPresentationAttrs(svgEl);
+
+      // Parse child vector elements with recursive group and cascading presentation attribute inheritance
       const usedIds = new Set<string>();
-      const children = Array.from(svgEl.children);
-      children.forEach((child, idx) => {
-        const tag = child.tagName.toLowerCase();
+      let elementIdx = 0;
+
+      const parseNode = (node: Element, inherited: Record<string, string>) => {
+        const tag = node.tagName.toLowerCase();
+        if (tag === 'g') {
+          const groupInherited = { ...inherited, ...extractPresentationAttrs(node) };
+          Array.from(node.children).forEach((ch) => parseNode(ch, groupInherited));
+          return;
+        }
+
         if (['path', 'rect', 'ellipse', 'circle', 'line', 'polygon', 'polyline', 'star'].includes(tag)) {
+          const idx = elementIdx++;
           const attrs: Record<string, string> = {};
-          for (let i = 0; i < child.attributes.length; i++) {
-            const attr = child.attributes[i];
+          for (let i = 0; i < node.attributes.length; i++) {
+            const attr = node.attributes[i];
             attrs[attr.name] = attr.value;
+          }
+
+          // Merge inline presentation styles if present
+          const inlinePres = extractPresentationAttrs(node);
+          for (const [k, v] of Object.entries(inlinePres)) {
+            if (attrs[k] === undefined) {
+              attrs[k] = v;
+            }
+          }
+
+          // Cascade inherited presentation attributes from ancestor <svg> or <g>
+          for (const [k, v] of Object.entries(inherited)) {
+            if (attrs[k] === undefined) {
+              attrs[k] = v;
+            }
           }
 
           // Import drop-shadow metadata from external <feDropShadow> filter if not already stored
@@ -296,13 +370,19 @@ export class SvgDeserializer {
           }
 
           if (!elem.isClosed) {
-            elem.attributes.fill = 'none';
-            delete elem.attributes['data-gradient'];
+            if (attrs.fill === undefined || tag === 'line') {
+              elem.attributes.fill = 'none';
+            }
+            if (elem.attributes.fill === 'none') {
+              delete elem.attributes['data-gradient'];
+            }
           }
 
           ctx.elements.push(elem);
         }
-      });
+      };
+
+      Array.from(svgEl.children).forEach((child) => parseNode(child, rootInheritedAttrs));
     } catch (e) {
       console.error('Failed to parse SVG string', e);
       ctx.createDefaultCanvas();

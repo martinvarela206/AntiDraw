@@ -1468,6 +1468,7 @@ class AntiDrawApp {
     bgRect.setAttribute('height', vb.height.toString());
     bgRect.setAttribute('fill', this.model.canvas.backgroundColor || '#ffffff');
     this.svgCanvas.appendChild(bgRect);
+    this.svgCanvas.style.color = '#000000';
 
     // 2. Render all vector elements
     const tempSvg = document.createElement('div');
