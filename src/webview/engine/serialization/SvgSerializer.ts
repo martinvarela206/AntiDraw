@@ -442,7 +442,9 @@ export class SvgSerializer {
       rootAttrs += ` stroke-linejoin="${escapeXml(svgStrokeLinejoin)}"`;
     }
 
-    let svg = `<svg ${rootAttrs} style="background-color: ${backgroundColor};">\n`;
+    const hasExplicitBg = backgroundColor && backgroundColor !== 'none' && backgroundColor !== 'transparent';
+    const bgStyle = hasExplicitBg ? ` style="background-color: ${backgroundColor};"` : '';
+    let svg = `<svg ${rootAttrs}${bgStyle}>\n`;
 
     // Detect if any vector element makes use of SVG marker terminations
     const hasMarkers = ctx.elements.some(

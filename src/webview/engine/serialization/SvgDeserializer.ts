@@ -74,7 +74,12 @@ export class SvgDeserializer {
 
       let viewBox = vbAttr || `0 0 ${width} ${height}`;
 
-      let bg = '#ffffff';
+      // ARCHITECTURAL RATIONALE: Standard SVG Transparency Preservation
+      // Standard W3C SVG documents have transparent canvas backgrounds by default unless explicitly declared.
+      // Initializing bg to 'none' ensures that SVGs without a background-color declaration render
+      // with fill="none" on the artboard <rect id="__artboard_bg__">, preserving transparency
+      // and preventing unwanted solid white boxes without requiring intrusive checkerboard patterns.
+      let bg = 'none';
       const bgMatch = styleAttr.match(/background-color:\s*([^;]+)/i);
       if (bgMatch) {
         bg = bgMatch[1].trim();

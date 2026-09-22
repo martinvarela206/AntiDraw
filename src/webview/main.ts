@@ -1464,8 +1464,8 @@ class AntiDrawApp {
     bgRect.setAttribute('x', vb.minX.toString());
     bgRect.setAttribute('y', vb.minY.toString());
     bgRect.setAttribute('width', vb.width.toString());
-    bgRect.setAttribute('height', vb.height.toString());
-    bgRect.setAttribute('fill', this.model.canvas.backgroundColor || '#ffffff');
+    const artboardBg = this.model.canvas.backgroundColor;
+    bgRect.setAttribute('fill', artboardBg && artboardBg !== 'transparent' ? artboardBg : 'none');
     this.svgCanvas.appendChild(bgRect);
     this.svgCanvas.style.color = this.model.canvas.currentColor || '#000000';
 

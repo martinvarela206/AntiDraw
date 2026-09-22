@@ -171,8 +171,9 @@ export class CanvasInspector {
         <div class="prop-row">
           <span class="prop-label">Color</span>
           <div class="color-picker-row">
-            <input type="color" class="color-swatch" id="canvas-bg-color" value="${canvas.backgroundColor}" />
-            <input type="text" class="prop-input" id="canvas-bg-hex" value="${canvas.backgroundColor}" />
+            <input type="color" class="color-swatch" id="canvas-bg-color" value="${canvas.backgroundColor && canvas.backgroundColor.startsWith('#') ? canvas.backgroundColor : '#ffffff'}" />
+            <input type="text" class="prop-input" id="canvas-bg-hex" value="${canvas.backgroundColor || 'none'}" placeholder="none o #hex" style="flex:1;" />
+            <button class="prop-input ${canvas.backgroundColor === 'none' || !canvas.backgroundColor ? 'active' : ''}" id="btn-canvas-bg-none" style="cursor:pointer; width:auto; padding:2px 6px; font-size:10px; font-weight:600;" title="Quitar color de fondo (transparente)">Sin fondo</button>
           </div>
         </div>
       </div>
@@ -379,6 +380,15 @@ export class CanvasInspector {
       });
     }
 
+    const btnBgNone = container.querySelector<HTMLButtonElement>('#btn-canvas-bg-none');
+    if (btnBgNone) {
+      btnBgNone.addEventListener('click', () => {
+        model.canvas.backgroundColor = 'none';
+        if (bgHex) bgHex.value = 'none';
+        callbacks.onUpdateCanvas();
+      });
+    }
+
     if (bgColor) {
       bgColor.addEventListener('input', () => {
         model.canvas.backgroundColor = bgColor.value;
@@ -388,8 +398,9 @@ export class CanvasInspector {
     }
     if (bgHex) {
       bgHex.addEventListener('change', () => {
-        model.canvas.backgroundColor = bgHex.value;
-        if (bgColor) bgColor.value = bgHex.value;
+        const val = bgHex.value.trim();
+        model.canvas.backgroundColor = val;
+        if (bgColor && val.startsWith('#')) bgColor.value = val;
         callbacks.onUpdateCanvas();
       });
     }

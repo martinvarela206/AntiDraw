@@ -124,7 +124,7 @@ export class VectorModel {
     width: 800,
     height: 600,
     viewBox: '0 0 800 600',
-    backgroundColor: '#ffffff',
+    backgroundColor: 'none',
     currentColor: '#000000',
     preserveAspectRatio: 'xMidYMid meet',
   };
@@ -230,7 +230,7 @@ export class VectorModel {
       width: 800,
       height: 600,
       viewBox: '0 0 800 600',
-      backgroundColor: '#ffffff',
+      backgroundColor: 'none',
     };
     this.elements = [];
   }
