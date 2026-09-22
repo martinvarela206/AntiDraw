@@ -12,7 +12,7 @@
  * 3. Strict Parity & Non-Regression Invariant: Retains 100% API compatibility across all UI panels,
  *    toolbars, inspectors, and quick-help components.
  */
-import addVertexSvg from '../assets/icons/add_vertex.svg';
+import addVertexToolSvg from '../assets/icons/add_vertex_tool.svg';
 import alignBottomSvg from '../assets/icons/align_bottom.svg';
 import alignCenterSvg from '../assets/icons/align_center.svg';
 import alignLeftSvg from '../assets/icons/align_left.svg';
@@ -21,34 +21,34 @@ import alignRightSvg from '../assets/icons/align_right.svg';
 import alignTopSvg from '../assets/icons/align_top.svg';
 import bringForwardSvg from '../assets/icons/bring_forward.svg';
 import bringFrontSvg from '../assets/icons/bring_front.svg';
-import canvasSvg from '../assets/icons/canvas.svg';
+import canvasToolSvg from '../assets/icons/canvas_tool.svg';
 import chevronDownSvg from '../assets/icons/chevron_down.svg';
-import circleSvg from '../assets/icons/circle.svg';
+import circleToolSvg from '../assets/icons/circle_tool.svg';
 import combineSvg from '../assets/icons/combine.svg';
-import ellipseSvg from '../assets/icons/ellipse.svg';
+import ellipseToolSvg from '../assets/icons/ellipse_tool.svg';
 import excludeSvg from '../assets/icons/exclude.svg';
 import flipHorizontalSvg from '../assets/icons/flip_horizontal.svg';
 import flipVerticalSvg from '../assets/icons/flip_vertical.svg';
 import fragmentSvg from '../assets/icons/fragment.svg';
-import gridSvg from '../assets/icons/grid.svg';
-import guideSvg from '../assets/icons/guide.svg';
+import gridVisibilitySvg from '../assets/icons/grid_visibility.svg';
 import guideDoubleArrowVerticalLeftRotateSvg from '../assets/icons/guide_double_arrow_vertical_left_rotate.svg';
 import guideDoubleArrowVerticalRightRotateSvg from '../assets/icons/guide_double_arrow_vertical_right_rotate.svg';
+import guidesVisibilitySvg from '../assets/icons/guides_visibility.svg';
 import intersectSvg from '../assets/icons/intersect.svg';
-import lineSvg from '../assets/icons/line.svg';
-import nodeSvg from '../assets/icons/node.svg';
+import lineToolSvg from '../assets/icons/line_tool.svg';
 import nodeAsymmetricSvg from '../assets/icons/node_asymmetric.svg';
 import nodeSharpSvg from '../assets/icons/node_sharp.svg';
 import nodeSmoothSvg from '../assets/icons/node_smooth.svg';
 import nodeSymmetricSvg from '../assets/icons/node_symmetric.svg';
-import penSvg from '../assets/icons/pen.svg';
-import polygonSvg from '../assets/icons/polygon.svg';
-import polylineSvg from '../assets/icons/polyline.svg';
-import rectSvg from '../assets/icons/rect.svg';
+import nodeToolSvg from '../assets/icons/node_tool.svg';
+import penToolSvg from '../assets/icons/pen_tool.svg';
+import polygonToolSvg from '../assets/icons/polygon_tool.svg';
+import polylineToolSvg from '../assets/icons/polyline_tool.svg';
+import rectToolSvg from '../assets/icons/rect_tool.svg';
 import redoSvg from '../assets/icons/redo.svg';
-import rulerSvg from '../assets/icons/ruler.svg';
 import rulerCornerSvg from '../assets/icons/ruler_corner.svg';
-import selectSvg from '../assets/icons/select.svg';
+import rulersVisibilitySvg from '../assets/icons/rulers_visibility.svg';
+import selectToolSvg from '../assets/icons/select_tool.svg';
 import sendBackSvg from '../assets/icons/send_back.svg';
 import sendBackwardSvg from '../assets/icons/send_backward.svg';
 import snapAngularSvg from '../assets/icons/snap_angular.svg';
@@ -58,15 +58,15 @@ import snapGuideSvg from '../assets/icons/snap_guide.svg';
 import snapVertexSvg from '../assets/icons/snap_vertex.svg';
 import snapViewBoxSvg from '../assets/icons/snap_view_box.svg';
 import splitNodeSvg from '../assets/icons/split_node.svg';
-import starSvg from '../assets/icons/star.svg';
-import strokeSvg from '../assets/icons/stroke.svg';
+import starToolSvg from '../assets/icons/star_tool.svg';
+import strokeToolSvg from '../assets/icons/stroke_tool.svg';
 import subtractSvg from '../assets/icons/subtract.svg';
 import undoSvg from '../assets/icons/undo.svg';
 import unionSvg from '../assets/icons/union.svg';
-import zoomSvg from '../assets/icons/zoom.svg';
+import zoomToolSvg from '../assets/icons/zoom_tool.svg';
 
 export const ToolIcons = {
-  addVertex: addVertexSvg,
+  addVertexTool: addVertexToolSvg,
   alignBottom: alignBottomSvg,
   alignCenter: alignCenterSvg,
   alignLeft: alignLeftSvg,
@@ -75,34 +75,34 @@ export const ToolIcons = {
   alignTop: alignTopSvg,
   bringForward: bringForwardSvg,
   bringFront: bringFrontSvg,
-  canvas: canvasSvg,
+  canvasTool: canvasToolSvg,
   chevronDown: chevronDownSvg,
-  circle: circleSvg,
+  circleTool: circleToolSvg,
   combine: combineSvg,
-  ellipse: ellipseSvg,
+  ellipseTool: ellipseToolSvg,
   exclude: excludeSvg,
   flipHorizontal: flipHorizontalSvg,
   flipVertical: flipVerticalSvg,
   fragment: fragmentSvg,
-  grid: gridSvg,
-  guide: guideSvg,
+  gridVisibility: gridVisibilitySvg,
   guideDoubleArrowVerticalLeftRotate: guideDoubleArrowVerticalLeftRotateSvg,
   guideDoubleArrowVerticalRightRotate: guideDoubleArrowVerticalRightRotateSvg,
+  guidesVisibility: guidesVisibilitySvg,
   intersect: intersectSvg,
-  line: lineSvg,
-  node: nodeSvg,
+  lineTool: lineToolSvg,
   nodeAsymmetric: nodeAsymmetricSvg,
   nodeSharp: nodeSharpSvg,
   nodeSmooth: nodeSmoothSvg,
   nodeSymmetric: nodeSymmetricSvg,
-  pen: penSvg,
-  polygon: polygonSvg,
-  polyline: polylineSvg,
-  rect: rectSvg,
+  nodeTool: nodeToolSvg,
+  penTool: penToolSvg,
+  polygonTool: polygonToolSvg,
+  polylineTool: polylineToolSvg,
+  rectTool: rectToolSvg,
   redo: redoSvg,
-  ruler: rulerSvg,
   rulerCorner: rulerCornerSvg,
-  select: selectSvg,
+  rulersVisibility: rulersVisibilitySvg,
+  selectTool: selectToolSvg,
   sendBack: sendBackSvg,
   sendBackward: sendBackwardSvg,
   snapAngular: snapAngularSvg,
@@ -112,12 +112,29 @@ export const ToolIcons = {
   snapVertex: snapVertexSvg,
   snapViewBox: snapViewBoxSvg,
   splitNode: splitNodeSvg,
-  star: starSvg,
-  stroke: strokeSvg,
+  starTool: starToolSvg,
+  strokeTool: strokeToolSvg,
   subtract: subtractSvg,
   undo: undoSvg,
   union: unionSvg,
-  zoom: zoomSvg,
+  zoomTool: zoomToolSvg,
+  select: selectToolSvg,
+  stroke: strokeToolSvg,
+  node: nodeToolSvg,
+  pen: penToolSvg,
+  line: lineToolSvg,
+  polyline: polylineToolSvg,
+  rect: rectToolSvg,
+  circle: circleToolSvg,
+  ellipse: ellipseToolSvg,
+  polygon: polygonToolSvg,
+  star: starToolSvg,
+  addVertex: addVertexToolSvg,
+  canvas: canvasToolSvg,
+  zoom: zoomToolSvg,
+  ruler: rulersVisibilitySvg,
+  grid: gridVisibilitySvg,
+  guide: guidesVisibilitySvg,
   doubleArrowLeftRotate: guideDoubleArrowVerticalLeftRotateSvg,
   doubleArrowRightRotate: guideDoubleArrowVerticalRightRotateSvg,
 } as const;

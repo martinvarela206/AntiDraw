@@ -58,20 +58,20 @@ export class Toolbar {
 
   private render(): void {
     const tools: { id: ToolType; title: string; icon: string }[] = [
-      { id: 'select', title: 'Selection Tool (V)', icon: ToolIcons.select },
-      { id: 'stroke', title: 'Stroke Tool (T)', icon: ToolIcons.stroke },
-      { id: 'node', title: 'Node Edit Tool (N)', icon: ToolIcons.node },
-      { id: 'pen', title: 'Bézier Curve Tool (P)', icon: ToolIcons.pen },
-      { id: 'line', title: 'Line Tool (L)', icon: ToolIcons.line },
-      { id: 'polyline', title: 'Polyline Tool (Y)', icon: ToolIcons.polyline },
-      { id: 'rect', title: 'Rectangle Tool (R)', icon: ToolIcons.rect },
-      { id: 'circle', title: 'Circle Tool (O)', icon: ToolIcons.circle },
-      { id: 'ellipse', title: 'Ellipse Tool (E)', icon: ToolIcons.ellipse },
-      { id: 'polygon', title: 'Polygon Tool (G)', icon: ToolIcons.polygon },
-      { id: 'star', title: 'Star Tool (S)', icon: ToolIcons.star },
-      { id: 'addVertex', title: 'Add Vertex Tool (+)', icon: ToolIcons.addVertex },
-      { id: 'canvas', title: 'Canvas Tool (C)', icon: ToolIcons.canvas },
-      { id: 'zoom', title: 'Zoom/Pan Tool (Z)', icon: ToolIcons.zoom },
+      { id: 'select', title: 'Selection Tool (V)', icon: ToolIcons.selectTool },
+      { id: 'stroke', title: 'Stroke Tool (T)', icon: ToolIcons.strokeTool },
+      { id: 'node', title: 'Node Edit Tool (N)', icon: ToolIcons.nodeTool },
+      { id: 'pen', title: 'Bézier Curve Tool (P)', icon: ToolIcons.penTool },
+      { id: 'line', title: 'Line Tool (L)', icon: ToolIcons.lineTool },
+      { id: 'polyline', title: 'Polyline Tool (Y)', icon: ToolIcons.polylineTool },
+      { id: 'rect', title: 'Rectangle Tool (R)', icon: ToolIcons.rectTool },
+      { id: 'circle', title: 'Circle Tool (O)', icon: ToolIcons.circleTool },
+      { id: 'ellipse', title: 'Ellipse Tool (E)', icon: ToolIcons.ellipseTool },
+      { id: 'polygon', title: 'Polygon Tool (G)', icon: ToolIcons.polygonTool },
+      { id: 'star', title: 'Star Tool (S)', icon: ToolIcons.starTool },
+      { id: 'addVertex', title: 'Add Vertex Tool (+)', icon: ToolIcons.addVertexTool },
+      { id: 'canvas', title: 'Canvas Tool (C)', icon: ToolIcons.canvasTool },
+      { id: 'zoom', title: 'Zoom/Pan Tool (Z)', icon: ToolIcons.zoomTool },
     ];
 
     this.container.innerHTML = '';

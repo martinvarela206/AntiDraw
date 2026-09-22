@@ -30,12 +30,31 @@ function syncIcons() {
   });
 
   // Aliases for backward compatibility
-  if (files.includes('guide_double_arrow_vertical_left_rotate.svg')) {
-    toolProps += `  doubleArrowLeftRotate: guideDoubleArrowVerticalLeftRotateSvg,\n`;
-  }
-  if (files.includes('guide_double_arrow_vertical_right_rotate.svg')) {
-    toolProps += `  doubleArrowRightRotate: guideDoubleArrowVerticalRightRotateSvg,\n`;
-  }
+  const legacyAliases = [
+    ['select', 'selectToolSvg'],
+    ['stroke', 'strokeToolSvg'],
+    ['node', 'nodeToolSvg'],
+    ['pen', 'penToolSvg'],
+    ['line', 'lineToolSvg'],
+    ['polyline', 'polylineToolSvg'],
+    ['rect', 'rectToolSvg'],
+    ['circle', 'circleToolSvg'],
+    ['ellipse', 'ellipseToolSvg'],
+    ['polygon', 'polygonToolSvg'],
+    ['star', 'starToolSvg'],
+    ['addVertex', 'addVertexToolSvg'],
+    ['canvas', 'canvasToolSvg'],
+    ['zoom', 'zoomToolSvg'],
+    ['ruler', 'rulersVisibilitySvg'],
+    ['grid', 'gridVisibilitySvg'],
+    ['guide', 'guidesVisibilitySvg'],
+    ['doubleArrowLeftRotate', 'guideDoubleArrowVerticalLeftRotateSvg'],
+    ['doubleArrowRightRotate', 'guideDoubleArrowVerticalRightRotateSvg'],
+  ];
+
+  legacyAliases.forEach(([aliasKey, varName]) => {
+    toolProps += `  ${aliasKey}: ${varName},\n`;
+  });
 
   const toolIconsContent = `/**
  * ARCHITECTURAL RATIONALE: Centralized SVG Vector Asset Import Pipeline
@@ -71,12 +90,31 @@ export type ToolIconName = keyof typeof ToolIcons;
     regProps += `  ${key}: ${varName},\n`;
   });
 
-  if (files.includes('guide_double_arrow_vertical_left_rotate.svg')) {
-    regProps += `  doubleArrowLeftRotate: GuideDoubleArrowVerticalLeftRotateSvg,\n`;
-  }
-  if (files.includes('guide_double_arrow_vertical_right_rotate.svg')) {
-    regProps += `  doubleArrowRightRotate: GuideDoubleArrowVerticalRightRotateSvg,\n`;
-  }
+  const regLegacyAliases = [
+    ['select', 'SelectToolSvg'],
+    ['stroke', 'StrokeToolSvg'],
+    ['node', 'NodeToolSvg'],
+    ['pen', 'PenToolSvg'],
+    ['line', 'LineToolSvg'],
+    ['polyline', 'PolylineToolSvg'],
+    ['rect', 'RectToolSvg'],
+    ['circle', 'CircleToolSvg'],
+    ['ellipse', 'EllipseToolSvg'],
+    ['polygon', 'PolygonToolSvg'],
+    ['star', 'StarToolSvg'],
+    ['addVertex', 'AddVertexToolSvg'],
+    ['canvas', 'CanvasToolSvg'],
+    ['zoom', 'ZoomToolSvg'],
+    ['ruler', 'RulersVisibilitySvg'],
+    ['grid', 'GridVisibilitySvg'],
+    ['guide', 'GuidesVisibilitySvg'],
+    ['doubleArrowLeftRotate', 'GuideDoubleArrowVerticalLeftRotateSvg'],
+    ['doubleArrowRightRotate', 'GuideDoubleArrowVerticalRightRotateSvg'],
+  ];
+
+  regLegacyAliases.forEach(([aliasKey, varName]) => {
+    regProps += `  ${aliasKey}: ${varName},\n`;
+  });
 
   const registryContent = `/**
  * ARCHITECTURAL RATIONALE: Centralized UI Icon Registry & SVG Asset Pipeline

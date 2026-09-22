@@ -39,7 +39,7 @@ export class QuickHelpInspector {
     select: {
       title: 'Herramienta Selección',
       toolId: 'select',
-      icon: ToolIcons.select,
+      icon: ToolIcons.selectTool,
       shortcuts: [
         { keys: ['Clic'], description: 'Selecciona elemento bajo el cursor o deselecciona en vacío' },
         { keys: ['Shift', 'Clic'], description: 'Añade o remueve el elemento de la selección múltiple' },
@@ -53,20 +53,23 @@ export class QuickHelpInspector {
         { keys: ['Tirador esquina'], description: 'Escala libremente el elemento o grupo seleccionado' },
         { keys: ['Shift', 'Escala'], description: 'Escala proporcional manteniendo relación de aspecto' },
         { keys: ['Alt', 'Escala'], description: 'Escala simétricamente expandiendo desde el centro/pivote' },
-        { keys: ['Tirador exterior'], description: 'Gira la selección alrededor del centro de pivote' },
-        { keys: ['Ctrl / Shift', 'Rotar'], description: 'Fuerza la rotación a saltos angulares de 15° y 45°' },
-        { keys: ['Tirador de sesgo'], description: 'Inclina (skew) la figura horizontal o verticalmente' },
-        { keys: ['Tirador distorsión'], description: 'Deformación homográfica libre en las 4 esquinas' },
-        { keys: ['Shift', 'Distorsión'], description: 'Deforma en simetría con la esquina opuesta' },
-        { keys: ['Ctrl', 'Distorsión'], description: 'Restringe la deformación a lo largo del eje del borde' },
-        { keys: ['Alt', 'Distorsión'], description: 'Deformación trapezoidal en perspectiva' },
-        { keys: ['Supr / Backspace'], description: 'Elimina los elementos seleccionados del documento' },
+        { keys: ['Arrastrar'], description: 'Traslada elementos seleccionados con snap a nodos, bordes y guías' },
+        { keys: ['Shift', 'Arrastrar'], description: 'Restringe el desplazamiento al eje horizontal o vertical' },
+        { keys: ['Alt', 'Arrastre en vacío'], description: 'Marquesina de selección por toque/cruce (touch-select)' },
+        { keys: ['Shift', 'Arrastre tirador'], description: 'Escala proporcional preservando relación de aspecto' },
+        { keys: ['Alt', 'Arrastre tirador'], description: 'Escala simétrica concéntrica desde el centro' },
+        { keys: ['Shift', 'Arrastre rotar'], description: 'Fuerza el ángulo de rotación a múltiplos de 15°' },
+        { keys: ['Clic pausado'], description: 'Cicla modos: Escala → Rotación → Deformación libre (Perspectiva)' },
+        { keys: ['Doble clic'], description: 'Entra directamente al modo de edición de nodos' },
+        { keys: ['Ctrl+C / Ctrl+V'], description: 'Copia y pega con desplazamiento automático de 15px' },
+        { keys: ['Ctrl+D'], description: 'Duplica instantáneamente los elementos seleccionados' },
+        { keys: ['Supr / Backspace'], description: 'Elimina los elementos seleccionados' },
       ],
     },
     node: {
       title: 'Edición de Nodos',
       toolId: 'node',
-      icon: ToolIcons.node,
+      icon: ToolIcons.nodeTool,
       shortcuts: [
         { keys: ['Clic en nodo'], description: 'Selecciona el vértice y muestra tiradores Bézier' },
         { keys: ['Shift / Ctrl', 'Clic'], description: 'Selección aditiva de múltiples vértices' },
@@ -82,7 +85,7 @@ export class QuickHelpInspector {
     pen: {
       title: 'Pluma Bézier',
       toolId: 'pen',
-      icon: ToolIcons.pen,
+      icon: ToolIcons.penTool,
       shortcuts: [
         { keys: ['Clic'], description: 'Añade un vértice recto (nodo cúspide sin tiradores)' },
         { keys: ['Clic + Arrastre'], description: 'Extrae tiradores tangenciales para crear curvas suaves' },
@@ -95,7 +98,7 @@ export class QuickHelpInspector {
     polyline: {
       title: 'Polilínea',
       toolId: 'polyline',
-      icon: ToolIcons.polyline,
+      icon: ToolIcons.polylineTool,
       shortcuts: [
         { keys: ['Clic'], description: 'Añade un nuevo vértice con segmento recto puro' },
         { keys: ['Clic en inicio'], description: 'Cierra la polilínea transformándola en polígono' },
@@ -106,7 +109,7 @@ export class QuickHelpInspector {
     line: {
       title: 'Línea Recta',
       toolId: 'line',
-      icon: ToolIcons.line,
+      icon: ToolIcons.lineTool,
       shortcuts: [
         { keys: ['Clic + Arrastre'], description: 'Traza un segmento de recta nativo <line>' },
         { keys: ['Shift', 'Arrastre'], description: 'Fuerza el ángulo a múltiplos de 45° (horizontal/vertical/diagonal)' },
@@ -115,7 +118,7 @@ export class QuickHelpInspector {
     rect: {
       title: 'Rectángulo',
       toolId: 'rect',
-      icon: ToolIcons.rect,
+      icon: ToolIcons.rectTool,
       shortcuts: [
         { keys: ['Clic + Arrastre'], description: 'Dibuja un rectángulo libre desde la esquina inicial' },
         { keys: ['Ctrl', 'Arrastre'], description: 'Fuerza relación de aspecto cuadrada perfecta 1:1' },
@@ -126,7 +129,7 @@ export class QuickHelpInspector {
     circle: {
       title: 'Círculo',
       toolId: 'circle',
-      icon: ToolIcons.circle,
+      icon: ToolIcons.circleTool,
       shortcuts: [
         { keys: ['Clic + Arrastre'], description: 'Dibuja un círculo nativo <circle> (1:1 intrínseco)' },
         { keys: ['Shift', 'Arrastre'], description: 'Expande el círculo simétricamente desde su centro' },
@@ -135,7 +138,7 @@ export class QuickHelpInspector {
     ellipse: {
       title: 'Elipse',
       toolId: 'ellipse',
-      icon: ToolIcons.ellipse,
+      icon: ToolIcons.ellipseTool,
       shortcuts: [
         { keys: ['Clic + Arrastre'], description: 'Dibuja una elipse paramétrica libre' },
         { keys: ['Ctrl', 'Arrastre'], description: 'Fuerza relación de aspecto circular perfecta 1:1' },
@@ -146,7 +149,7 @@ export class QuickHelpInspector {
     polygon: {
       title: 'Polígono Regular',
       toolId: 'polygon',
-      icon: ToolIcons.polygon,
+      icon: ToolIcons.polygonTool,
       shortcuts: [
         { keys: ['Clic + Arrastre'], description: 'Dibuja un polígono regular con los lados configurados' },
         { keys: ['Shift', 'Arrastre'], description: 'Restringe la orientación angular del polígono' },
@@ -155,7 +158,7 @@ export class QuickHelpInspector {
     star: {
       title: 'Estrella Paramétrica',
       toolId: 'star',
-      icon: ToolIcons.star,
+      icon: ToolIcons.starTool,
       shortcuts: [
         { keys: ['Clic + Arrastre'], description: 'Dibuja una estrella con las puntas y radio configurados' },
         { keys: ['Shift', 'Arrastre'], description: 'Restringe la orientación angular de la estrella' },
@@ -164,7 +167,7 @@ export class QuickHelpInspector {
     stroke: {
       title: 'Herramienta Trazo',
       toolId: 'stroke',
-      icon: ToolIcons.stroke,
+      icon: ToolIcons.strokeTool,
       shortcuts: [
         { keys: ['Clic en vector'], description: 'Inspecciona y edita grosor, remates, uniones y guiones' },
         { keys: ['Clic en vacío'], description: 'Deselecciona el vector inspeccionado' },
@@ -173,7 +176,7 @@ export class QuickHelpInspector {
     addVertex: {
       title: 'Añadir Vértice',
       toolId: 'addVertex',
-      icon: ToolIcons.addVertex,
+      icon: ToolIcons.addVertexTool,
       shortcuts: [
         { keys: ['Clic en trazado'], description: 'Inserta un nuevo nodo manteniendo la curvatura analítica exacta' },
       ],
@@ -181,7 +184,7 @@ export class QuickHelpInspector {
     canvas: {
       title: 'Lienzo y ViewBox',
       toolId: 'canvas',
-      icon: ToolIcons.canvas,
+      icon: ToolIcons.canvasTool,
       shortcuts: [
         { keys: ['Arrastrar bordes'], description: 'Redimensiona interactivamente el ViewBox de dibujo' },
         { keys: ['Shift', 'Arrastre'], description: 'Redimensiona manteniendo la proporción de aspecto' },
@@ -191,7 +194,7 @@ export class QuickHelpInspector {
     zoom: {
       title: 'Zoom y Paneo',
       toolId: 'zoom',
-      icon: ToolIcons.zoom,
+      icon: ToolIcons.zoomTool,
       shortcuts: [
         { keys: ['Clic'], description: 'Aumenta el nivel de zoom centrado en el cursor' },
         { keys: ['Alt', 'Clic'], description: 'Disminuye el nivel de zoom' },
@@ -204,7 +207,7 @@ export class QuickHelpInspector {
     ruler: {
       title: 'Reglas y Guías',
       toolId: 'ruler',
-      icon: ToolIcons.ruler,
+      icon: ToolIcons.rulersVisibility,
       shortcuts: [
         { keys: ['Arrastre desde regla'], description: 'Crea una nueva guía métrica horizontal o vertical' },
         { keys: ['Ctrl / Shift', 'Arrastre'], description: 'Fuerza el giro angular de la guía a saltos de 15°' },
