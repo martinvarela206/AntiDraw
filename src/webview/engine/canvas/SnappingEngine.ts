@@ -230,8 +230,10 @@ export class SnappingEngine {
     }
 
     // 3. Snap to ViewBox Frame (Artboard boundaries & keypoints)
-    const snapToGuidesOrViewBox = ctx.snapToGuides || ctx.snapToViewBox;
-    if (snapToGuidesOrViewBox && viewBoxBounds) {
+    // ARCHITECTURAL RATIONALE: ViewBox frame snapping is decoupled from guideline snapping (snapToGuides).
+    // This allows users to independently snap to infinite guidelines without magnetic interference from artboard margins,
+    // or vice versa when aligning vectors strictly against canvas boundaries without requiring guidelines.
+    if (ctx.snapToViewBox && viewBoxBounds) {
       const vb = viewBoxBounds;
       const keypoints: Point[] = [
         { x: vb.minX, y: vb.minY },

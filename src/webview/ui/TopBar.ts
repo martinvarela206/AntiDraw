@@ -72,7 +72,8 @@ export class TopBar {
         <button class="btn-icon ${this.canvasMgr.showGrid ? 'active' : ''}" id="btn-toggle-grid" title="Toggle Grid Overlay">${ToolIcons.grid}</button>
         <button class="btn-icon ${this.canvasMgr.showGuides ? 'active' : ''}" id="btn-toggle-guides" title="Toggle Guide Lines">${ToolIcons.guide}</button>
         <button class="btn-icon ${this.canvasMgr.snapToGrid ? 'active' : ''}" id="btn-snap-grid" title="Snap to Grid (Lines &amp; Cells)">${ToolIcons.snapGrid}</button>
-        <button class="btn-icon ${this.canvasMgr.snapToGuides ? 'active' : ''}" id="btn-snap-guide" title="Snap to Guides &amp; ViewBox (Lines, Borders &amp; Center)">${ToolIcons.snapGuide}</button>
+        <button class="btn-icon ${this.canvasMgr.snapToGuides ? 'active' : ''}" id="btn-snap-guide" title="Snap to Guides (Infinite Guidelines &amp; Intersections)">${ToolIcons.snapGuide}</button>
+        <button class="btn-icon ${this.canvasMgr.snapToViewBox ? 'active' : ''}" id="btn-snap-view-box" title="Snap to ViewBox (Canvas Borders, Corners &amp; Center)">${ToolIcons.snapViewBox}</button>
         <button class="btn-icon ${this.canvasMgr.snapToNodes ? 'active' : ''}" id="btn-snap-nodes" title="Snap to Vector Nodes (Structural, Handles &amp; Positional)">${ToolIcons.snapVertex}</button>
         <button class="btn-icon ${this.canvasMgr.snapToEdges ? 'active' : ''}" id="btn-snap-edges" title="Snap to Vector Edges (Contours &amp; Paths)">${ToolIcons.snapEdge}</button>
         <button class="btn-icon ${this.canvasMgr.snapAngular ? 'active' : ''}" id="btn-snap-angular" title="Snap Angular (Multiples of 15°)">${ToolIcons.snapAngular}</button>
@@ -103,6 +104,7 @@ export class TopBar {
     this.bindClick('btn-toggle-guides', () => this.callbacks.onToggleGuides());
     this.bindClick('btn-snap-grid', () => this.callbacks.onToggleSnap('grid'));
     this.bindClick('btn-snap-guide', () => this.callbacks.onToggleSnap('guide'));
+    this.bindClick('btn-snap-view-box', () => this.callbacks.onToggleSnap('viewbox'));
     this.bindClick('btn-snap-nodes', () => this.callbacks.onToggleSnap('nodes'));
     this.bindClick('btn-snap-edges', () => this.callbacks.onToggleSnap('edges'));
     this.bindClick('btn-snap-angular', () => this.callbacks.onToggleSnap('angular'));

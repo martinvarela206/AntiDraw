@@ -267,10 +267,7 @@ class AntiDrawApp {
         },
         onToggleSnap: (type) => {
           if (type === 'grid') this.canvasMgr.snapToGrid = !this.canvasMgr.snapToGrid;
-          if (type === 'guide') {
-            this.canvasMgr.snapToGuides = !this.canvasMgr.snapToGuides;
-            this.canvasMgr.snapToViewBox = this.canvasMgr.snapToGuides;
-          }
+          if (type === 'guide') this.canvasMgr.snapToGuides = !this.canvasMgr.snapToGuides;
           if (type === 'nodes' || type === 'vertex') this.canvasMgr.snapToNodes = !this.canvasMgr.snapToNodes;
           if (type === 'edges') this.canvasMgr.snapToEdges = !this.canvasMgr.snapToEdges;
           if (type === 'viewbox') this.canvasMgr.snapToViewBox = !this.canvasMgr.snapToViewBox;
