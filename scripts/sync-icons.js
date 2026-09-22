@@ -13,8 +13,8 @@ function syncIcons() {
   function toCamelCase(filename) {
     const base = filename.replace(/\.svg$/, '');
     if (base === 'snap_view_box') return 'snapViewBox';
-    if (base === 'double_arrow_vertical_left_rotate') return 'doubleArrowLeftRotate';
-    if (base === 'double_arrow_vertical_right_rotate') return 'doubleArrowRightRotate';
+    if (base === 'guide_double_arrow_vertical_left_rotate') return 'guideDoubleArrowVerticalLeftRotate';
+    if (base === 'guide_double_arrow_vertical_right_rotate') return 'guideDoubleArrowVerticalRightRotate';
     return base.replace(/_([a-z0-9])/g, (_, char) => char.toUpperCase());
   }
 
@@ -29,9 +29,12 @@ function syncIcons() {
     toolProps += `  ${key}: ${varName},\n`;
   });
 
-  // Alias for backward compatibility if needed
-  if (!files.includes('ruler.svg') && files.includes('rulers.svg')) {
-    toolProps += `  ruler: rulersSvg,\n`;
+  // Aliases for backward compatibility
+  if (files.includes('guide_double_arrow_vertical_left_rotate.svg')) {
+    toolProps += `  doubleArrowLeftRotate: guideDoubleArrowVerticalLeftRotateSvg,\n`;
+  }
+  if (files.includes('guide_double_arrow_vertical_right_rotate.svg')) {
+    toolProps += `  doubleArrowRightRotate: guideDoubleArrowVerticalRightRotateSvg,\n`;
   }
 
   const toolIconsContent = `/**
@@ -67,6 +70,13 @@ export type ToolIconName = keyof typeof ToolIcons;
     regImports += `import ${varName} from '../../assets/icons/${file}';\n`;
     regProps += `  ${key}: ${varName},\n`;
   });
+
+  if (files.includes('guide_double_arrow_vertical_left_rotate.svg')) {
+    regProps += `  doubleArrowLeftRotate: GuideDoubleArrowVerticalLeftRotateSvg,\n`;
+  }
+  if (files.includes('guide_double_arrow_vertical_right_rotate.svg')) {
+    regProps += `  doubleArrowRightRotate: GuideDoubleArrowVerticalRightRotateSvg,\n`;
+  }
 
   const registryContent = `/**
  * ARCHITECTURAL RATIONALE: Centralized UI Icon Registry & SVG Asset Pipeline

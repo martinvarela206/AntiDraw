@@ -24,8 +24,6 @@ import CanvasSvg from '../../assets/icons/canvas.svg';
 import ChevronDownSvg from '../../assets/icons/chevron_down.svg';
 import CircleSvg from '../../assets/icons/circle.svg';
 import CombineSvg from '../../assets/icons/combine.svg';
-import DoubleArrowLeftRotateSvg from '../../assets/icons/double_arrow_vertical_left_rotate.svg';
-import DoubleArrowRightRotateSvg from '../../assets/icons/double_arrow_vertical_right_rotate.svg';
 import EllipseSvg from '../../assets/icons/ellipse.svg';
 import ExcludeSvg from '../../assets/icons/exclude.svg';
 import FlipHorizontalSvg from '../../assets/icons/flip_horizontal.svg';
@@ -33,6 +31,8 @@ import FlipVerticalSvg from '../../assets/icons/flip_vertical.svg';
 import FragmentSvg from '../../assets/icons/fragment.svg';
 import GridSvg from '../../assets/icons/grid.svg';
 import GuideSvg from '../../assets/icons/guide.svg';
+import GuideDoubleArrowVerticalLeftRotateSvg from '../../assets/icons/guide_double_arrow_vertical_left_rotate.svg';
+import GuideDoubleArrowVerticalRightRotateSvg from '../../assets/icons/guide_double_arrow_vertical_right_rotate.svg';
 import IntersectSvg from '../../assets/icons/intersect.svg';
 import LineSvg from '../../assets/icons/line.svg';
 import NodeSvg from '../../assets/icons/node.svg';
@@ -78,8 +78,6 @@ export const ICONS = {
   chevronDown: ChevronDownSvg,
   circle: CircleSvg,
   combine: CombineSvg,
-  doubleArrowLeftRotate: DoubleArrowLeftRotateSvg,
-  doubleArrowRightRotate: DoubleArrowRightRotateSvg,
   ellipse: EllipseSvg,
   exclude: ExcludeSvg,
   flipHorizontal: FlipHorizontalSvg,
@@ -87,6 +85,8 @@ export const ICONS = {
   fragment: FragmentSvg,
   grid: GridSvg,
   guide: GuideSvg,
+  guideDoubleArrowVerticalLeftRotate: GuideDoubleArrowVerticalLeftRotateSvg,
+  guideDoubleArrowVerticalRightRotate: GuideDoubleArrowVerticalRightRotateSvg,
   intersect: IntersectSvg,
   line: LineSvg,
   node: NodeSvg,
@@ -117,6 +117,8 @@ export const ICONS = {
   undo: UndoSvg,
   union: UnionSvg,
   zoom: ZoomSvg,
+  doubleArrowLeftRotate: GuideDoubleArrowVerticalLeftRotateSvg,
+  doubleArrowRightRotate: GuideDoubleArrowVerticalRightRotateSvg,
 } as const;
 
 export type IconName = keyof typeof ICONS;

@@ -25,8 +25,6 @@ import canvasSvg from '../assets/icons/canvas.svg';
 import chevronDownSvg from '../assets/icons/chevron_down.svg';
 import circleSvg from '../assets/icons/circle.svg';
 import combineSvg from '../assets/icons/combine.svg';
-import doubleArrowLeftRotateSvg from '../assets/icons/double_arrow_vertical_left_rotate.svg';
-import doubleArrowRightRotateSvg from '../assets/icons/double_arrow_vertical_right_rotate.svg';
 import ellipseSvg from '../assets/icons/ellipse.svg';
 import excludeSvg from '../assets/icons/exclude.svg';
 import flipHorizontalSvg from '../assets/icons/flip_horizontal.svg';
@@ -34,6 +32,8 @@ import flipVerticalSvg from '../assets/icons/flip_vertical.svg';
 import fragmentSvg from '../assets/icons/fragment.svg';
 import gridSvg from '../assets/icons/grid.svg';
 import guideSvg from '../assets/icons/guide.svg';
+import guideDoubleArrowVerticalLeftRotateSvg from '../assets/icons/guide_double_arrow_vertical_left_rotate.svg';
+import guideDoubleArrowVerticalRightRotateSvg from '../assets/icons/guide_double_arrow_vertical_right_rotate.svg';
 import intersectSvg from '../assets/icons/intersect.svg';
 import lineSvg from '../assets/icons/line.svg';
 import nodeSvg from '../assets/icons/node.svg';
@@ -79,8 +79,6 @@ export const ToolIcons = {
   chevronDown: chevronDownSvg,
   circle: circleSvg,
   combine: combineSvg,
-  doubleArrowLeftRotate: doubleArrowLeftRotateSvg,
-  doubleArrowRightRotate: doubleArrowRightRotateSvg,
   ellipse: ellipseSvg,
   exclude: excludeSvg,
   flipHorizontal: flipHorizontalSvg,
@@ -88,6 +86,8 @@ export const ToolIcons = {
   fragment: fragmentSvg,
   grid: gridSvg,
   guide: guideSvg,
+  guideDoubleArrowVerticalLeftRotate: guideDoubleArrowVerticalLeftRotateSvg,
+  guideDoubleArrowVerticalRightRotate: guideDoubleArrowVerticalRightRotateSvg,
   intersect: intersectSvg,
   line: lineSvg,
   node: nodeSvg,
@@ -118,6 +118,8 @@ export const ToolIcons = {
   undo: undoSvg,
   union: unionSvg,
   zoom: zoomSvg,
+  doubleArrowLeftRotate: guideDoubleArrowVerticalLeftRotateSvg,
+  doubleArrowRightRotate: guideDoubleArrowVerticalRightRotateSvg,
 } as const;
 
 export type ToolIconName = keyof typeof ToolIcons;

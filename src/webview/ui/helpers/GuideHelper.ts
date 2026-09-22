@@ -1,8 +1,8 @@
 import { BaseHelper } from './BaseHelper.js';
 import { extractSvgPathD, ICONS } from '../icons/index.js';
 
-export const GUIDE_ROTATE_LEFT_PATH = extractSvgPathD(ICONS.doubleArrowLeftRotate);
-export const GUIDE_ROTATE_RIGHT_PATH = extractSvgPathD(ICONS.doubleArrowRightRotate);
+export const GUIDE_ROTATE_LEFT_PATH = extractSvgPathD(ICONS.guideDoubleArrowVerticalLeftRotate);
+export const GUIDE_ROTATE_RIGHT_PATH = extractSvgPathD(ICONS.guideDoubleArrowVerticalRightRotate);
 
 /**
  * ARCHITECTURAL RATIONALE: Scale-Invariant Guide Line Control Helper (GuideHelper)
