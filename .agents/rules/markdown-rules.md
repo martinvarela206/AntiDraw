@@ -2,9 +2,9 @@
 trigger: always_on
 ---
 
-# Markdown & Documentation Standards
+# Universal Markdown & Formatting Standards
 
-This file contains the Markdown hygiene and visual formatting standards for all generated documentation in this repository. Rules are written in English to optimize context window efficiency and reduce token usage.
+This file contains the universal Markdown hygiene, syntax standards, and visual formatting specifications for all generated Markdown documents across any project. Rules are written in English to optimize context window efficiency and reduce token usage.
 
 ---
 
@@ -24,4 +24,8 @@ This file contains the Markdown hygiene and visual formatting standards for all 
 
 3. **Markdown Hygiene & Structure**:
    - Markdown is the exclusive format for all generated documents.
-   - Maintain structural consistency using standard Markdown elements: tables for multi-variable comparisons, concise bulleted lists, and bounded code blocks with language identifiers.
+   - Maintain structural consistency using standard Markdown elements:
+     - Tables for multi-variable comparisons.
+     - Concise, well-organized bulleted lists.
+     - Bounded code blocks with explicit, accurate language identifiers.
+     - Clickable GitHub markdown links for file paths and code symbols.
