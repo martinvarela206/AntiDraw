@@ -2,7 +2,6 @@ import { IToolHandler, ToolContext } from './IToolHandler.js';
 import { ToolType } from './ToolType.js';
 import { Point, PathVertex, NodeType, VectorElement, RectCorners } from '../engine/VectorModel.js';
 import { NodeEditorTool } from '../engine/NodeEditorTool.js';
-import { ConfirmationModal } from '../ui/ConfirmationModal.js';
 import { ParametricHandleController } from './node/ParametricHandleController.js';
 import { NodeMarqueeSelector } from './node/NodeMarqueeSelector.js';
 import { NodeOverlayBuilder } from './node/NodeOverlayBuilder.js';

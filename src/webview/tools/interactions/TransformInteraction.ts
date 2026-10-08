@@ -8,7 +8,6 @@ import { DistortTransformer } from './DistortTransformer.js';
 import { QuadCorners } from '../../engine/geometry/ProjectiveHomography.js';
 import { PivotManager } from './PivotManager.js';
 import { GradientGizmoController } from './GradientGizmoController.js';
-import { ConfirmationModal } from '../../ui/ConfirmationModal.js';
 import type { SelectToolCallbacks } from '../SelectToolHandler.js';
 
 /**
@@ -390,7 +389,7 @@ export class TransformInteraction {
             this.lastSkewTransformFn = null;
             ctx.renderOverlay();
 
-            ConfirmationModal.confirm({
+            ctx.confirm({
               title: 'Convertir Primitiva a Curvas',
               message: 'La rotación de esta figura paramétrica requiere convertirla a curvas de Bézier.',
               details: 'Las figuras paramétricas nativas en SVG no admiten rotación angular libre sin perder sus parámetros nativos (como radios o esquinas redondeadas). ¿Deseas convertir a curvas y aplicar la rotación?',

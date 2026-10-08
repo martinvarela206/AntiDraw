@@ -196,6 +196,7 @@ class AntiDrawApp {
       getOtherVertices: (excludeIds) => this.getOtherVertices(excludeIds),
       setTool: (t) => this.toolbar.setTool(t),
       getActiveTool: () => this.toolbar.activeTool,
+      confirm: (options) => ConfirmationModal.confirm(options),
       applyCanvasSize: () => this.applyCanvasSize(),
       isPointerOverRuler: (clientX, clientY, orientation) => this.rulerView?.isPointOverRuler(clientX, clientY, orientation) ?? false,
     };

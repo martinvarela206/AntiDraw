@@ -3,6 +3,15 @@ import { Point, VectorModel } from '../engine/VectorModel.js';
 import { SelectionTool } from '../engine/SelectionTool.js';
 import { CanvasManager } from '../engine/CanvasManager.js';
 
+export interface ConfirmOptions {
+  title: string;
+  message: string;
+  details?: string;
+  confirmText?: string;
+  cancelText?: string;
+  confirmButtonClass?: 'accent' | 'danger';
+}
+
 export interface ToolContext {
   model: VectorModel;
   selectionTool: SelectionTool;
@@ -15,6 +24,7 @@ export interface ToolContext {
   getOtherVertices(excludeIds?: string[]): Point[];
   setTool(tool: ToolType): void;
   getActiveTool(): ToolType;
+  confirm(options: ConfirmOptions): Promise<boolean>;
   applyCanvasSize?(): void;
   isPointerOverRuler?(clientX: number, clientY: number, orientation?: 'horizontal' | 'vertical' | 'angled'): boolean;
 }

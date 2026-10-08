@@ -8,7 +8,6 @@ import { GuideInteraction, GuideHandleType } from './interactions/GuideInteracti
 import { BoxSelectInteraction } from './interactions/BoxSelectInteraction.js';
 import { TranslateInteraction } from './interactions/TranslateInteraction.js';
 import { TransformInteraction } from './interactions/TransformInteraction.js';
-import { ConfirmationModal } from '../ui/ConfirmationModal.js';
 
 export interface SelectToolCallbacks {
   onSelectionChanged?: () => void;
@@ -227,7 +226,7 @@ export class SelectToolHandler implements IToolHandler {
         if (handle) {
           if (handle.startsWith('skew-')) {
             if (!this.transformInteraction.canSkew(selectedEls, this.ctx)) {
-              ConfirmationModal.confirm({
+              this.ctx.confirm({
                 title: 'Convertir Primitiva a Curvas',
                 message: 'La inclinación (sesgo) de figuras paramétricas requiere convertirlas a curvas de Bézier.',
                 details: 'Para aplicar deformaciones afines de sesgo o cizallamiento a una figura paramétrica, es necesario convertirla previamente a curvas libres. ¿Deseas convertirla ahora?',

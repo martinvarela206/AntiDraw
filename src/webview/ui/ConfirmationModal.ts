@@ -16,14 +16,9 @@
  *    menus, tool handlers, and shortcut dispatchers.
  */
 
-export interface ConfirmationModalOptions {
-  title: string;
-  message: string;
-  details?: string;
-  confirmText?: string;
-  cancelText?: string;
-  confirmButtonClass?: 'accent' | 'danger';
-}
+import { ConfirmOptions } from '../tools/IToolHandler.js';
+
+export type ConfirmationModalOptions = ConfirmOptions;
 
 export class ConfirmationModal {
   private static activeModal: HTMLElement | null = null;
