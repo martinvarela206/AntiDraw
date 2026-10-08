@@ -1,4 +1,5 @@
-import { Toolbar, ToolType } from '../ui/Toolbar.js';
+import { Toolbar } from '../ui/Toolbar.js';
+import { ToolType } from '../tools/ToolType.js';
 import { SelectionTool } from '../engine/SelectionTool.js';
 import { CanvasManager } from '../engine/CanvasManager.js';
 import { NodeEditorTool } from '../engine/NodeEditorTool.js';

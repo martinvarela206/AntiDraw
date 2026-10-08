@@ -3,7 +3,7 @@ import { SelectionTool } from './SelectionTool.js';
 import { CanvasManager } from './CanvasManager.js';
 import { NodeEditorTool } from './NodeEditorTool.js';
 import { IToolHandler } from '../tools/IToolHandler.js';
-import { ToolType } from '../ui/Toolbar.js';
+import { ToolType } from '../tools/ToolType.js';
 import { MarkerHelper, GuideHelper, NodeHelper, GUIDE_ROTATE_LEFT_PATH, GUIDE_ROTATE_RIGHT_PATH } from '../ui/helpers/index.js';
 import { SnappingEngine } from './canvas/SnappingEngine.js';
 

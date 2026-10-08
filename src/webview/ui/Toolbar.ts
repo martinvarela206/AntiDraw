@@ -1,38 +1,7 @@
 import { ToolIcons } from '../icons/ToolIcons.js';
+import { ToolType } from '../tools/ToolType.js';
 
-/**
- * ARCHITECTURAL RATIONALE: Direct Toolbar Access for Canonical SVG Primitives (FEAT-11)
- *
- * 1. Explicit Primitive Tooling vs. Modal Overloading:
- *    Earlier revisions unified line drawing into PolylineToolHandler and circle creation into
- *    the ellipse tool via keyboard modifiers (Ctrl+Drag). However, direct toolbar presence for
- *    the standard SVG primitive suite (<circle>, <ellipse>, <rect>, <line>, <polyline>, <polygon>)
- *    provides immediate, discoverable single-click access for technical draftspersons, eliminating
- *    hidden modal interactions.
- *
- * 2. Dedicated Tool Semantics:
- *    - 'line': Produces native <line x1 y1 x2 y2> primitives without multi-click vertex accumulation.
- *    - 'circle': Enforces 1:1 circular aspect ratio intrinsically, producing native <circle cx cy r>.
- *    - 'ellipse': Produces parametric <ellipse cx cy rx ry>.
- *    - 'rect': Produces parametric <rect x y width height>.
- *    - 'polyline': Multi-node straight open paths producing <polyline points="...">.
- *    - 'polygon': Multi-node closed regular or freeform shapes producing <polygon points="...">.
- */
-export type ToolType =
-  | 'select'
-  | 'stroke'
-  | 'node'
-  | 'pen'
-  | 'line'
-  | 'polyline'
-  | 'rect'
-  | 'circle'
-  | 'ellipse'
-  | 'polygon'
-  | 'star'
-  | 'addVertex'
-  | 'canvas'
-  | 'zoom';
+export type { ToolType };
 
 export class Toolbar {
   public activeTool: ToolType = 'select';

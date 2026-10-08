@@ -3,7 +3,7 @@ import { Point, GradientConfig } from '../engine/VectorModel.js';
 import { HandleType } from '../engine/SelectionTool.js';
 import { GuideLine } from '../engine/CanvasManager.js';
 import { NodeEditorTool } from '../engine/NodeEditorTool.js';
-import { ToolType } from '../ui/Toolbar.js';
+import { ToolType } from './ToolType.js';
 import { GuideInteraction, GuideHandleType } from './interactions/GuideInteraction.js';
 import { BoxSelectInteraction } from './interactions/BoxSelectInteraction.js';
 import { TranslateInteraction } from './interactions/TranslateInteraction.js';

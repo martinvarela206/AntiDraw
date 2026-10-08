@@ -1,5 +1,5 @@
 import { IToolHandler, ToolContext } from './IToolHandler.js';
-import { ToolType } from '../ui/Toolbar.js';
+import { ToolType } from './ToolType.js';
 import { Point, PathVertex, NodeType, VectorElement, RectCorners } from '../engine/VectorModel.js';
 import { NodeEditorTool } from '../engine/NodeEditorTool.js';
 import { ConfirmationModal } from '../ui/ConfirmationModal.js';

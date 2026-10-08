@@ -1,4 +1,4 @@
-import { ToolType } from '../ui/Toolbar.js';
+import { ToolType } from './ToolType.js';
 import { Point, VectorModel } from '../engine/VectorModel.js';
 import { SelectionTool } from '../engine/SelectionTool.js';
 import { CanvasManager } from '../engine/CanvasManager.js';

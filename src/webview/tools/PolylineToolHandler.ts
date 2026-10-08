@@ -1,5 +1,5 @@
 import { IToolHandler, ToolContext } from './IToolHandler.js';
-import { ToolType } from '../ui/Toolbar.js';
+import { ToolType } from './ToolType.js';
 import { Point, PathVertex, VectorElement } from '../engine/VectorModel.js';
 import { formatNum } from '../engine/geometry/PathGeometryCompiler.js';
 import { ActionIntent, ActionIntentFactory } from './contracts/ActionIntent.js';
