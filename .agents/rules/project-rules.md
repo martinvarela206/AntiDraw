@@ -1,7 +1,9 @@
-﻿# AntiDraw Project Specific Rules
+# AntiDraw Project Specific Rules
 
-## 1. Generación de Artefactos VSIX
-- Tras completar modificaciones y actualizar la versión, generar el paquete `.vsix` de la extensión (`pnpm run package` / `vsce package --no-dependencies`).
+## 1. Generación Obligatoria de Artefacto VSIX con Cada Commit
+- **Empaquetado Inmediato con Cada Commit:** Cada vez que se culmine una tarea atómica, se actualice la versión en `package.json` y se realice su correspondiente commit, **ES OBLIGATORIO** ejecutar `pnpm run package` para compilar y empaquetar el binario `.vsix` instalable actualizado (ej. `antidraw-X.Y.Z.vsix`).
+- **Sincronización Permanente:** El desarrollador o diseñador debe contar siempre con el artefacto `.vsix` listo para instalar y probar en VS Code reflejando exactamente el estado del último commit.
+- **Naturaleza del Archivo:** Los archivos `.vsix` están excluidos del control de versiones en `.gitignore`, pero su generación local es un requisito ineludible al cerrar cada ciclo atómico.
 
 ## 2. Serialización SVG Estándar W3C vs Companion JSON
 - El SVG exportado por `SvgSerializer.toSvgString()` debe ser **SVG W3C estrictamente estándar y limpio**.
