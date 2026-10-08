@@ -8,7 +8,34 @@
  */
 
 import { CrashGuard } from '../guard/CrashGuard.js';
-import { CommandSpec, CommandContext, ExecutionResult } from './CommandSpec.js';
+
+export interface CommandContext {
+  model: any;
+  selectionTool?: any;
+  canvasMgr?: any;
+  actionDispatcher?: any;
+  historyService?: any;
+  viewportCtrl?: any;
+  propertyPanel?: any;
+  [key: string]: any;
+}
+
+export interface ExecutionResult<T = any> {
+  success: boolean;
+  value?: T;
+  error?: string;
+  undoable?: boolean;
+}
+
+export interface CommandSpec<TParams = any, TResult = any> {
+  readonly id: string;
+  readonly label: string;
+  readonly description?: string;
+  readonly category?: 'edit' | 'object' | 'view' | 'layer' | 'shape' | 'path';
+  readonly shortcut?: string;
+  readonly isEnabled?: (ctx: CommandContext, params?: TParams) => boolean;
+  readonly execute: (ctx: CommandContext, params?: TParams) => ExecutionResult<TResult>;
+}
 
 export type CommandExecutionListener = (commandId: string, result: ExecutionResult) => void;
 

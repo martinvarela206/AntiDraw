@@ -7,8 +7,6 @@
  * la herramienta evalúa los eventos del ratón/teclado y emite una intención declarativa.
  */
 
-import { OverlayDescriptor } from './OverlayDescriptor.js';
-
 export type ActionIntentKind = 'none' | 'begin' | 'preview' | 'commit' | 'cancel' | 'exec';
 
 export interface BaseActionIntent {
@@ -29,7 +27,7 @@ export interface PreviewIntent extends BaseActionIntent {
   readonly kind: 'preview';
   readonly actionId?: string;
   readonly payload?: any;
-  readonly overlays?: OverlayDescriptor[];
+  readonly overlays?: any[];
 }
 
 export interface CommitIntent extends BaseActionIntent {
@@ -67,7 +65,7 @@ export const ActionIntentFactory = {
     return { kind: 'begin', actionId, payload };
   },
 
-  preview(actionId?: string, payload?: any, overlays?: OverlayDescriptor[]): PreviewIntent {
+  preview(actionId?: string, payload?: any, overlays?: any[]): PreviewIntent {
     return { kind: 'preview', actionId, payload, overlays };
   },
 

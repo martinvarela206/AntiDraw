@@ -3,8 +3,7 @@
  * Registra comandos estándar de edición, objetos y vista en el CommandRegistry.
  */
 
-import { CommandRegistry } from './CommandRegistry.js';
-import { CommandSpec, CommandContext } from './CommandSpec.js';
+import { CommandRegistry, CommandSpec, CommandContext } from './CommandRegistry.js';
 
 export function registerSystemCommands(registry: CommandRegistry): void {
   // --- EDICIÓN ---
