@@ -9,6 +9,7 @@ import { NodeToolHandler } from '../tools/NodeToolHandler.js';
 import { ShapeToolHandler } from '../tools/ShapeToolHandler.js';
 import { PenToolHandler } from '../tools/PenToolHandler.js';
 import { PolylineToolHandler } from '../tools/PolylineToolHandler.js';
+import { CommandRegistry } from '../engine/commands/CommandRegistry.js';
 
 export interface KeyboardControllerContext {
   toolbar: Toolbar;
@@ -102,9 +103,14 @@ export class KeyboardShortcutController {
     }
 
     const isCtrl = e.ctrlKey || e.metaKey;
+    const cmdRegistry = CommandRegistry.getInstance();
 
     if (isCtrl && (e.key === 'c' || e.key === 'C')) {
-      if (this.ctx.selectionTool.selectedElementIds.size > 0 || this.ctx.canvasMgr.selectedGuideId) {
+      if (cmdRegistry.has('edit.copy') && cmdRegistry.isEnabled('edit.copy')) {
+        e.preventDefault();
+        cmdRegistry.execute('edit.copy');
+        return;
+      } else if (this.ctx.selectionTool.selectedElementIds.size > 0 || this.ctx.canvasMgr.selectedGuideId) {
         e.preventDefault();
         this.ctx.copySelection();
         return;
@@ -112,7 +118,11 @@ export class KeyboardShortcutController {
     }
 
     if (isCtrl && (e.key === 'q' || e.key === 'Q')) {
-      if (this.ctx.selectionTool.selectedElementIds.size > 0) {
+      if (cmdRegistry.has('object.convertToCurves') && cmdRegistry.isEnabled('object.convertToCurves')) {
+        e.preventDefault();
+        cmdRegistry.execute('object.convertToCurves');
+        return;
+      } else if (this.ctx.selectionTool.selectedElementIds.size > 0) {
         e.preventDefault();
         this.ctx.handleConvertToCurves();
         return;
@@ -120,7 +130,11 @@ export class KeyboardShortcutController {
     }
 
     if (isCtrl && (e.key === 'x' || e.key === 'X')) {
-      if (this.ctx.selectionTool.selectedElementIds.size > 0 || this.ctx.canvasMgr.selectedGuideId) {
+      if (cmdRegistry.has('edit.cut') && cmdRegistry.isEnabled('edit.cut')) {
+        e.preventDefault();
+        cmdRegistry.execute('edit.cut');
+        return;
+      } else if (this.ctx.selectionTool.selectedElementIds.size > 0 || this.ctx.canvasMgr.selectedGuideId) {
         e.preventDefault();
         this.ctx.cutSelection();
         return;
@@ -128,7 +142,11 @@ export class KeyboardShortcutController {
     }
 
     if (isCtrl && (e.key === 'v' || e.key === 'V')) {
-      if (this.ctx.clipboardService.hasContent) {
+      if (cmdRegistry.has('edit.paste') && cmdRegistry.isEnabled('edit.paste')) {
+        e.preventDefault();
+        cmdRegistry.execute('edit.paste');
+        return;
+      } else if (this.ctx.clipboardService.hasContent) {
         e.preventDefault();
         this.ctx.pasteClipboard();
         return;
@@ -136,16 +154,32 @@ export class KeyboardShortcutController {
     }
 
     if (isCtrl && (e.key === 'd' || e.key === 'D')) {
-      if (this.ctx.selectionTool.selectedElementIds.size > 0 || this.ctx.canvasMgr.selectedGuideId) {
+      if (cmdRegistry.has('edit.duplicate') && cmdRegistry.isEnabled('edit.duplicate')) {
+        e.preventDefault();
+        cmdRegistry.execute('edit.duplicate');
+        return;
+      } else if (this.ctx.selectionTool.selectedElementIds.size > 0 || this.ctx.canvasMgr.selectedGuideId) {
         e.preventDefault();
         this.ctx.duplicateSelection();
         return;
       }
     }
 
+    if (isCtrl && (e.key === 'g' || e.key === 'G')) {
+      const groupCmd = e.shiftKey ? 'object.ungroup' : 'object.group';
+      if (cmdRegistry.has(groupCmd) && cmdRegistry.isEnabled(groupCmd)) {
+        e.preventDefault();
+        cmdRegistry.execute(groupCmd);
+        return;
+      }
+    }
+
     if (isCtrl && (e.key === 'z' || e.key === 'Z')) {
       e.preventDefault();
-      if (e.shiftKey) {
+      const undoCmd = e.shiftKey ? 'edit.redo' : 'edit.undo';
+      if (cmdRegistry.has(undoCmd)) {
+        cmdRegistry.execute(undoCmd);
+      } else if (e.shiftKey) {
         this.ctx.redo();
       } else {
         this.ctx.undo();
@@ -155,7 +189,11 @@ export class KeyboardShortcutController {
 
     if (isCtrl && (e.key === 'y' || e.key === 'Y')) {
       e.preventDefault();
-      this.ctx.redo();
+      if (cmdRegistry.has('edit.redo')) {
+        cmdRegistry.execute('edit.redo');
+      } else {
+        this.ctx.redo();
+      }
       return;
     }
 
@@ -205,6 +243,13 @@ export class KeyboardShortcutController {
     }
 
     if (e.key === 'Delete' || e.key === 'Backspace') {
+      if (cmdRegistry.has('edit.deleteSelected') && cmdRegistry.isEnabled('edit.deleteSelected')) {
+        e.preventDefault();
+        cmdRegistry.execute('edit.deleteSelected');
+        return;
+      }
+
+      // Fallback si CommandRegistry no estuviera inicializado
       // 1. Delete selected guide line
       if (this.ctx.canvasMgr.selectedGuideId) {
         this.ctx.canvasMgr.removeGuide(this.ctx.canvasMgr.selectedGuideId);

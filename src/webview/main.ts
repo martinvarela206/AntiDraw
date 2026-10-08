@@ -28,6 +28,8 @@ import { HistoryService } from './services/HistoryService.js';
 import { CanvasActionDispatcher } from './services/CanvasActionDispatcher.js';
 import { KeyboardShortcutController } from './controllers/KeyboardShortcutController.js';
 import { ContextMenuController } from './controllers/ContextMenuController.js';
+import { CommandRegistry } from './engine/commands/CommandRegistry.js';
+import { registerSystemCommands } from './engine/commands/SystemCommands.js';
 import './styles/main.css';
 
 class AntiDrawApp {
@@ -94,6 +96,7 @@ class AntiDrawApp {
   private clipboardService!: ClipboardService;
   private historyService!: HistoryService;
   private actionDispatcher!: CanvasActionDispatcher;
+  private commandRegistry!: CommandRegistry;
 
   constructor() {
     this.initTools();
@@ -102,6 +105,7 @@ class AntiDrawApp {
     this.initHistoryService();
     this.initActionDispatcher();
     this.initViewport();
+    this.initCommandRegistry();
     this.initEvents();
     this.notifyReady();
   }
@@ -143,6 +147,38 @@ class AntiDrawApp {
       onResetPropertyPanel: () => this.propertyPanel.resetPanelMode(),
       onUpdatePropertyPanel: (activeTool: string) => this.propertyPanel.update(null, activeTool),
       getActiveTool: () => this.toolbar?.activeTool || 'select',
+    });
+  }
+
+  private initCommandRegistry(): void {
+    this.commandRegistry = CommandRegistry.getInstance();
+    registerSystemCommands(this.commandRegistry);
+    this.commandRegistry.setContext({
+      model: this.model,
+      selectionTool: this.selectionTool,
+      canvasMgr: this.canvasMgr,
+      toolbar: this.toolbar,
+      propertyPanel: this.propertyPanel,
+      clipboardService: this.clipboardService,
+      historyService: this.historyService,
+      actionDispatcher: this.actionDispatcher,
+      viewportCtrl: this.viewportCtrl,
+      nodeEditorTool: this.nodeEditorTool,
+      nodeToolHandler: this.nodeToolHandler,
+      undo: () => this.undo(),
+      redo: () => this.redo(),
+      pushUndo: () => this.pushUndo(),
+      render: () => this.render(),
+      syncToHost: () => this.syncToHost(),
+      syncMetadataToHost: () => this.syncMetadataToHost(),
+      cutSelection: () => this.cutSelection(),
+      copySelection: () => this.copySelection(),
+      pasteClipboard: () => this.pasteClipboard(),
+      duplicateSelection: () => this.duplicateSelection(),
+      handleConvertToCurves: () => this.handleConvertToCurves(),
+      handleConvertToPrimitives: () => this.handleConvertToPrimitives(),
+      handleZOrder: (action: 'front' | 'forward' | 'backward' | 'back') => this.handleZOrder(action),
+      recenterViewBox: () => this.recenterViewBox(),
     });
   }
 
