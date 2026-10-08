@@ -50,4 +50,6 @@ export interface IToolHandler {
   renderOverlay?(zoom: number): string;
   activate?(): void;
   deactivate?(): void;
+  onKeyDown?(e: KeyboardEvent): boolean | void;
+  onKeyUp?(e: KeyboardEvent): boolean | void;
 }

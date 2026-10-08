@@ -2,6 +2,8 @@ import { IToolHandler, ToolContext } from './IToolHandler.js';
 import { ToolType } from '../ui/Toolbar.js';
 import { Point, VectorElement, PathVertex } from '../engine/VectorModel.js';
 import { formatNum } from '../engine/geometry/PathGeometryCompiler.js';
+import { ActionIntent, ActionIntentFactory } from './contracts/ActionIntent.js';
+import { CommandRegistry } from '../engine/commands/CommandRegistry.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Geometric Shape Tool Isolation & Canonical SVG Primitive Compilation (FEAT-11)
@@ -42,23 +44,35 @@ export class ShapeToolHandler implements IToolHandler {
     this.ctx = ctx;
   }
 
-  public onPointerDown(e: PointerEvent, pt: Point): boolean {
+  /**
+   * Ciclo Declarativo (Capa L2): Evalúa pointerdown y emite BeginIntent
+   */
+  public evalPointerDown(e: PointerEvent, pt: Point): ActionIntent {
     const activeTool = this.ctx.getActiveTool();
-    if (!this.toolTypes.includes(activeTool)) return false;
-    if (e.button !== 0) return false;
-
+    if (!this.toolTypes.includes(activeTool) || e.button !== 0) {
+      return ActionIntentFactory.none();
+    }
     const otherVertices = this.ctx.getOtherVertices();
     const snappedPt = this.ctx.snapPoint(pt, otherVertices);
     this.shapeStartPt = snappedPt;
     this.ghostShapeElement = null;
+    return ActionIntentFactory.begin('shape.create', { startPoint: snappedPt, tool: activeTool });
+  }
+
+  public onPointerDown(e: PointerEvent, pt: Point): boolean {
+    const intent = this.evalPointerDown(e, pt);
+    if (intent.kind === 'none') return false;
     this.ctx.renderOverlay();
     return true;
   }
 
-  public onPointerMove(e: PointerEvent, pt: Point): boolean {
-    if (!this.shapeStartPt) return false;
+  /**
+   * Ciclo Declarativo (Capa L2): Evalúa pointermove y emite PreviewIntent
+   */
+  public evalPointerMove(e: PointerEvent, pt: Point): ActionIntent {
+    if (!this.shapeStartPt) return ActionIntentFactory.none();
     const activeTool = this.ctx.getActiveTool();
-    if (!this.toolTypes.includes(activeTool)) return false;
+    if (!this.toolTypes.includes(activeTool)) return ActionIntentFactory.none();
 
     const otherVertices = this.ctx.getOtherVertices();
     let currentPt = this.ctx.snapPoint(pt, otherVertices);
@@ -86,12 +100,21 @@ export class ShapeToolHandler implements IToolHandler {
       e.altKey
     );
 
+    return ActionIntentFactory.preview('shape.preview', { ghost: this.ghostShapeElement });
+  }
+
+  public onPointerMove(e: PointerEvent, pt: Point): boolean {
+    const intent = this.evalPointerMove(e, pt);
+    if (intent.kind === 'none') return false;
     this.ctx.renderOverlay();
     return true;
   }
 
-  public onPointerUp(_e: PointerEvent, _pt: Point): boolean {
-    if (!this.shapeStartPt) return false;
+  /**
+   * Ciclo Declarativo (Capa L2): Evalúa pointerup y emite CommitIntent o CancelIntent
+   */
+  public evalPointerUp(_e: PointerEvent, _pt: Point): ActionIntent {
+    if (!this.shapeStartPt) return ActionIntentFactory.none();
 
     if (this.ghostShapeElement) {
       // Reject micro-drags (< 2px) to prevent accidental zero-dimension primitives
@@ -101,14 +124,10 @@ export class ShapeToolHandler implements IToolHandler {
         const x2 = parseFloat(this.ghostShapeElement.attributes.x2 || '0');
         const y2 = parseFloat(this.ghostShapeElement.attributes.y2 || '0');
         if (Math.hypot(x2 - x1, y2 - y1) < 2) {
-          this.shapeStartPt = null;
-          this.ghostShapeElement = null;
-          this.ctx.renderOverlay();
-          return true;
+          return ActionIntentFactory.cancel('micro_drag_rejected');
         }
       }
 
-      this.ctx.pushUndo();
       const id = `el_${Date.now().toString(36)}`;
       const committedEl: VectorElement = {
         ...this.ghostShapeElement,
@@ -119,20 +138,42 @@ export class ShapeToolHandler implements IToolHandler {
         },
       };
 
-      this.ctx.model.elements.push(committedEl);
-      this.ctx.selectionTool.select(id);
-
-      this.shapeStartPt = null;
-      this.ghostShapeElement = null;
-      this.ctx.render();
-      this.ctx.syncToHost();
-    } else {
-      this.shapeStartPt = null;
-      this.ghostShapeElement = null;
-      this.ctx.renderOverlay();
+      return ActionIntentFactory.commit('shape.create', { element: committedEl });
     }
 
+    return ActionIntentFactory.cancel('no_ghost_shape');
+  }
+
+  public onPointerUp(e: PointerEvent, pt: Point): boolean {
+    if (!this.shapeStartPt) return false;
+
+    const intent = this.evalPointerUp(e, pt);
+    const cmdRegistry = CommandRegistry.getInstance();
+
+    if (intent.kind === 'commit') {
+      if (cmdRegistry.has('shape.create')) {
+        cmdRegistry.execute('shape.create', intent.params);
+      } else {
+        // Fallback directo
+        this.ctx.pushUndo();
+        this.ctx.model.elements.push(intent.params.element);
+        this.ctx.selectionTool.select(intent.params.element.id);
+        this.ctx.render();
+        this.ctx.syncToHost();
+      }
+    }
+
+    this.shapeStartPt = null;
+    this.ghostShapeElement = null;
+    this.ctx.renderOverlay();
     return true;
+  }
+
+  public onKeyDown(e: KeyboardEvent): boolean {
+    if (e.key === 'Escape' && (this.shapeStartPt || this.ghostShapeElement)) {
+      return this.cancel();
+    }
+    return false;
   }
 
   public cancel(): boolean {

@@ -212,6 +212,24 @@ export function registerSystemCommands(registry: CommandRegistry): void {
     },
   });
 
+  registry.register<{ element: any }>({
+    id: 'shape.create',
+    label: 'Crear Figura Geométrica',
+    category: 'shape',
+    isEnabled: (ctx: CommandContext) => !!ctx.model,
+    execute: (ctx: CommandContext, params) => {
+      if (!params || !params.element) {
+        return { success: false, error: 'Elemento geométrico no provisto' };
+      }
+      ctx.pushUndo?.();
+      ctx.model.elements.push(params.element);
+      ctx.selectionTool?.select(params.element.id);
+      ctx.render?.();
+      ctx.syncToHost?.();
+      return { success: true };
+    },
+  });
+
   registry.register<{ op: 'union' | 'subtract' | 'intersect' | 'exclude' | 'combine' | 'fragment' }>({
     id: 'object.boolean',
     label: 'Operación Booleana',
