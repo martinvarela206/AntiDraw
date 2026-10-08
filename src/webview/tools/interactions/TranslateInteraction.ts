@@ -2,7 +2,7 @@ import { ToolContext } from '../IToolHandler.js';
 import { VectorElement, PathVertex, Point } from '../../engine/VectorModel.js';
 import type { SelectToolCallbacks } from '../SelectToolHandler.js';
 import { NodeCatalogService } from '../../engine/selection/NodeCatalogService.js';
-import { BaseHelper } from '../../ui/helpers/index.js';
+import { BaseHelper } from '../../engine/canvas/helpers/index.js';
 import { SnappingEngine } from '../../engine/canvas/SnappingEngine.js';
 import { VectorCloneHelper } from '../../engine/selection/VectorCloneHelper.js';
 

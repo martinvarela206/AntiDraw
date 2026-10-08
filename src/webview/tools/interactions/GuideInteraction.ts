@@ -2,7 +2,7 @@ import { ToolContext } from '../IToolHandler.js';
 import { Point } from '../../engine/VectorModel.js';
 import { GuideLine } from '../../engine/CanvasManager.js';
 import type { SelectToolCallbacks } from '../SelectToolHandler.js';
-import { GuideHelper } from '../../ui/helpers/index.js';
+import { GuideHelper } from '../../engine/canvas/helpers/index.js';
 
 export type GuideHandleType = 'guide-move' | 'guide-pivot' | 'guide-rotate';
 
