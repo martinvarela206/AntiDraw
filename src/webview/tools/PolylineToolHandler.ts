@@ -2,6 +2,8 @@ import { IToolHandler, ToolContext } from './IToolHandler.js';
 import { ToolType } from '../ui/Toolbar.js';
 import { Point, PathVertex, VectorElement } from '../engine/VectorModel.js';
 import { formatNum } from '../engine/geometry/PathGeometryCompiler.js';
+import { ActionIntent, ActionIntentFactory } from './contracts/ActionIntent.js';
+import { CommandRegistry } from '../engine/commands/CommandRegistry.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Polyline & Orthogonal Polygon State Machine (PolylineToolHandler)
@@ -40,10 +42,12 @@ export class PolylineToolHandler implements IToolHandler {
     return this.currentPolylineVertices.length;
   }
 
-  public onPointerDown(e: PointerEvent, pt: Point): boolean {
+  /**
+   * Ciclo Declarativo (Capa L2): Evalúa pointerdown y emite intenciones
+   */
+  public evalPointerDown(e: PointerEvent, pt: Point): ActionIntent {
     const activeTool = this.ctx.getActiveTool();
-    if (activeTool !== 'polyline') return false;
-    if (e.button !== 0) return false;
+    if (activeTool !== 'polyline' || e.button !== 0) return ActionIntentFactory.none();
 
     const z = this.ctx.canvasMgr.zoom || 1;
     const closeRadius = 14 / z;
@@ -51,31 +55,23 @@ export class PolylineToolHandler implements IToolHandler {
     this.currentPolylineVertices.forEach((v) => otherVertices.push({ x: v.x, y: v.y }));
     const snappedPt = this.ctx.snapPoint(pt, otherVertices);
 
-    // If clicking on the first vertex, close the polygon
-    // ARCHITECTURAL RATIONALE: Resilient Proximity Snapping & Preventing Premature Duplicate Stacking
-    // 1. Minimum 2 vertices required to form a closed polygon/contour. Checking `>= 2` instead of `>= 3`
-    //    prevents the 3rd click (e.g. closing a triangle) from failing the close condition and
-    //    silently appending an unintended duplicate vertex on top of `firstV`.
-    // 2. Both `snappedPt` and raw `pt` are tested within `closeRadius` to ensure snapping to an adjacent
-    //    grid line or guide never prevents the user from committing the path closure.
+    // Si hace click en el primer vértice, cerrar polígono
     if (this.currentPolylineVertices.length >= 2) {
       const firstV = this.currentPolylineVertices[0];
       const distSnapped = Math.hypot(snappedPt.x - firstV.x, snappedPt.y - firstV.y);
       const distRaw = Math.hypot(pt.x - firstV.x, pt.y - firstV.y);
       if (distSnapped <= closeRadius || distRaw <= closeRadius) {
-        this.finishPolylinePath(true);
-        return true;
+        return ActionIntentFactory.commit('polyline.finish', { close: true });
       }
     }
 
-    // If clicking on the last vertex, finalize the open path
+    // Si hace click en el último vértice, finalizar trazado abierto
     if (this.currentPolylineVertices.length >= 2) {
       const lastV = this.currentPolylineVertices[this.currentPolylineVertices.length - 1];
       const distSnapped = Math.hypot(snappedPt.x - lastV.x, snappedPt.y - lastV.y);
       const distRaw = Math.hypot(pt.x - lastV.x, pt.y - lastV.y);
       if (distSnapped <= 6 / z || distRaw <= 6 / z) {
-        this.finishPolylinePath(false);
-        return true;
+        return ActionIntentFactory.commit('polyline.finish', { close: false });
       }
     }
 
@@ -88,20 +84,45 @@ export class PolylineToolHandler implements IToolHandler {
       command: isStart ? 'M' : 'L',
     };
 
-    this.currentPolylineVertices.push(newV);
-    this.polylineHoverPoint = snappedPt;
-    this.ctx.renderOverlay();
-    return true;
+    return ActionIntentFactory.begin('polyline.vertex', { vertex: newV, isStart });
   }
 
-  public onPointerMove(_e: PointerEvent, pt: Point): boolean {
+  public onPointerDown(e: PointerEvent, pt: Point): boolean {
+    const intent = this.evalPointerDown(e, pt);
+    if (intent.kind === 'none') return false;
+
+    if (intent.kind === 'commit') {
+      this.finishPolylinePath(intent.params.close);
+      return true;
+    }
+
+    if (intent.kind === 'begin' && intent.payload?.vertex) {
+      this.currentPolylineVertices.push(intent.payload.vertex);
+      this.polylineHoverPoint = { x: intent.payload.vertex.x, y: intent.payload.vertex.y };
+      this.ctx.renderOverlay();
+      return true;
+    }
+
+    return false;
+  }
+
+  public evalPointerMove(_e: PointerEvent, pt: Point): ActionIntent {
     const activeTool = this.ctx.getActiveTool();
-    if (activeTool !== 'polyline') return false;
+    if (activeTool !== 'polyline') return ActionIntentFactory.none();
 
     const otherVertices = this.ctx.getOtherVertices();
     this.currentPolylineVertices.forEach((v) => otherVertices.push({ x: v.x, y: v.y }));
     const snappedPt = this.ctx.snapPoint(pt, otherVertices);
-    this.polylineHoverPoint = snappedPt;
+    return ActionIntentFactory.preview('polyline.hover', { point: snappedPt });
+  }
+
+  public onPointerMove(e: PointerEvent, pt: Point): boolean {
+    const intent = this.evalPointerMove(e, pt);
+    if (intent.kind === 'none') return false;
+
+    if (intent.kind === 'preview' && intent.payload?.point) {
+      this.polylineHoverPoint = intent.payload.point;
+    }
     this.ctx.renderOverlay();
     return true;
   }
@@ -115,6 +136,19 @@ export class PolylineToolHandler implements IToolHandler {
     if (activeTool === 'polyline' && this.currentPolylineVertices.length >= 2) {
       this.finishPolylinePath(false);
       return true;
+    }
+    return false;
+  }
+
+  public onKeyDown(e: KeyboardEvent): boolean {
+    if (e.key === 'Enter') {
+      if (this.currentPolylineVertices.length >= 2) {
+        this.finishPolylinePath(false);
+        return true;
+      }
+    }
+    if (e.key === 'Escape') {
+      return this.cancel();
     }
     return false;
   }
@@ -160,7 +194,6 @@ export class PolylineToolHandler implements IToolHandler {
     );
 
     if (cleanVerts.length >= 2) {
-      this.ctx.pushUndo();
       const id = `el_poly_${Date.now().toString(36)}`;
       const pathD = this.ctx.model.compilePathD(cleanVerts, close);
       const pointsStr = cleanVerts.map((v) => `${formatNum(v.x)},${formatNum(v.y)}`).join(' ');
@@ -198,13 +231,21 @@ export class PolylineToolHandler implements IToolHandler {
         isParametric,
       };
 
-      this.ctx.model.elements.push(newEl);
-      this.ctx.selectionTool.select(id);
+      const cmdRegistry = CommandRegistry.getInstance();
+      if (cmdRegistry.has('shape.create')) {
+        cmdRegistry.execute('shape.create', { element: newEl });
+      } else {
+        this.ctx.pushUndo();
+        this.ctx.model.elements.push(newEl);
+        this.ctx.selectionTool.select(id);
+        this.ctx.render();
+        this.ctx.syncToHost();
+      }
+
       this.currentPolylineVertices = [];
       this.polylineHoverPoint = null;
       this.ctx.setTool('select');
       this.ctx.render();
-      this.ctx.syncToHost();
     } else {
       this.currentPolylineVertices = [];
       this.polylineHoverPoint = null;

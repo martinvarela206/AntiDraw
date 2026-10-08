@@ -1,6 +1,8 @@
 import { IToolHandler, ToolContext } from './IToolHandler.js';
 import { ToolType } from '../ui/Toolbar.js';
 import { Point, PathVertex, NodeType, VectorElement } from '../engine/VectorModel.js';
+import { ActionIntent, ActionIntentFactory } from './contracts/ActionIntent.js';
+import { CommandRegistry } from '../engine/commands/CommandRegistry.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Elastic Real-Time Curvature Feedback & Dynamic Bézier Ghosting
@@ -42,21 +44,15 @@ export class PenToolHandler implements IToolHandler {
     return this.currentPenVertices.length;
   }
 
-  public onPointerDown(e: PointerEvent, pt: Point): boolean {
+  /**
+   * Ciclo Declarativo (Capa L2): Evalúa pointerdown y emite intenciones
+   */
+  public evalPointerDown(e: PointerEvent, pt: Point): ActionIntent {
     const activeTool = this.ctx.getActiveTool();
-    if (activeTool !== 'pen') return false;
-    if (e.button !== 0) return false;
+    if (activeTool !== 'pen' || e.button !== 0) return ActionIntentFactory.none();
 
     const z = this.ctx.canvasMgr.zoom || 1;
     const closeRadius = 14 / z;
-
-    // ARCHITECTURAL RATIONALE: Screen-Normalized Proximity and Snapping Consistency
-    // 1. Evaluating snapping with `currentPenVertices` ensures the cursor magnetically locks
-    //    to the initial node if the user clicks close to it.
-    // 2. Testing both `snappedPt` and raw `pt` against `closeRadius = 14 / z` ensures that
-    //    even if external grid/guide snapping pulled `snappedPt` slightly away, a physical click
-    //    directly targeting the initial node reliably triggers path closure instead of inserting
-    //    an unwanted duplicate vertex directly on top of the origin.
     const otherVertices = this.ctx.getOtherVertices();
     this.currentPenVertices.forEach((v) => otherVertices.push({ x: v.x, y: v.y }));
     const snappedPt = this.ctx.snapPoint(pt, otherVertices);
@@ -68,8 +64,7 @@ export class PenToolHandler implements IToolHandler {
       const distRaw = Math.hypot(pt.x - firstV.x, pt.y - firstV.y);
 
       if (distSnapped <= closeRadius || distRaw <= closeRadius) {
-        this.finishPenPath(true);
-        return true;
+        return ActionIntentFactory.commit('pen.finish', { close: true });
       }
     }
 
@@ -83,11 +78,27 @@ export class PenToolHandler implements IToolHandler {
       command: isStart ? 'M' : 'L',
     };
 
-    this.currentPenVertices.push(newV);
-    this.penActiveVertexIdx = this.currentPenVertices.length - 1;
-    this.isDragging = true;
-    this.ctx.render();
-    return true;
+    return ActionIntentFactory.begin('pen.vertex', { vertex: newV, isStart });
+  }
+
+  public onPointerDown(e: PointerEvent, pt: Point): boolean {
+    const intent = this.evalPointerDown(e, pt);
+    if (intent.kind === 'none') return false;
+
+    if (intent.kind === 'commit') {
+      this.finishPenPath(intent.params.close);
+      return true;
+    }
+
+    if (intent.kind === 'begin' && intent.payload?.vertex) {
+      this.currentPenVertices.push(intent.payload.vertex);
+      this.penActiveVertexIdx = this.currentPenVertices.length - 1;
+      this.isDragging = true;
+      this.ctx.render();
+      return true;
+    }
+
+    return false;
   }
 
   public onPointerMove(e: PointerEvent, pt: Point): boolean {
@@ -157,6 +168,19 @@ export class PenToolHandler implements IToolHandler {
     return false;
   }
 
+  public onKeyDown(e: KeyboardEvent): boolean {
+    if (e.key === 'Enter') {
+      if (this.currentPenVertices.length >= 2) {
+        this.finishPenPath(false);
+        return true;
+      }
+    }
+    if (e.key === 'Escape') {
+      return this.cancel();
+    }
+    return false;
+  }
+
   public cancel(): boolean {
     if (this.isDragging || this.currentPenVertices.length > 0 || this.penHoverPoint) {
       this.currentPenVertices = [];
@@ -199,7 +223,6 @@ export class PenToolHandler implements IToolHandler {
     );
 
     if (cleanVerts.length >= 2) {
-      this.ctx.pushUndo();
       const id = `el_pen_${Date.now().toString(36)}`;
       const pathD = this.ctx.model.compilePathD(cleanVerts, close);
       const newEl: VectorElement = {
@@ -217,13 +240,21 @@ export class PenToolHandler implements IToolHandler {
         isClosed: close,
       };
 
-      this.ctx.model.elements.push(newEl);
-      this.ctx.selectionTool.select(id);
+      const cmdRegistry = CommandRegistry.getInstance();
+      if (cmdRegistry.has('shape.create')) {
+        cmdRegistry.execute('shape.create', { element: newEl });
+      } else {
+        this.ctx.pushUndo();
+        this.ctx.model.elements.push(newEl);
+        this.ctx.selectionTool.select(id);
+        this.ctx.render();
+        this.ctx.syncToHost();
+      }
+
       this.currentPenVertices = [];
       this.penHoverPoint = null;
       this.ctx.setTool('select');
       this.ctx.render();
-      this.ctx.syncToHost();
     } else {
       this.currentPenVertices = [];
       this.penHoverPoint = null;
