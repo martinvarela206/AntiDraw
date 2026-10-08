@@ -1,12 +1,9 @@
-import { Point, PathVertex } from '../VectorModel.js';
+import { Point } from '../../core/geom/Point.js';
+import { QuadCorners } from '../../core/geom/TransformMatrix.js';
+import { PathVertex } from '../VectorModel.js';
 import { BoundingBox } from '../SelectionTool.js';
 
-export interface QuadCorners {
-  nw: Point;
-  ne: Point;
-  se: Point;
-  sw: Point;
-}
+export type { QuadCorners };
 
 /**
  * ARCHITECTURAL RATIONALE: 2D Projective Homography Engine (ProjectiveHomography)

@@ -1,7 +1,7 @@
-export interface Point {
-  x: number;
-  y: number;
-}
+import { Point, PointUtils } from '../core/geom/Point.js';
+
+export type { Point };
+export { PointUtils };
 
 export type NodeType = 'sharp' | 'asymmetric' | 'smooth' | 'symmetric';
 
