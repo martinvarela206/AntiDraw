@@ -29,12 +29,13 @@ export class PenToolHandler implements IToolHandler {
   public readonly toolTypes: ToolType[] = ['pen'];
   private ctx: ToolContext;
 
-  public penNodeType: NodeType = 'asymmetric';
+  public penNodeType: NodeType = 'symmetric';
   public currentPenVertices: PathVertex[] = [];
   public penHoverPoint: Point | null = null;
   public penActiveVertexIdx: number | null = null;
   public penMovingVertexIdx: number | null = null;
   public isDragging: boolean = false;
+  public isCuspBroken: boolean = false;
 
   constructor(ctx: ToolContext) {
     this.ctx = ctx;
@@ -69,7 +70,7 @@ export class PenToolHandler implements IToolHandler {
     }
 
     const isStart = this.currentPenVertices.length === 0;
-    const initialNodeType = this.penNodeType || 'asymmetric';
+    const initialNodeType: NodeType = 'sharp';
     const newV: PathVertex = {
       id: `v_pen_${Date.now().toString(36)}_${this.currentPenVertices.length}`,
       x: snappedPt.x,
@@ -94,6 +95,7 @@ export class PenToolHandler implements IToolHandler {
       this.currentPenVertices.push(intent.payload.vertex);
       this.penActiveVertexIdx = this.currentPenVertices.length - 1;
       this.isDragging = true;
+      this.isCuspBroken = false;
       this.ctx.render();
       return true;
     }
@@ -115,23 +117,27 @@ export class PenToolHandler implements IToolHandler {
 
       const dx = snappedPt.x - v.x;
       const dy = snappedPt.y - v.y;
-      const isAlt = e.altKey;
+      const dist = Math.hypot(dx, dy);
 
-      if (Math.hypot(dx, dy) > 3) {
-        if (isAlt) {
+      if (dist > 3) {
+        if (e.altKey) {
+          this.isCuspBroken = true;
+        }
+
+        if (this.isCuspBroken) {
+          // Tangente quebrada: handleOut sigue al puntero libremente formando cúspide asimétrica
           v.nodeType = 'asymmetric';
           v.handleOut = { x: snappedPt.x, y: snappedPt.y };
         } else {
+          // Continuidad colineal simétrica por defecto
+          v.nodeType = 'symmetric';
           v.handleOut = { x: snappedPt.x, y: snappedPt.y };
-          if (v.nodeType === 'smooth' || v.nodeType === 'symmetric') {
-            v.handleIn = { x: v.x - dx, y: v.y - dy };
-          } else if (v.nodeType === 'asymmetric') {
-            if (!v.handleIn) {
-              v.handleIn = { x: v.x - dx, y: v.y - dy };
-            }
-          }
+          v.handleIn = { x: v.x - dx, y: v.y - dy };
         }
       } else {
+        if (!this.isCuspBroken && !v.handleOut && !v.handleIn) {
+          v.nodeType = 'sharp';
+        }
         const otherVerts = this.ctx.getOtherVertices();
         this.currentPenVertices.forEach((item) => otherVerts.push({ x: item.x, y: item.y }));
         this.penHoverPoint = this.ctx.snapPoint(pt, otherVerts);
@@ -151,9 +157,17 @@ export class PenToolHandler implements IToolHandler {
 
   public onPointerUp(_e: PointerEvent, _pt: Point): boolean {
     if (this.isDragging) {
+      if (this.penActiveVertexIdx !== null) {
+        const v = this.currentPenVertices[this.penActiveVertexIdx];
+        if (v && !v.handleIn && !v.handleOut) {
+          v.nodeType = 'sharp';
+        }
+      }
       this.isDragging = false;
+      this.isCuspBroken = false;
       this.penActiveVertexIdx = null;
       this.penMovingVertexIdx = null;
+      this.ctx.renderOverlay();
       return true;
     }
     return false;
@@ -169,6 +183,17 @@ export class PenToolHandler implements IToolHandler {
   }
 
   public onKeyDown(e: KeyboardEvent): boolean {
+    if (e.key === 'Alt') {
+      if (this.isDragging && this.penActiveVertexIdx !== null) {
+        this.isCuspBroken = true;
+        const v = this.currentPenVertices[this.penActiveVertexIdx];
+        if (v) {
+          v.nodeType = 'asymmetric';
+          this.ctx.renderOverlay();
+        }
+        return true;
+      }
+    }
     if (e.key === 'Enter') {
       if (this.currentPenVertices.length >= 2) {
         this.finishPenPath(false);
@@ -186,6 +211,7 @@ export class PenToolHandler implements IToolHandler {
       this.currentPenVertices = [];
       this.penHoverPoint = null;
       this.isDragging = false;
+      this.isCuspBroken = false;
       this.penActiveVertexIdx = null;
       this.penMovingVertexIdx = null;
       this.ctx.renderOverlay();
@@ -198,6 +224,7 @@ export class PenToolHandler implements IToolHandler {
     this.currentPenVertices = [];
     this.penHoverPoint = null;
     this.isDragging = false;
+    this.isCuspBroken = false;
     this.penActiveVertexIdx = null;
     this.penMovingVertexIdx = null;
   }

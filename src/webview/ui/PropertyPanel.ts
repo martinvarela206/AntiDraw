@@ -70,7 +70,7 @@ export class PropertyPanel {
   private activeVertex: PathVertex | null = null;
   public selectedNodeCount: number = 1;
   private activeTool: string = 'select';
-  public penNodeType: NodeType = 'asymmetric';
+  public penNodeType: NodeType = 'symmetric';
   public penVertexCount: number = 0;
   public polylineVertexCount: number = 0;
   public gridAlignmentMode: GridAlignmentMode = 'origin';
@@ -129,7 +129,7 @@ export class PropertyPanel {
   public update(
     selectedVertex: PathVertex | null = null,
     activeTool: string = 'select',
-    penNodeType: NodeType = 'asymmetric',
+    penNodeType: NodeType = 'symmetric',
     penVertexCount: number = 0,
     selectedGuide: GuideLine | null = null,
     polylineVertexCount: number = 0,
