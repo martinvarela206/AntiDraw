@@ -1,12 +1,10 @@
 import { CanvasManager } from './CanvasManager.js';
 import { VectorModel, Point } from './VectorModel.js';
-import { RulerView } from '../ui/RulerView.js';
 
 export interface ViewportControllerOptions {
   canvasScrollArea: HTMLElement;
   canvasWrapper: HTMLElement;
   getSvgCanvas: () => SVGSVGElement;
-  getRulerView: () => RulerView | null;
   canvasMgr: CanvasManager;
   model: VectorModel;
   onRender: () => void;
@@ -14,6 +12,8 @@ export interface ViewportControllerOptions {
   onRenderOverlay?: () => void;
   onZoomChanged?: (zoom: number) => void;
   onCameraOffsetChanged?: (offset: Point) => void;
+  onSyncRulers?: (cameraOffsetX: number, cameraOffsetY: number) => void;
+  onResizeRulers?: (width: number, height: number) => void;
 }
 
 /**
@@ -50,7 +50,6 @@ export class ViewportController {
   private canvasScrollArea: HTMLElement;
   private canvasWrapper: HTMLElement;
   private getSvgCanvas: () => SVGSVGElement;
-  private getRulerView: () => RulerView | null;
   private canvasMgr: CanvasManager;
   private model: VectorModel;
   private onRender: () => void;
@@ -58,6 +57,8 @@ export class ViewportController {
   private onRenderOverlay?: () => void;
   private onZoomChanged?: (zoom: number) => void;
   private onCameraOffsetChanged?: (offset: Point) => void;
+  private onSyncRulers?: (cameraOffsetX: number, cameraOffsetY: number) => void;
+  private onResizeRulers?: (width: number, height: number) => void;
 
   public cameraOffset: Point = { x: 0, y: 0 };
   public isMiddlePanning: boolean = false;
@@ -68,7 +69,6 @@ export class ViewportController {
     this.canvasScrollArea = options.canvasScrollArea;
     this.canvasWrapper = options.canvasWrapper;
     this.getSvgCanvas = options.getSvgCanvas;
-    this.getRulerView = options.getRulerView;
     this.canvasMgr = options.canvasMgr;
     this.model = options.model;
     this.onRender = options.onRender;
@@ -76,6 +76,8 @@ export class ViewportController {
     this.onRenderOverlay = options.onRenderOverlay;
     this.onZoomChanged = options.onZoomChanged;
     this.onCameraOffsetChanged = options.onCameraOffsetChanged;
+    this.onSyncRulers = options.onSyncRulers;
+    this.onResizeRulers = options.onResizeRulers;
 
     this.initEvents();
   }
@@ -244,10 +246,7 @@ export class ViewportController {
 
     // Window resize handler to update rulers and viewport-bounded overlay/grid renderers
     window.addEventListener('resize', () => {
-      const ruler = this.getRulerView();
-      if (ruler) {
-        ruler.updateSize(this.model.canvas.width, this.model.canvas.height);
-      }
+      this.onResizeRulers?.(this.model.canvas.width, this.model.canvas.height);
       this.syncRulerScroll();
       this.onRenderOverlay?.();
     });
@@ -383,9 +382,8 @@ export class ViewportController {
    * Passing `cameraOffset` directly eliminates 100% of synchronous DOM layout queries.
    */
   public syncRulerScroll(): void {
-    const ruler = this.getRulerView();
-    if (!ruler || !this.canvasWrapper || !this.canvasScrollArea) return;
-    ruler.renderRulers(this.cameraOffset.x, this.cameraOffset.y);
+    if (!this.canvasWrapper || !this.canvasScrollArea) return;
+    this.onSyncRulers?.(this.cameraOffset.x, this.cameraOffset.y);
   }
 
   public updateStatusZoom(): void {

@@ -253,12 +253,13 @@ class AntiDrawApp {
       canvasScrollArea: this.canvasScrollArea,
       canvasWrapper: this.canvasWrapper,
       getSvgCanvas: () => this.svgCanvas,
-      getRulerView: () => this.rulerView,
       canvasMgr: this.canvasMgr,
       model: this.model,
       onRender: () => this.render(),
       onApplyCanvasSize: () => this.applyCanvasSize(),
       onRenderOverlay: () => this.renderOverlay(),
+      onSyncRulers: (x, y) => this.rulerView?.renderRulers(x, y),
+      onResizeRulers: (w, h) => this.rulerView?.updateSize(w, h),
       onZoomChanged: () => {
         this.syncMetadataToHostDebounced();
       },
