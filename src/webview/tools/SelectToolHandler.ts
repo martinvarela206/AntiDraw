@@ -573,6 +573,31 @@ export class SelectToolHandler implements IToolHandler {
     return handled;
   }
 
+  public onKeyDown(e: KeyboardEvent): boolean {
+    if (e.key === 'Escape') {
+      if (this.cancel()) {
+        return true;
+      }
+      if (
+        this.ctx.selectionTool.selectedElementIds.size > 0 ||
+        this.ctx.canvasMgr.selectedGuideId !== null
+      ) {
+        this.ctx.selectionTool.deselectAll();
+        this.ctx.canvasMgr.selectedGuideId = null;
+        this.ctx.canvasMgr.activeGuideTransformId = null;
+        this.callbacks.onClearPanelMode?.();
+        this.callbacks.onSelectionChanged?.();
+        this.ctx.render();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  public deactivate(): void {
+    this.cancel();
+  }
+
   public renderOverlay(zoom: number): string {
     let html = '';
 
