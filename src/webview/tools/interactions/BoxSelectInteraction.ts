@@ -1,6 +1,7 @@
 import { ToolContext } from '../IToolHandler.js';
 import { Point } from '../../engine/VectorModel.js';
 import type { SelectToolCallbacks } from '../SelectToolHandler.js';
+import { OverlayDescriptor } from '../../engine/canvas/OverlayDescriptor.js';
 
 /**
  * ARCHITECTURAL RATIONALE: CorelDraw Benchmark Box Selection Interaction
@@ -103,8 +104,8 @@ export class BoxSelectInteraction {
     return false;
   }
 
-  public renderOverlay(ctx: ToolContext): string {
-    if (!ctx.selectionTool.marqueeRect) return '';
+  public renderOverlay(ctx: ToolContext): OverlayDescriptor[] {
+    if (!ctx.selectionTool.marqueeRect) return [];
     const m = ctx.selectionTool.marqueeRect;
     const isToggle = ctx.selectionTool.isToggleMarquee;
     const isTouching = ctx.selectionTool.isTouchingMarquee;
@@ -130,23 +131,56 @@ export class BoxSelectInteraction {
       dashArray = '4 2';
     }
 
-    const rectSvg = `<rect x="${m.x}" y="${m.y}" width="${m.width}" height="${m.height}" fill="${fill}" stroke="${stroke}" stroke-width="1" stroke-dasharray="${dashArray}" vector-effect="non-scaling-stroke" />`;
+    const descriptors: OverlayDescriptor[] = [
+      {
+        type: 'rect',
+        x: m.x,
+        y: m.y,
+        width: m.width,
+        height: m.height,
+        fill,
+        stroke,
+        strokeWidth: 1,
+        strokeDasharray: dashArray,
+        vectorEffect: 'non-scaling-stroke',
+      },
+    ];
 
     // High-fidelity mode badge when Touching (Alt) is active and box has sufficient size
-    let badgeSvg = '';
     if (isTouching && m.width > 60 && m.height > 24) {
       const zoom = ctx.canvasMgr.zoom || 1;
       const badgeW = 74 / zoom;
       const badgeH = 18 / zoom;
-      const badgeX = m.x + m.width - badgeW - (4 / zoom);
-      const badgeY = m.y + (4 / zoom);
+      const badgeX = m.x + m.width - badgeW - 4 / zoom;
+      const badgeY = m.y + 4 / zoom;
       const fontSize = 10 / zoom;
-      badgeSvg = `
-        <rect x="${badgeX}" y="${badgeY}" width="${badgeW}" height="${badgeH}" rx="${3 / zoom}" fill="#1e293b" fill-opacity="0.9" stroke="#f59e0b" stroke-width="1" vector-effect="non-scaling-stroke" />
-        <text x="${badgeX + badgeW / 2}" y="${badgeY + badgeH * 0.72}" fill="#fbbf24" font-family="sans-serif" font-size="${fontSize}" font-weight="600" text-anchor="middle" pointer-events="none">Cruce (Alt)</text>
-      `;
+
+      descriptors.push({
+        type: 'rect',
+        x: badgeX,
+        y: badgeY,
+        width: badgeW,
+        height: badgeH,
+        rx: 3 / zoom,
+        fill: '#1e293b',
+        opacity: 0.9,
+        stroke: '#f59e0b',
+        strokeWidth: 1,
+        vectorEffect: 'non-scaling-stroke',
+      });
+      descriptors.push({
+        type: 'text',
+        x: badgeX + badgeW / 2,
+        y: badgeY + badgeH * 0.72,
+        text: 'Cruce (Alt)',
+        fill: '#fbbf24',
+        fontFamily: 'sans-serif',
+        fontSize,
+        textAnchor: 'middle',
+        pointerEvents: 'none',
+      });
     }
 
-    return rectSvg + badgeSvg;
+    return descriptors;
   }
 }

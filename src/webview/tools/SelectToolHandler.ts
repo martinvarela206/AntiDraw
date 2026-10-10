@@ -8,6 +8,7 @@ import { GuideInteraction, GuideHandleType } from './interactions/GuideInteracti
 import { BoxSelectInteraction } from './interactions/BoxSelectInteraction.js';
 import { TranslateInteraction } from './interactions/TranslateInteraction.js';
 import { TransformInteraction } from './interactions/TransformInteraction.js';
+import { OverlayDescriptor } from '../engine/canvas/OverlayDescriptor.js';
 
 export interface SelectToolCallbacks {
   onSelectionChanged?: () => void;
@@ -598,11 +599,12 @@ export class SelectToolHandler implements IToolHandler {
     this.cancel();
   }
 
-  public renderOverlay(zoom: number): string {
-    let html = '';
+  public renderOverlay(zoom: number): OverlayDescriptor[] {
+    const descriptors: OverlayDescriptor[] = [];
 
     // 1. Marquee selection rectangle
-    html += this.boxSelectInteraction.renderOverlay(this.ctx);
+    const boxDescriptors = this.boxSelectInteraction.renderOverlay(this.ctx);
+    descriptors.push(...boxDescriptors);
 
     // 2. Hover highlight border
     if (
@@ -613,24 +615,42 @@ export class SelectToolHandler implements IToolHandler {
       if (hEl && hEl.vertices) {
         const isClosed = this.ctx.model.isElementClosed(hEl);
         const d = this.ctx.model.compilePathD(hEl.vertices, isClosed);
-        html += `<path d="${d}" fill="none" stroke="#6366f1" stroke-width="2" stroke-dasharray="4 2" opacity="0.8" vector-effect="non-scaling-stroke" />`;
+        descriptors.push({
+          type: 'path',
+          d,
+          fill: 'none',
+          stroke: '#6366f1',
+          strokeWidth: 2,
+          strokeDasharray: '4 2',
+          opacity: 0.8,
+          vectorEffect: 'non-scaling-stroke',
+        });
       }
     }
 
     // 3. Transform & Rotate handles, Pivot marker, Gradient vector overlay
-    html += this.transformInteraction.renderOverlay(
+    const transformHtml = this.transformInteraction.renderOverlay(
       this.ctx,
       zoom,
       this.activeHandle,
       this.translateInteraction.ghostDragOffset
     );
+    if (transformHtml) {
+      descriptors.push({ type: 'raw', html: transformHtml });
+    }
 
     // 4. Ghost Move Vector and Bounding Box
-    html += this.translateInteraction.renderGhostOverlay(this.ctx);
+    const ghostHtml = this.translateInteraction.renderGhostOverlay(this.ctx);
+    if (ghostHtml) {
+      descriptors.push({ type: 'raw', html: ghostHtml });
+    }
 
     // 5. Guide line rotation ray overlay
-    html += this.guideInteraction.renderOverlay(this.ctx);
+    const guideHtml = this.guideInteraction.renderOverlay(this.ctx);
+    if (guideHtml) {
+      descriptors.push({ type: 'raw', html: guideHtml });
+    }
 
-    return html;
+    return descriptors;
   }
 }

@@ -1,4 +1,5 @@
 import { Point, PathVertex } from '../../engine/VectorModel.js';
+import { OverlayDescriptor } from '../../engine/canvas/OverlayDescriptor.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Encapsulated Node Marquee Selector (SOLID / SRP)
@@ -139,14 +140,24 @@ export class NodeMarqueeSelector {
     return this.selectedVertexIds.has(id);
   }
 
-  /**
-   * Renders the SVG overlay for the active rubber-band marquee rectangle.
-   */
-  public renderOverlay(z: number): string {
-    if (!this.marqueeRect) return '';
+  public renderOverlay(z: number): OverlayDescriptor[] {
+    if (!this.marqueeRect) return [];
     const m = this.marqueeRect;
     const stroke = this.isDeselect ? '#ef4444' : '#38bdf8';
     const fill = this.isDeselect ? 'rgba(239, 68, 68, 0.12)' : 'rgba(56, 189, 248, 0.12)';
-    return `<rect x="${m.x}" y="${m.y}" width="${m.width}" height="${m.height}" fill="${fill}" stroke="${stroke}" stroke-width="${1.5 / z}" stroke-dasharray="${4 / z} ${3 / z}" vector-effect="non-scaling-stroke" />`;
+    return [
+      {
+        type: 'rect',
+        x: m.x,
+        y: m.y,
+        width: m.width,
+        height: m.height,
+        fill,
+        stroke,
+        strokeWidth: 1.5 / z,
+        strokeDasharray: `${4 / z} ${3 / z}`,
+        vectorEffect: 'non-scaling-stroke',
+      },
+    ];
   }
 }

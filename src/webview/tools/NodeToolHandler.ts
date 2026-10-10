@@ -5,6 +5,7 @@ import { NodeEditorTool } from '../engine/NodeEditorTool.js';
 import { ParametricHandleController } from './node/ParametricHandleController.js';
 import { NodeMarqueeSelector } from './node/NodeMarqueeSelector.js';
 import { NodeOverlayBuilder } from './node/NodeOverlayBuilder.js';
+import { OverlayDescriptor } from '../engine/canvas/OverlayDescriptor.js';
 
 export interface NodeToolCallbacks {
   onNodeSelected?: (vertex: PathVertex, element: VectorElement, selectedCount?: number) => void;
@@ -1065,9 +1066,9 @@ export class NodeToolHandler implements IToolHandler {
     }
   }
 
-  public renderOverlay(zoom: number): string {
+  public renderOverlay(zoom: number): OverlayDescriptor[] {
     const z = zoom || 1;
-    let html = '';
+    const descriptors: OverlayDescriptor[] = [];
 
     const selectedEls = this.ctx.model.elements.filter((el) => this.ctx.selectionTool.isSelected(el.id));
 
@@ -1077,47 +1078,57 @@ export class NodeToolHandler implements IToolHandler {
       selectedEls.length === 1 &&
       this.ctx.getActiveTool() === 'node'
     ) {
-      html += this.overlayBuilder.renderIdleBezierHandles(selectedEls[0], z);
-      html += this.overlayBuilder.renderSelectedSegment(selectedEls[0], z);
+      const handlesHtml = this.overlayBuilder.renderIdleBezierHandles(selectedEls[0], z);
+      const segmentHtml = this.overlayBuilder.renderSelectedSegment(selectedEls[0], z);
+      if (handlesHtml || segmentHtml) {
+        descriptors.push({ type: 'raw', html: handlesHtml + segmentHtml });
+      }
     }
 
     /**
      * ARCHITECTURAL RATIONALE: Selective Handle Ghost Dispatch (FIX-NodePreview)
      * Differentiates parametric shape controls (quadrants, inner donuts, rounded corners, star tips)
      * from standard vector topology manipulation (vertex, handleIn, handleOut, segment).
-     *
-     * Evaluating `if (this.activeHandle)` previously intercepted 'vertex', 'handleIn', 'handleOut',
-     * and 'segment' drags, mistakenly routing them into `parametricController.renderGhostOverlay`.
-     * Because parametric delegates do not handle generic topology nodes, they returned empty markup,
-     * completely suppressing `renderGhostPath` and hiding node movement feedback during polyline/path drag.
      */
     if (this.isParametricHandle(this.activeHandle)) {
-      html += this.parametricController.renderGhostOverlay(this.activeHandle, z);
+      const paramGhostHtml = this.parametricController.renderGhostOverlay(this.activeHandle, z);
+      if (paramGhostHtml) {
+        descriptors.push({ type: 'raw', html: paramGhostHtml });
+      }
     } else if (this.ghostNodeVertices && selectedEls.length > 0) {
       // 3. Ghost Path & Node Handles during Drag (Polylines, Polygons, Freeform Paths, Lines, Primitives)
-      html += this.overlayBuilder.renderGhostPath(
+      const ghostPathHtml = this.overlayBuilder.renderGhostPath(
         selectedEls[0],
         this.ghostNodeVertices,
         this.marqueeSelector,
         z
       );
+      if (ghostPathHtml) {
+        descriptors.push({ type: 'raw', html: ghostPathHtml });
+      }
     }
 
     // 4. Parametric Idle Handles (Quadrant, Donut, Rect Corners)
     if (!this.ghostNodeVertices && !this.activeHandle) {
-      html += this.parametricController.renderIdleHandles(selectedEls, z);
+      const idleParamHtml = this.parametricController.renderIdleHandles(selectedEls, z);
+      if (idleParamHtml) {
+        descriptors.push({ type: 'raw', html: idleParamHtml });
+      }
     }
 
     // 5. Rubber-band Marquee Selection Box
     if (this.marqueeSelector.isMarqueeActive()) {
-      html += this.marqueeSelector.renderOverlay(z);
+      descriptors.push(...this.marqueeSelector.renderOverlay(z));
     }
 
     // 6. Highlight Multi-Selected Vertices
     if (!this.ghostNodeVertices && selectedEls.length === 1 && this.ctx.getActiveTool() === 'node') {
-      html += this.overlayBuilder.renderMultiSelectedVertices(selectedEls[0], this.marqueeSelector, z);
+      const multiSelectedHtml = this.overlayBuilder.renderMultiSelectedVertices(selectedEls[0], this.marqueeSelector, z);
+      if (multiSelectedHtml) {
+        descriptors.push({ type: 'raw', html: multiSelectedHtml });
+      }
     }
 
-    return html;
+    return descriptors;
   }
 }
