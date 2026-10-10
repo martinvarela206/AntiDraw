@@ -57,7 +57,7 @@ export interface IToolHandler {
   onPointerUp(e: PointerEvent, pt: Point): boolean | void;
   onDoubleClick?(e: MouseEvent, pt: Point): boolean | void;
   cancel?(): boolean;
-  renderOverlay?(zoom: number): string;
+  renderOverlay?(zoom: number): string | import('../engine/canvas/OverlayDescriptor.js').OverlayDescriptor[];
   activate?(): void;
   deactivate?(): void;
   onKeyDown?(e: KeyboardEvent): boolean | void;

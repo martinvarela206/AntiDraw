@@ -6,6 +6,7 @@ import { IToolHandler } from '../tools/IToolHandler.js';
 import { ToolType } from '../tools/ToolType.js';
 import { MarkerHelper, GuideHelper, NodeHelper, GUIDE_ROTATE_LEFT_PATH, GUIDE_ROTATE_RIGHT_PATH } from './canvas/helpers/index.js';
 import { SnappingEngine } from './canvas/SnappingEngine.js';
+import { OverlayDescriptor } from './canvas/OverlayDescriptor.js';
 
 export interface OverlayRenderContext {
   model: VectorModel;
@@ -263,7 +264,12 @@ export class OverlayRenderer {
     // 6. Delegate Tool Overlays
     for (const tool of ctx.tools) {
       if (tool.renderOverlay) {
-        html += tool.renderOverlay(z);
+        const res = tool.renderOverlay(z);
+        if (typeof res === 'string') {
+          html += res;
+        } else if (Array.isArray(res)) {
+          html += this.compileDescriptors(res);
+        }
       }
     }
 
@@ -280,5 +286,68 @@ export class OverlayRenderer {
     }
 
     return html;
+  }
+
+  public renderToSvg(overlaySvg: SVGSVGElement, ctx: OverlayRenderContext, zoom: number): void {
+    overlaySvg.innerHTML = this.render(ctx, zoom);
+  }
+
+  public compileDescriptors(descriptors: OverlayDescriptor[]): string {
+    let out = '';
+    for (const d of descriptors) {
+      out += this.compileDescriptor(d);
+    }
+    return out;
+  }
+
+  public compileDescriptor(d: OverlayDescriptor): string {
+    const opacityAttr = d.opacity !== undefined ? ` opacity="${d.opacity}"` : '';
+    const classAttr = d.className ? ` class="${d.className}"` : '';
+    const idAttr = d.id ? ` id="${d.id}"` : '';
+    const peAttr = d.pointerEvents ? ` pointer-events="${d.pointerEvents}"` : '';
+
+    switch (d.type) {
+      case 'line': {
+        const sw = d.strokeWidth !== undefined ? d.strokeWidth : 1;
+        const da = d.strokeDasharray ? ` stroke-dasharray="${d.strokeDasharray}"` : '';
+        const ve = d.vectorEffect ? ` vector-effect="${d.vectorEffect}"` : '';
+        return `<line${idAttr}${classAttr} x1="${d.x1}" y1="${d.y1}" x2="${d.x2}" y2="${d.y2}" stroke="${d.stroke}" stroke-width="${sw}"${da}${ve}${opacityAttr}${peAttr} />`;
+      }
+      case 'rect': {
+        const sw = d.strokeWidth !== undefined ? ` stroke-width="${d.strokeWidth}"` : '';
+        const str = d.stroke ? ` stroke="${d.stroke}"` : '';
+        const fill = d.fill ? ` fill="${d.fill}"` : ' fill="none"';
+        const da = d.strokeDasharray ? ` stroke-dasharray="${d.strokeDasharray}"` : '';
+        const rx = d.rx !== undefined ? ` rx="${d.rx}"` : '';
+        const ry = d.ry !== undefined ? ` ry="${d.ry}"` : '';
+        const ve = d.vectorEffect ? ` vector-effect="${d.vectorEffect}"` : '';
+        return `<rect${idAttr}${classAttr} x="${d.x}" y="${d.y}" width="${d.width}" height="${d.height}"${str}${sw}${fill}${da}${rx}${ry}${ve}${opacityAttr}${peAttr} />`;
+      }
+      case 'circle': {
+        const sw = d.strokeWidth !== undefined ? ` stroke-width="${d.strokeWidth}"` : '';
+        const str = d.stroke ? ` stroke="${d.stroke}"` : '';
+        const fill = d.fill ? ` fill="${d.fill}"` : ' fill="none"';
+        const ve = d.vectorEffect ? ` vector-effect="${d.vectorEffect}"` : '';
+        return `<circle${idAttr}${classAttr} cx="${d.cx}" cy="${d.cy}" r="${d.r}"${str}${sw}${fill}${ve}${opacityAttr}${peAttr} />`;
+      }
+      case 'path': {
+        const sw = d.strokeWidth !== undefined ? ` stroke-width="${d.strokeWidth}"` : '';
+        const str = d.stroke ? ` stroke="${d.stroke}"` : '';
+        const fill = d.fill ? ` fill="${d.fill}"` : ' fill="none"';
+        const da = d.strokeDasharray ? ` stroke-dasharray="${d.strokeDasharray}"` : '';
+        const ve = d.vectorEffect ? ` vector-effect="${d.vectorEffect}"` : '';
+        return `<path${idAttr}${classAttr} d="${d.d}"${str}${sw}${fill}${da}${ve}${opacityAttr}${peAttr} />`;
+      }
+      case 'text': {
+        const fill = d.fill ? ` fill="${d.fill}"` : '';
+        const fs = d.fontSize ? ` font-size="${d.fontSize}"` : '';
+        const ff = d.fontFamily ? ` font-family="${d.fontFamily}"` : '';
+        const ta = d.textAnchor ? ` text-anchor="${d.textAnchor}"` : '';
+        const db = d.dominantBaseline ? ` dominant-baseline="${d.dominantBaseline}"` : '';
+        return `<text${idAttr}${classAttr} x="${d.x}" y="${d.y}"${fill}${fs}${ff}${ta}${db}${opacityAttr}${peAttr}>${d.text}</text>`;
+      }
+      case 'raw':
+        return d.html;
+    }
   }
 }
