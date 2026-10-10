@@ -12,6 +12,7 @@ import { ViewportController } from '../engine/ViewportController.js';
 import { ToolSuite } from '../tools/ToolFactory.js';
 import { OverlayRenderer } from '../engine/OverlayRenderer.js';
 import { SvgDomRenderer } from '../engine/canvas/SvgDomRenderer.js';
+import { CrashGuard } from './CrashGuard.js';
 
 export interface CoreServiceContext {
   model: VectorModel;
@@ -29,6 +30,7 @@ export interface CoreServices {
   clipboardService: ClipboardService;
   actionDispatcher: CanvasActionDispatcher;
   workspaceLayout: WorkspaceLayoutService;
+  crashGuard: CrashGuard;
 }
 
 /**
@@ -67,6 +69,11 @@ export class CoreServiceRegistry {
       onUpdatePropertyPanel: () => ctx.getLayoutMgr()?.propertyPanel.update(null, 'select'),
     });
 
+    const crashGuard = new CrashGuard({
+      historyService,
+      render: () => workspaceLayout.render(),
+    });
+
     const actionDispatcher = new CanvasActionDispatcher({
       model: ctx.model,
       selectionTool: ctx.selectionTool,
@@ -76,6 +83,7 @@ export class CoreServiceRegistry {
       onResetPropertyPanel: () => ctx.getLayoutMgr()?.propertyPanel.resetPanelMode(),
       onUpdatePropertyPanel: (t) => ctx.getLayoutMgr()?.propertyPanel.update(null, t),
       getActiveTool: () => ctx.getLayoutMgr()?.toolbar?.activeTool || 'select',
+      crashGuard,
     });
 
     workspaceLayout = new WorkspaceLayoutService({
@@ -104,6 +112,7 @@ export class CoreServiceRegistry {
       clipboardService,
       actionDispatcher,
       workspaceLayout,
+      crashGuard,
     };
   }
 }

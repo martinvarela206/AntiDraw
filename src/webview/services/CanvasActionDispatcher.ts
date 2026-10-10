@@ -2,6 +2,7 @@ import { VectorModel, VectorElement } from '../engine/VectorModel.js';
 import { SelectionTool } from '../engine/SelectionTool.js';
 import { BooleanOperations } from '../engine/BooleanOperations.js';
 import { ConfirmationModal } from '../ui/ConfirmationModal.js';
+import { CrashGuard } from './CrashGuard.js';
 
 export interface CanvasActionDispatcherContext {
   model: VectorModel;
@@ -12,6 +13,7 @@ export interface CanvasActionDispatcherContext {
   onResetPropertyPanel: () => void;
   onUpdatePropertyPanel: (activeTool: string) => void;
   getActiveTool: () => string;
+  crashGuard?: CrashGuard;
 }
 
 /**
@@ -65,91 +67,99 @@ export class CanvasActionDispatcher {
   }
 
   public executeBoolean(op: 'union' | 'subtract' | 'intersect' | 'exclude' | 'combine' | 'fragment'): void {
-    const selectedIds = Array.from(this.ctx.selectionTool.selectedElementIds);
-    const selectedEls: VectorElement[] = [];
-    selectedIds.forEach((id) => {
-      const el = this.ctx.model.elements.find((e) => e.id === id);
-      if (el) selectedEls.push(el);
-    });
+    const run = () => {
+      const selectedIds = Array.from(this.ctx.selectionTool.selectedElementIds);
+      const selectedEls: VectorElement[] = [];
+      selectedIds.forEach((id) => {
+        const el = this.ctx.model.elements.find((e) => e.id === id);
+        if (el) selectedEls.push(el);
+      });
 
-    if (selectedEls.length < 2) return;
-    this.ctx.pushUndo();
+      if (selectedEls.length < 2) return;
+      this.ctx.pushUndo();
 
-    if (op === 'union') {
-      const result = BooleanOperations.union(selectedEls, this.ctx.model);
-      if (result) {
-        const removeIds = new Set(selectedEls.map((e) => e.id));
-        this.ctx.model.elements = this.ctx.model.elements.filter((e) => !removeIds.has(e.id));
-        this.ctx.model.elements.push(result);
-        this.ctx.selectionTool.select(result.id);
-        this.ctx.onResetPropertyPanel();
-        this.ctx.render();
-        this.ctx.syncToHost();
-      }
-    } else if (op === 'subtract') {
-      // 1st selected vector cuts the last selected vector; cutter is NOT deleted
-      const trimRes = BooleanOperations.subtract(selectedEls, this.ctx.model);
-      if (trimRes) {
-        const targetIdx = this.ctx.model.elements.findIndex((e) => e.id === trimRes.targetId);
-        if (targetIdx >= 0) {
-          this.ctx.model.elements[targetIdx] = trimRes.trimmed;
+      if (op === 'union') {
+        const result = BooleanOperations.union(selectedEls, this.ctx.model);
+        if (result) {
+          const removeIds = new Set(selectedEls.map((e) => e.id));
+          this.ctx.model.elements = this.ctx.model.elements.filter((e) => !removeIds.has(e.id));
+          this.ctx.model.elements.push(result);
+          this.ctx.selectionTool.select(result.id);
+          this.ctx.onResetPropertyPanel();
+          this.ctx.render();
+          this.ctx.syncToHost();
         }
-        this.ctx.selectionTool.select(trimRes.trimmed.id);
-        this.ctx.onResetPropertyPanel();
-        this.ctx.render();
-        this.ctx.syncToHost();
+      } else if (op === 'subtract') {
+        // 1st selected vector cuts the last selected vector; cutter is NOT deleted
+        const trimRes = BooleanOperations.subtract(selectedEls, this.ctx.model);
+        if (trimRes) {
+          const targetIdx = this.ctx.model.elements.findIndex((e) => e.id === trimRes.targetId);
+          if (targetIdx >= 0) {
+            this.ctx.model.elements[targetIdx] = trimRes.trimmed;
+          }
+          this.ctx.selectionTool.select(trimRes.trimmed.id);
+          this.ctx.onResetPropertyPanel();
+          this.ctx.render();
+          this.ctx.syncToHost();
+        }
+      } else if (op === 'intersect') {
+        const result = BooleanOperations.intersect(selectedEls, this.ctx.model);
+        if (result) {
+          const removeIds = new Set(selectedEls.map((e) => e.id));
+          this.ctx.model.elements = this.ctx.model.elements.filter((e) => !removeIds.has(e.id));
+          this.ctx.model.elements.push(result);
+          this.ctx.selectionTool.select(result.id);
+          this.ctx.onResetPropertyPanel();
+          this.ctx.render();
+          this.ctx.syncToHost();
+        }
+      } else if (op === 'exclude') {
+        const result = BooleanOperations.exclude(selectedEls, this.ctx.model);
+        if (result) {
+          const removeIds = new Set(selectedEls.map((e) => e.id));
+          this.ctx.model.elements = this.ctx.model.elements.filter((e) => !removeIds.has(e.id));
+          this.ctx.model.elements.push(result);
+          this.ctx.selectionTool.select(result.id);
+          this.ctx.onResetPropertyPanel();
+          this.ctx.render();
+          this.ctx.syncToHost();
+        }
+      } else if (op === 'combine') {
+        /**
+         * ARCHITECTURAL RATIONALE: Compound Path (Combine) with Source Removal (FIX-07)
+         * Combines multiple vector contours into a single unified <path fill-rule="evenodd">
+         * and removes the source shapes so inner contours render as actual cutouts/holes.
+         */
+        const result = BooleanOperations.combine(selectedEls, this.ctx.model);
+        if (result) {
+          const removeIds = new Set(selectedEls.map((e) => e.id));
+          this.ctx.model.elements = this.ctx.model.elements.filter((e) => !removeIds.has(e.id));
+          this.ctx.model.elements.push(result);
+          this.ctx.selectionTool.select(result.id);
+          this.ctx.onResetPropertyPanel();
+          this.ctx.render();
+          this.ctx.syncToHost();
+        }
+      } else if (op === 'fragment') {
+        // Divide into intersection + exclusion simultaneously, removing originals
+        const frags = BooleanOperations.fragment(selectedEls, this.ctx.model);
+        if (frags && frags.length > 0) {
+          const removeIds = new Set(selectedEls.map((e) => e.id));
+          this.ctx.model.elements = this.ctx.model.elements.filter((e) => !removeIds.has(e.id));
+          frags.forEach((f) => this.ctx.model.elements.push(f));
+          this.ctx.selectionTool.deselectAll();
+          frags.forEach((f) => this.ctx.selectionTool.selectedElementIds.add(f.id));
+          this.ctx.onResetPropertyPanel();
+          this.ctx.render();
+          this.ctx.syncToHost();
+        }
       }
-    } else if (op === 'intersect') {
-      const result = BooleanOperations.intersect(selectedEls, this.ctx.model);
-      if (result) {
-        const removeIds = new Set(selectedEls.map((e) => e.id));
-        this.ctx.model.elements = this.ctx.model.elements.filter((e) => !removeIds.has(e.id));
-        this.ctx.model.elements.push(result);
-        this.ctx.selectionTool.select(result.id);
-        this.ctx.onResetPropertyPanel();
-        this.ctx.render();
-        this.ctx.syncToHost();
-      }
-    } else if (op === 'exclude') {
-      const result = BooleanOperations.exclude(selectedEls, this.ctx.model);
-      if (result) {
-        const removeIds = new Set(selectedEls.map((e) => e.id));
-        this.ctx.model.elements = this.ctx.model.elements.filter((e) => !removeIds.has(e.id));
-        this.ctx.model.elements.push(result);
-        this.ctx.selectionTool.select(result.id);
-        this.ctx.onResetPropertyPanel();
-        this.ctx.render();
-        this.ctx.syncToHost();
-      }
-    } else if (op === 'combine') {
-      /**
-       * ARCHITECTURAL RATIONALE: Compound Path (Combine) with Source Removal (FIX-07)
-       * Combines multiple vector contours into a single unified <path fill-rule="evenodd">
-       * and removes the source shapes so inner contours render as actual cutouts/holes.
-       */
-      const result = BooleanOperations.combine(selectedEls, this.ctx.model);
-      if (result) {
-        const removeIds = new Set(selectedEls.map((e) => e.id));
-        this.ctx.model.elements = this.ctx.model.elements.filter((e) => !removeIds.has(e.id));
-        this.ctx.model.elements.push(result);
-        this.ctx.selectionTool.select(result.id);
-        this.ctx.onResetPropertyPanel();
-        this.ctx.render();
-        this.ctx.syncToHost();
-      }
-    } else if (op === 'fragment') {
-      // Divide into intersection + exclusion simultaneously, removing originals
-      const frags = BooleanOperations.fragment(selectedEls, this.ctx.model);
-      if (frags && frags.length > 0) {
-        const removeIds = new Set(selectedEls.map((e) => e.id));
-        this.ctx.model.elements = this.ctx.model.elements.filter((e) => !removeIds.has(e.id));
-        frags.forEach((f) => this.ctx.model.elements.push(f));
-        this.ctx.selectionTool.deselectAll();
-        frags.forEach((f) => this.ctx.selectionTool.selectedElementIds.add(f.id));
-        this.ctx.onResetPropertyPanel();
-        this.ctx.render();
-        this.ctx.syncToHost();
-      }
+    };
+
+    if (this.ctx.crashGuard) {
+      this.ctx.crashGuard.execute(`Boolean (${op})`, run);
+    } else {
+      run();
     }
   }
 
