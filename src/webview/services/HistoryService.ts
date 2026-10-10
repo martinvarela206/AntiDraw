@@ -1,13 +1,7 @@
-import { VectorModel, VectorElement, Point } from '../engine/VectorModel.js';
+import { VectorModel, Point } from '../engine/VectorModel.js';
 import { SelectionTool } from '../engine/SelectionTool.js';
-import { CanvasManager, GuideLine } from '../engine/CanvasManager.js';
-
-export interface HistorySnapshot {
-  elements: VectorElement[];
-  guides?: GuideLine[];
-  elementPivots?: [string, Point][];
-  customPivot?: Point | null;
-}
+import { CanvasManager } from '../engine/CanvasManager.js';
+import { DocumentState, DocumentStateFactory } from '../core/model/DocumentState.js';
 
 export interface HistoryServiceContext {
   model: VectorModel;
@@ -20,30 +14,29 @@ export interface HistoryServiceContext {
 }
 
 /**
- * ARCHITECTURAL RATIONALE: Dedicated Vector History Service (HistoryService)
+ * ARCHITECTURAL RATIONALE: Dedicated Vector History Service (HistoryService - L3)
  *
- * 1. Single Responsibility Principle (SRP):
- *    Decouples undo/redo stack persistence, transaction snapshotting, depth limiting,
- *    and state restoration from the visual and event-dispatching layers of AntiDrawApp.
+ * 1. O(1) In-Memory Structural Sharing (VectorCraft Parity):
+ *    Stack entries store immutable `DocumentState` references rather than repeatedly executing
+ *    heavy `JSON.stringify()` / `JSON.parse()` cycles on every user interaction.
  *
- * 2. Unified Canvas & Metadata Deep Snapshotting (ITEM-05):
- *    In addition to VectorElement[], history snapshots encapsulate companion canvas state:
- *    - `guides`: Metric guidelines, orientations, angles, and custom guideline pivots.
- *    - `customPivot` & `elementPivots`: Arbitrary rotation centers and solidary object anchors.
- *    Restoring snapshots synchronizes both the active DOM representation and host companion metadata (.json).
+ * 2. Unified Canvas & Metadata Snapshotting:
+ *    In addition to VectorElement[], snapshots capture companion canvas state:
+ *    - `guides`: Metric guidelines, orientations, angles, and guideline pivots.
+ *    - `customPivot` & `elementPivots`: Object transformation anchors.
  *
- * 3. Backward Compatible Parser:
- *    Handles legacy array-only snapshot strings seamlessly while transparently persisting the unified
- *    multi-subsystem state container.
+ * 3. Monotonic Revisions:
+ *    Each snapshot advances state revision for instant O(1) dirty checking and host sync.
  *
- * 4. Bounded Memory Consumption:
- *    Maintains a FIFO sliding window (`maxHistory = 20`) to eliminate unbounded memory growth
- *    during intensive vector workflows while supporting metadata serialization across sessions.
+ * 4. Bounded Memory Window:
+ *    Maintains a FIFO sliding window (`maxHistory = 30`) with low memory footprint thanks to
+ *    reference sharing across unmodified elements.
  */
 export class HistoryService {
-  private undoStack: string[] = [];
-  private redoStack: string[] = [];
-  private readonly maxHistory: number = 20;
+  private undoStack: DocumentState[] = [];
+  private redoStack: DocumentState[] = [];
+  private readonly maxHistory: number = 30;
+  private currentRevision: number = 1;
 
   constructor(private ctx: HistoryServiceContext) {}
 
@@ -56,25 +49,42 @@ export class HistoryService {
   }
 
   public get undoStackSnapshots(): string[] {
-    return this.undoStack;
+    return this.undoStack.map((s) =>
+      JSON.stringify({
+        elements: s.elements,
+        guides: s.guides,
+        elementPivots: Array.from(s.elementPivots.entries()),
+        customPivot: s.customPivot,
+      })
+    );
   }
 
   public get redoStackSnapshots(): string[] {
-    return this.redoStack;
+    return this.redoStack.map((s) =>
+      JSON.stringify({
+        elements: s.elements,
+        guides: s.guides,
+        elementPivots: Array.from(s.elementPivots.entries()),
+        customPivot: s.customPivot,
+      })
+    );
   }
 
-  private createSnapshot(): HistorySnapshot {
-    return {
-      elements: JSON.parse(JSON.stringify(this.ctx.model.elements)),
-      guides: JSON.parse(JSON.stringify(this.ctx.canvasMgr.guides)),
-      elementPivots: Array.from(this.ctx.selectionTool.elementPivots.entries()),
-      customPivot: this.ctx.selectionTool.customPivot ? { ...this.ctx.selectionTool.customPivot } : null,
-    };
+  public createSnapshot(): DocumentState {
+    return DocumentStateFactory.create({
+      revision: this.currentRevision++,
+      canvas: this.ctx.model.canvas,
+      elements: this.ctx.model.elements,
+      guides: this.ctx.canvasMgr.guides,
+      elementPivots: this.ctx.selectionTool.elementPivots,
+      customPivot: this.ctx.selectionTool.customPivot,
+      selection: this.ctx.selectionTool.selectedElementIds,
+    });
   }
 
   public pushUndo(): void {
     const snapshot = this.createSnapshot();
-    this.undoStack.push(JSON.stringify(snapshot));
+    this.undoStack.push(snapshot);
     if (this.undoStack.length > this.maxHistory) {
       this.undoStack.shift();
     }
@@ -84,37 +94,31 @@ export class HistoryService {
   public undo(): boolean {
     if (this.undoStack.length === 0) return false;
     const currentSnapshot = this.createSnapshot();
-    this.redoStack.push(JSON.stringify(currentSnapshot));
-    const prevStateStr = this.undoStack.pop()!;
-    this.applySnapshot(prevStateStr);
+    this.redoStack.push(currentSnapshot);
+    const prevState = this.undoStack.pop()!;
+    this.applyState(prevState);
     return true;
   }
 
   public redo(): boolean {
     if (this.redoStack.length === 0) return false;
     const currentSnapshot = this.createSnapshot();
-    this.undoStack.push(JSON.stringify(currentSnapshot));
-    const nextStateStr = this.redoStack.pop()!;
-    this.applySnapshot(nextStateStr);
+    this.undoStack.push(currentSnapshot);
+    const nextState = this.redoStack.pop()!;
+    this.applyState(nextState);
     return true;
   }
 
-  private applySnapshot(stateStr: string): void {
-    const parsed = JSON.parse(stateStr);
-    if (Array.isArray(parsed)) {
-      this.ctx.model.elements = parsed;
-    } else {
-      this.ctx.model.elements = parsed.elements || [];
-      if (parsed.guides) {
-        this.ctx.canvasMgr.guides = parsed.guides;
-      }
-      if (parsed.elementPivots) {
-        this.ctx.selectionTool.elementPivots = new Map(parsed.elementPivots);
-      }
-      if (parsed.customPivot !== undefined) {
-        this.ctx.selectionTool.customPivot = parsed.customPivot;
-      }
-    }
+  public applyState(state: DocumentState): void {
+    this.ctx.model.elements = state.elements.map((el) => ({
+      ...el,
+      attributes: { ...el.attributes },
+      vertices: el.vertices ? el.vertices.map((v) => ({ ...v })) : undefined,
+    }));
+    this.ctx.canvasMgr.guides = [...state.guides];
+    this.ctx.selectionTool.elementPivots = new Map(state.elementPivots);
+    this.ctx.selectionTool.customPivot = state.customPivot ? { ...state.customPivot } : null;
+
     this.ctx.selectionTool.deselectAll();
     this.ctx.canvasMgr.selectedGuideId = null;
     this.ctx.canvasMgr.activeGuideTransformId = null;
@@ -126,10 +130,40 @@ export class HistoryService {
 
   public loadFromMetadata(metadata: { undoStack?: unknown; redoStack?: unknown }): void {
     if (Array.isArray(metadata.undoStack)) {
-      this.undoStack = (metadata.undoStack as string[]).slice(-this.maxHistory);
+      this.undoStack = (metadata.undoStack as string[])
+        .slice(-this.maxHistory)
+        .map((str) => this.parseSnapshotString(str))
+        .filter((s): s is DocumentState => s !== null);
     }
     if (Array.isArray(metadata.redoStack)) {
-      this.redoStack = (metadata.redoStack as string[]).slice(-this.maxHistory);
+      this.redoStack = (metadata.redoStack as string[])
+        .slice(-this.maxHistory)
+        .map((str) => this.parseSnapshotString(str))
+        .filter((s): s is DocumentState => s !== null);
+    }
+  }
+
+  private parseSnapshotString(str: string): DocumentState | null {
+    try {
+      const parsed = typeof str === 'string' ? JSON.parse(str) : str;
+      if (Array.isArray(parsed)) {
+        return DocumentStateFactory.create({
+          revision: this.currentRevision++,
+          canvas: this.ctx.model.canvas,
+          elements: parsed,
+          guides: this.ctx.canvasMgr.guides,
+        });
+      }
+      return DocumentStateFactory.create({
+        revision: this.currentRevision++,
+        canvas: this.ctx.model.canvas,
+        elements: parsed.elements || [],
+        guides: parsed.guides || [],
+        elementPivots: parsed.elementPivots,
+        customPivot: parsed.customPivot,
+      });
+    } catch {
+      return null;
     }
   }
 
