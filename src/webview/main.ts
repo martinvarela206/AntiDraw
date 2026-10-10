@@ -5,6 +5,7 @@ import { CanvasManager, GuideLine, RulerConfig } from './engine/CanvasManager.js
 import { BooleanOperations } from './engine/BooleanOperations.js';
 import { ViewportController } from './engine/ViewportController.js';
 import { OverlayRenderer } from './engine/OverlayRenderer.js';
+import { SvgDomRenderer } from './engine/canvas/SvgDomRenderer.js';
 import { VsCodeBridge } from './bridge/VsCodeBridge.js';
 import { NodeCatalogService } from './engine/selection/NodeCatalogService.js';
 import { ToolContext } from './tools/IToolHandler.js';
@@ -37,6 +38,7 @@ class AntiDrawApp {
   private vscodeBridge: VsCodeBridge = VsCodeBridge.getInstance();
   private viewportCtrl!: ViewportController;
   private overlayRenderer: OverlayRenderer = new OverlayRenderer();
+  private svgDomRenderer: SvgDomRenderer = new SvgDomRenderer();
   private selectToolHandler!: SelectToolHandler;
   private shapeToolHandler!: ShapeToolHandler;
   private polylineToolHandler!: PolylineToolHandler;
@@ -1493,30 +1495,8 @@ class AntiDrawApp {
       this.syncRulerScroll();
     }
 
-    // Render actual SVG elements
-    this.svgCanvas.innerHTML = '';
-
-    // 1. Render Artboard background rect behind all vector elements
-    const vb = this.model.getViewBoxBounds();
-    const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    bgRect.setAttribute('id', '__artboard_bg__');
-    bgRect.setAttribute('x', vb.minX.toString());
-    bgRect.setAttribute('y', vb.minY.toString());
-    bgRect.setAttribute('width', vb.width.toString());
-    const artboardBg = this.model.canvas.backgroundColor;
-    bgRect.setAttribute('fill', artboardBg && artboardBg !== 'transparent' ? artboardBg : 'none');
-    this.svgCanvas.appendChild(bgRect);
-    this.svgCanvas.style.color = this.model.canvas.currentColor || '#000000';
-
-    // 2. Render all vector elements
-    const tempSvg = document.createElement('div');
-    tempSvg.innerHTML = this.model.toSvgString();
-    const parsedSvg = tempSvg.querySelector('svg');
-    if (parsedSvg) {
-      Array.from(parsedSvg.children).forEach((child) => {
-        this.svgCanvas.appendChild(child.cloneNode(true));
-      });
-    }
+    // Render actual SVG elements via dedicated SvgDomRenderer
+    this.svgDomRenderer.render(this.svgCanvas, this.model);
 
     this.renderOverlay();
 
