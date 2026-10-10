@@ -114,6 +114,7 @@ export class CanvasInteractionController implements CanvasViewDelegate {
     const session = this.session;
     session.dragStartPt = pt;
     session.isDragging = true;
+    session.beginInteraction('Drag', pt);
 
     const toolbar = this.ctx.getToolbar();
     if (!toolbar?.activeTool || (toolbar.activeTool as any) === '') {
@@ -229,6 +230,7 @@ export class CanvasInteractionController implements CanvasViewDelegate {
     canvasView?.releasePointerCapture(e.pointerId);
 
     const session = this.session;
+    session.commitInteraction();
     const toolbar = this.ctx.getToolbar();
     const activeTool = toolbar?.activeTool || 'select';
 

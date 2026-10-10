@@ -136,6 +136,9 @@ export class ToolFactory {
         onToolChanged: (tool) => ctx.getToolbar()?.setTool(tool),
         onResetPropertyPanel: () => ctx.getPropertyPanel()?.resetPanelMode(),
         setCursor: (cursor) => ctx.getCanvasView()?.setCursor(cursor),
+        getBaseSnapshot: () => ctx.getHistoryService().createSnapshot(),
+        onRestoreSnapshot: (state) => ctx.getHistoryService().applyState(state),
+        onCommitSnapshot: () => ctx.getHistoryService().pushUndo(),
       }
     );
 

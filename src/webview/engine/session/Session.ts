@@ -6,6 +6,14 @@ import { ShapeToolHandler } from '../../tools/ShapeToolHandler.js';
 import { PolylineToolHandler } from '../../tools/PolylineToolHandler.js';
 import { PenToolHandler } from '../../tools/PenToolHandler.js';
 import { NodeToolHandler } from '../../tools/NodeToolHandler.js';
+import { DocumentState } from '../../core/model/DocumentState.js';
+
+export interface ActiveInteraction {
+  readonly label: string;
+  readonly baseSnapshot: DocumentState;
+  readonly startPoint: Point;
+  lastPreviewPoint?: Point;
+}
 
 export interface SessionCallbacks {
   onRender: () => void;
@@ -13,6 +21,9 @@ export interface SessionCallbacks {
   onToolChanged?: (tool: ToolType) => void;
   onResetPropertyPanel?: () => void;
   setCursor?: (cursor: string) => void;
+  getBaseSnapshot?: () => DocumentState;
+  onRestoreSnapshot?: (state: DocumentState) => void;
+  onCommitSnapshot?: (label: string) => void;
 }
 
 /**
@@ -40,6 +51,9 @@ export class Session {
   public dragGuideOrientation: 'horizontal' | 'vertical' = 'horizontal';
   public dragGuideCurrentPt: Point = { x: 0, y: 0 };
   public dragOriginPt: Point | null = null;
+
+  // Formal Interaction Cycle (VectorCraft Begin -> Preview -> Commit/Cancel)
+  public activeInteraction: ActiveInteraction | null = null;
 
   // Handlers
   public readonly selectHandler: SelectToolHandler;
@@ -129,8 +143,46 @@ export class Session {
     this.callbacks.onRender();
   }
 
+  public beginInteraction(label: string, startPt: Point): void {
+    const baseSnapshot = this.callbacks.getBaseSnapshot?.();
+    if (baseSnapshot) {
+      this.activeInteraction = {
+        label,
+        baseSnapshot,
+        startPoint: { ...startPt },
+      };
+    }
+  }
+
+  public previewInteraction(currentPt: Point): void {
+    if (this.activeInteraction) {
+      this.activeInteraction.lastPreviewPoint = { ...currentPt };
+    }
+  }
+
+  public commitInteraction(): void {
+    if (this.activeInteraction) {
+      this.callbacks.onCommitSnapshot?.(this.activeInteraction.label);
+      this.activeInteraction = null;
+    }
+  }
+
+  public cancelInteraction(): boolean {
+    if (this.activeInteraction) {
+      this.callbacks.onRestoreSnapshot?.(this.activeInteraction.baseSnapshot);
+      this.activeInteraction = null;
+      return true;
+    }
+    return false;
+  }
+
   public cancelCurrentAction(): boolean {
     let handled = false;
+
+    // 0. Formal interaction rollback
+    if (this.cancelInteraction()) {
+      handled = true;
+    }
 
     // 1. Tool cancellation
     if (this.selectHandler.cancel()) handled = true;
