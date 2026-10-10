@@ -6,6 +6,7 @@ import { BooleanOperations } from './engine/BooleanOperations.js';
 import { ViewportController } from './engine/ViewportController.js';
 import { OverlayRenderer } from './engine/OverlayRenderer.js';
 import { SvgDomRenderer } from './engine/canvas/SvgDomRenderer.js';
+import { CanvasView } from './engine/canvas/CanvasView.js';
 import { Session } from './engine/session/Session.js';
 import { VsCodeBridge } from './bridge/VsCodeBridge.js';
 import { NodeCatalogService } from './engine/selection/NodeCatalogService.js';
@@ -40,6 +41,7 @@ class AntiDrawApp {
   private viewportCtrl!: ViewportController;
   private overlayRenderer: OverlayRenderer = new OverlayRenderer();
   private svgDomRenderer: SvgDomRenderer = new SvgDomRenderer();
+  private canvasView!: CanvasView;
   private selectToolHandler!: SelectToolHandler;
   private shapeToolHandler!: ShapeToolHandler;
   private polylineToolHandler!: PolylineToolHandler;
@@ -71,9 +73,6 @@ class AntiDrawApp {
   private gridCanvas!: HTMLCanvasElement;
   private gridCanvasRenderer!: GridCanvasRenderer;
   private overlaySvg!: SVGSVGElement;
-
-  private pointerMoveRafId: number | null = null;
-  private latestPointerMoveEvent: PointerEvent | null = null;
 
   private session!: Session;
   private get isDragging(): boolean { return this.session?.isDragging ?? false; }
@@ -225,10 +224,7 @@ class AntiDrawApp {
         this.propertyPanel.resetPanelMode();
       },
       setCursor: (cursor) => {
-        this.canvasWrapper.style.cursor = cursor;
-        if (!this.isMiddlePanning) {
-          this.canvasScrollArea.style.cursor = cursor === 'default' ? '' : cursor;
-        }
+        this.canvasView?.setCursor(cursor);
       },
       syncMetadataToHost: () => {
         this.syncMetadataToHost();
@@ -578,6 +574,24 @@ class AntiDrawApp {
     this.canvasContainer = this.layoutMgr.canvasContainer;
     this.canvasScrollArea = this.layoutMgr.canvasScrollArea;
     this.canvasWrapper = this.layoutMgr.canvasWrapper;
+    this.canvasView = new CanvasView(
+      {
+        canvasContainer: this.canvasContainer,
+        canvasScrollArea: this.canvasScrollArea,
+        canvasWrapper: this.canvasWrapper,
+      },
+      {
+        getCanvasPoint: (e) => this.getCanvasPoint(e),
+        onPointerDown: (e, pt) => this.onPointerDown(e, pt),
+        onPointerMove: (e, pt) => this.onPointerMove(e, pt),
+        onPointerUp: (e, pt) => this.onPointerUp(e, pt),
+        onDoubleClick: (e, pt) => this.onDoubleClick(e, pt),
+        onCancelAction: () => this.cancelCurrentAction(),
+        onLostFocusOrCancel: () => this.handleLostFocusOrCancel(),
+        isDragging: () => this.isDragging,
+        isMiddlePanning: () => this.isMiddlePanning,
+      }
+    );
     this.svgCanvas = this.layoutMgr.svgCanvas;
     this.gridSvg = this.layoutMgr.gridSvg;
     this.gridCanvas = this.layoutMgr.gridCanvas;
@@ -693,26 +707,6 @@ class AntiDrawApp {
     });
 
     // Window level pointer events for dragging across boundaries
-    window.addEventListener('pointermove', (e) => {
-      if (this.isDragging) {
-        this.onPointerMove(e);
-      }
-    });
-
-    window.addEventListener('pointerup', (e) => {
-      if (this.isDragging) {
-        this.onPointerUp(e);
-      }
-    });
-
-    // Window-level focus loss and pointer cancellation (e.g. Windows Snipping Tool with delay, Alt+Tab, OS modals)
-    window.addEventListener('blur', () => {
-      this.handleLostFocusOrCancel();
-    });
-    window.addEventListener('pointercancel', () => {
-      this.handleLostFocusOrCancel();
-    });
-
     // Dedicated Context Menu Controller (SOLID / SRP)
     this.contextMenuController = new ContextMenuController(
       {
@@ -738,57 +732,6 @@ class AntiDrawApp {
       },
       [this.canvasContainer, this.canvasWrapper, this.canvasScrollArea]
     );
-
-    // Pointer events on Canvas Wrapper
-    this.canvasWrapper.addEventListener('pointerdown', (e) => {
-      if (e.button === 1) return; // Allow middle click to bubble up for panning
-      e.stopPropagation();
-      this.onPointerDown(e);
-    });
-    this.canvasWrapper.addEventListener('pointermove', (e) => {
-      e.stopPropagation();
-      this.onPointerMove(e);
-    });
-    this.canvasWrapper.addEventListener('pointerup', (e) => {
-      e.stopPropagation();
-      this.onPointerUp(e);
-    });
-    this.canvasWrapper.addEventListener('pointercancel', () => {
-      this.handleLostFocusOrCancel();
-    });
-    this.canvasWrapper.addEventListener('dblclick', (e) => {
-      e.stopPropagation();
-      this.onDoubleClick(e);
-    });
-
-    // Pointer events on Canvas Scroll Area (delegating interaction for guides extending outside canvasWrapper)
-    this.canvasScrollArea.addEventListener('pointerdown', (e: PointerEvent) => {
-      this.contextMenu?.hide();
-      if (e.button === 2) {
-        e.preventDefault();
-        this.cancelCurrentAction();
-        return;
-      }
-      if (e.button === 0) {
-        this.onPointerDown(e);
-      }
-    });
-    this.canvasScrollArea.addEventListener('pointermove', (e: PointerEvent) => {
-      if (!this.isMiddlePanning && !this.isDragging) {
-        this.onPointerMove(e);
-      }
-    });
-    this.canvasScrollArea.addEventListener('pointerup', (e: PointerEvent) => {
-      if (e.button === 0 && this.isDragging) {
-        this.onPointerUp(e);
-      }
-    });
-    this.canvasScrollArea.addEventListener('pointercancel', () => {
-      this.handleLostFocusOrCancel();
-    });
-    this.canvasScrollArea.addEventListener('dblclick', (e: MouseEvent) => {
-      this.onDoubleClick(e);
-    });
 
     // ARCHITECTURAL RATIONALE: Persistent Status Bar Grid-Ruler Alignment (FEAT-StatusBarGridAlign)
     // Synchronizes the grid-ruler alignment mode directly from the global bottom status bar.
@@ -1055,11 +998,7 @@ class AntiDrawApp {
 
   private cancelCurrentAction(): void {
     this.contextMenu?.hide();
-    if (this.pointerMoveRafId !== null) {
-      cancelAnimationFrame(this.pointerMoveRafId);
-      this.pointerMoveRafId = null;
-    }
-    this.latestPointerMoveEvent = null;
+    this.canvasView?.cancelRaf();
     this.session.cancelCurrentAction();
   }
 
@@ -1083,7 +1022,7 @@ class AntiDrawApp {
     }
   }
 
-  private onPointerDown(e: PointerEvent): void {
+  private onPointerDown(e: PointerEvent, pt?: Point): void {
     this.contextMenu?.hide();
     if (e.button === 2) {
       e.preventDefault();
@@ -1092,8 +1031,8 @@ class AntiDrawApp {
       return;
     }
     if (e.button !== 0) return;
-    const pt = this.getCanvasPoint(e);
-    this.dragStartPt = pt;
+    const canvasPt = pt || this.getCanvasPoint(e);
+    this.dragStartPt = canvasPt;
     this.isDragging = true;
 
     // If toolbar is currently in ruler or inactive state, switch back to select tool
@@ -1105,30 +1044,28 @@ class AntiDrawApp {
 
     const activeTool = this.toolbar.activeTool;
 
-    try {
-      this.canvasWrapper.setPointerCapture(e.pointerId);
-    } catch (_err) {}
+    this.canvasView?.setPointerCapture(e.pointerId);
 
     if (activeTool === 'select' || activeTool === 'stroke') {
-      if (this.selectToolHandler.onPointerDown(e, pt)) {
+      if (this.selectToolHandler.onPointerDown(e, canvasPt)) {
         return;
       }
     } else if (activeTool === 'node') {
-      if (this.nodeToolHandler.onPointerDown(e, pt)) {
+      if (this.nodeToolHandler.onPointerDown(e, canvasPt)) {
         return;
       }
     } else if (['rect', 'circle', 'ellipse', 'line', 'polygon', 'star'].includes(activeTool)) {
-      if (this.shapeToolHandler.onPointerDown(e, pt)) {
+      if (this.shapeToolHandler.onPointerDown(e, canvasPt)) {
         this.activeHandle = 'shape';
         return;
       }
     } else if (activeTool === 'polyline') {
-      if (this.polylineToolHandler.onPointerDown(e, pt)) {
+      if (this.polylineToolHandler.onPointerDown(e, canvasPt)) {
         this.render();
         return;
       }
     } else if (activeTool === 'pen') {
-      if (this.penToolHandler.onPointerDown(e, pt)) {
+      if (this.penToolHandler.onPointerDown(e, canvasPt)) {
         return;
       }
     } else if (activeTool === 'zoom') {
@@ -1140,78 +1077,48 @@ class AntiDrawApp {
     this.render();
   }
 
-  /**
-   * HISTORICAL PERFORMANCE ARCHITECTURE (FIX-12):
-   * requestAnimationFrame Coalescing for Pointer Movement.
-   *
-   * Previous Implementation:
-   * High-polling mice (125Hz-1000Hz) dispatched hundreds of pointermove events per second.
-   * Each event executed hit-testing, coordinate transforms, status text updates, and at line 1093
-   * fell through to an accidental `this.render()`, which re-parsed and reconstructed the entire
-   * SVG DOM and property panel on every mouse pixel moved!
-   *
-   * Solution:
-   * 1. Coalesce high-frequency pointer movements into `requestAnimationFrame`, processing
-   *    at most one update per screen refresh cycle.
-   * 2. Completely eliminate the accidental `this.render()` on passive mouse movements.
-   */
-  private onPointerMove(e: PointerEvent): void {
-    this.latestPointerMoveEvent = e;
-    if (this.pointerMoveRafId === null) {
-      this.pointerMoveRafId = requestAnimationFrame(() => {
-        this.pointerMoveRafId = null;
-        if (this.latestPointerMoveEvent) {
-          this.processPointerMove(this.latestPointerMoveEvent);
-        }
-      });
-    }
-  }
-
-  private processPointerMove(e: PointerEvent): void {
-    const pt = this.getCanvasPoint(e);
+  private onPointerMove(e: PointerEvent, pt?: Point): void {
+    const canvasPt = pt || this.getCanvasPoint(e);
     const coordsEl = document.getElementById('status-coords');
     if (coordsEl) {
       const vb = this.model.getViewBoxBounds();
       const cfg = this.canvasMgr.rulerConfig;
       const originX = vb.minX + (cfg.originX || 0);
       const originY = vb.minY + (cfg.originY || 0);
-      const relX = Math.round((pt.x - originX) / (cfg.scale || 1));
-      const relY = Math.round((pt.y - originY) / (cfg.scale || 1));
+      const relX = Math.round((canvasPt.x - originX) / (cfg.scale || 1));
+      const relY = Math.round((canvasPt.y - originY) / (cfg.scale || 1));
       coordsEl.innerText = `X: ${relX}, Y: ${relY}`;
     }
 
     // Update cursor indicator on rulers (hardware-accelerated DOM markers, 0 canvas redraw)
-    this.rulerView.setCursorPos(pt.x, pt.y);
+    this.rulerView.setCursorPos(canvasPt.x, canvasPt.y);
 
     // Node Tool Delegation
     if (this.toolbar.activeTool === 'node') {
-      if (this.nodeToolHandler.onPointerMove(e, pt)) {
+      if (this.nodeToolHandler.onPointerMove(e, canvasPt)) {
         return;
       }
       const z = this.canvasMgr.zoom || 1;
       const selectedEl = this.model.elements.find((el) => this.selectionTool.isSelected(el.id));
       if (selectedEl && selectedEl.vertices) {
-        const hit = this.nodeEditorTool.hitTestVertices(selectedEl.vertices, pt, 12 / z, this.nodeEditorTool.selectedVertexId);
+        const hit = this.nodeEditorTool.hitTestVertices(selectedEl.vertices, canvasPt, 12 / z, this.nodeEditorTool.selectedVertexId);
         if (hit) {
-          this.canvasWrapper.style.cursor = 'pointer';
-          this.canvasScrollArea.style.cursor = 'pointer';
+          this.canvasView.setCursor('pointer');
           return;
         }
-        const hitSeg = this.nodeEditorTool.hitTestSegment(selectedEl.vertices, pt, 10 / z, this.model.isElementClosed(selectedEl));
+        const hitSeg = this.nodeEditorTool.hitTestSegment(selectedEl.vertices, canvasPt, 10 / z, this.model.isElementClosed(selectedEl));
         if (hitSeg !== null) {
-          this.canvasWrapper.style.cursor = 'crosshair';
-          this.canvasScrollArea.style.cursor = 'crosshair';
+          this.canvasView.setCursor('crosshair');
           return;
         }
       }
-      this.canvasWrapper.style.cursor = 'default';
-      this.canvasScrollArea.style.cursor = '';
+      this.canvasView.setCursor('default');
       return;
     }
 
     // Handle Origin Drag preview from ruler corner
     if (this.activeHandle === 'origin-drag') {
-      this.dragOriginPt = this.snapPoint(pt);
+      this.dragOriginPt = this.snapPoint(canvasPt);
       this.renderOverlay();
       return;
     }
@@ -1219,59 +1126,42 @@ class AntiDrawApp {
     // Handle Guide creation preview from ruler drag
     if (this.activeHandle === 'guide-create') {
       const allVerts = this.getOtherVertices();
-      this.dragGuideCurrentPt = this.snapPoint(pt, allVerts);
+      this.dragGuideCurrentPt = this.snapPoint(canvasPt, allVerts);
       this.renderOverlay();
       return;
     }
 
     // Select Tool Delegation
     if (this.toolbar.activeTool === 'select' || this.toolbar.activeTool === 'stroke') {
-      if (this.selectToolHandler.onPointerMove(e, pt)) {
+      if (this.selectToolHandler.onPointerMove(e, canvasPt)) {
         return;
       }
     } else if (this.toolbar.activeTool === 'polyline') {
-      this.canvasWrapper.style.cursor = 'crosshair';
-      if (!this.isMiddlePanning) {
-        this.canvasScrollArea.style.cursor = '';
-      }
-      this.polylineToolHandler.onPointerMove(e, pt);
+      this.canvasView.setCursor('crosshair');
+      this.polylineToolHandler.onPointerMove(e, canvasPt);
       return;
     } else if (this.toolbar.activeTool === 'pen') {
-      this.canvasWrapper.style.cursor = 'crosshair';
-      if (!this.isMiddlePanning) {
-        this.canvasScrollArea.style.cursor = '';
-      }
-      this.penToolHandler.onPointerMove(e, pt);
+      this.canvasView.setCursor('crosshair');
+      this.penToolHandler.onPointerMove(e, canvasPt);
       return;
     } else if (this.activeHandle === 'shape') {
-      this.shapeToolHandler.onPointerMove(e, pt);
+      this.shapeToolHandler.onPointerMove(e, canvasPt);
       return;
     }
 
     // Passive pointer moves without active drag or tool capture must never trigger full document re-render.
   }
 
-  private onPointerUp(e: PointerEvent): void {
-    if (this.pointerMoveRafId !== null) {
-      cancelAnimationFrame(this.pointerMoveRafId);
-      this.pointerMoveRafId = null;
-      if (this.latestPointerMoveEvent) {
-        this.processPointerMove(this.latestPointerMoveEvent);
-      }
-    }
+  private onPointerUp(e: PointerEvent, pt?: Point): void {
+    this.canvasView?.cancelRaf();
+    this.canvasView?.releasePointerCapture(e.pointerId);
 
-    try {
-      if (this.canvasWrapper.hasPointerCapture(e.pointerId)) {
-        this.canvasWrapper.releasePointerCapture(e.pointerId);
-      }
-    } catch (_err) {}
-
-    const pt = this.getCanvasPoint(e);
+    const canvasPt = pt || this.getCanvasPoint(e);
 
     // Node Tool Delegation
     if (this.toolbar.activeTool === 'node') {
       this.isDragging = false;
-      if (this.nodeToolHandler.onPointerUp(e, pt)) {
+      if (this.nodeToolHandler.onPointerUp(e, canvasPt)) {
         return;
       }
       return;
@@ -1281,7 +1171,7 @@ class AntiDrawApp {
     if (this.activeHandle === 'origin-drag') {
       this.isDragging = false;
       const vb = this.model.getViewBoxBounds();
-      const finalPt = this.dragOriginPt || pt;
+      const finalPt = this.dragOriginPt || canvasPt;
       this.canvasMgr.rulerConfig.originX = Math.round(finalPt.x - vb.minX);
       this.canvasMgr.rulerConfig.originY = Math.round(finalPt.y - vb.minY);
       this.activeHandle = null;
@@ -1298,7 +1188,7 @@ class AntiDrawApp {
       this.isDragging = false;
       const isHoriz = this.dragGuideOrientation === 'horizontal';
       const allVerts = this.getOtherVertices();
-      const snappedPt = this.snapPoint(pt, allVerts);
+      const snappedPt = this.snapPoint(canvasPt, allVerts);
       const pos = Math.round(isHoriz ? snappedPt.y : snappedPt.x);
 
       // ARCHITECTURAL RATIONALE: Physical Ruler Drag Cancellation (FIX-04)
@@ -1336,7 +1226,7 @@ class AntiDrawApp {
     // Select Tool Delegation
     if (this.toolbar.activeTool === 'select' || this.toolbar.activeTool === 'stroke') {
       this.isDragging = false;
-      if (this.selectToolHandler.onPointerUp(e, pt)) {
+      if (this.selectToolHandler.onPointerUp(e, canvasPt)) {
         return;
       }
     }
@@ -1344,7 +1234,7 @@ class AntiDrawApp {
     // Pen Tool Delegation
     if (this.toolbar.activeTool === 'pen') {
       this.isDragging = false;
-      if (this.penToolHandler.onPointerUp(e, pt)) {
+      if (this.penToolHandler.onPointerUp(e, canvasPt)) {
         return;
       }
     }
@@ -1352,7 +1242,7 @@ class AntiDrawApp {
     // Shape Tool Delegation
     if (this.activeHandle === 'shape') {
       this.isDragging = false;
-      this.shapeToolHandler.onPointerUp(e, pt);
+      this.shapeToolHandler.onPointerUp(e, canvasPt);
       this.activeHandle = null;
       this.toolbar.setTool('select');
       this.applyCanvasSize();
@@ -1365,30 +1255,30 @@ class AntiDrawApp {
     this.render();
   }
 
-  private onDoubleClick(e: MouseEvent): void {
+  private onDoubleClick(e: MouseEvent, pt?: Point): void {
     if (this.toolbar.activeTool === 'zoom') {
       this.zoomAtClientPoint(e.clientX, e.clientY, -0.2);
       return;
     }
 
-    const pt = this.getCanvasPoint(e);
+    const canvasPt = pt || this.getCanvasPoint(e);
 
     if (this.toolbar.activeTool === 'polyline') {
-      if (this.polylineToolHandler.onDoubleClick(e, pt)) return;
+      if (this.polylineToolHandler.onDoubleClick(e, canvasPt)) return;
     }
 
     if (this.toolbar.activeTool === 'pen') {
-      if (this.penToolHandler.onDoubleClick(e, pt)) return;
+      if (this.penToolHandler.onDoubleClick(e, canvasPt)) return;
     }
 
     // Node Tool Delegation
     if (this.toolbar.activeTool === 'node') {
-      if (this.nodeToolHandler.onDoubleClick(e, pt)) return;
+      if (this.nodeToolHandler.onDoubleClick(e, canvasPt)) return;
     }
 
     // Select Tool Delegation (Guide angle/pivot or segment subdivision)
     if (this.toolbar.activeTool === 'select') {
-      if (this.selectToolHandler.onDoubleClick(e, pt)) return;
+      if (this.selectToolHandler.onDoubleClick(e, canvasPt)) return;
     }
   }
 
