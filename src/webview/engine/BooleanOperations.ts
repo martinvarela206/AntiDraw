@@ -5,6 +5,7 @@ import { LayerReorderService, ReorderAction } from './layout/LayerReorderService
 import { StrokeOutlineGenerator } from './boolean/StrokeOutlineGenerator.js';
 import { PolygonBooleanService } from './boolean/PolygonBooleanService.js';
 import { BezierCurveTrimmer, TrimResult } from './boolean/BezierCurveTrimmer.js';
+import { SchneiderFit, CubicBezier } from './operations/booleans/SchneiderFit.js';
 
 export {
   ElementAligner,
@@ -16,6 +17,8 @@ export {
   PolygonBooleanService,
   BezierCurveTrimmer,
   TrimResult,
+  SchneiderFit,
+  CubicBezier,
 };
 
 /**
