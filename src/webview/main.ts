@@ -6,6 +6,7 @@ import { BooleanOperations } from './engine/BooleanOperations.js';
 import { ViewportController } from './engine/ViewportController.js';
 import { OverlayRenderer } from './engine/OverlayRenderer.js';
 import { SvgDomRenderer } from './engine/canvas/SvgDomRenderer.js';
+import { Session } from './engine/session/Session.js';
 import { VsCodeBridge } from './bridge/VsCodeBridge.js';
 import { NodeCatalogService } from './engine/selection/NodeCatalogService.js';
 import { ToolContext } from './tools/IToolHandler.js';
@@ -74,14 +75,21 @@ class AntiDrawApp {
   private pointerMoveRafId: number | null = null;
   private latestPointerMoveEvent: PointerEvent | null = null;
 
-  private isDragging: boolean = false;
-  private dragStartPt: Point = { x: 0, y: 0 };
-  private activeHandle: 'origin-drag' | 'guide-create' | 'shape' | null = null;
+  private session!: Session;
+  private get isDragging(): boolean { return this.session?.isDragging ?? false; }
+  private set isDragging(v: boolean) { if (this.session) this.session.isDragging = v; }
+  private get dragStartPt(): Point { return this.session?.dragStartPt ?? { x: 0, y: 0 }; }
+  private set dragStartPt(v: Point) { if (this.session) this.session.dragStartPt = v; }
+  private get activeHandle(): 'origin-drag' | 'guide-create' | 'shape' | null { return this.session?.activeHandle ?? null; }
+  private set activeHandle(v: 'origin-drag' | 'guide-create' | 'shape' | null) { if (this.session) this.session.activeHandle = v; }
 
   // Ruler drag state
-  private dragGuideOrientation: 'horizontal' | 'vertical' = 'horizontal';
-  private dragGuideCurrentPt: Point = { x: 0, y: 0 };
-  private dragOriginPt: Point | null = null;
+  private get dragGuideOrientation(): 'horizontal' | 'vertical' { return this.session?.dragGuideOrientation ?? 'horizontal'; }
+  private set dragGuideOrientation(v: 'horizontal' | 'vertical') { if (this.session) this.session.dragGuideOrientation = v; }
+  private get dragGuideCurrentPt(): Point { return this.session?.dragGuideCurrentPt ?? { x: 0, y: 0 }; }
+  private set dragGuideCurrentPt(v: Point) { if (this.session) this.session.dragGuideCurrentPt = v; }
+  private get dragOriginPt(): Point | null { return this.session?.dragOriginPt ?? null; }
+  private set dragOriginPt(v: Point | null) { if (this.session) this.session.dragOriginPt = v; }
 
   private hasInitialCentered: boolean = false;
   private get isMiddlePanning(): boolean {
@@ -248,6 +256,34 @@ class AntiDrawApp {
         this.propertyPanel.resetPanelMode();
       },
     });
+
+    this.session = new Session(
+      {
+        select: this.selectToolHandler,
+        shape: this.shapeToolHandler,
+        polyline: this.polylineToolHandler,
+        pen: this.penToolHandler,
+        node: this.nodeToolHandler,
+      },
+      {
+        onRender: () => this.render(),
+        onRenderOverlay: () => this.renderOverlay(),
+        onToolChanged: (tool) => {
+          this.toolbar?.setTool(tool);
+        },
+        onResetPropertyPanel: () => {
+          this.propertyPanel?.resetPanelMode();
+        },
+        setCursor: (cursor) => {
+          if (this.canvasWrapper) {
+            this.canvasWrapper.style.cursor = cursor;
+          }
+          if (this.canvasScrollArea && !this.isMiddlePanning) {
+            this.canvasScrollArea.style.cursor = cursor === 'default' ? '' : cursor;
+          }
+        },
+      }
+    );
   }
 
   private initViewport(): void {
@@ -1010,94 +1046,21 @@ class AntiDrawApp {
     const statusTool = document.getElementById('status-tool');
     if (statusTool) statusTool.innerText = `Tool: ${tool}`;
     this.rulerView.setCornerActive(false);
-    this.propertyPanel.resetPanelMode();
     if (tool !== 'select' && tool !== 'stroke') {
       this.canvasMgr.selectedGuideId = null;
       this.canvasMgr.activeGuideTransformId = null;
     }
-    if (tool !== 'polyline') {
-      this.polylineToolHandler.deactivate();
-    }
-    if (!['rect', 'circle', 'ellipse', 'line', 'polygon', 'star'].includes(tool)) {
-      this.shapeToolHandler.cancel();
-    }
-    if (tool !== 'pen') {
-      this.penToolHandler.deactivate();
-    }
-    if (tool !== 'node') {
-      this.nodeToolHandler.deactivate();
-    }
-    this.render();
+    this.session.setTool(tool);
   }
 
   private cancelCurrentAction(): void {
-    let needsRender = false;
-
     this.contextMenu?.hide();
-
-    // 1. Select tool cancellation
-    if (this.selectToolHandler.cancel()) {
-      needsRender = true;
-    }
-
-    // 2. Node tool vertex or handle manipulation
-    if (this.nodeToolHandler.cancel()) {
-      needsRender = true;
-    }
-
-    // 3. Shape creation
-    if (this.shapeToolHandler.cancel()) {
-      this.activeHandle = null;
-      this.isDragging = false;
-      needsRender = true;
-    }
-
-    // 4. Pen tool in-progress path or dragging
-    if (this.toolbar.activeTool === 'pen' && this.penToolHandler.cancel()) {
-      this.activeHandle = null;
-      this.isDragging = false;
-      needsRender = true;
-    }
-
-    // 5. Polyline tool in-progress path
-    if (this.toolbar.activeTool === 'polyline' && this.polylineToolHandler.cancel()) {
-      this.isDragging = false;
-      this.activeHandle = null;
-      needsRender = true;
-    }
-
-    // 6. Ruler guide creation
-    if (this.activeHandle === 'guide-create') {
-      this.dragGuideCurrentPt = { x: 0, y: 0 };
-      this.activeHandle = null;
-      this.isDragging = false;
-      needsRender = true;
-    }
-
-    // 7. Ruler origin drag
-    if (this.activeHandle === 'origin-drag') {
-      this.dragOriginPt = null;
-      this.activeHandle = null;
-      this.isDragging = false;
-      needsRender = true;
-    }
-
-    this.isDragging = false;
-    this.activeHandle = null;
     if (this.pointerMoveRafId !== null) {
       cancelAnimationFrame(this.pointerMoveRafId);
       this.pointerMoveRafId = null;
     }
     this.latestPointerMoveEvent = null;
-
-    this.canvasWrapper.style.cursor = '';
-    this.canvasScrollArea.style.cursor = '';
-
-    if (needsRender) {
-      this.render();
-    } else {
-      this.renderOverlay();
-    }
+    this.session.cancelCurrentAction();
   }
 
   /**
@@ -1550,14 +1513,7 @@ class AntiDrawApp {
       dragGuideCurrentPt: this.dragGuideCurrentPt,
       isDraggingGuideCreate: this.activeHandle === 'guide-create',
       isDraggingOrigin: this.activeHandle === 'origin-drag',
-      hasGhostNodeVertices: !!this.nodeToolHandler.ghostNodeVertices,
-      tools: [
-        this.selectToolHandler,
-        this.nodeToolHandler,
-        this.shapeToolHandler,
-        this.penToolHandler,
-        this.polylineToolHandler,
-      ],
+      tools: this.session ? this.session.getAllHandlers() : [],
     }, z);
   }
 }
