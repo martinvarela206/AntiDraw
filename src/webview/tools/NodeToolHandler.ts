@@ -832,8 +832,12 @@ export class NodeToolHandler implements IToolHandler {
   public cancel(): boolean {
     let handled = false;
     this.pendingSingleVertexId = null;
-    if (this.parametricController.cancel()) handled = true;
-    if (this.ghostNodeVertices || this.isDragging || this.marqueeSelector.isMarqueeActive()) {
+
+    if (this.parametricController.cancel()) {
+      handled = true;
+    }
+
+    if (this.ghostNodeVertices || this.isDragging || this.activeHandle || this.marqueeSelector.isMarqueeActive()) {
       this.ghostNodeVertices = null;
       this.initialVertices = [];
       this.activeHandle = null;
@@ -842,19 +846,47 @@ export class NodeToolHandler implements IToolHandler {
       this.marqueeSelector.cancelMarquee();
       handled = true;
     }
+
     if (handled) {
       this.ctx.renderOverlay();
+      return true;
     }
-    return handled;
+
+    if (
+      this.nodeEditorTool.selectedVertexId !== null ||
+      this.marqueeSelector.selectedVertexIds.size > 0
+    ) {
+      this.nodeEditorTool.selectedVertexId = null;
+      this.nodeEditorTool.selectedVertexIds?.clear();
+      this.marqueeSelector.selectedVertexIds.clear();
+      if (this.callbacks.onDeselectNode) {
+        this.callbacks.onDeselectNode();
+      }
+      this.ctx.render();
+      return true;
+    }
+
+    return false;
+  }
+
+  public onKeyDown(e: KeyboardEvent): boolean {
+    if (e.key === 'Escape') {
+      return this.cancel();
+    }
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      if (
+        this.nodeEditorTool.selectedVertexId !== null ||
+        this.marqueeSelector.selectedVertexIds.size > 0
+      ) {
+        return this.deleteSelectedVertex();
+      }
+    }
+    return false;
   }
 
   public deactivate(): void {
+    this.cancel();
     this.pendingSingleVertexId = null;
-    this.parametricController.cancel();
-    this.ghostNodeVertices = null;
-    this.initialVertices = [];
-    this.activeHandle = null;
-    this.isDragging = false;
     this.nodeEditorTool.selectedVertexId = null;
     this.nodeEditorTool.selectedHandleType = null;
     this.nodeEditorTool.selectedSegmentIdx = null;
