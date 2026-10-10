@@ -47,7 +47,9 @@ export interface CircleOverlayDescriptor extends BaseOverlayDescriptor {
   r: number;
   stroke?: string;
   strokeWidth?: number;
+  strokeDasharray?: string;
   fill?: string;
+  fillOpacity?: number;
   vectorEffect?: 'non-scaling-stroke' | 'none';
 }
 

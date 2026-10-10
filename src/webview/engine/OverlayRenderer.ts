@@ -327,8 +327,10 @@ export class OverlayRenderer {
         const sw = d.strokeWidth !== undefined ? ` stroke-width="${d.strokeWidth}"` : '';
         const str = d.stroke ? ` stroke="${d.stroke}"` : '';
         const fill = d.fill ? ` fill="${d.fill}"` : ' fill="none"';
+        const da = d.strokeDasharray ? ` stroke-dasharray="${d.strokeDasharray}"` : '';
+        const fo = d.fillOpacity !== undefined ? ` fill-opacity="${d.fillOpacity}"` : '';
         const ve = d.vectorEffect ? ` vector-effect="${d.vectorEffect}"` : '';
-        return `<circle${idAttr}${classAttr} cx="${d.cx}" cy="${d.cy}" r="${d.r}"${str}${sw}${fill}${ve}${opacityAttr}${peAttr} />`;
+        return `<circle${idAttr}${classAttr} cx="${d.cx}" cy="${d.cy}" r="${d.r}"${str}${sw}${fill}${fo}${da}${ve}${opacityAttr}${peAttr} />`;
       }
       case 'path': {
         const sw = d.strokeWidth !== undefined ? ` stroke-width="${d.strokeWidth}"` : '';

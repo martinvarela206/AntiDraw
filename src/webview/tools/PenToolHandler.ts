@@ -3,6 +3,7 @@ import { ToolType } from './ToolType.js';
 import { Point, PathVertex, NodeType, VectorElement } from '../engine/VectorModel.js';
 import { ActionIntent, ActionIntentFactory } from './contracts/ActionIntent.js';
 import { CommandRegistry } from '../engine/commands/CommandRegistry.js';
+import { OverlayDescriptor } from '../engine/canvas/OverlayDescriptor.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Elastic Real-Time Curvature Feedback & Dynamic Bézier Ghosting
@@ -289,13 +290,20 @@ export class PenToolHandler implements IToolHandler {
     }
   }
 
-  public renderOverlay(zoom: number): string {
+  public renderOverlay(zoom: number): OverlayDescriptor[] {
     const z = zoom || 1;
-    let html = '';
+    const descriptors: OverlayDescriptor[] = [];
 
     if (this.currentPenVertices.length > 0) {
       const penD = this.ctx.model.compilePathD(this.currentPenVertices, false);
-      html += `<path d="${penD}" fill="none" stroke="#38bdf8" stroke-width="2" vector-effect="non-scaling-stroke" />`;
+      descriptors.push({
+        type: 'path',
+        d: penD,
+        fill: 'none',
+        stroke: '#38bdf8',
+        strokeWidth: 2,
+        vectorEffect: 'non-scaling-stroke',
+      });
 
       const lastV = this.currentPenVertices[this.currentPenVertices.length - 1];
       const firstV = this.currentPenVertices[0];
@@ -313,17 +321,50 @@ export class PenToolHandler implements IToolHandler {
         } else {
           ghostD = `M ${lastV.x} ${lastV.y} L ${targetPt.x} ${targetPt.y}`;
         }
-        html += `<path d="${ghostD}" fill="none" stroke="${isHoveringStart ? '#10b981' : '#38bdf8'}" stroke-width="1.5" stroke-dasharray="4 3" vector-effect="non-scaling-stroke" />`;
+        descriptors.push({
+          type: 'path',
+          d: ghostD,
+          fill: 'none',
+          stroke: isHoveringStart ? '#10b981' : '#38bdf8',
+          strokeWidth: 1.5,
+          strokeDasharray: '4 3',
+          vectorEffect: 'non-scaling-stroke',
+        });
 
         if (isHoveringStart) {
-          html += `<circle cx="${firstV.x}" cy="${firstV.y}" r="${8 / z}" fill="none" stroke="#10b981" stroke-width="2" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
+          descriptors.push({
+            type: 'circle',
+            cx: firstV.x,
+            cy: firstV.y,
+            r: 8 / z,
+            fill: 'none',
+            stroke: '#10b981',
+            strokeWidth: 2,
+            strokeDasharray: '2 2',
+            vectorEffect: 'non-scaling-stroke',
+          });
         } else {
-          html += `
-            <g opacity="0.95" pointer-events="none">
-              <circle cx="${targetPt.x}" cy="${targetPt.y}" r="${3.5 / z}" fill="rgba(56, 189, 248, 0.35)" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />
-              <circle cx="${targetPt.x}" cy="${targetPt.y}" r="${1.2 / z}" fill="#ffffff" />
-            </g>
-          `;
+          descriptors.push({
+            type: 'circle',
+            cx: targetPt.x,
+            cy: targetPt.y,
+            r: 3.5 / z,
+            fill: 'rgba(56, 189, 248, 0.35)',
+            opacity: 0.95,
+            stroke: '#38bdf8',
+            strokeWidth: 1.5,
+            strokeDasharray: '2 2',
+            vectorEffect: 'non-scaling-stroke',
+            pointerEvents: 'none',
+          });
+          descriptors.push({
+            type: 'circle',
+            cx: targetPt.x,
+            cy: targetPt.y,
+            r: 1.2 / z,
+            fill: '#ffffff',
+            pointerEvents: 'none',
+          });
         }
       }
 
@@ -331,30 +372,103 @@ export class PenToolHandler implements IToolHandler {
         const isStart = idx === 0;
 
         if (v.handleIn) {
-          html += `<line x1="${v.x}" y1="${v.y}" x2="${v.handleIn.x}" y2="${v.handleIn.y}" stroke="#a855f7" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
-          html += `<circle cx="${v.handleIn.x}" cy="${v.handleIn.y}" r="${3 / z}" fill="#a855f7" stroke="#ffffff" stroke-width="1" vector-effect="non-scaling-stroke" />`;
+          descriptors.push({
+            type: 'line',
+            x1: v.x,
+            y1: v.y,
+            x2: v.handleIn.x,
+            y2: v.handleIn.y,
+            stroke: '#a855f7',
+            strokeWidth: 1,
+            strokeDasharray: '2 2',
+            vectorEffect: 'non-scaling-stroke',
+          });
+          descriptors.push({
+            type: 'circle',
+            cx: v.handleIn.x,
+            cy: v.handleIn.y,
+            r: 3 / z,
+            fill: '#a855f7',
+            stroke: '#ffffff',
+            strokeWidth: 1,
+            vectorEffect: 'non-scaling-stroke',
+          });
         }
         if (v.handleOut) {
-          html += `<line x1="${v.x}" y1="${v.y}" x2="${v.handleOut.x}" y2="${v.handleOut.y}" stroke="#a855f7" stroke-width="1" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
-          html += `<circle cx="${v.handleOut.x}" cy="${v.handleOut.y}" r="${3 / z}" fill="#a855f7" stroke="#ffffff" stroke-width="1" vector-effect="non-scaling-stroke" />`;
+          descriptors.push({
+            type: 'line',
+            x1: v.x,
+            y1: v.y,
+            x2: v.handleOut.x,
+            y2: v.handleOut.y,
+            stroke: '#a855f7',
+            strokeWidth: 1,
+            strokeDasharray: '2 2',
+            vectorEffect: 'non-scaling-stroke',
+          });
+          descriptors.push({
+            type: 'circle',
+            cx: v.handleOut.x,
+            cy: v.handleOut.y,
+            r: 3 / z,
+            fill: '#a855f7',
+            stroke: '#ffffff',
+            strokeWidth: 1,
+            vectorEffect: 'non-scaling-stroke',
+          });
         }
 
         if (isStart) {
-          html += `<circle cx="${v.x}" cy="${v.y}" r="${5 / z}" fill="#10b981" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
+          descriptors.push({
+            type: 'circle',
+            cx: v.x,
+            cy: v.y,
+            r: 5 / z,
+            fill: '#10b981',
+            stroke: '#ffffff',
+            strokeWidth: 1.5,
+            vectorEffect: 'non-scaling-stroke',
+          });
         } else {
-          html += `<rect x="${v.x - 3.5 / z}" y="${v.y - 3.5 / z}" width="${7 / z}" height="${7 / z}" fill="#38bdf8" stroke="#ffffff" stroke-width="1" rx="${1 / z}" vector-effect="non-scaling-stroke" />`;
+          descriptors.push({
+            type: 'rect',
+            x: v.x - 3.5 / z,
+            y: v.y - 3.5 / z,
+            width: 7 / z,
+            height: 7 / z,
+            fill: '#38bdf8',
+            stroke: '#ffffff',
+            strokeWidth: 1,
+            rx: 1 / z,
+            vectorEffect: 'non-scaling-stroke',
+          });
         }
       });
     } else if (this.ctx.getActiveTool() === 'pen' && this.penHoverPoint) {
       // First ghost point preview under cursor before first click (zoom-independent screen size)
-      html += `
-        <g opacity="0.95" pointer-events="none">
-          <circle cx="${this.penHoverPoint.x}" cy="${this.penHoverPoint.y}" r="${3.5 / z}" fill="rgba(56, 189, 248, 0.35)" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />
-          <circle cx="${this.penHoverPoint.x}" cy="${this.penHoverPoint.y}" r="${1.2 / z}" fill="#ffffff" />
-        </g>
-      `;
+      descriptors.push({
+        type: 'circle',
+        cx: this.penHoverPoint.x,
+        cy: this.penHoverPoint.y,
+        r: 3.5 / z,
+        fill: 'rgba(56, 189, 248, 0.35)',
+        opacity: 0.95,
+        stroke: '#38bdf8',
+        strokeWidth: 1.5,
+        strokeDasharray: '2 2',
+        vectorEffect: 'non-scaling-stroke',
+        pointerEvents: 'none',
+      });
+      descriptors.push({
+        type: 'circle',
+        cx: this.penHoverPoint.x,
+        cy: this.penHoverPoint.y,
+        r: 1.2 / z,
+        fill: '#ffffff',
+        pointerEvents: 'none',
+      });
     }
 
-    return html;
+    return descriptors;
   }
 }

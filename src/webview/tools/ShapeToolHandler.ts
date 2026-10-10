@@ -4,6 +4,7 @@ import { Point, VectorElement, PathVertex } from '../engine/VectorModel.js';
 import { formatNum } from '../engine/geometry/PathGeometryCompiler.js';
 import { ActionIntent, ActionIntentFactory } from './contracts/ActionIntent.js';
 import { CommandRegistry } from '../engine/commands/CommandRegistry.js';
+import { OverlayDescriptor } from '../engine/canvas/OverlayDescriptor.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Geometric Shape Tool Isolation & Canonical SVG Primitive Compilation (FEAT-11)
@@ -186,32 +187,83 @@ export class ShapeToolHandler implements IToolHandler {
     return false;
   }
 
-  public renderOverlay(zoom: number): string {
-    if (!this.ghostShapeElement) return '';
+  public renderOverlay(zoom: number): OverlayDescriptor[] {
+    if (!this.ghostShapeElement) return [];
 
     const z = zoom || 1;
+    const descriptors: OverlayDescriptor[] = [];
 
     // Dedicated overlay rendering for straight line primitives
     if (this.ghostShapeElement.tagName === 'line') {
       const attrs = this.ghostShapeElement.attributes;
-      let html = `<line x1="${attrs.x1}" y1="${attrs.y1}" x2="${attrs.x2}" y2="${attrs.y2}" stroke="#818cf8" stroke-width="2" stroke-dasharray="5 3" vector-effect="non-scaling-stroke" />`;
-      html += `<circle cx="${attrs.x1}" cy="${attrs.y1}" r="${3.5 / z}" fill="#ffffff" stroke="#6366f1" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
-      html += `<circle cx="${attrs.x2}" cy="${attrs.y2}" r="${3.5 / z}" fill="#ffffff" stroke="#6366f1" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
-      return html;
+      const x1 = parseFloat(attrs.x1 || '0');
+      const y1 = parseFloat(attrs.y1 || '0');
+      const x2 = parseFloat(attrs.x2 || '0');
+      const y2 = parseFloat(attrs.y2 || '0');
+
+      descriptors.push({
+        type: 'line',
+        x1,
+        y1,
+        x2,
+        y2,
+        stroke: '#818cf8',
+        strokeWidth: 2,
+        strokeDasharray: '5 3',
+        vectorEffect: 'non-scaling-stroke',
+      });
+      descriptors.push({
+        type: 'circle',
+        cx: x1,
+        cy: y1,
+        r: 3.5 / z,
+        fill: '#ffffff',
+        stroke: '#6366f1',
+        strokeWidth: 1.5,
+        vectorEffect: 'non-scaling-stroke',
+      });
+      descriptors.push({
+        type: 'circle',
+        cx: x2,
+        cy: y2,
+        r: 3.5 / z,
+        fill: '#ffffff',
+        stroke: '#6366f1',
+        strokeWidth: 1.5,
+        vectorEffect: 'non-scaling-stroke',
+      });
+      return descriptors;
     }
 
     const d = this.ghostShapeElement.attributes.d;
     const isClosed = this.ghostShapeElement.isClosed;
 
-    let html = `<path d="${d}" fill="${isClosed ? 'rgba(99, 102, 241, 0.25)' : 'none'}" stroke="#818cf8" stroke-width="2" stroke-dasharray="5 3" vector-effect="non-scaling-stroke" />`;
+    descriptors.push({
+      type: 'path',
+      d,
+      fill: isClosed ? 'rgba(99, 102, 241, 0.25)' : 'none',
+      stroke: '#818cf8',
+      strokeWidth: 2,
+      strokeDasharray: '5 3',
+      vectorEffect: 'non-scaling-stroke',
+    });
 
     if (this.ghostShapeElement.vertices) {
       this.ghostShapeElement.vertices.forEach((gv) => {
-        html += `<circle cx="${gv.x}" cy="${gv.y}" r="${3.5 / z}" fill="#ffffff" stroke="#6366f1" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
+        descriptors.push({
+          type: 'circle',
+          cx: gv.x,
+          cy: gv.y,
+          r: 3.5 / z,
+          fill: '#ffffff',
+          stroke: '#6366f1',
+          strokeWidth: 1.5,
+          vectorEffect: 'non-scaling-stroke',
+        });
       });
     }
 
-    return html;
+    return descriptors;
   }
 
   public calculateShapeBounds(
