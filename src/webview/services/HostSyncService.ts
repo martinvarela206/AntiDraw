@@ -5,6 +5,7 @@ import { SelectionTool } from '../engine/SelectionTool.js';
 import { HistoryService } from './HistoryService.js';
 import { ViewportController } from '../engine/ViewportController.js';
 import { TopBar } from '../ui/TopBar.js';
+import { DocumentState, DocumentStateFactory } from '../core/model/DocumentState.js';
 
 export interface HostSyncContext {
   model: VectorModel;
@@ -38,6 +39,7 @@ export class HostSyncService {
   private vscodeBridge: VsCodeBridge = VsCodeBridge.getInstance();
   private metadataSyncTimeout: any = null;
   private hasInitialCentered: boolean = false;
+  private savedState: DocumentState | null = null;
 
   constructor(private ctx: HostSyncContext) {
     this.bindHostEvents();
@@ -48,10 +50,25 @@ export class HostSyncService {
     this.vscodeBridge.notifyReady();
   }
 
+  public markSaved(): void {
+    this.savedState = this.ctx.historyService.createSnapshot();
+  }
+
+  public isDirty(): boolean {
+    if (!this.savedState) return false;
+    const current = this.ctx.historyService.createSnapshot();
+    return DocumentStateFactory.isDirty(current, this.savedState);
+  }
+
+  public getSavedState(): DocumentState | null {
+    return this.savedState;
+  }
+
   public syncToHost(): void {
     const svgText = this.ctx.model.toSvgString();
     this.vscodeBridge.updateDocument(svgText);
     this.syncMetadataToHost();
+    this.markSaved();
   }
 
   public syncMetadataToHost(): void {
@@ -203,6 +220,7 @@ export class HostSyncService {
       this.ctx.model.loadSvgString(payload.text, payload.metadata);
       this.ctx.applyCanvasSize();
       this.ctx.render();
+      this.markSaved();
 
       if (!this.hasInitialCentered) {
         this.hasInitialCentered = true;
