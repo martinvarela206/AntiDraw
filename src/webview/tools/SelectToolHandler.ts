@@ -126,7 +126,7 @@ export class SelectToolHandler implements IToolHandler {
      *    - Shift + Marquee Drag: toggles selection state for all elements intersected by the marquee box.
      */
     if (e.shiftKey) {
-      const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, this.ctx.canvasMgr.zoom);
+      const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, this.ctx.canvasMgr.zoom, this.ctx.model.spatialIndex);
       if (hit) {
         this.ctx.selectionTool.toggleSelect(hit.element.id);
         this.callbacks.onClearPanelMode?.();
@@ -305,7 +305,7 @@ export class SelectToolHandler implements IToolHandler {
     }
 
     // 7. Hit test vector elements under cursor
-    const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, this.ctx.canvasMgr.zoom);
+    const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, this.ctx.canvasMgr.zoom, this.ctx.model.spatialIndex);
 
     // Case 1: Clicked on a different, unselected vector element -> switch selection
     if (hit && !this.ctx.selectionTool.isSelected(hit.element.id)) {
@@ -405,7 +405,7 @@ export class SelectToolHandler implements IToolHandler {
 
       // 3. Vector element hover cursor
       if (cursor === 'default') {
-        const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt);
+        const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, this.ctx.canvasMgr.zoom, this.ctx.model.spatialIndex);
         this.ctx.selectionTool.hoveredElementId = hit ? hit.element.id : null;
         if (hit) {
           cursor = 'move';
@@ -519,7 +519,7 @@ export class SelectToolHandler implements IToolHandler {
       pt.y >= groupBox.y &&
       pt.y <= groupBox.y + groupBox.height;
 
-    const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, this.ctx.canvasMgr.zoom);
+    const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, this.ctx.canvasMgr.zoom, this.ctx.model.spatialIndex);
     const targetEl = hit ? hit.element : (isInsideBox && selectedEls.length === 1 ? selectedEls[0] : null);
 
     if (targetEl) {

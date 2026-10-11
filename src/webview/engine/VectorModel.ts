@@ -109,6 +109,7 @@ import { RectPrimitive } from './primitives/RectPrimitive.js';
 import { EllipsePrimitive } from './primitives/EllipsePrimitive.js';
 import { PrimitiveDetector } from './primitives/PrimitiveDetector.js';
 import { GlobalSwatch, GlobalSwatchManager } from './color/GlobalSwatchManager.js';
+import { SpatialIndex } from './spatial/SpatialIndex.js';
 import type { CompanionMetadata } from '../bridge/VsCodeBridge.js';
 
 export {
@@ -120,6 +121,7 @@ export {
   PrimitiveDetector,
   GlobalSwatch,
   GlobalSwatchManager,
+  SpatialIndex,
 };
 
 export class VectorModel {
@@ -135,6 +137,11 @@ export class VectorModel {
   public elements: VectorElement[] = [];
   public customDefs: string = '';
   public swatches: GlobalSwatch[] = GlobalSwatchManager.getDefaultSwatches();
+  public readonly spatialIndex: SpatialIndex = new SpatialIndex(256);
+
+  public rebuildSpatialIndex(): void {
+    this.spatialIndex.build(this.elements);
+  }
 
   constructor() {}
 
@@ -144,6 +151,7 @@ export class VectorModel {
    */
   public loadSvgString(svgText: string, companionMetadata?: CompanionMetadata | null): void {
     SvgSerializer.loadSvgString(svgText, this, companionMetadata);
+    this.rebuildSpatialIndex();
   }
 
   /**

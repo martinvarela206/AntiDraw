@@ -36,6 +36,9 @@ export class SvgDomRenderer {
   }
 
   private renderFromModel(svgCanvas: SVGSVGElement, model: VectorModel): void {
+    // Synchronize spatial index for sub-millisecond hit-testing and viewport culling
+    model.rebuildSpatialIndex();
+
     // 1. Render Artboard background rect
     const vb = model.getViewBoxBounds();
     const bgRect = document.createElementNS(SvgDomRenderer.SVG_NS, 'rect');

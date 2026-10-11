@@ -5,11 +5,13 @@ import { StrokeOutlineGenerator } from './boolean/StrokeOutlineGenerator.js';
 import { BoundingBox, BoundingBoxCalculator } from './geometry/BoundingBoxCalculator.js';
 import { HandleType, HitTestResult, HitTestService } from './selection/HitTestService.js';
 import { QuadCorners } from './geometry/ProjectiveHomography.js';
+import { SpatialIndex } from './spatial/SpatialIndex.js';
 import type { Polygon } from 'polygon-clipping';
 
 export { BoundingBox, BoundingBoxCalculator } from './geometry/BoundingBoxCalculator.js';
 export { HandleType, HitTestResult, HitTestService } from './selection/HitTestService.js';
 export { QuadCorners } from './geometry/ProjectiveHomography.js';
+export { SpatialIndex } from './spatial/SpatialIndex.js';
 
 export interface DragState {
   initialElement: VectorElement;
@@ -315,8 +317,12 @@ export class SelectionTool {
   public hitTest(
     elements: VectorElement[],
     pt: Point,
-    zoomScale: number = 1.0
+    zoomScale: number = 1.0,
+    spatialIndex?: SpatialIndex
   ): HitTestResult | null {
+    if (spatialIndex && spatialIndex.size > 0) {
+      return HitTestService.hitTestSpatial(spatialIndex, pt, zoomScale, this.hoverTolerance);
+    }
     return HitTestService.hitTest(elements, pt, zoomScale, this.hoverTolerance);
   }
 
