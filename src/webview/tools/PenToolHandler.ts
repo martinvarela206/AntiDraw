@@ -88,9 +88,14 @@ export class PenToolHandler implements IToolHandler {
     return false;
   }
 
+  public evalPointerMove(e: PointerEvent, pt: Point): ActionIntent {
+    if (this.ctx.getActiveTool() !== 'pen') return ActionIntentFactory.none();
+    return ActionIntentFactory.preview('pen.move', { pt, altKey: e.altKey });
+  }
+
   public onPointerMove(e: PointerEvent, pt: Point): boolean {
-    const activeTool = this.ctx.getActiveTool();
-    if (activeTool !== 'pen') return false;
+    const intent = this.evalPointerMove(e, pt);
+    if (intent.kind === 'none') return false;
 
     if (this.isDragging && this.penActiveVertexIdx !== null) {
       const v = this.currentPenVertices[this.penActiveVertexIdx];
@@ -105,24 +110,17 @@ export class PenToolHandler implements IToolHandler {
       const dist = Math.hypot(dx, dy);
 
       if (dist > 3) {
-        if (e.altKey) {
-          this.isCuspBroken = true;
-        }
-
+        if (e.altKey) this.isCuspBroken = true;
         if (this.isCuspBroken) {
-          // Tangente quebrada: handleOut sigue al puntero libremente formando cúspide asimétrica
           v.nodeType = 'asymmetric';
           v.handleOut = { x: snappedPt.x, y: snappedPt.y };
         } else {
-          // Continuidad colineal simétrica por defecto
           v.nodeType = 'symmetric';
           v.handleOut = { x: snappedPt.x, y: snappedPt.y };
           v.handleIn = { x: v.x - dx, y: v.y - dy };
         }
       } else {
-        if (!this.isCuspBroken && !v.handleOut && !v.handleIn) {
-          v.nodeType = 'sharp';
-        }
+        if (!this.isCuspBroken && !v.handleOut && !v.handleIn) v.nodeType = 'sharp';
         const otherVerts = this.ctx.getOtherVertices();
         this.currentPenVertices.forEach((item) => otherVerts.push({ x: item.x, y: item.y }));
         this.penHoverPoint = this.ctx.snapPoint(pt, otherVerts);
@@ -134,28 +132,29 @@ export class PenToolHandler implements IToolHandler {
     // Hover mode (cursor preview)
     const otherVertices = this.ctx.getOtherVertices();
     this.currentPenVertices.forEach((v) => otherVertices.push({ x: v.x, y: v.y }));
-    const snappedPt = this.ctx.snapPoint(pt, otherVertices);
-    this.penHoverPoint = snappedPt;
+    this.penHoverPoint = this.ctx.snapPoint(pt, otherVertices);
     this.ctx.renderOverlay();
     return true;
   }
 
-  public onPointerUp(_e: PointerEvent, _pt: Point): boolean {
-    if (this.isDragging) {
-      if (this.penActiveVertexIdx !== null) {
-        const v = this.currentPenVertices[this.penActiveVertexIdx];
-        if (v && !v.handleIn && !v.handleOut) {
-          v.nodeType = 'sharp';
-        }
-      }
-      this.isDragging = false;
-      this.isCuspBroken = false;
-      this.penActiveVertexIdx = null;
-      this.penMovingVertexIdx = null;
-      this.ctx.renderOverlay();
-      return true;
+  public evalPointerUp(_e: PointerEvent, _pt: Point): ActionIntent {
+    return this.isDragging ? ActionIntentFactory.preview('pen.drag_end') : ActionIntentFactory.none();
+  }
+
+  public onPointerUp(e: PointerEvent, pt: Point): boolean {
+    const intent = this.evalPointerUp(e, pt);
+    if (intent.kind === 'none') return false;
+
+    if (this.penActiveVertexIdx !== null) {
+      const v = this.currentPenVertices[this.penActiveVertexIdx];
+      if (v && !v.handleIn && !v.handleOut) v.nodeType = 'sharp';
     }
-    return false;
+    this.isDragging = false;
+    this.isCuspBroken = false;
+    this.penActiveVertexIdx = null;
+    this.penMovingVertexIdx = null;
+    this.ctx.renderOverlay();
+    return true;
   }
 
   public onDoubleClick(_e: MouseEvent, _pt: Point): boolean {
@@ -244,8 +243,9 @@ export class PenToolHandler implements IToolHandler {
       };
 
       const cmdRegistry = CommandRegistry.getInstance();
-      if (cmdRegistry.has('shape.create')) {
-        cmdRegistry.execute('shape.create', { element: newEl });
+      const cmdId = cmdRegistry.has('path.create') ? 'path.create' : 'shape.create';
+      if (cmdRegistry.has(cmdId)) {
+        cmdRegistry.execute(cmdId, { element: newEl });
       } else {
         this.ctx.pushUndo();
         this.ctx.model.elements.push(newEl);

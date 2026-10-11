@@ -129,8 +129,13 @@ export class PolylineToolHandler implements IToolHandler {
     return true;
   }
 
-  public onPointerUp(_e: PointerEvent, _pt: Point): boolean {
-    return false;
+  public evalPointerUp(_e: PointerEvent, _pt: Point): ActionIntent {
+    return ActionIntentFactory.none();
+  }
+
+  public onPointerUp(e: PointerEvent, pt: Point): boolean {
+    const intent = this.evalPointerUp(e, pt);
+    return intent.kind !== 'none';
   }
 
   public onDoubleClick(_e: MouseEvent, _pt: Point): boolean {
@@ -234,7 +239,10 @@ export class PolylineToolHandler implements IToolHandler {
       };
 
       const cmdRegistry = CommandRegistry.getInstance();
-      if (cmdRegistry.has('shape.create')) {
+      const cmdId = newEl.tagName === 'path' ? 'path.create' : 'shape.create';
+      if (cmdRegistry.has(cmdId)) {
+        cmdRegistry.execute(cmdId, { element: newEl });
+      } else if (cmdRegistry.has('shape.create')) {
         cmdRegistry.execute('shape.create', { element: newEl });
       } else {
         this.ctx.pushUndo();

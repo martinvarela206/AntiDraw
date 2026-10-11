@@ -19,3 +19,7 @@
 - **Desacoplamiento:** Servicios algorítmicos (snapping, geometría, hit-test) no deben condicionarse a flags visuales.
 - **Precedencia de Eventos:** Asegurar que nuevos listeners no anulen interacciones base (arrastre de canvas, selección de nodos).
 - **Documentación:** Mantener sincronizado `Docs/Descripción de las herramientas.md`. Para tareas múltiples y TODO.md, seguir el skill global `task-atomic-workflow`.
+
+## 5. Prohibición de Límites Arbitrarios de Líneas de Código (Anti-Sobreingeniería)
+- **Prohibido el Conteo y Restricciones Numéricas de Líneas:** Queda terminantemente PROHIBIDO imponer límites artificiales (ej. `< 350 líneas`), ejecutar comandos de conteo de líneas o fraccionar archivos/clases cohesionadas por motivos de tamaño.
+- **Cohesión sobre Fragmentación:** Se prioriza la cohesión funcional, la claridad y la arquitectura unificada frente a divisiones arbitrarias que dispersen el código y provoquen sobreingeniería innecesaria.
