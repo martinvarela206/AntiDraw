@@ -666,7 +666,8 @@ export class PropertyPanel {
   private getStrokeProps(el: VectorElement): StrokeInspectorProps {
     const stroke = el.attributes['stroke'] || '#ffffff';
     const strokeWidth = el.attributes['stroke-width'] || '1';
-    const strokeDash = el.attributes['stroke-dasharray'] || '';
+    const strokeDash = el.attributes['data-dash-nominal'] || el.attributes['stroke-dasharray'] || '';
+    const dashAlignCorners = el.attributes['data-dash-align'] === 'corners';
     const strokeLinecap = el.attributes['stroke-linecap'] || 'butt';
     const strokeLinejoin = el.attributes['stroke-linejoin'] || 'miter';
     const strokeMiterlimit = parseFloat(el.attributes['stroke-miterlimit'] || '4') || 4;
@@ -707,6 +708,7 @@ export class PropertyPanel {
       markerUnits,
       markerLayer,
       markerColor,
+      dashAlignCorners,
     };
   }
 

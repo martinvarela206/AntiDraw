@@ -3,6 +3,7 @@ import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
 import { bindInspectorMouseDown } from './CanvasInspector.js';
 import { degreesToMiterLimit } from './AppearanceInspector.js';
 import { StrokeMarkerControls } from './StrokeMarkerControls.js';
+import { DashCornerAligner } from '../../engine/geometry/DashCornerAligner.js';
 
 export interface StrokeInspectorProps {
   stroke: string;
@@ -19,6 +20,7 @@ export interface StrokeInspectorProps {
   markerUnits: 'strokeWidth' | 'userSpaceOnUse';
   markerLayer: 'over' | 'under';
   markerColor: string;
+  dashAlignCorners?: boolean;
 }
 
 /**
@@ -69,6 +71,7 @@ export class StrokeInspector {
       markerUnits,
       markerLayer,
       markerColor,
+      dashAlignCorners,
     } = props;
 
     const isCurrentColor = stroke === 'currentColor';
@@ -109,9 +112,24 @@ export class StrokeInspector {
           <span class="prop-label">Width</span>
           <input type="number" class="prop-input" id="el-stroke-width" value="${strokeWidth}" min="0" step="0.5" />
         </div>
-        <div class="prop-row">
-          <span class="prop-label">Dashes</span>
-          <input type="text" class="prop-input" id="el-stroke-dash" value="${strokeDash}" placeholder="e.g. 4 2" />
+        <div class="prop-row" style="align-items:flex-start;">
+          <span class="prop-label" style="margin-top:4px;">Dashes</span>
+          <div style="display:flex; flex-direction:column; gap:4px; flex:1;">
+            <div style="display:flex; gap:4px; align-items:center;">
+              <input type="text" class="prop-input" id="el-stroke-dash" value="${strokeDash}" placeholder="e.g. 8 4 o 0 8" style="flex:1;" />
+              <label style="display:flex; align-items:center; gap:3px; font-size:10px; cursor:pointer; color:var(--text-muted); white-space:nowrap;" title="Ajustar guiones a esquinas (Plan::fitted): calcula y escala micro-intervalos para centrar perfectamente un guión o punto en cada esquina">
+                <input type="checkbox" id="el-stroke-dash-align-corners" ${dashAlignCorners ? 'checked' : ''} style="cursor:pointer;" />
+                <span>Esquinas</span>
+              </label>
+            </div>
+            <div style="display:flex; gap:3px; flex-wrap:wrap;">
+              <button type="button" class="prop-input" id="btn-dash-solid" style="cursor:pointer; width:auto; padding:1px 5px; font-size:9.5px;" title="Trazo continuo sin guiones">Sólido</button>
+              <button type="button" class="prop-input" id="btn-dash-dashed" style="cursor:pointer; width:auto; padding:1px 5px; font-size:9.5px;" title="Guiones estándar (8 4) adaptados a esquinas">Guiones</button>
+              <button type="button" class="prop-input" id="btn-dash-dots" style="cursor:pointer; width:auto; padding:1px 5px; font-size:9.5px;" title="Discos circulares perfectos (0 8) centrados en cada vértice">Puntos</button>
+              <button type="button" class="prop-input" id="btn-dash-dense-dots" style="cursor:pointer; width:auto; padding:1px 5px; font-size:9.5px;" title="Puntos finos densos (0 5)">Puntos finos</button>
+              <button type="button" class="prop-input" id="btn-dash-long" style="cursor:pointer; width:auto; padding:1px 5px; font-size:9.5px;" title="Rayas largas (16 6)">Rayas</button>
+            </div>
+          </div>
         </div>
         <div class="prop-row">
           <span class="prop-label">Cap</span>
@@ -278,11 +296,91 @@ export class StrokeInspector {
       });
     }
 
+    const elStrokeDashAlignCorners = container.querySelector<HTMLInputElement>('#el-stroke-dash-align-corners');
+
+    const applyDashSettings = (nominalValue: string, alignCorners: boolean) => {
+      const trimmed = nominalValue.trim();
+      if (!trimmed || trimmed === 'none' || trimmed === '0') {
+        delete el.attributes['stroke-dasharray'];
+        delete el.attributes['data-dash-nominal'];
+        delete el.attributes['data-dash-align'];
+        if (elStrokeDash) elStrokeDash.value = '';
+        if (elStrokeDashAlignCorners) elStrokeDashAlignCorners.checked = false;
+      } else if (alignCorners) {
+        el.attributes['data-dash-nominal'] = trimmed;
+        el.attributes['data-dash-align'] = 'corners';
+        const fitted = DashCornerAligner.calculateFittedDashString(el, trimmed);
+        el.attributes['stroke-dasharray'] = fitted;
+        if (elStrokeDash) elStrokeDash.value = trimmed;
+        if (elStrokeDashAlignCorners) elStrokeDashAlignCorners.checked = true;
+      } else {
+        delete el.attributes['data-dash-nominal'];
+        delete el.attributes['data-dash-align'];
+        el.attributes['stroke-dasharray'] = trimmed;
+        if (elStrokeDash) elStrokeDash.value = trimmed;
+        if (elStrokeDashAlignCorners) elStrokeDashAlignCorners.checked = false;
+      }
+      callbacks.onUpdateElement(el);
+    };
+
     if (elStrokeDash) {
       elStrokeDash.addEventListener('change', () => {
         if (callbacks.onPushUndo) callbacks.onPushUndo();
-        el.attributes['stroke-dasharray'] = elStrokeDash.value;
-        callbacks.onUpdateElement(el);
+        const align = elStrokeDashAlignCorners ? elStrokeDashAlignCorners.checked : false;
+        applyDashSettings(elStrokeDash.value, align);
+      });
+    }
+
+    if (elStrokeDashAlignCorners) {
+      elStrokeDashAlignCorners.addEventListener('change', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        const nominal = elStrokeDash ? elStrokeDash.value || '8 4' : '8 4';
+        applyDashSettings(nominal, elStrokeDashAlignCorners.checked);
+      });
+    }
+
+    // Quick Dash Presets
+    const btnSolid = container.querySelector<HTMLButtonElement>('#btn-dash-solid');
+    if (btnSolid) {
+      btnSolid.addEventListener('click', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        applyDashSettings('', false);
+      });
+    }
+
+    const btnDashed = container.querySelector<HTMLButtonElement>('#btn-dash-dashed');
+    if (btnDashed) {
+      btnDashed.addEventListener('click', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        applyDashSettings('8 4', true);
+      });
+    }
+
+    const btnDots = container.querySelector<HTMLButtonElement>('#btn-dash-dots');
+    if (btnDots) {
+      btnDots.addEventListener('click', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        el.attributes['stroke-linecap'] = 'round';
+        if (elStrokeCap) elStrokeCap.value = 'round';
+        applyDashSettings('0 8', true);
+      });
+    }
+
+    const btnDenseDots = container.querySelector<HTMLButtonElement>('#btn-dash-dense-dots');
+    if (btnDenseDots) {
+      btnDenseDots.addEventListener('click', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        el.attributes['stroke-linecap'] = 'round';
+        if (elStrokeCap) elStrokeCap.value = 'round';
+        applyDashSettings('0 5', true);
+      });
+    }
+
+    const btnLong = container.querySelector<HTMLButtonElement>('#btn-dash-long');
+    if (btnLong) {
+      btnLong.addEventListener('click', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        applyDashSettings('16 6', true);
       });
     }
 

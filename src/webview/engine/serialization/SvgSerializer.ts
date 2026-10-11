@@ -10,6 +10,7 @@ import {
   VectorElement,
 } from '../VectorModel.js';
 import { PathGeometryCompiler } from '../geometry/PathGeometryCompiler.js';
+import { DashCornerAligner } from '../geometry/DashCornerAligner.js';
 
 export interface IVectorModelSerializerContext {
   canvas: CanvasSettings;
@@ -490,6 +491,8 @@ export class SvgSerializer {
     ctx.elements.forEach((el) => {
       // HISTORICAL ARCHITECTURE (FIX-19): Guarantee attributes.id strictly reflects model el.id upon serialization
       el.attributes.id = el.id;
+
+      DashCornerAligner.updateFittedDashIfActive(el);
 
       if (ctx.isParametricElement(el) && el.tagName !== 'path') {
         /**
