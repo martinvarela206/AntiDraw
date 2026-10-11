@@ -5,6 +5,7 @@ import { formatNum } from '../engine/geometry/PathGeometryCompiler.js';
 import { ActionIntent, ActionIntentFactory } from './contracts/ActionIntent.js';
 import { CommandRegistry } from '../engine/commands/CommandRegistry.js';
 import { OverlayDescriptor } from '../engine/canvas/OverlayDescriptor.js';
+import { GizmoRenderer, GizmoTheme } from '../engine/canvas/helpers/GizmoRenderer.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Polyline & Orthogonal Polygon State Machine (PolylineToolHandler)
@@ -260,14 +261,7 @@ export class PolylineToolHandler implements IToolHandler {
 
     if (this.currentPolylineVertices.length > 0) {
       const polyD = this.ctx.model.compilePathD(this.currentPolylineVertices, false);
-      descriptors.push({
-        type: 'path',
-        d: polyD,
-        fill: 'none',
-        stroke: '#38bdf8',
-        strokeWidth: 2,
-        vectorEffect: 'non-scaling-stroke',
-      });
+      descriptors.push(GizmoRenderer.renderGhostPathDescriptor(polyD, false));
 
       const lastV = this.currentPolylineVertices[this.currentPolylineVertices.length - 1];
       const firstV = this.currentPolylineVertices[0];
@@ -279,105 +273,43 @@ export class PolylineToolHandler implements IToolHandler {
 
         const targetPt = isHoveringStart ? { x: firstV.x, y: firstV.y } : this.polylineHoverPoint;
 
-        // Rubberband line from last vertex to hover point
-        descriptors.push({
-          type: 'line',
-          x1: lastV.x,
-          y1: lastV.y,
-          x2: targetPt.x,
-          y2: targetPt.y,
-          stroke: isHoveringStart ? '#10b981' : '#60a5fa',
-          strokeWidth: 1.5,
-          strokeDasharray: '4 3',
-          vectorEffect: 'non-scaling-stroke',
-        });
+        descriptors.push(...GizmoRenderer.renderRubberbandDescriptor(lastV, targetPt, z, isHoveringStart));
 
         if (isHoveringStart) {
           descriptors.push({
             type: 'circle',
             cx: firstV.x,
             cy: firstV.y,
-            r: 8 / z,
+            r: GizmoTheme.rubberband.closureHaloRadius / z,
             fill: 'none',
-            stroke: '#10b981',
-            strokeWidth: 2,
-            strokeDasharray: '2 2',
+            stroke: GizmoTheme.rubberband.strokeClosing,
+            strokeWidth: GizmoTheme.rubberband.closureHaloWidth,
+            strokeDasharray: GizmoTheme.rubberband.closureHaloDash,
             vectorEffect: 'non-scaling-stroke',
           });
         } else {
-          descriptors.push({
-            type: 'circle',
-            cx: targetPt.x,
-            cy: targetPt.y,
-            r: 3.5 / z,
-            fill: '#38bdf8',
-            opacity: 0.35,
-            stroke: '#38bdf8',
-            strokeWidth: 1.5,
-            vectorEffect: 'non-scaling-stroke',
-            pointerEvents: 'none',
-          });
-          descriptors.push({
-            type: 'circle',
-            cx: targetPt.x,
-            cy: targetPt.y,
-            r: 1.2 / z,
-            fill: '#ffffff',
-            pointerEvents: 'none',
-          });
+          descriptors.push(...GizmoRenderer.renderAnchorDescriptor(targetPt, { kind: 'standard', state: 'idle' }, z));
         }
       }
 
       this.currentPolylineVertices.forEach((v, idx) => {
         const isStart = idx === 0;
-        if (isStart) {
-          descriptors.push({
-            type: 'circle',
-            cx: v.x,
-            cy: v.y,
-            r: 5 / z,
-            fill: '#10b981',
-            stroke: '#ffffff',
-            strokeWidth: 1.5,
-            vectorEffect: 'non-scaling-stroke',
-          });
-        } else {
-          descriptors.push({
-            type: 'rect',
-            x: v.x - 3.5 / z,
-            y: v.y - 3.5 / z,
-            width: 7 / z,
-            height: 7 / z,
-            fill: '#38bdf8',
-            stroke: '#ffffff',
-            strokeWidth: 1,
-            rx: 1 / z,
-            vectorEffect: 'non-scaling-stroke',
-          });
-        }
+        descriptors.push(
+          ...GizmoRenderer.renderAnchorDescriptor(
+            v,
+            { kind: isStart ? 'first' : 'standard', state: 'idle' },
+            z
+          )
+        );
       });
     } else if (this.ctx.getActiveTool() === 'polyline' && this.polylineHoverPoint) {
-      descriptors.push({
-        type: 'circle',
-        cx: this.polylineHoverPoint.x,
-        cy: this.polylineHoverPoint.y,
-        r: 3.5 / z,
-        fill: '#10b981',
-        opacity: 0.3,
-        stroke: '#10b981',
-        strokeWidth: 1.5,
-        strokeDasharray: '2 2',
-        vectorEffect: 'non-scaling-stroke',
-        pointerEvents: 'none',
-      });
-      descriptors.push({
-        type: 'circle',
-        cx: this.polylineHoverPoint.x,
-        cy: this.polylineHoverPoint.y,
-        r: 1.2 / z,
-        fill: '#ffffff',
-        pointerEvents: 'none',
-      });
+      descriptors.push(
+        ...GizmoRenderer.renderAnchorDescriptor(
+          this.polylineHoverPoint,
+          { kind: 'standard', state: 'idle' },
+          z
+        )
+      );
     }
 
     return descriptors;

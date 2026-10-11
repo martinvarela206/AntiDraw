@@ -279,7 +279,7 @@ export class GizmoRenderer extends BaseHelper {
   public static renderGhostPathDescriptor(
     d: string,
     isClosed: boolean,
-    _zoom: number
+    _zoom: number = 1.0
   ): OverlayDescriptor {
     return {
       type: 'path',

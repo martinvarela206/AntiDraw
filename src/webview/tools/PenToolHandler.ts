@@ -4,27 +4,11 @@ import { Point, PathVertex, NodeType, VectorElement } from '../engine/VectorMode
 import { ActionIntent, ActionIntentFactory } from './contracts/ActionIntent.js';
 import { CommandRegistry } from '../engine/commands/CommandRegistry.js';
 import { OverlayDescriptor } from '../engine/canvas/OverlayDescriptor.js';
+import { GizmoRenderer, GizmoTheme } from '../engine/canvas/helpers/GizmoRenderer.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Elastic Real-Time Curvature Feedback & Dynamic Bézier Ghosting
- *
- * 1. Dynamic Bézier Ghosting:
- *    Traditional pen tools show only a straight rubberband line to the cursor, forcing the
- *    illustrator to mentally calculate the outgoing tangent curve. By synthesizing a cubic Bézier
- *    path (`M lastV.x,lastV.y C lastV.handleOut ... targetPt targetPt`) directly from the outgoing
- *    handle of the committed node to the hovering cursor point, the user visualizes the precise
- *    mathematical curve prior to committing the click.
- *
- * 2. Unlinked Tangents via Alt-Modifier (Sharp Cusps in Continuous Gestures):
- *    When dragging a new node, handles are generated colinearly. If the user holds `Alt`, the
- *    tangent link is immediately broken, switching the node to `asymmetric` and locking `handleIn`
- *    while freely positioning `handleOut`. This allows illustrators to form corners and sharp cusp
- *    transitions without breaking flow or having to switch to a secondary tool.
- *
- * 3. Physical Screen-Pixel Scale Normalization:
- *    Control points and stroke widths use `vector-effect="non-scaling-stroke"` and radii divided
- *    by `zoom` (e.g. `5 / z`, `3 / z`). This ensures interactive handles remain crisp, constant-size,
- *    and comfortable to target across all zoom factors (from 10% overview to 1000% macro editing).
+ * Dynamic Bézier ghosting, Alt-modifier cusp breaking, and scale normalization via GizmoRenderer.
  */
 export class PenToolHandler implements IToolHandler {
   public readonly toolTypes: ToolType[] = ['pen'];
@@ -231,16 +215,7 @@ export class PenToolHandler implements IToolHandler {
   }
 
   /**
-   * ARCHITECTURAL RATIONALE: Coincident Vertex Deduplication and Topological Fusion
-   *
-   * 1. Eliminating Micro-Offset Duplicates:
-   *    Consecutive micro-clicks (e.g. double-click gestures or mouse debounce jitter) frequently
-   *    append multiple nodes at identical or near-identical coordinates.
-   * 2. Single Unified Closing Node:
-   *    When closing the path (`close === true`), if the final vertex was placed over the starting
-   *    anchor point (`v0`), `unifyClosingVertices` fuses the closing vertex into `v0`, transferring
-   *    incoming tangent handles and discarding the duplicate endpoint. The SVG 'Z' command then
-   *    cleanly seals the contour to `v0` without producing double-stacked nodes.
+   * Coincident Vertex Deduplication and Topological Fusion (unifyClosingVertices)
    */
   public finishPenPath(close: boolean = false): void {
     const z = this.ctx.canvasMgr.zoom || 1;
@@ -296,14 +271,7 @@ export class PenToolHandler implements IToolHandler {
 
     if (this.currentPenVertices.length > 0) {
       const penD = this.ctx.model.compilePathD(this.currentPenVertices, false);
-      descriptors.push({
-        type: 'path',
-        d: penD,
-        fill: 'none',
-        stroke: '#38bdf8',
-        strokeWidth: 2,
-        vectorEffect: 'non-scaling-stroke',
-      });
+      descriptors.push(GizmoRenderer.renderGhostPathDescriptor(penD, false));
 
       const lastV = this.currentPenVertices[this.currentPenVertices.length - 1];
       const firstV = this.currentPenVertices[0];
@@ -315,158 +283,62 @@ export class PenToolHandler implements IToolHandler {
 
         const targetPt = isHoveringStart ? { x: firstV.x, y: firstV.y } : this.penHoverPoint;
 
-        let ghostD = '';
         if (lastV.handleOut) {
-          ghostD = `M ${lastV.x} ${lastV.y} C ${lastV.handleOut.x} ${lastV.handleOut.y}, ${targetPt.x} ${targetPt.y}, ${targetPt.x} ${targetPt.y}`;
+          const ghostD = `M ${lastV.x} ${lastV.y} C ${lastV.handleOut.x} ${lastV.handleOut.y}, ${targetPt.x} ${targetPt.y}, ${targetPt.x} ${targetPt.y}`;
+          descriptors.push({
+            type: 'path',
+            d: ghostD,
+            fill: 'none',
+            stroke: isHoveringStart ? GizmoTheme.rubberband.strokeClosing : GizmoTheme.rubberband.strokeStandard,
+            strokeWidth: GizmoTheme.rubberband.strokeWidth,
+            strokeDasharray: GizmoTheme.rubberband.dash,
+            vectorEffect: 'non-scaling-stroke',
+          });
         } else {
-          ghostD = `M ${lastV.x} ${lastV.y} L ${targetPt.x} ${targetPt.y}`;
+          descriptors.push(...GizmoRenderer.renderRubberbandDescriptor(lastV, targetPt, z, isHoveringStart));
         }
-        descriptors.push({
-          type: 'path',
-          d: ghostD,
-          fill: 'none',
-          stroke: isHoveringStart ? '#10b981' : '#38bdf8',
-          strokeWidth: 1.5,
-          strokeDasharray: '4 3',
-          vectorEffect: 'non-scaling-stroke',
-        });
 
         if (isHoveringStart) {
           descriptors.push({
             type: 'circle',
             cx: firstV.x,
             cy: firstV.y,
-            r: 8 / z,
+            r: GizmoTheme.rubberband.closureHaloRadius / z,
             fill: 'none',
-            stroke: '#10b981',
-            strokeWidth: 2,
-            strokeDasharray: '2 2',
+            stroke: GizmoTheme.rubberband.strokeClosing,
+            strokeWidth: GizmoTheme.rubberband.closureHaloWidth,
+            strokeDasharray: GizmoTheme.rubberband.closureHaloDash,
             vectorEffect: 'non-scaling-stroke',
           });
         } else {
-          descriptors.push({
-            type: 'circle',
-            cx: targetPt.x,
-            cy: targetPt.y,
-            r: 3.5 / z,
-            fill: 'rgba(56, 189, 248, 0.35)',
-            opacity: 0.95,
-            stroke: '#38bdf8',
-            strokeWidth: 1.5,
-            strokeDasharray: '2 2',
-            vectorEffect: 'non-scaling-stroke',
-            pointerEvents: 'none',
-          });
-          descriptors.push({
-            type: 'circle',
-            cx: targetPt.x,
-            cy: targetPt.y,
-            r: 1.2 / z,
-            fill: '#ffffff',
-            pointerEvents: 'none',
-          });
+          descriptors.push(...GizmoRenderer.renderAnchorDescriptor(targetPt, { kind: 'standard', state: 'idle' }, z));
         }
       }
 
       this.currentPenVertices.forEach((v, idx) => {
         const isStart = idx === 0;
-
         if (v.handleIn) {
-          descriptors.push({
-            type: 'line',
-            x1: v.x,
-            y1: v.y,
-            x2: v.handleIn.x,
-            y2: v.handleIn.y,
-            stroke: '#a855f7',
-            strokeWidth: 1,
-            strokeDasharray: '2 2',
-            vectorEffect: 'non-scaling-stroke',
-          });
-          descriptors.push({
-            type: 'circle',
-            cx: v.handleIn.x,
-            cy: v.handleIn.y,
-            r: 3 / z,
-            fill: '#a855f7',
-            stroke: '#ffffff',
-            strokeWidth: 1,
-            vectorEffect: 'non-scaling-stroke',
-          });
+          descriptors.push(...GizmoRenderer.renderHandleDescriptor(v, v.handleIn, z));
         }
         if (v.handleOut) {
-          descriptors.push({
-            type: 'line',
-            x1: v.x,
-            y1: v.y,
-            x2: v.handleOut.x,
-            y2: v.handleOut.y,
-            stroke: '#a855f7',
-            strokeWidth: 1,
-            strokeDasharray: '2 2',
-            vectorEffect: 'non-scaling-stroke',
-          });
-          descriptors.push({
-            type: 'circle',
-            cx: v.handleOut.x,
-            cy: v.handleOut.y,
-            r: 3 / z,
-            fill: '#a855f7',
-            stroke: '#ffffff',
-            strokeWidth: 1,
-            vectorEffect: 'non-scaling-stroke',
-          });
+          descriptors.push(...GizmoRenderer.renderHandleDescriptor(v, v.handleOut, z));
         }
-
-        if (isStart) {
-          descriptors.push({
-            type: 'circle',
-            cx: v.x,
-            cy: v.y,
-            r: 5 / z,
-            fill: '#10b981',
-            stroke: '#ffffff',
-            strokeWidth: 1.5,
-            vectorEffect: 'non-scaling-stroke',
-          });
-        } else {
-          descriptors.push({
-            type: 'rect',
-            x: v.x - 3.5 / z,
-            y: v.y - 3.5 / z,
-            width: 7 / z,
-            height: 7 / z,
-            fill: '#38bdf8',
-            stroke: '#ffffff',
-            strokeWidth: 1,
-            rx: 1 / z,
-            vectorEffect: 'non-scaling-stroke',
-          });
-        }
+        descriptors.push(
+          ...GizmoRenderer.renderAnchorDescriptor(
+            v,
+            { kind: isStart ? 'first' : 'standard', state: 'idle' },
+            z
+          )
+        );
       });
     } else if (this.ctx.getActiveTool() === 'pen' && this.penHoverPoint) {
-      // First ghost point preview under cursor before first click (zoom-independent screen size)
-      descriptors.push({
-        type: 'circle',
-        cx: this.penHoverPoint.x,
-        cy: this.penHoverPoint.y,
-        r: 3.5 / z,
-        fill: 'rgba(56, 189, 248, 0.35)',
-        opacity: 0.95,
-        stroke: '#38bdf8',
-        strokeWidth: 1.5,
-        strokeDasharray: '2 2',
-        vectorEffect: 'non-scaling-stroke',
-        pointerEvents: 'none',
-      });
-      descriptors.push({
-        type: 'circle',
-        cx: this.penHoverPoint.x,
-        cy: this.penHoverPoint.y,
-        r: 1.2 / z,
-        fill: '#ffffff',
-        pointerEvents: 'none',
-      });
+      descriptors.push(
+        ...GizmoRenderer.renderAnchorDescriptor(
+          this.penHoverPoint,
+          { kind: 'standard', state: 'idle' },
+          z
+        )
+      );
     }
 
     return descriptors;
