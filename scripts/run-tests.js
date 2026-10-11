@@ -17,7 +17,7 @@ async function runSuite(entryFile, exportFnName) {
     });
 
     const mod = require(tmpOut);
-    return mod[exportFnName]();
+    return await mod[exportFnName]();
   } finally {
     if (fs.existsSync(tmpOut)) {
       try {
@@ -30,8 +30,9 @@ async function runSuite(entryFile, exportFnName) {
 async function main() {
   const ok1 = await runSuite(path.join(__dirname, 'test-validator.ts'), 'runValidatorTests');
   const ok2 = await runSuite(path.join(__dirname, 'test-metadata-fusion.ts'), 'runMetadataFusionTests');
+  const ok3 = await runSuite(path.join(__dirname, 'test-clipboard.ts'), 'runClipboardTests');
 
-  const allSuccess = ok1 && ok2;
+  const allSuccess = ok1 && ok2 && ok3;
   process.exit(allSuccess ? 0 : 1);
 }
 

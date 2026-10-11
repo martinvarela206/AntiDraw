@@ -1,6 +1,7 @@
 import { VectorModel, VectorElement } from '../engine/VectorModel.js';
 import { SelectionTool } from '../engine/SelectionTool.js';
 import { CanvasManager, GuideLine } from '../engine/CanvasManager.js';
+import { ClipboardManager } from '../engine/clipboard/ClipboardManager.js';
 
 export interface ClipboardServiceContext {
   model: VectorModel;
@@ -46,6 +47,11 @@ export class ClipboardService {
     if (this.ctx.selectionTool.selectedElementIds.size > 0) {
       const selected = this.ctx.model.elements.filter((el) => this.ctx.selectionTool.isSelected(el.id));
       this.clipboardElements = JSON.parse(JSON.stringify(selected));
+
+      // Asynchronously publish multi-flavour representations (SVG + Plain Text + PNG) to OS clipboard
+      ClipboardManager.copySelectionMultiFlavour(selected).catch((err) => {
+        console.warn('[ClipboardService] System clipboard export warning:', err);
+      });
     } else {
       this.clipboardElements = [];
     }
