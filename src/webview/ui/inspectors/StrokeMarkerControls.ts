@@ -5,12 +5,15 @@ export interface StrokeMarkerProps {
   markerStart: string;
   markerMid: string;
   markerEnd: string;
+  markerAlign: 'tip' | 'extend';
   markerOffset: string;
   markerSize: string;
   markerUnits: string;
   markerLayer: string;
   markerColor: string;
   stroke: string;
+  isShapeRestricted?: boolean;
+  shapeTagName?: string;
 }
 
 /**
@@ -20,58 +23,107 @@ export interface StrokeMarkerProps {
  *    Decoupled from StrokeInspector to preserve cohesive responsibilities and maintain file sizes
  *    well under the 500-line threshold.
  *
- * 2. Universal SVG Terminal Marker System:
- *    Encapsulates controls for terminal and midpoint markers (start, mid, end), parametric offsets,
- *    relative vs absolute sizing (strokeWidth vs userSpaceOnUse), paint-order layer stacking,
- *    and decoupled marker tints with context-stroke fallback.
+ * 2. Universal SVG Terminal Marker System with 13 Standard Models:
+ *    Encapsulates controls for terminal and midpoint markers (start, mid, end), alignment modes
+ *    (tip-on-end vs extend-past-end), parametric offsets, relative vs absolute sizing (strokeWidth vs userSpaceOnUse),
+ *    paint-order layer stacking, and decoupled marker tints with context-stroke fallback.
+ *
+ * 3. Guided Primitive Conversion:
+ *    For W3C-restricted shapes (<rect>, <circle>, <ellipse>) which ignore SVG markers per specification,
+ *    presents an informative conversion callout with explicit action button.
  */
 export class StrokeMarkerControls {
+  private static readonly DIRECTIONAL_MARKERS = [
+    'arrow-open',
+    'arrow-filled',
+    'arrow-stealth',
+    'arrow-triangle-wide',
+    'arrow-concave',
+    'bar-cap',
+    'bracket',
+  ];
+
   public static renderHtml(props: StrokeMarkerProps): string {
     const {
       markerStart,
       markerMid,
       markerEnd,
+      markerAlign,
       markerOffset,
       markerSize,
       markerUnits,
       markerLayer,
       markerColor,
       stroke,
+      isShapeRestricted,
+      shapeTagName,
     } = props;
+
+    if (isShapeRestricted) {
+      return `
+        <div class="prop-row" style="flex-direction:column; align-items:stretch; background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:4px; padding:6px 8px; gap:6px; margin-top:4px;">
+          <div style="font-size:10px; color:var(--text-muted); line-height:1.35;">
+            ℹ️ Las figuras SVG cerradas (&lt;${shapeTagName || 'figura'}&gt;) no admiten marcadores en el estándar SVG W3C. Para añadir flechas o terminales, convierte la figura a vector.
+          </div>
+          <button type="button" class="prop-input" id="btn-convert-for-markers" style="cursor:pointer; background:var(--accent-color); color:#fff; font-weight:600; padding:4px 8px; text-align:center; font-size:11px;" title="Convertir a trazado Bézier editable para admitir flechas y marcadores">
+            ⚡ Convertir a Curvas para Flechas
+          </button>
+        </div>
+      `;
+    }
 
     const isCustomMarkerColor = markerColor && markerColor !== 'context-stroke';
     const markerColorDisplay = isCustomMarkerColor ? markerColor : (stroke === 'none' || stroke === 'currentColor' ? '#000000' : stroke);
+
+    const renderMarkerOptions = (current: string, isMid: boolean = false) => `
+      <option value="none" ${current === 'none' ? 'selected' : ''}>None (Ninguno)</option>
+      <optgroup label="Flechas">
+        <option value="arrow-open" ${current === 'arrow-open' ? 'selected' : ''}>Flecha Abierta (V)</option>
+        <option value="arrow-filled" ${current === 'arrow-filled' ? 'selected' : ''}>Flecha Rellena (Triángulo)</option>
+        <option value="arrow-stealth" ${current === 'arrow-stealth' ? 'selected' : ''}>Flecha Furtiva (Stealth)</option>
+        <option value="arrow-triangle-wide" ${current === 'arrow-triangle-wide' ? 'selected' : ''}>Flecha Ancha (Wide)</option>
+        <option value="arrow-concave" ${current === 'arrow-concave' ? 'selected' : ''}>Flecha Cóncava (Concave)</option>
+      </optgroup>
+      <optgroup label="Geometría">
+        <option value="circle-dot" ${current === 'circle-dot' ? 'selected' : ''}>Punto Sólido (Circle Dot)</option>
+        <option value="circle-open" ${current === 'circle-open' ? 'selected' : ''}>Círculo Hueco (Circle Open)</option>
+        <option value="diamond" ${current === 'diamond' ? 'selected' : ''}>Rombo Diamante (Diamond)</option>
+        <option value="square-block" ${current === 'square-block' ? 'selected' : ''}>Cuadrado Sólido (Square)</option>
+        <option value="square-open" ${current === 'square-open' ? 'selected' : ''}>Cuadrado Hueco (Square Open)</option>
+      </optgroup>
+      ${!isMid ? `
+      <optgroup label="Cotas y Remates">
+        <option value="bar-cap" ${current === 'bar-cap' ? 'selected' : ''}>Barra Remate en T</option>
+        <option value="slash" ${current === 'slash' ? 'selected' : ''}>Barra Inclinada (Slash)</option>
+        <option value="bracket" ${current === 'bracket' ? 'selected' : ''}>Corchete Delimitador (Bracket)</option>
+      </optgroup>
+      ` : ''}
+    `;
 
     return `
       <div class="prop-row">
         <span class="prop-label">Start Mkr</span>
         <select class="prop-input" id="el-marker-start" style="cursor:pointer;" title="Marcador de inicio de trazo (marker-start)">
-          <option value="none" ${markerStart === 'none' ? 'selected' : ''}>None</option>
-          <option value="arrow-open" ${markerStart === 'arrow-open' ? 'selected' : ''}>Arrow (Open)</option>
-          <option value="arrow-filled" ${markerStart === 'arrow-filled' ? 'selected' : ''}>Arrow (Filled)</option>
-          <option value="circle-dot" ${markerStart === 'circle-dot' ? 'selected' : ''}>Circle Dot</option>
-          <option value="square-block" ${markerStart === 'square-block' ? 'selected' : ''}>Square</option>
-          <option value="bar-cap" ${markerStart === 'bar-cap' ? 'selected' : ''}>Bar Cap</option>
+          ${renderMarkerOptions(markerStart)}
         </select>
       </div>
       <div class="prop-row">
         <span class="prop-label">Mid Mkr</span>
         <select class="prop-input" id="el-marker-mid" style="cursor:pointer;" title="Marcador en vértices intermedios (marker-mid)">
-          <option value="none" ${markerMid === 'none' ? 'selected' : ''}>None</option>
-          <option value="arrow-filled" ${markerMid === 'arrow-filled' ? 'selected' : ''}>Arrow (Directional)</option>
-          <option value="circle-dot" ${markerMid === 'circle-dot' ? 'selected' : ''}>Circle Dot</option>
-          <option value="square-block" ${markerMid === 'square-block' ? 'selected' : ''}>Square</option>
+          ${renderMarkerOptions(markerMid, true)}
         </select>
       </div>
       <div class="prop-row">
         <span class="prop-label">End Mkr</span>
         <select class="prop-input" id="el-marker-end" style="cursor:pointer;" title="Marcador de final de trazo (marker-end)">
-          <option value="none" ${markerEnd === 'none' ? 'selected' : ''}>None</option>
-          <option value="arrow-open" ${markerEnd === 'arrow-open' ? 'selected' : ''}>Arrow (Open)</option>
-          <option value="arrow-filled" ${markerEnd === 'arrow-filled' ? 'selected' : ''}>Arrow (Filled)</option>
-          <option value="circle-dot" ${markerEnd === 'circle-dot' ? 'selected' : ''}>Circle Dot</option>
-          <option value="square-block" ${markerEnd === 'square-block' ? 'selected' : ''}>Square</option>
-          <option value="bar-cap" ${markerEnd === 'bar-cap' ? 'selected' : ''}>Bar Cap</option>
+          ${renderMarkerOptions(markerEnd)}
+        </select>
+      </div>
+      <div class="prop-row">
+        <span class="prop-label">Mkr Align</span>
+        <select class="prop-input" id="el-marker-align" style="cursor:pointer;" title="Alineación del marcador: Punta en nodo (Tip-on-end) ancla la punta exterior exacta en el vértice; Extender (Extend-past-end) ancla la base en el vértice y proyecta la flecha hacia afuera">
+          <option value="tip" ${markerAlign === 'tip' ? 'selected' : ''}>Punta en nodo (Tip)</option>
+          <option value="extend" ${markerAlign === 'extend' ? 'selected' : ''}>Extender fuera (Extend)</option>
         </select>
       </div>
       <div class="prop-row">
@@ -109,13 +161,25 @@ export class StrokeMarkerControls {
   public static bindEvents(
     container: HTMLElement,
     el: VectorElement,
-    _model: VectorModel,
+    model: VectorModel,
     callbacks: PropertyPanelCallbacks,
     onReRender: () => void
   ): void {
+    const btnConvertForMarkers = container.querySelector<HTMLButtonElement>('#btn-convert-for-markers');
+    if (btnConvertForMarkers) {
+      btnConvertForMarkers.addEventListener('click', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        model.convertToCurves(el);
+        callbacks.onUpdateElement(el);
+        onReRender();
+      });
+      return;
+    }
+
     const elMarkerStart = container.querySelector<HTMLSelectElement>('#el-marker-start');
     const elMarkerMid = container.querySelector<HTMLSelectElement>('#el-marker-mid');
     const elMarkerEnd = container.querySelector<HTMLSelectElement>('#el-marker-end');
+    const elMarkerAlign = container.querySelector<HTMLSelectElement>('#el-marker-align');
     const elMarkerOffset = container.querySelector<HTMLInputElement>('#el-marker-offset');
     const elMarkerSize = container.querySelector<HTMLInputElement>('#el-marker-size');
     const elMarkerUnits = container.querySelector<HTMLSelectElement>('#el-marker-units');
@@ -128,18 +192,23 @@ export class StrokeMarkerControls {
       if (baseVal === 'none') {
         delete el.attributes[attr];
       } else {
+        const align = el.attributes['data-marker-align'] || 'tip';
         const offset = parseFloat(el.attributes['data-marker-offset'] || '0') || 0;
-        const isCustom = offset !== 0 ||
+        const isCustom =
+          align !== 'tip' ||
+          offset !== 0 ||
           el.attributes['data-marker-size'] !== undefined ||
           el.attributes['data-marker-units'] !== undefined ||
           (el.attributes['data-marker-color'] !== undefined && el.attributes['data-marker-color'] !== 'context-stroke');
+
         let keyWithPos = baseVal;
-        if (attr === 'marker-start' && (baseVal === 'arrow-open' || baseVal === 'arrow-filled' || baseVal === 'bar-cap')) {
+        const isDirectional = StrokeMarkerControls.DIRECTIONAL_MARKERS.includes(baseVal);
+        if (attr === 'marker-start' && isDirectional) {
           keyWithPos = `${baseVal}-start`;
-        } else if (attr === 'marker-end' && (baseVal === 'arrow-open' || baseVal === 'arrow-filled' || baseVal === 'bar-cap')) {
+        } else if (attr === 'marker-end' && isDirectional) {
           keyWithPos = `${baseVal}-end`;
-        } else if (attr === 'marker-mid' && baseVal === 'arrow-filled') {
-          keyWithPos = 'arrow-filled-mid';
+        } else if (attr === 'marker-mid' && isDirectional) {
+          keyWithPos = `${baseVal}-mid`;
         }
 
         if (isCustom) {
@@ -179,50 +248,51 @@ export class StrokeMarkerControls {
       });
     }
 
+    if (elMarkerAlign) {
+      elMarkerAlign.addEventListener('change', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        if (elMarkerAlign.value === 'tip') {
+          delete el.attributes['data-marker-align'];
+        } else {
+          el.attributes['data-marker-align'] = elMarkerAlign.value;
+        }
+        refreshActiveMarkers();
+      });
+    }
+
     if (elMarkerOffset) {
-      const applyOffset = () => {
-        const val = parseFloat(elMarkerOffset.value || '0') || 0;
+      elMarkerOffset.addEventListener('change', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        const val = parseFloat(elMarkerOffset.value) || 0;
         if (val === 0) {
           delete el.attributes['data-marker-offset'];
         } else {
           el.attributes['data-marker-offset'] = val.toString();
         }
         refreshActiveMarkers();
-      };
-
-      elMarkerOffset.addEventListener('input', applyOffset);
-      elMarkerOffset.addEventListener('change', () => {
-        if (callbacks.onPushUndo) callbacks.onPushUndo();
-        applyOffset();
       });
     }
 
     if (elMarkerSize) {
-      const applySize = () => {
-        const val = parseFloat(elMarkerSize.value || '6') || 6;
-        if (val === 6 && (!el.attributes['data-marker-units'] || el.attributes['data-marker-units'] === 'strokeWidth')) {
+      elMarkerSize.addEventListener('change', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        const val = Math.max(0.5, parseFloat(elMarkerSize.value) || 6);
+        if (val === 6) {
           delete el.attributes['data-marker-size'];
         } else {
           el.attributes['data-marker-size'] = val.toString();
         }
         refreshActiveMarkers();
-      };
-
-      elMarkerSize.addEventListener('input', applySize);
-      elMarkerSize.addEventListener('change', () => {
-        if (callbacks.onPushUndo) callbacks.onPushUndo();
-        applySize();
       });
     }
 
     if (elMarkerUnits) {
       elMarkerUnits.addEventListener('change', () => {
         if (callbacks.onPushUndo) callbacks.onPushUndo();
-        const units = elMarkerUnits.value;
-        if (units === 'strokeWidth') {
+        if (elMarkerUnits.value === 'strokeWidth') {
           delete el.attributes['data-marker-units'];
         } else {
-          el.attributes['data-marker-units'] = units;
+          el.attributes['data-marker-units'] = elMarkerUnits.value;
         }
         refreshActiveMarkers();
       });
@@ -240,37 +310,42 @@ export class StrokeMarkerControls {
       });
     }
 
+    const applyMarkerColor = (color: string) => {
+      if (color === 'context-stroke') {
+        delete el.attributes['data-marker-color'];
+        if (elMarkerColorHex) elMarkerColorHex.value = 'Auto (trazo)';
+      } else {
+        el.attributes['data-marker-color'] = color;
+        if (elMarkerColor) elMarkerColor.value = color;
+        if (elMarkerColorHex) elMarkerColorHex.value = color;
+      }
+      refreshActiveMarkers();
+    };
+
     if (elMarkerColor) {
       elMarkerColor.addEventListener('input', () => {
-        el.attributes['data-marker-color'] = elMarkerColor.value;
-        if (elMarkerColorHex) elMarkerColorHex.value = elMarkerColor.value;
-        refreshActiveMarkers();
-      });
-      elMarkerColor.addEventListener('change', () => {
         if (callbacks.onPushUndo) callbacks.onPushUndo();
+        applyMarkerColor(elMarkerColor.value);
       });
     }
 
     if (elMarkerColorHex) {
       elMarkerColorHex.addEventListener('change', () => {
-        const val = elMarkerColorHex.value.trim();
-        if (!val || val.toLowerCase().includes('auto') || val === 'context-stroke') {
-          delete el.attributes['data-marker-color'];
-        } else {
-          el.attributes['data-marker-color'] = val.startsWith('#') ? val : `#${val}`;
-        }
         if (callbacks.onPushUndo) callbacks.onPushUndo();
-        refreshActiveMarkers();
-        onReRender();
+        const val = elMarkerColorHex.value.trim();
+        if (val === '' || val.toLowerCase() === 'auto' || val === 'context-stroke') {
+          applyMarkerColor('context-stroke');
+        } else {
+          const hex = val.startsWith('#') ? val : `#${val}`;
+          applyMarkerColor(hex);
+        }
       });
     }
 
     if (btnResetMarkerColor) {
       btnResetMarkerColor.addEventListener('click', () => {
-        delete el.attributes['data-marker-color'];
         if (callbacks.onPushUndo) callbacks.onPushUndo();
-        refreshActiveMarkers();
-        onReRender();
+        applyMarkerColor('context-stroke');
       });
     }
   }

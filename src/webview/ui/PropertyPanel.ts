@@ -675,23 +675,41 @@ export class PropertyPanel {
 
     const parseMarkerId = (val?: string): string => {
       if (!val || val === 'none') return 'none';
-      if (val.includes('arrow-open')) return 'arrow-open';
-      if (val.includes('arrow-filled')) return 'arrow-filled';
-      if (val.includes('circle-dot')) return 'circle-dot';
-      if (val.includes('square-block')) return 'square-block';
-      if (val.includes('bar-cap')) return 'bar-cap';
+      const models = [
+        'arrow-open',
+        'arrow-filled',
+        'arrow-stealth',
+        'arrow-triangle-wide',
+        'arrow-concave',
+        'circle-dot',
+        'circle-open',
+        'diamond',
+        'square-block',
+        'square-open',
+        'bar-cap',
+        'slash',
+        'bracket',
+      ];
+      for (const m of models) {
+        if (val.includes(m)) return m;
+      }
       return 'none';
     };
 
     const markerStart = parseMarkerId(el.attributes['marker-start']);
     const markerMid = parseMarkerId(el.attributes['marker-mid']);
     const markerEnd = parseMarkerId(el.attributes['marker-end']);
+    const markerAlign = (el.attributes['data-marker-align'] as 'tip' | 'extend') || 'tip';
     const markerOffset = parseFloat(el.attributes['data-marker-offset'] || '0') || 0;
     const markerSize = el.attributes['data-marker-size'] ? parseFloat(el.attributes['data-marker-size']) : 6;
     const markerUnits = (el.attributes['data-marker-units'] as 'strokeWidth' | 'userSpaceOnUse') || 'strokeWidth';
     const paintOrder = el.attributes['paint-order'] || '';
     const markerLayer: 'over' | 'under' = paintOrder.includes('markers stroke') ? 'under' : 'over';
     const markerColor = el.attributes['data-marker-color'] || 'context-stroke';
+
+    const tag = el.tagName?.toLowerCase() || '';
+    const shape = el.shapeType?.toLowerCase() || '';
+    const isShapeRestricted = tag === 'rect' || tag === 'circle' || tag === 'ellipse' || shape === 'rect' || shape === 'circle' || shape === 'ellipse';
 
     return {
       stroke,
@@ -703,12 +721,15 @@ export class PropertyPanel {
       markerStart,
       markerMid,
       markerEnd,
+      markerAlign,
       markerOffset,
       markerSize,
       markerUnits,
       markerLayer,
       markerColor,
       dashAlignCorners,
+      isShapeRestricted,
+      shapeTagName: el.tagName,
     };
   }
 

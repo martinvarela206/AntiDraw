@@ -15,12 +15,15 @@ export interface StrokeInspectorProps {
   markerStart: string;
   markerMid: string;
   markerEnd: string;
+  markerAlign: 'tip' | 'extend';
   markerOffset: number;
   markerSize: number;
   markerUnits: 'strokeWidth' | 'userSpaceOnUse';
   markerLayer: 'over' | 'under';
   markerColor: string;
   dashAlignCorners?: boolean;
+  isShapeRestricted?: boolean;
+  shapeTagName?: string;
 }
 
 /**
@@ -66,12 +69,15 @@ export class StrokeInspector {
       markerStart,
       markerMid,
       markerEnd,
+      markerAlign,
       markerOffset,
       markerSize,
       markerUnits,
       markerLayer,
       markerColor,
       dashAlignCorners,
+      isShapeRestricted,
+      shapeTagName,
     } = props;
 
     const isCurrentColor = stroke === 'currentColor';
@@ -157,12 +163,15 @@ export class StrokeInspector {
           markerStart,
           markerMid,
           markerEnd,
+          markerAlign,
           markerOffset: markerOffset.toString(),
           markerSize: markerSize.toString(),
           markerUnits,
           markerLayer,
           markerColor,
           stroke,
+          isShapeRestricted,
+          shapeTagName,
         })}
         <div class="prop-row" style="margin-top: 8px;">
           <button class="prop-input" id="btn-stroke-to-path" style="cursor:pointer; background:var(--bg-active); text-align:center; font-weight:600; color:var(--text-main); padding:6px;" title="Convertir geométricamente el trazo en un contorno cerrado independiente con relleno (Outline Stroke)">
