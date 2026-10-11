@@ -196,6 +196,31 @@ export class ContextMenuController {
             }
           },
         },
+        ...(this.ctx.selectionTool.selectedElementIds.size >= 2
+          ? [
+              { id: 'separator-bool', label: '', action: () => {} },
+              {
+                id: 'bool-union',
+                label: 'Unir (Soldar Formas)',
+                action: () => cmdRegistry.execute('boolean.union'),
+              },
+              {
+                id: 'bool-subtract',
+                label: 'Menos Frente (Sustraer)',
+                action: () => cmdRegistry.execute('boolean.subtract'),
+              },
+              {
+                id: 'bool-intersect',
+                label: 'Formar Intersección',
+                action: () => cmdRegistry.execute('boolean.intersect'),
+              },
+              {
+                id: 'bool-exclude',
+                label: 'Excluir (XOR)',
+                action: () => cmdRegistry.execute('boolean.exclude'),
+              },
+            ]
+          : []),
         { id: 'separator', label: '', action: () => {} },
         {
           id: 'delete',

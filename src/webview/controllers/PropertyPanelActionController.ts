@@ -10,6 +10,7 @@ import { CanvasActionDispatcher } from '../services/CanvasActionDispatcher.js';
 import { DistortTransformer } from '../tools/interactions/DistortTransformer.js';
 import { QuadCorners } from '../engine/geometry/ProjectiveHomography.js';
 import { Point } from '../core/geom/Point.js';
+import { CommandRegistry } from '../commands/CommandRegistry.js';
 
 import { ToolSuite } from '../tools/ToolFactory.js';
 import { CoreServices } from '../services/CoreServiceRegistry.js';
@@ -150,7 +151,15 @@ export class PropertyPanelActionController {
         }
         s.workspaceLayout.render();
       },
-      onBoolean: (op) => s.actionDispatcher.executeBoolean(op),
+      onBoolean: (op) => {
+        const cmdId = `boolean.${op}`;
+        const registry = CommandRegistry.getInstance();
+        if (registry.has(cmdId)) {
+          registry.execute(cmdId);
+        } else {
+          s.actionDispatcher.executeBoolean(op);
+        }
+      },
       onStrokeToPath: () => s.actionDispatcher.strokeToPath(),
       onConvertToCurves: (_el) => s.actionDispatcher.convertToCurves(),
       onPushUndo: () => s.historyService.pushUndo(),
