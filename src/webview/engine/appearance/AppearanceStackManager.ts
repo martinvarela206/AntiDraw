@@ -137,7 +137,8 @@ export class AppearanceStackManager {
     }
 
     // Set appearance stroke properties for this layer
-    cleanAttrs['id'] = `${el.id}-${layer.id}`;
+    cleanAttrs['id'] = `${el.id}__stroke_${layer.id}`;
+    cleanAttrs['class'] = 'ad-appearance-stroke-slave';
     cleanAttrs['fill'] = 'none';
     cleanAttrs['stroke'] = layer.stroke;
     cleanAttrs['stroke-width'] = layer.strokeWidth.toString();
@@ -145,7 +146,6 @@ export class AppearanceStackManager {
     if (layer.strokeLinejoin) cleanAttrs['stroke-linejoin'] = layer.strokeLinejoin;
     if (layer.strokeDash) cleanAttrs['stroke-dasharray'] = layer.strokeDash;
     if (layer.opacity !== undefined && layer.opacity < 1) cleanAttrs['stroke-opacity'] = layer.opacity.toString();
-    cleanAttrs['data-appearance-role'] = 'secondary-stroke';
 
     const attrStr = Object.entries(cleanAttrs)
       .map(([k, v]) => ` ${k}="${v}"`)

@@ -228,6 +228,18 @@ export class SvgDeserializer {
         }
 
         if (['path', 'rect', 'ellipse', 'circle', 'line', 'polygon', 'polyline', 'star'].includes(tag)) {
+          // Suppress importing compiled secondary appearance layers as orphaned standalone canvas elements
+          const nodeClass = node.getAttribute('class') || '';
+          const nodeId = node.getAttribute('id') || '';
+          const isSecondaryAppearanceLayer =
+            nodeClass.includes('ad-appearance-stroke-slave') ||
+            node.getAttribute('data-appearance-role') === 'secondary-stroke' ||
+            /__stroke_/.test(nodeId);
+
+          if (isSecondaryAppearanceLayer) {
+            return;
+          }
+
           const idx = elementIdx++;
           const attrs: Record<string, string> = {};
           for (let i = 0; i < node.attributes.length; i++) {

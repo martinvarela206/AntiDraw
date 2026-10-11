@@ -3,12 +3,12 @@ const path = require('path');
 const os = require('os');
 const fs = require('fs');
 
-async function main() {
-  const tmpOut = path.join(os.tmpdir(), `antidraw-test-${Date.now()}.cjs`);
+async function runSuite(entryFile, exportFnName) {
+  const tmpOut = path.join(os.tmpdir(), `antidraw-test-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.cjs`);
 
   try {
     await esbuild.build({
-      entryPoints: [path.join(__dirname, 'test-validator.ts')],
+      entryPoints: [entryFile],
       bundle: true,
       platform: 'node',
       format: 'cjs',
@@ -16,9 +16,8 @@ async function main() {
       logLevel: 'error',
     });
 
-    const { runValidatorTests } = require(tmpOut);
-    const success = runValidatorTests();
-    process.exit(success ? 0 : 1);
+    const mod = require(tmpOut);
+    return mod[exportFnName]();
   } finally {
     if (fs.existsSync(tmpOut)) {
       try {
@@ -26,6 +25,14 @@ async function main() {
       } catch (_) {}
     }
   }
+}
+
+async function main() {
+  const ok1 = await runSuite(path.join(__dirname, 'test-validator.ts'), 'runValidatorTests');
+  const ok2 = await runSuite(path.join(__dirname, 'test-metadata-fusion.ts'), 'runMetadataFusionTests');
+
+  const allSuccess = ok1 && ok2;
+  process.exit(allSuccess ? 0 : 1);
 }
 
 main().catch((err) => {
