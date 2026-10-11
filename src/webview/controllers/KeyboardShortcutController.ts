@@ -76,6 +76,11 @@ export class KeyboardShortcutController {
       this.ctx.selectionTool.isTouchingMarquee = false;
       this.ctx.renderOverlay();
     }
+    if (this.ctx.shapeToolHandler.shapeStartPt !== null) {
+      if (this.ctx.shapeToolHandler.onKeyUp(e)) {
+        return;
+      }
+    }
   }
 
   private handleKeyDown(e: KeyboardEvent): void {
@@ -83,6 +88,12 @@ export class KeyboardShortcutController {
     if (e.key === 'Alt' && this.ctx.selectionTool.marqueeRect) {
       this.ctx.selectionTool.isTouchingMarquee = true;
       this.ctx.renderOverlay();
+    }
+    if (this.ctx.shapeToolHandler.shapeStartPt !== null) {
+      if (this.ctx.shapeToolHandler.onKeyDown(e)) {
+        e.preventDefault();
+        return;
+      }
     }
 
     if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'SELECT') return;

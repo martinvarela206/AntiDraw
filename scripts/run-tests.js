@@ -14,6 +14,9 @@ async function runSuite(entryFile, exportFnName) {
       format: 'cjs',
       outfile: tmpOut,
       logLevel: 'error',
+      loader: {
+        '.svg': 'text',
+      },
     });
 
     const mod = require(tmpOut);
@@ -34,8 +37,9 @@ async function main() {
   const ok4 = await runSuite(path.join(__dirname, 'test-export.ts'), 'runExportTests');
   const ok5 = await runSuite(path.join(__dirname, 'test-error-boundary.ts'), 'runErrorBoundaryTests');
   const ok6 = await runSuite(path.join(__dirname, 'test-fuzzing.ts'), 'runFuzzingTests');
+  const ok7 = await runSuite(path.join(__dirname, 'test-drag-modifiers.ts'), 'runDragModifiersTests');
 
-  const allSuccess = ok1 && ok2 && ok3 && ok4 && ok5 && ok6;
+  const allSuccess = ok1 && ok2 && ok3 && ok4 && ok5 && ok6 && ok7;
   process.exit(allSuccess ? 0 : 1);
 }
 

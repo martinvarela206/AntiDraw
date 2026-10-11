@@ -40,6 +40,14 @@ export class ShapeToolHandler implements IToolHandler {
 
   public shapeStartPt: Point | null = null;
   public ghostShapeElement: VectorElement | null = null;
+  public isSpacePressed: boolean = false;
+  private frozenSpaceDelta: { dx: number; dy: number } | null = null;
+  public lastMovePt: Point | null = null;
+  public lastModifiers: { shiftKey: boolean; ctrlKey: boolean; altKey: boolean } = {
+    shiftKey: false,
+    ctrlKey: false,
+    altKey: false,
+  };
 
   constructor(ctx: ToolContext) {
     this.ctx = ctx;
@@ -57,6 +65,10 @@ export class ShapeToolHandler implements IToolHandler {
     const snappedPt = this.ctx.snapPoint(pt, otherVertices);
     this.shapeStartPt = snappedPt;
     this.ghostShapeElement = null;
+    this.isSpacePressed = false;
+    this.frozenSpaceDelta = null;
+    this.lastMovePt = snappedPt;
+    this.lastModifiers = { shiftKey: e.shiftKey, ctrlKey: e.ctrlKey, altKey: e.altKey };
     return ActionIntentFactory.begin('shape.create', { startPoint: snappedPt, tool: activeTool });
   }
 
@@ -68,6 +80,56 @@ export class ShapeToolHandler implements IToolHandler {
   }
 
   /**
+   * Conmuta el estado de la tecla Espacio en vuelo (09.1).
+   * Al presionarse, congela las dimensiones alcanzadas para permitir trasladar
+   * la posición de la forma por el lienzo sin perder su tamaño.
+   */
+  public setSpacePressed(pressed: boolean): void {
+    this.isSpacePressed = pressed;
+    if (!pressed) {
+      this.frozenSpaceDelta = null;
+    } else if (this.shapeStartPt && this.lastMovePt && !this.frozenSpaceDelta) {
+      this.frozenSpaceDelta = {
+        dx: this.lastMovePt.x - this.shapeStartPt.x,
+        dy: this.lastMovePt.y - this.shapeStartPt.y,
+      };
+    }
+  }
+
+  /**
+   * Actualiza los modificadores (Shift, Alt, Ctrl) en vuelo mientras se arrastra una forma (09.1).
+   */
+  public updateModifierInFlight(shiftKey: boolean, altKey: boolean, ctrlKey: boolean): void {
+    if (!this.shapeStartPt || !this.lastMovePt) return;
+    this.lastModifiers = { shiftKey, altKey, ctrlKey };
+    const activeTool = this.ctx.getActiveTool();
+    if (!this.toolTypes.includes(activeTool)) return;
+
+    let currentPt = this.lastMovePt;
+    if (activeTool === 'line' && shiftKey) {
+      const dx = currentPt.x - this.shapeStartPt.x;
+      const dy = currentPt.y - this.shapeStartPt.y;
+      const dist = Math.hypot(dx, dy);
+      const angle = Math.atan2(dy, dx);
+      const snapAngle = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
+      currentPt = {
+        x: this.shapeStartPt.x + dist * Math.cos(snapAngle),
+        y: this.shapeStartPt.y + dist * Math.sin(snapAngle),
+      };
+    }
+
+    this.ghostShapeElement = this.createShapeElement(
+      activeTool,
+      this.shapeStartPt,
+      currentPt,
+      'ghost_shape_preview',
+      shiftKey,
+      ctrlKey,
+      altKey
+    );
+  }
+
+  /**
    * Ciclo Declarativo (Capa L2): Evalúa pointermove y emite PreviewIntent
    */
   public evalPointerMove(e: PointerEvent, pt: Point): ActionIntent {
@@ -75,10 +137,29 @@ export class ShapeToolHandler implements IToolHandler {
     const activeTool = this.ctx.getActiveTool();
     if (!this.toolTypes.includes(activeTool)) return ActionIntentFactory.none();
 
+    this.lastModifiers = { shiftKey: e.shiftKey, ctrlKey: e.ctrlKey, altKey: e.altKey };
+
     const otherVertices = this.ctx.getOtherVertices();
     let currentPt = this.ctx.snapPoint(pt, otherVertices);
+    this.lastMovePt = currentPt;
 
-    // Line 45-degree angle constraint on Shift
+    // Espacio en vuelo (09.1): traslada la posición de la forma preservando su tamaño
+    if (this.isSpacePressed) {
+      if (!this.frozenSpaceDelta) {
+        this.frozenSpaceDelta = {
+          dx: currentPt.x - this.shapeStartPt.x,
+          dy: currentPt.y - this.shapeStartPt.y,
+        };
+      }
+      this.shapeStartPt = {
+        x: currentPt.x - this.frozenSpaceDelta.dx,
+        y: currentPt.y - this.frozenSpaceDelta.dy,
+      };
+    } else {
+      this.frozenSpaceDelta = null;
+    }
+
+    // Restricción angular a pasos de 45° en líneas con Shift
     if (activeTool === 'line' && e.shiftKey) {
       const dx = currentPt.x - this.shapeStartPt.x;
       const dy = currentPt.y - this.shapeStartPt.y;
@@ -166,6 +247,9 @@ export class ShapeToolHandler implements IToolHandler {
 
     this.shapeStartPt = null;
     this.ghostShapeElement = null;
+    this.isSpacePressed = false;
+    this.frozenSpaceDelta = null;
+    this.lastMovePt = null;
     this.ctx.renderOverlay();
     return true;
   }
@@ -174,6 +258,38 @@ export class ShapeToolHandler implements IToolHandler {
     if (e.key === 'Escape' && (this.shapeStartPt || this.ghostShapeElement)) {
       return this.cancel();
     }
+    if (e.code === 'Space' || e.key === ' ') {
+      if (this.shapeStartPt) {
+        this.setSpacePressed(true);
+        this.ctx.renderOverlay();
+        return true;
+      }
+    }
+    if (e.key === 'Shift' || e.key === 'Alt' || e.key === 'Control') {
+      if (this.shapeStartPt) {
+        this.updateModifierInFlight(e.shiftKey, e.altKey, e.ctrlKey);
+        this.ctx.renderOverlay();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  public onKeyUp(e: KeyboardEvent): boolean {
+    if (e.code === 'Space' || e.key === ' ') {
+      if (this.shapeStartPt) {
+        this.setSpacePressed(false);
+        this.ctx.renderOverlay();
+        return true;
+      }
+    }
+    if (e.key === 'Shift' || e.key === 'Alt' || e.key === 'Control') {
+      if (this.shapeStartPt) {
+        this.updateModifierInFlight(e.shiftKey, e.altKey, e.ctrlKey);
+        this.ctx.renderOverlay();
+        return true;
+      }
+    }
     return false;
   }
 
@@ -181,6 +297,9 @@ export class ShapeToolHandler implements IToolHandler {
     if (this.shapeStartPt || this.ghostShapeElement) {
       this.shapeStartPt = null;
       this.ghostShapeElement = null;
+      this.isSpacePressed = false;
+      this.frozenSpaceDelta = null;
+      this.lastMovePt = null;
       this.ctx.renderOverlay();
       return true;
     }
@@ -283,23 +402,11 @@ export class ShapeToolHandler implements IToolHandler {
     let targetW = Math.max(rawW, 2);
     let targetH = Math.max(rawH, 2);
 
-    // Priority: ctrlKey (1:1 ratio) takes precedence over altKey
-    if (ctrlKey) {
+    // 1. Shift (o Ctrl): Bloquea proporción 1:1 cuadrada / circular perfecta (09.1)
+    if (shiftKey || ctrlKey) {
       const size = Math.max(rawW, rawH, 2);
       targetW = size;
       targetH = size;
-    } else if (altKey) {
-      const ratioW = this.ctx.canvasMgr.shapeConfig?.aspectRatioW || 4;
-      const ratioH = this.ctx.canvasMgr.shapeConfig?.aspectRatioH || 3;
-      const ratio = ratioW / (ratioH || 1);
-
-      if (rawW / ratio > rawH) {
-        targetW = Math.max(rawW, 2);
-        targetH = Math.max(targetW / ratio, 2);
-      } else {
-        targetH = Math.max(rawH, 2);
-        targetW = Math.max(targetH * ratio, 2);
-      }
     }
 
     let x = 0;
@@ -311,8 +418,8 @@ export class ShapeToolHandler implements IToolHandler {
     let rx = 0;
     let ry = 0;
 
-    if (shiftKey) {
-      // Shift: Expand from center
+    // 2. Alt: Proyección concéntrica desde el centro geométrico (09.1)
+    if (altKey) {
       cx = start.x;
       cy = start.y;
       rx = targetW;
@@ -322,7 +429,7 @@ export class ShapeToolHandler implements IToolHandler {
       x = cx - targetW;
       y = cy - targetH;
     } else {
-      // Corner-to-corner expansion
+      // Proyección estándar desde la esquina opuesta
       x = sx > 0 ? start.x : start.x - targetW;
       y = sy > 0 ? start.y : start.y - targetH;
       w = targetW;

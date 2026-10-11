@@ -113,6 +113,7 @@ export class QuickHelpInspector {
       shortcuts: [
         { keys: ['Clic + Arrastre'], description: 'Traza un segmento de recta nativo <line>' },
         { keys: ['Shift', 'Arrastre'], description: 'Fuerza el ángulo a múltiplos de 45° (horizontal/vertical/diagonal)' },
+        { keys: ['Espacio', 'en vuelo'], description: 'Desplaza la línea completa en pantalla sin alterar su longitud' },
       ],
     },
     rect: {
@@ -120,10 +121,10 @@ export class QuickHelpInspector {
       toolId: 'rect',
       icon: ToolIcons.rectTool,
       shortcuts: [
-        { keys: ['Clic + Arrastre'], description: 'Dibuja un rectángulo libre desde la esquina inicial' },
-        { keys: ['Ctrl', 'Arrastre'], description: 'Fuerza relación de aspecto cuadrada perfecta 1:1' },
-        { keys: ['Shift', 'Arrastre'], description: 'Dibuja el rectángulo expandiéndolo desde su centro' },
-        { keys: ['Alt', 'Arrastre'], description: 'Bloquea a la relación de aspecto prefijada (ej. 4:3, 16:9)' },
+        { keys: ['Clic + Arrastre'], description: 'Dibuja un rectángulo libre desde la esquina opuesta' },
+        { keys: ['Shift', 'Arrastre'], description: 'Bloquea proporción 1:1 (cuadrado perfecto en vuelo)' },
+        { keys: ['Alt', 'Arrastre'], description: 'Proyecta simétricamente expandiendo desde el centro geométrico' },
+        { keys: ['Espacio', 'en vuelo'], description: 'Desplaza la posición de la forma en pantalla sin perder su tamaño' },
       ],
     },
     circle: {
@@ -132,7 +133,8 @@ export class QuickHelpInspector {
       icon: ToolIcons.circleTool,
       shortcuts: [
         { keys: ['Clic + Arrastre'], description: 'Dibuja un círculo nativo <circle> (1:1 intrínseco)' },
-        { keys: ['Shift', 'Arrastre'], description: 'Expande el círculo simétricamente desde su centro' },
+        { keys: ['Alt', 'Arrastre'], description: 'Expande el círculo concéntricamente desde su centro' },
+        { keys: ['Espacio', 'en vuelo'], description: 'Desplaza la posición del círculo en pantalla sin alterar su radio' },
       ],
     },
     ellipse: {
@@ -140,10 +142,10 @@ export class QuickHelpInspector {
       toolId: 'ellipse',
       icon: ToolIcons.ellipseTool,
       shortcuts: [
-        { keys: ['Clic + Arrastre'], description: 'Dibuja una elipse paramétrica libre' },
-        { keys: ['Ctrl', 'Arrastre'], description: 'Fuerza relación de aspecto circular perfecta 1:1' },
-        { keys: ['Shift', 'Arrastre'], description: 'Expande la elipse simétricamente desde su centro' },
-        { keys: ['Alt', 'Arrastre'], description: 'Bloquea a la relación de aspecto prefijada' },
+        { keys: ['Clic + Arrastre'], description: 'Dibuja una elipse paramétrica libre desde la esquina opuesta' },
+        { keys: ['Shift', 'Arrastre'], description: 'Bloquea proporción 1:1 (círculo perfecto en vuelo)' },
+        { keys: ['Alt', 'Arrastre'], description: 'Proyecta simétricamente expandiendo desde el centro geométrico' },
+        { keys: ['Espacio', 'en vuelo'], description: 'Desplaza la posición de la elipse en pantalla sin perder su tamaño' },
       ],
     },
     polygon: {
@@ -152,7 +154,8 @@ export class QuickHelpInspector {
       icon: ToolIcons.polygonTool,
       shortcuts: [
         { keys: ['Clic + Arrastre'], description: 'Dibuja un polígono regular con los lados configurados' },
-        { keys: ['Shift', 'Arrastre'], description: 'Restringe la orientación angular del polígono' },
+        { keys: ['Alt', 'Arrastre'], description: 'Proyecta el polígono expandiéndolo desde su centro' },
+        { keys: ['Espacio', 'en vuelo'], description: 'Desplaza el polígono en pantalla sin alterar su tamaño' },
       ],
     },
     star: {
@@ -161,7 +164,8 @@ export class QuickHelpInspector {
       icon: ToolIcons.starTool,
       shortcuts: [
         { keys: ['Clic + Arrastre'], description: 'Dibuja una estrella con las puntas y radio configurados' },
-        { keys: ['Shift', 'Arrastre'], description: 'Restringe la orientación angular de la estrella' },
+        { keys: ['Alt', 'Arrastre'], description: 'Proyecta la estrella expandiéndola desde su centro' },
+        { keys: ['Espacio', 'en vuelo'], description: 'Desplaza la estrella en pantalla sin alterar su tamaño' },
       ],
     },
     stroke: {
