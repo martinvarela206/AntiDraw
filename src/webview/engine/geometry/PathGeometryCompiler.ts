@@ -38,7 +38,8 @@ export class PathGeometryCompiler {
       if (match[1]) {
         tokens.push(match[1]);
       } else if (match[2]) {
-        tokens.push(parseFloat(match[2]));
+        const val = parseFloat(match[2]);
+        tokens.push(Number.isFinite(val) ? val : 0);
       }
     }
 
@@ -236,6 +237,20 @@ export class PathGeometryCompiler {
           v.nodeType = t;
         }
       });
+    }
+
+    // Final defensive guard: ensure 100% of vertices and their handles are strictly finite numbers
+    for (const v of vertices) {
+      if (!Number.isFinite(v.x)) v.x = 0;
+      if (!Number.isFinite(v.y)) v.y = 0;
+      if (v.handleIn) {
+        if (!Number.isFinite(v.handleIn.x)) v.handleIn.x = v.x;
+        if (!Number.isFinite(v.handleIn.y)) v.handleIn.y = v.y;
+      }
+      if (v.handleOut) {
+        if (!Number.isFinite(v.handleOut.x)) v.handleOut.x = v.x;
+        if (!Number.isFinite(v.handleOut.y)) v.handleOut.y = v.y;
+      }
     }
 
     return vertices;

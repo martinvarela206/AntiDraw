@@ -54,6 +54,11 @@ export class SvgDeserializer {
     try {
       const parser = new DOMParser();
       const doc = parser.parseFromString(svgText, 'image/svg+xml');
+      const parserError = doc.querySelector('parsererror');
+      if (parserError) {
+        console.warn('[AntiDraw:SvgDeserializer] XML parser error detectado al procesar SVG');
+      }
+
       const svgEl = doc.querySelector('svg');
 
       if (!svgEl) {
@@ -69,10 +74,21 @@ export class SvgDeserializer {
 
       let width = wAttr ? parseFloat(wAttr) : 800;
       let height = hAttr ? parseFloat(hAttr) : 600;
-      if (isNaN(width) || width <= 0) width = 800;
-      if (isNaN(height) || height <= 0) height = 600;
+      if (!Number.isFinite(width) || width <= 0) width = 800;
+      if (!Number.isFinite(height) || height <= 0) height = 600;
 
       let viewBox = vbAttr || `0 0 ${width} ${height}`;
+      if (vbAttr) {
+        const vbNums = vbAttr.trim().split(/[\s,]+/).map((v) => parseFloat(v));
+        if (
+          vbNums.length !== 4 ||
+          vbNums.some((n) => !Number.isFinite(n)) ||
+          vbNums[2] <= 0 ||
+          vbNums[3] <= 0
+        ) {
+          viewBox = `0 0 ${width} ${height}`;
+        }
+      }
 
       // ARCHITECTURAL RATIONALE: Standard SVG Transparency Preservation
       // Standard W3C SVG documents have transparent canvas backgrounds by default unless explicitly declared.
@@ -262,6 +278,12 @@ export class SvgDeserializer {
             }
           }
 
+          const parseFinite = (val: string | null, defVal: number): number => {
+            if (!val) return defVal;
+            const n = parseFloat(val);
+            return Number.isFinite(n) ? n : defVal;
+          };
+
           // Import drop-shadow metadata from external <feDropShadow> filter if not already stored
           if (!attrs['data-drop-shadow'] && attrs['filter'] && defsEl) {
             const match = attrs['filter'].match(/url\(#([^)]+)\)/);
@@ -271,11 +293,11 @@ export class SvgDeserializer {
               if (filterEl) {
                 const dropEl = filterEl.querySelector('feDropShadow');
                 if (dropEl) {
-                  const dx = parseFloat(dropEl.getAttribute('dx') || '4') || 4;
-                  const dy = parseFloat(dropEl.getAttribute('dy') || '4') || 4;
-                  const blur = parseFloat(dropEl.getAttribute('stdDeviation') || '4') || 4;
+                  const dx = parseFinite(dropEl.getAttribute('dx'), 4);
+                  const dy = parseFinite(dropEl.getAttribute('dy'), 4);
+                  const blur = Math.max(0, parseFinite(dropEl.getAttribute('stdDeviation'), 4));
                   const color = dropEl.getAttribute('flood-color') || '#000000';
-                  const opacity = parseFloat(dropEl.getAttribute('flood-opacity') || '0.5') || 0.5;
+                  const opacity = Math.max(0, Math.min(1, parseFinite(dropEl.getAttribute('flood-opacity'), 0.5)));
                   attrs['data-drop-shadow'] = JSON.stringify({ enabled: true, dx, dy, blur, color, opacity });
                 }
               }
@@ -296,14 +318,16 @@ export class SvgDeserializer {
                   const stops: GradientStop[] = stopEls.map((s, sIdx) => {
                     const offStr = s.getAttribute('offset') || '0';
                     const offVal = offStr.includes('%') ? parseFloat(offStr) / 100 : parseFloat(offStr);
+                    const safeOffset = Number.isFinite(offVal) ? Math.max(0, Math.min(1, offVal)) : 0;
                     const color = s.getAttribute('stop-color') || '#000000';
                     const opStr = s.getAttribute('stop-opacity');
                     const op = opStr ? parseFloat(opStr) : 1;
+                    const safeOp = Number.isFinite(op) ? Math.max(0, Math.min(1, op)) : 1;
                     return {
                       id: `stop_${sIdx}`,
-                      offset: isNaN(offVal) ? 0 : offVal,
+                      offset: safeOffset,
                       color,
-                      opacity: isNaN(op) ? 1 : op,
+                      opacity: safeOp,
                     };
                   });
                   if (stops.length >= 2) {
@@ -314,7 +338,8 @@ export class SvgDeserializer {
                     if (!isLinear) {
                       const parsePctOrNum = (val: string | null, defVal: number): number => {
                         if (!val) return defVal;
-                        return val.includes('%') ? parseFloat(val) / 100 : parseFloat(val);
+                        const raw = val.includes('%') ? parseFloat(val) / 100 : parseFloat(val);
+                        return Number.isFinite(raw) ? raw : defVal;
                       };
                       gradConfig.cx = parsePctOrNum(gradEl.getAttribute('cx'), 0.5);
                       gradConfig.cy = parsePctOrNum(gradEl.getAttribute('cy'), 0.5);
@@ -330,12 +355,12 @@ export class SvgDeserializer {
                           /matrix\(\s*([-\d.e]+)[\s,]+([-\d.e]+)[\s,]+([-\d.e]+)[\s,]+([-\d.e]+)[\s,]+([-\d.e]+)[\s,]+([-\d.e]+)\s*\)/i
                         );
                         if (matMatch) {
-                          const a = parseFloat(matMatch[1]);
-                          const b = parseFloat(matMatch[2]);
-                          const c = parseFloat(matMatch[3]);
-                          const d = parseFloat(matMatch[4]);
-                          const e = parseFloat(matMatch[5]);
-                          const f = parseFloat(matMatch[6]);
+                          const a = parseFinite(matMatch[1], 1);
+                          const b = parseFinite(matMatch[2], 0);
+                          const c = parseFinite(matMatch[3], 0);
+                          const d = parseFinite(matMatch[4], 1);
+                          const e = parseFinite(matMatch[5], 0);
+                          const f = parseFinite(matMatch[6], 0);
                           gradConfig.cx = Math.round(e * 1000) / 1000;
                           gradConfig.cy = Math.round(f * 1000) / 1000;
                           const angleRad = Math.atan2(b, a);
@@ -345,10 +370,10 @@ export class SvgDeserializer {
                           gradConfig.r = gradConfig.rx;
                         } else {
                           const rotMatch = gTrans.match(/rotate\(([-\d.]+)/);
-                          if (rotMatch) gradConfig.rotation = parseFloat(rotMatch[1]);
+                          if (rotMatch) gradConfig.rotation = parseFinite(rotMatch[1], 0);
                           const scaleMatch = gTrans.match(/scale\(1,\s*([-\d.]+)\)/);
                           if (scaleMatch && gradConfig.rx) {
-                            const sy = parseFloat(scaleMatch[1]);
+                            const sy = parseFinite(scaleMatch[1], 1);
                             gradConfig.ry = Math.round(gradConfig.rx * sy * 1000) / 1000;
                           }
                         }
@@ -357,6 +382,17 @@ export class SvgDeserializer {
                     attrs['data-gradient'] = JSON.stringify(gradConfig);
                   }
                 }
+              }
+            }
+          }
+
+          // Sanitize corrupted numerical attributes (NaN, Infinity)
+          for (const [k, v] of Object.entries(attrs)) {
+            if (typeof v === 'string' && (v.includes('NaN') || v.includes('Infinity'))) {
+              if (['x', 'y', 'x1', 'y1', 'x2', 'y2', 'cx', 'cy'].includes(k)) {
+                attrs[k] = '0';
+              } else if (['width', 'height', 'r', 'rx', 'ry'].includes(k)) {
+                attrs[k] = '50';
               }
             }
           }

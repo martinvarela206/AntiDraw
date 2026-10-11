@@ -253,22 +253,28 @@ export class PrimitiveDetector {
       command: idx === 1 ? 'M' : (hIn || hOut ? 'C' : 'L')
     });
 
+    const toFinite = (v: string | undefined, fallback: number): number => {
+      if (v === undefined || v === null) return fallback;
+      const n = parseFloat(v);
+      return Number.isFinite(n) ? n : fallback;
+    };
+
     if (tag === 'rect') {
-      const x = parseFloat(attrs.x || '0');
-      const y = parseFloat(attrs.y || '0');
-      const w = parseFloat(attrs.width || '100');
-      const h = parseFloat(attrs.height || '100');
+      const x = toFinite(attrs.x, 0);
+      const y = toFinite(attrs.y, 0);
+      const w = Math.max(0.1, toFinite(attrs.width, 100));
+      const h = Math.max(0.1, toFinite(attrs.height, 100));
       const corners = RectPrimitive.parseCornersFromAttrs(attrs, w, h);
       const eff = RectPrimitive.calculateEffectiveCorners(w, h, corners);
       return RectPrimitive.convertRectToVertices(x, y, w, h, eff.tl, eff.tr, eff.br, eff.bl);
     } else if (tag === 'circle' || tag === 'ellipse') {
-      const cx = parseFloat(attrs.cx || '50');
-      const cy = parseFloat(attrs.cy || '50');
-      const rx = tag === 'circle' ? parseFloat(attrs.r || '50') : parseFloat(attrs.rx || '50');
-      const ry = tag === 'circle' ? parseFloat(attrs.r || '50') : parseFloat(attrs.ry || '50');
+      const cx = toFinite(attrs.cx, 50);
+      const cy = toFinite(attrs.cy, 50);
+      const rx = Math.max(0.1, tag === 'circle' ? toFinite(attrs.r, 50) : toFinite(attrs.rx, 50));
+      const ry = Math.max(0.1, tag === 'circle' ? toFinite(attrs.r, 50) : toFinite(attrs.ry, 50));
       const ellipseType = (attrs['data-ellipse-type'] as 'ellipse' | 'pie' | 'arc') || 'ellipse';
-      const startAngle = parseFloat(attrs['data-start-angle'] || '0');
-      const endAngle = parseFloat(attrs['data-end-angle'] || '360');
+      const startAngle = toFinite(attrs['data-start-angle'], 0);
+      const endAngle = toFinite(attrs['data-end-angle'], 360);
 
       if (ellipseType === 'pie' || ellipseType === 'arc') {
         return EllipsePrimitive.convertEllipseToVertices(cx, cy, rx, ry, ellipseType, startAngle, endAngle);
@@ -284,13 +290,13 @@ export class PrimitiveDetector {
       vertices.push(mkV(cx, cy + ry, { x: cx + ox, y: cy + ry }, { x: cx - ox, y: cy + ry }, 'symmetric'));
       vertices.push(mkV(cx - rx, cy, { x: cx - rx, y: cy + oy }, { x: cx - rx, y: cy - oy }, 'symmetric'));
     } else if (tag === 'star' || ((tag === 'polygon' || tag === 'path') && attrs.cx)) {
-      const cx = parseFloat(attrs.cx || '50');
-      const cy = parseFloat(attrs.cy || '50');
-      const rx = parseFloat(attrs.rx || attrs.r || '50');
-      const ry = parseFloat(attrs.ry || attrs.r || '50');
+      const cx = toFinite(attrs.cx, 50);
+      const cy = toFinite(attrs.cy, 50);
+      const rx = Math.max(0.1, toFinite(attrs.rx || attrs.r, 50));
+      const ry = Math.max(0.1, toFinite(attrs.ry || attrs.r, 50));
       const points = Math.max(3, Math.min(64, parseInt(attrs['data-star-points'] || attrs['data-polygon-sides'] || attrs.points || '5', 10)));
       const regularRatio = Math.cos(Math.PI / points);
-      let innerRatio = parseFloat(attrs['data-star-inner-ratio'] || attrs.innerRatio || regularRatio.toString());
+      let innerRatio = toFinite(attrs['data-star-inner-ratio'] || attrs.innerRatio, regularRatio);
       if (isNaN(innerRatio) || innerRatio <= 0) innerRatio = regularRatio;
       innerRatio = Math.max(0.05, Math.min(2.0, innerRatio));
 
@@ -302,10 +308,10 @@ export class PrimitiveDetector {
         vertices.push(mkV(cx + curRx * Math.cos(angle), cy + curRy * Math.sin(angle)));
       }
     } else if (tag === 'line') {
-      const x1 = parseFloat(attrs.x1 || '0');
-      const y1 = parseFloat(attrs.y1 || '0');
-      const x2 = parseFloat(attrs.x2 || '100');
-      const y2 = parseFloat(attrs.y2 || '100');
+      const x1 = toFinite(attrs.x1, 0);
+      const y1 = toFinite(attrs.y1, 0);
+      const x2 = toFinite(attrs.x2, 100);
+      const y2 = toFinite(attrs.y2, 100);
       vertices.push(mkV(x1, y1));
       vertices.push(mkV(x2, y2));
     } else if (tag === 'polygon' || tag === 'polyline') {
@@ -313,7 +319,7 @@ export class PrimitiveDetector {
       for (let i = 0; i < pts.length - 1; i += 2) {
         const x = parseFloat(pts[i]);
         const y = parseFloat(pts[i + 1]);
-        if (!isNaN(x) && !isNaN(y)) {
+        if (Number.isFinite(x) && Number.isFinite(y)) {
           vertices.push(mkV(x, y));
         }
       }
