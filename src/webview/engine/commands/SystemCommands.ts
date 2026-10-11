@@ -4,8 +4,12 @@
  */
 
 import { CommandRegistry, CommandSpec, CommandContext } from './CommandRegistry.js';
+import { registerAllDomainCommands } from '../../commands/index.js';
 
 export function registerSystemCommands(registry: CommandRegistry): void {
+  // Registrar comandos de dominio formalizados (shape.*, path.*, transform.*, node.*)
+  registerAllDomainCommands(registry);
+
   // --- EDICIÓN ---
   registry.register({
     id: 'edit.undo',
