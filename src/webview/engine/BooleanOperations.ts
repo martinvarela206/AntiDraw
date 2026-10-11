@@ -6,6 +6,11 @@ import { StrokeOutlineGenerator } from './boolean/StrokeOutlineGenerator.js';
 import { PolygonBooleanService } from './boolean/PolygonBooleanService.js';
 import { BezierCurveTrimmer, TrimResult } from './boolean/BezierCurveTrimmer.js';
 import { SchneiderFit, CubicBezier } from './operations/booleans/SchneiderFit.js';
+import {
+  BooleanPreflightService,
+  BooleanPreflightResult,
+  BooleanOperationType,
+} from './boolean/BooleanPreflightService.js';
 
 export {
   ElementAligner,
@@ -19,6 +24,9 @@ export {
   TrimResult,
   SchneiderFit,
   CubicBezier,
+  BooleanPreflightService,
+  BooleanPreflightResult,
+  BooleanOperationType,
 };
 
 /**
@@ -35,6 +43,17 @@ export {
  * - LayerReorderService: SVG document tree Z-ordering.
  */
 export class BooleanOperations {
+  /**
+   * Evaluates collision and detects whether parametric primitives will undergo modification.
+   */
+  public static preflight(
+    elements: VectorElement[],
+    op: BooleanOperationType,
+    model: VectorModel
+  ): BooleanPreflightResult {
+    return BooleanPreflightService.analyze(elements, op, model);
+  }
+
   /**
    * Converts a vector element to a polygon-clipping MultiPolygon.
    */
