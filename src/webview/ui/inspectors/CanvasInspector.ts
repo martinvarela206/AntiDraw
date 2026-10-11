@@ -1,6 +1,7 @@
 import { VectorModel } from '../../engine/VectorModel.js';
 import { GridAlignmentMode } from '../../engine/CanvasManager.js';
 import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
+import { SwatchPaletteInspector } from './SwatchPaletteInspector.js';
 
 export interface ViewBoxPreset {
   id: string;
@@ -189,6 +190,8 @@ export class CanvasInspector {
           </button>
         </div>
       </div>
+
+      ${SwatchPaletteInspector.renderHtml(model, null)}
     `;
 
     const presetSelect = container.querySelector<HTMLSelectElement>('#canvas-preset');
@@ -413,5 +416,7 @@ export class CanvasInspector {
       if (callbacks.onGridAlignmentChange) callbacks.onGridAlignmentChange('cell-center');
       onReRender();
     });
+
+    SwatchPaletteInspector.bindEvents(container, model, null, callbacks, onReRender);
   }
 }

@@ -111,6 +111,10 @@ export class SvgDeserializer {
         ctx.canvas.currentColor = '#000000';
       }
 
+      if (companionMetadata?.swatches && Array.isArray(companionMetadata.swatches)) {
+        ctx.swatches = companionMetadata.swatches;
+      }
+
       ctx.elements.length = 0;
 
       // Strict Defs Sanitization & Orphaned Comments Elimination (FIX-20)

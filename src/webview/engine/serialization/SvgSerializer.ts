@@ -16,6 +16,7 @@ export interface IVectorModelSerializerContext {
   canvas: CanvasSettings;
   elements: VectorElement[];
   customDefs: string;
+  swatches?: any[];
   createDefaultCanvas(): void;
   parsePathD(d: string, nodeTypesStr?: string): PathVertex[];
   convertShapeToVertices(tag: string, attrs: Record<string, string>): PathVertex[];

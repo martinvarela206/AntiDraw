@@ -108,6 +108,7 @@ import { PathGeometryCompiler, formatNum } from './geometry/PathGeometryCompiler
 import { RectPrimitive } from './primitives/RectPrimitive.js';
 import { EllipsePrimitive } from './primitives/EllipsePrimitive.js';
 import { PrimitiveDetector } from './primitives/PrimitiveDetector.js';
+import { GlobalSwatch, GlobalSwatchManager } from './color/GlobalSwatchManager.js';
 import type { CompanionMetadata } from '../bridge/VsCodeBridge.js';
 
 export {
@@ -117,6 +118,8 @@ export {
   RectPrimitive,
   EllipsePrimitive,
   PrimitiveDetector,
+  GlobalSwatch,
+  GlobalSwatchManager,
 };
 
 export class VectorModel {
@@ -131,6 +134,7 @@ export class VectorModel {
 
   public elements: VectorElement[] = [];
   public customDefs: string = '';
+  public swatches: GlobalSwatch[] = GlobalSwatchManager.getDefaultSwatches();
 
   constructor() {}
 

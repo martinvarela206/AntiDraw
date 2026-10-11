@@ -58,6 +58,7 @@ import { PrimitiveInspector } from './inspectors/PrimitiveInspector.js';
 import { ShapeDefaultsInspector } from './inspectors/ShapeDefaultsInspector.js';
 import { NodeInspector } from './inspectors/NodeInspector.js';
 import { MultiSelectionInspector } from './inspectors/MultiSelectionInspector.js';
+import { SwatchPaletteInspector } from './inspectors/SwatchPaletteInspector.js';
 import { StrokeInspector, StrokeInspectorProps } from './inspectors/StrokeInspector.js';
 import { QuickHelpInspector } from './inspectors/QuickHelpInspector.js';
 
@@ -586,6 +587,8 @@ export class PropertyPanel {
 
       ${StrokeInspector.renderHtml(el, this.getStrokeProps(el))}
 
+      ${SwatchPaletteInspector.renderHtml(this.model, el)}
+
       ${EffectsInspector.renderHtml(ds, is)}
 
       <div class="panel-section">
@@ -637,6 +640,14 @@ export class PropertyPanel {
       this.inspectorContainer,
       el,
       this.model,
+      this.callbacks,
+      () => this.renderElementProperties(el)
+    );
+
+    SwatchPaletteInspector.bindEvents(
+      this.inspectorContainer,
+      this.model,
+      el,
       this.callbacks,
       () => this.renderElementProperties(el)
     );

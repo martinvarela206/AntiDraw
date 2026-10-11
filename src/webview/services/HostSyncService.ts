@@ -113,6 +113,7 @@ export class HostSyncService {
       scaleCorners: this.ctx.selectionTool.scaleCorners,
       elementPivots: Object.fromEntries(this.ctx.selectionTool.elementPivots),
       canvas: { currentColor: this.ctx.model.canvas.currentColor },
+      swatches: this.ctx.model.swatches,
       elements: elementsMetadata,
     });
   }
