@@ -180,27 +180,55 @@ export class Session {
     let handled = false;
 
     // 0. Formal interaction rollback
-    if (this.cancelInteraction()) {
-      handled = true;
+    try {
+      if (this.cancelInteraction()) {
+        handled = true;
+      }
+    } catch (e) {
+      console.error('[Session] Error during cancelInteraction:', e);
     }
 
-    // 1. Tool cancellation
-    if (this.selectHandler.cancel()) handled = true;
-    if (this.nodeHandler.cancel()) handled = true;
-    if (this.shapeHandler.cancel()) {
-      this.activeHandle = null;
-      this.isDragging = false;
-      handled = true;
+    // 1. Tool cancellation (defensive per-tool isolation)
+    try {
+      if (this.selectHandler.cancel()) handled = true;
+    } catch (e) {
+      console.error('[Session] Error during selectHandler.cancel():', e);
     }
-    if (this.activeTool === 'pen' && this.penHandler.cancel()) {
-      this.activeHandle = null;
-      this.isDragging = false;
-      handled = true;
+
+    try {
+      if (this.nodeHandler.cancel()) handled = true;
+    } catch (e) {
+      console.error('[Session] Error during nodeHandler.cancel():', e);
     }
-    if (this.activeTool === 'polyline' && this.polylineHandler.cancel()) {
-      this.activeHandle = null;
-      this.isDragging = false;
-      handled = true;
+
+    try {
+      if (this.shapeHandler.cancel()) {
+        this.activeHandle = null;
+        this.isDragging = false;
+        handled = true;
+      }
+    } catch (e) {
+      console.error('[Session] Error during shapeHandler.cancel():', e);
+    }
+
+    try {
+      if (this.activeTool === 'pen' && this.penHandler.cancel()) {
+        this.activeHandle = null;
+        this.isDragging = false;
+        handled = true;
+      }
+    } catch (e) {
+      console.error('[Session] Error during penHandler.cancel():', e);
+    }
+
+    try {
+      if (this.activeTool === 'polyline' && this.polylineHandler.cancel()) {
+        this.activeHandle = null;
+        this.isDragging = false;
+        handled = true;
+      }
+    } catch (e) {
+      console.error('[Session] Error during polylineHandler.cancel():', e);
     }
 
     // 2. Guide creation drag
@@ -221,13 +249,18 @@ export class Session {
 
     this.isDragging = false;
     this.activeHandle = null;
-    this.callbacks.setCursor?.('');
 
-    if (handled) {
-      this.callbacks.onRender();
-    } else {
-      this.callbacks.onRenderOverlay();
-    }
+    try {
+      this.callbacks.setCursor?.('');
+    } catch (_e) {}
+
+    try {
+      if (handled) {
+        this.callbacks.onRender();
+      } else {
+        this.callbacks.onRenderOverlay();
+      }
+    } catch (_e) {}
 
     return handled;
   }

@@ -184,8 +184,12 @@ export class CanvasView {
       this.pointerMoveRafId = requestAnimationFrame(() => {
         this.pointerMoveRafId = null;
         if (this.latestPointerMoveEvent) {
-          const pt = this.delegate.getCanvasPoint(this.latestPointerMoveEvent);
-          this.delegate.onPointerMove(this.latestPointerMoveEvent, pt);
+          try {
+            const pt = this.delegate.getCanvasPoint(this.latestPointerMoveEvent);
+            this.delegate.onPointerMove(this.latestPointerMoveEvent, pt);
+          } catch (err) {
+            console.error('[CanvasView] Unhandled exception in RAF pointermove:', err);
+          }
         }
       });
     }
