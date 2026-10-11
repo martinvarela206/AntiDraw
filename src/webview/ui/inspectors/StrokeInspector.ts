@@ -3,6 +3,7 @@ import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
 import { bindInspectorMouseDown } from './CanvasInspector.js';
 import { degreesToMiterLimit } from './AppearanceInspector.js';
 import { StrokeMarkerControls } from './StrokeMarkerControls.js';
+import { StrokeLayersControls } from './StrokeLayersControls.js';
 import { DashCornerAligner } from '../../engine/geometry/DashCornerAligner.js';
 
 export interface StrokeInspectorProps {
@@ -173,6 +174,7 @@ export class StrokeInspector {
           isShapeRestricted,
           shapeTagName,
         })}
+        ${StrokeLayersControls.renderHtml(el)}
         <div class="prop-row" style="margin-top: 8px;">
           <button class="prop-input" id="btn-stroke-to-path" style="cursor:pointer; background:var(--bg-active); text-align:center; font-weight:600; color:var(--text-main); padding:6px;" title="Convertir geométricamente el trazo en un contorno cerrado independiente con relleno (Outline Stroke)">
             ⤹ Convertir Trazo a Vector
@@ -443,6 +445,9 @@ export class StrokeInspector {
 
     // Delegate all terminal marker events to modular StrokeMarkerControls
     StrokeMarkerControls.bindEvents(container, el, model, callbacks, onReRender);
+
+    // Delegate multi-stroke layers events
+    StrokeLayersControls.bindEvents(container, el, callbacks, onReRender);
 
     bindInspectorMouseDown(container, 'btn-stroke-to-path', () => {
       if (callbacks.onStrokeToPath) callbacks.onStrokeToPath();

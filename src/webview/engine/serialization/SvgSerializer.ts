@@ -11,6 +11,7 @@ import {
 } from '../VectorModel.js';
 import { PathGeometryCompiler } from '../geometry/PathGeometryCompiler.js';
 import { DashCornerAligner } from '../geometry/DashCornerAligner.js';
+import { AppearanceStackManager } from '../appearance/AppearanceStackManager.js';
 
 export interface IVectorModelSerializerContext {
   canvas: CanvasSettings;
@@ -495,6 +496,21 @@ export class SvgSerializer {
 
       DashCornerAligner.updateFittedDashIfActive(el);
 
+      if (ctx.isParametricElement(el)) {
+        ctx.syncParametricAttributes(el);
+      }
+      if (el.vertices && el.vertices.length > 0 && el.tagName === 'path') {
+        el.attributes.d = ctx.compilePathD(el.vertices, el.isClosed);
+      }
+
+      const stack = AppearanceStackManager.getStack(el);
+      const belowLayers = stack.strokes.filter((s) => s.position === 'below');
+      const aboveLayers = stack.strokes.filter((s) => s.position === 'above');
+
+      for (const layer of belowLayers) {
+        svg += AppearanceStackManager.compileLayerTags(el, layer);
+      }
+
       if (ctx.isParametricElement(el) && el.tagName !== 'path') {
         /**
          * ARCHITECTURAL RATIONALE: Native Parametric SVG Export (FEAT-01 & FEAT-02)
@@ -610,6 +626,10 @@ export class SvgSerializer {
         }
 
         svg += `  <${el.tagName}${serializeCleanAttrs(el.attributes)} />\n`;
+      }
+
+      for (const layer of aboveLayers) {
+        svg += AppearanceStackManager.compileLayerTags(el, layer);
       }
     });
 
