@@ -113,7 +113,13 @@ export class HistoryService {
     this.ctx.model.elements = state.elements.map((el) => ({
       ...el,
       attributes: { ...el.attributes },
-      vertices: el.vertices ? el.vertices.map((v) => ({ ...v })) : undefined,
+      vertices: el.vertices
+        ? el.vertices.map((v) => ({
+            ...v,
+            handleIn: v.handleIn ? { ...v.handleIn } : undefined,
+            handleOut: v.handleOut ? { ...v.handleOut } : undefined,
+          }))
+        : undefined,
     }));
     this.ctx.canvasMgr.guides = [...state.guides];
     this.ctx.selectionTool.elementPivots = new Map(state.elementPivots);

@@ -376,7 +376,18 @@ export class GeometryInspector {
     const elOpacity = container.querySelector<HTMLInputElement>('#el-opacity');
     const elOpacitySlider = container.querySelector<HTMLInputElement>('#el-opacity-slider');
     if (elOpacity && elOpacitySlider) {
+      let isEditingOpacity = false;
+      elOpacitySlider.addEventListener('pointerdown', () => {
+        if (!isEditingOpacity && callbacks.onPushUndo) {
+          callbacks.onPushUndo();
+          isEditingOpacity = true;
+        }
+      });
       elOpacitySlider.addEventListener('input', () => {
+        if (!isEditingOpacity && callbacks.onPushUndo) {
+          callbacks.onPushUndo();
+          isEditingOpacity = true;
+        }
         const val = Math.max(0, Math.min(100, Math.round(parseFloat(elOpacitySlider.value) || 0)));
         elOpacity.value = val.toString();
         const strVal = val === 100 ? '1' : (val / 100).toString();
@@ -388,7 +399,7 @@ export class GeometryInspector {
         }
       });
       elOpacitySlider.addEventListener('change', () => {
-        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        isEditingOpacity = false;
         callbacks.onUpdateElement(el);
       });
       elOpacity.addEventListener('change', () => {

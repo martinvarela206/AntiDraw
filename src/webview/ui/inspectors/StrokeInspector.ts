@@ -198,7 +198,18 @@ export class StrokeInspector {
     if (btnAddStrokeBody) btnAddStrokeBody.addEventListener('click', onAddStrokeClicked);
 
     if (elStrokeColor) {
+      let isPickingStroke = false;
+      elStrokeColor.addEventListener('pointerdown', () => {
+        if (!isPickingStroke && callbacks.onPushUndo) {
+          callbacks.onPushUndo();
+          isPickingStroke = true;
+        }
+      });
       elStrokeColor.addEventListener('input', () => {
+        if (!isPickingStroke && callbacks.onPushUndo) {
+          callbacks.onPushUndo();
+          isPickingStroke = true;
+        }
         el.attributes['stroke'] = elStrokeColor.value;
         if (!el.attributes['stroke-width'] || parseFloat(el.attributes['stroke-width']) <= 0) {
           el.attributes['stroke-width'] = '1';
@@ -207,7 +218,7 @@ export class StrokeInspector {
         callbacks.onUpdateElement(el);
       });
       elStrokeColor.addEventListener('change', () => {
-        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        isPickingStroke = false;
       });
     }
 
@@ -230,6 +241,7 @@ export class StrokeInspector {
 
     if (elStrokeHex) {
       elStrokeHex.addEventListener('change', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
         const val = elStrokeHex.value.trim();
         if (val.toLowerCase() === 'currentcolor') {
           el.attributes['stroke'] = 'currentColor';
@@ -240,24 +252,35 @@ export class StrokeInspector {
         if (!el.attributes['stroke-width'] || parseFloat(el.attributes['stroke-width']) <= 0) {
           el.attributes['stroke-width'] = '1';
         }
-        if (callbacks.onPushUndo) callbacks.onPushUndo();
         callbacks.onUpdateElement(el);
         onReRender();
       });
     }
 
     if (elStrokeWidth) {
+      let isEditingWidth = false;
+      elStrokeWidth.addEventListener('pointerdown', () => {
+        if (!isEditingWidth && callbacks.onPushUndo) {
+          callbacks.onPushUndo();
+          isEditingWidth = true;
+        }
+      });
       elStrokeWidth.addEventListener('input', () => {
+        if (!isEditingWidth && callbacks.onPushUndo) {
+          callbacks.onPushUndo();
+          isEditingWidth = true;
+        }
         el.attributes['stroke-width'] = elStrokeWidth.value;
         callbacks.onUpdateElement(el);
       });
       elStrokeWidth.addEventListener('change', () => {
-        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        isEditingWidth = false;
       });
     }
 
     if (elStrokeDash) {
       elStrokeDash.addEventListener('change', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
         el.attributes['stroke-dasharray'] = elStrokeDash.value;
         callbacks.onUpdateElement(el);
       });
@@ -265,6 +288,7 @@ export class StrokeInspector {
 
     if (elStrokeCap) {
       elStrokeCap.addEventListener('change', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
         el.attributes['stroke-linecap'] = elStrokeCap.value;
         callbacks.onUpdateElement(el);
       });
@@ -272,6 +296,7 @@ export class StrokeInspector {
 
     if (elStrokeJoin) {
       elStrokeJoin.addEventListener('change', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
         el.attributes['stroke-linejoin'] = elStrokeJoin.value;
         const miterContainer = container.querySelector<HTMLElement>('#container-stroke-miterlimit');
         if (miterContainer) {
@@ -283,15 +308,28 @@ export class StrokeInspector {
 
     const elStrokeMiterAngle = container.querySelector<HTMLInputElement>('#el-stroke-miter-angle');
     if (elStrokeMiterAngle) {
+      let isEditingMiter = false;
       const applyMiterAngle = () => {
         const deg = Math.max(1, Math.min(170, parseFloat(elStrokeMiterAngle.value) || 29));
         const limit = degreesToMiterLimit(deg);
         el.attributes['stroke-miterlimit'] = limit.toString();
         callbacks.onUpdateElement(el);
       };
-      elStrokeMiterAngle.addEventListener('input', applyMiterAngle);
+      elStrokeMiterAngle.addEventListener('pointerdown', () => {
+        if (!isEditingMiter && callbacks.onPushUndo) {
+          callbacks.onPushUndo();
+          isEditingMiter = true;
+        }
+      });
+      elStrokeMiterAngle.addEventListener('input', () => {
+        if (!isEditingMiter && callbacks.onPushUndo) {
+          callbacks.onPushUndo();
+          isEditingMiter = true;
+        }
+        applyMiterAngle();
+      });
       elStrokeMiterAngle.addEventListener('change', () => {
-        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        isEditingMiter = false;
         applyMiterAngle();
       });
     }

@@ -62,7 +62,21 @@ export class DocumentStateFactory {
     return Object.freeze({
       revision: init.revision ?? 0,
       canvas: Object.freeze({ ...init.canvas }),
-      elements: Object.freeze(init.elements ? [...init.elements] : []),
+      elements: Object.freeze(
+        init.elements
+          ? init.elements.map((el) => ({
+              ...el,
+              attributes: { ...el.attributes },
+              vertices: el.vertices
+                ? el.vertices.map((v) => ({
+                    ...v,
+                    handleIn: v.handleIn ? { ...v.handleIn } : undefined,
+                    handleOut: v.handleOut ? { ...v.handleOut } : undefined,
+                  }))
+                : undefined,
+            }))
+          : []
+      ),
       guides: Object.freeze(init.guides ? [...init.guides] : []),
       customPivot: init.customPivot ? { ...init.customPivot } : null,
       elementPivots: elementPivotsMap,

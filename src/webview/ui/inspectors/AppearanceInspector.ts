@@ -481,8 +481,19 @@ export class AppearanceInspector {
     }
 
     if (elFillColor) {
+      let isPickingFill = false;
+      elFillColor.addEventListener('pointerdown', () => {
+        if (!isPickingFill && callbacks.onPushUndo) {
+          callbacks.onPushUndo();
+          isPickingFill = true;
+        }
+      });
       elFillColor.addEventListener('input', () => {
         if (fillType === 'solid') {
+          if (!isPickingFill && callbacks.onPushUndo) {
+            callbacks.onPushUndo();
+            isPickingFill = true;
+          }
           el.attributes['fill'] = elFillColor.value;
           delete el.attributes['data-gradient'];
           if (elFillHex) elFillHex.value = elFillColor.value;
@@ -490,13 +501,14 @@ export class AppearanceInspector {
         }
       });
       elFillColor.addEventListener('change', () => {
-        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        isPickingFill = false;
         onReRender();
       });
     }
     if (elFillHex) {
       elFillHex.addEventListener('change', () => {
         if (fillType === 'solid') {
+          if (callbacks.onPushUndo) callbacks.onPushUndo();
           const val = elFillHex.value.trim();
           if (val.toLowerCase() === 'currentcolor') {
             el.attributes['fill'] = 'currentColor';
@@ -506,7 +518,6 @@ export class AppearanceInspector {
             delete el.attributes['data-gradient'];
             if (elFillColor) elFillColor.value = el.attributes['fill'];
           }
-          if (callbacks.onPushUndo) callbacks.onPushUndo();
           callbacks.onUpdateElement(el);
           onReRender();
         }
@@ -549,7 +560,18 @@ export class AppearanceInspector {
     const stopColor = container.querySelector<HTMLInputElement>('#gradient-stop-color');
     const stopColorHex = container.querySelector<HTMLInputElement>('#gradient-stop-color-hex');
     if (stopColor) {
+      let isPickingStopColor = false;
+      stopColor.addEventListener('pointerdown', () => {
+        if (!isPickingStopColor && callbacks.onPushUndo) {
+          callbacks.onPushUndo();
+          isPickingStopColor = true;
+        }
+      });
       stopColor.addEventListener('input', () => {
+        if (!isPickingStopColor && callbacks.onPushUndo) {
+          callbacks.onPushUndo();
+          isPickingStopColor = true;
+        }
         if (grad.stops[activeStopIdx]) {
           grad.stops[activeStopIdx].color = stopColor.value;
           if (stopColorHex) stopColorHex.value = stopColor.value;
@@ -557,7 +579,7 @@ export class AppearanceInspector {
         }
       });
       stopColor.addEventListener('change', () => {
-        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        isPickingStopColor = false;
       });
     }
     if (stopColorHex) {
