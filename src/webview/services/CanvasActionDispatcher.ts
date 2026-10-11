@@ -66,22 +66,67 @@ export class CanvasActionDispatcher {
     }
   }
 
-  public executeBoolean(op: 'union' | 'subtract' | 'intersect' | 'exclude' | 'combine' | 'fragment'): void {
-    const run = () => {
-      const selectedIds = Array.from(this.ctx.selectionTool.selectedElementIds);
-      const selectedEls: VectorElement[] = [];
-      selectedIds.forEach((id) => {
-        const el = this.ctx.model.elements.find((e) => e.id === id);
-        if (el) selectedEls.push(el);
+  public async executeBoolean(op: 'union' | 'subtract' | 'intersect' | 'exclude' | 'combine' | 'fragment'): Promise<void> {
+    const selectedIds = Array.from(this.ctx.selectionTool.selectedElementIds);
+    const selectedEls: VectorElement[] = [];
+    selectedIds.forEach((id) => {
+      const el = this.ctx.model.elements.find((e) => e.id === id);
+      if (el) selectedEls.push(el);
+    });
+
+    if (selectedEls.length < 2) return;
+
+    // 1. Evaluador Previo (Preflight): analisis de colision y afectacion de primitivas puras
+    const preflight = BooleanOperations.preflight(selectedEls, op, this.ctx.model);
+    if (!preflight.canExecute) {
+      return;
+    }
+
+    // 2. Interrupcion y modal si primitivas van a sufrir mutacion estructural irreversible
+    if (preflight.affectedPrimitives.length > 0) {
+      const names = preflight.affectedPrimitives.map((el) => `<${el.shapeType || el.tagName}>`).join(', ');
+      const isSingle = preflight.affectedPrimitives.length === 1;
+      const opLabels: Record<string, string> = {
+        union: 'Unión',
+        subtract: 'Sustracción (Menos Frente)',
+        intersect: 'Intersección',
+        exclude: 'Exclusión (XOR)',
+        combine: 'Combinación (Compound Path)',
+        fragment: 'División (Fragmentar)',
+      };
+      const opLabel = opLabels[op] || op;
+
+      const confirmed = await ConfirmationModal.confirm({
+        title: 'Conversión de Primitiva por Operación Booleana',
+        message: `La operación de ${opLabel} modificará ${
+          isSingle ? `la primitiva ${names}` : `las ${preflight.affectedPrimitives.length} primitivas (${names})`
+        }, convirtiéndola(s) en trazado libre <path>. ¿Deseas continuar?`,
+        details:
+          'Las formas primitivas nativas perderán sus controles paramétricos (radios dinámicos, esquinas vivas o sectores circulares) al combinarse o cortarse.',
+        confirmText: 'Continuar y Convertir',
+        cancelText: 'Cancelar',
       });
 
-      if (selectedEls.length < 2) return;
+      if (!confirmed) {
+        // Interrupcion limpia: cero mutaciones, cero pushUndo
+        return;
+      }
+
+      // Convertir unicamente las primitivas afectadas
+      preflight.affectedPrimitives.forEach((p) => {
+        this.ctx.model.convertToCurves(p);
+      });
+    }
+
+    const run = () => {
       this.ctx.pushUndo();
 
       if (op === 'union') {
         const result = BooleanOperations.union(selectedEls, this.ctx.model);
         if (result) {
-          const removeIds = new Set(selectedEls.map((e) => e.id));
+          // Preservar en el documento cualquier primitiva no modificada (disjunta)
+          const unmodifiedIds = new Set(preflight.unmodifiedPrimitives.map((p) => p.id));
+          const removeIds = new Set(selectedEls.filter((e) => !unmodifiedIds.has(e.id)).map((e) => e.id));
           this.ctx.model.elements = this.ctx.model.elements.filter((e) => !removeIds.has(e.id));
           this.ctx.model.elements.push(result);
           this.ctx.selectionTool.select(result.id);

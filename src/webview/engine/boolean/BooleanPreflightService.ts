@@ -188,13 +188,13 @@ export class BooleanPreflightService {
     switch (op) {
       case 'subtract': {
         /**
-         * Subtract semantics in AntiDraw:
-         * elements[0] is the target shape being trimmed.
-         * elements[1..n] are cutters (or vice-versa depending on UI order).
+         * Subtract semantics in AntiDraw (BezierCurveTrimmer.subtract):
+         * elements[N-1] (last selected) is the target shape being trimmed.
+         * elements[0..N-2] are cutters that trim the target.
          * Target is trimmed by cutters; cutters themselves are not destroyed or modified in subtract().
          */
-        const target = elements[0];
-        const cutters = elements.slice(1);
+        const target = elements[elements.length - 1];
+        const cutters = elements.slice(0, elements.length - 1);
 
         let targetOverlapsWithAnyCutter = false;
         for (const cutter of cutters) {
