@@ -44,11 +44,19 @@ export class PolygonUtils {
    * preserving sharp corners intact.
    */
   public static ringToFittedVertices(cleanRing: Pair[], errorTolerance: number = 1.5): PathVertex[] {
-    const n = cleanRing.length;
+    const ring = [...cleanRing];
+    if (ring.length >= 3) {
+      const first = ring[0];
+      const last = ring[ring.length - 1];
+      if (Math.hypot(first[0] - last[0], first[1] - last[1]) < 0.05) {
+        ring.pop();
+      }
+    }
+    const n = ring.length;
     if (n < 3) return [];
 
     if (n <= 4) {
-      return cleanRing.map((pt, idx) => ({
+      return ring.map((pt, idx) => ({
         id: `v_${Date.now().toString(36)}_${idx}`,
         x: Math.round(pt[0] * 100) / 100,
         y: Math.round(pt[1] * 100) / 100,
@@ -60,9 +68,9 @@ export class PolygonUtils {
     // 1. Detect sharp corner indices where deflection angle exceeds threshold (~32 degrees, cos < 0.85)
     const cornerIndices: number[] = [];
     for (let i = 0; i < n; i++) {
-      const prev = cleanRing[(i - 1 + n) % n];
-      const curr = cleanRing[i];
-      const next = cleanRing[(i + 1) % n];
+      const prev = ring[(i - 1 + n) % n];
+      const curr = ring[i];
+      const next = ring[(i + 1) % n];
 
       const v1x = curr[0] - prev[0];
       const v1y = curr[1] - prev[1];
@@ -139,7 +147,7 @@ export class PolygonUtils {
     };
 
     if (cornerIndices.length === 0) {
-      const pts: Point[] = cleanRing.map((p) => ({ x: p[0], y: p[1] }));
+      const pts: Point[] = ring.map((p) => ({ x: p[0], y: p[1] }));
       const fitted = SchneiderFit.fitCurve(pts, errorTolerance);
       if (fitted.length > 0) {
         appendCurves(fitted, true);
@@ -155,7 +163,7 @@ export class PolygonUtils {
       const chain: Pair[] = [];
       let curr = startIdx;
       while (true) {
-        chain.push(cleanRing[curr]);
+        chain.push(ring[curr]);
         if (curr === endIdx) break;
         curr = (curr + 1) % n;
       }
