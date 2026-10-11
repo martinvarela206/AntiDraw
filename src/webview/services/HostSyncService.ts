@@ -64,11 +64,16 @@ export class HostSyncService {
     return this.savedState;
   }
 
-  public syncToHost(): void {
+  public syncToHost(): boolean {
     const svgText = this.ctx.model.toSvgString();
-    this.vscodeBridge.updateDocument(svgText);
+    const success = this.vscodeBridge.updateDocument(svgText);
+    if (!success) {
+      console.warn('[HostSyncService] Document sync aborted: SVG integrity validation failed.');
+      return false;
+    }
     this.syncMetadataToHost();
     this.markSaved();
+    return true;
   }
 
   public syncMetadataToHost(): void {

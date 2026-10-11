@@ -88,6 +88,16 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
 
         case 'updateDocument': {
           if (message.text !== undefined && message.text !== document.getText()) {
+            if (
+              typeof message.text !== 'string' ||
+              message.text.trim().length < 20 ||
+              !message.text.toLowerCase().includes('<svg') ||
+              !message.text.toLowerCase().includes('</svg>')
+            ) {
+              vscode.window.showErrorMessage('[AntiDraw] SafeSave: Se rechazó la sobreescritura del archivo con un SVG inválido o truncado.');
+              break;
+            }
+
             pendingWebviewEdits++;
             lastSavedSvgText = message.text;
             const edit = new vscode.WorkspaceEdit();

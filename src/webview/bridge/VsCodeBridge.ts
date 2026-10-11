@@ -21,6 +21,8 @@
  *    the application core from VS Code transport primitives.
  */
 
+import { SvgValidator } from '../engine/export/SvgValidator.js';
+
 export interface CompanionMetadata {
   grids?: any[];
   guides?: any[];
@@ -109,9 +111,18 @@ export class VsCodeBridge {
     this.vscodeApi.postMessage({ type: 'ready' });
   }
 
-  public updateDocument(svgText: string): void {
+  public updateDocument(svgText: string): boolean {
+    const validation = SvgValidator.validate(svgText);
+    if (!validation.isValid) {
+      const errorMsg = `[SafeSave Aborted] AntiDraw ha evitado guardar un SVG corrupto o truncado: ${validation.error}`;
+      console.error(errorMsg);
+      this.showError(errorMsg);
+      return false;
+    }
+
     this.isUpdatingFromWebview = true;
     this.vscodeApi.postMessage({ type: 'updateDocument', text: svgText });
+    return true;
   }
 
   public updateMetadata(metadata: CompanionMetadata): void {

@@ -3,6 +3,7 @@ import { SpatialIndex } from '../src/webview/engine/spatial/SpatialIndex.js';
 import { HitTestService } from '../src/webview/engine/selection/HitTestService.js';
 import { BoundingBoxCalculator } from '../src/webview/engine/geometry/BoundingBoxCalculator.js';
 import { SvgSerializer } from '../src/webview/engine/serialization/SvgSerializer.js';
+import { SvgValidator } from '../src/webview/engine/export/SvgValidator.js';
 
 interface BenchmarkResult {
   name: string;
@@ -173,6 +174,18 @@ export function runAllBenchmarks(): boolean {
     5,
     () => {
       SvgSerializer.toSvgString(model1000);
+    }
+  );
+
+  const serializedSvg = SvgSerializer.toSvgString(model1000);
+
+  runBenchmark(
+    'SafeSave SVG Validation',
+    1000,
+    2.0, // Budget: < 2.0ms
+    20,
+    () => {
+      SvgValidator.validate(serializedSvg);
     }
   );
 
