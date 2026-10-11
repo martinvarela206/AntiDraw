@@ -775,8 +775,9 @@ export class PropertyPanel {
 
   // Render Node Properties for single or multiple selected vertices
   private renderNodeProperties(el: VectorElement, v: PathVertex, selectedCount: number = 1): void {
-    this.inspectorContainer.innerHTML = NodeInspector.renderHtml(el, v, selectedCount);
-    NodeInspector.bindEvents(this.inspectorContainer, this.callbacks);
+    const isParametric = this.model.isParametricElement(el);
+    this.inspectorContainer.innerHTML = NodeInspector.renderHtml(el, v, selectedCount, isParametric);
+    NodeInspector.bindEvents(this.inspectorContainer, this.callbacks, el);
   }
 
     /**

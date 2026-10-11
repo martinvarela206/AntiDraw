@@ -18,7 +18,12 @@ export class NodeInspector {
   /**
    * Generates HTML markup for single or multi-selected vertex properties.
    */
-  public static renderHtml(el: VectorElement, v: PathVertex, selectedCount: number = 1): string {
+  public static renderHtml(
+    el: VectorElement,
+    v: PathVertex,
+    selectedCount: number = 1,
+    isParametric: boolean = false
+  ): string {
     const isMulti = selectedCount > 1;
     const isSharp = v.nodeType === 'sharp' || (!v.handleIn && !v.handleOut);
     const isClosed =
@@ -47,17 +52,28 @@ export class NodeInspector {
       </div>
       <div class="panel-section">
         <div class="panel-title">Node Type ${isMulti ? '(Lote)' : ''}</div>
-        <div class="prop-row" style="justify-content: flex-start; gap: 8px;">
-          <button class="btn-icon ${isSharp && !isMulti ? 'active' : ''}" id="btn-node-sharp" title="Sin tiradores (Cúspide / Recto)">
+        ${isParametric ? `
+        <div style="margin-bottom: 8px; padding: 6px 8px; background: rgba(59, 130, 246, 0.08); border: 1px dashed rgba(59, 130, 246, 0.3); border-radius: 4px;">
+          <button class="prop-input" id="btn-convert-to-curves-node" style="cursor:pointer; background:var(--accent-color, #3b82f6); color:#fff; border:none; border-radius:4px; padding:5px 8px; font-weight:600; font-size:11px; display:flex; align-items:center; justify-content:center; gap:6px; width:100%;" title="Convertir primitiva <${el.shapeType || el.tagName}> a trazado libre <path> (Ctrl+Q)">
+            <span>⚡</span>
+            <span>Convertir a Curvas de Bézier</span>
+          </button>
+          <div style="font-size:10px; color:var(--text-muted, #94a3b8); margin-top:4px; line-height:1.3; text-align:center;">
+            Las figuras &lt;${el.shapeType || el.tagName}&gt; son primitivas de tramos rectos. Conviértela a curvas para activar tiradores Bézier.
+          </div>
+        </div>
+        ` : ''}
+        <div class="prop-row" style="justify-content: flex-start; gap: 8px; ${isParametric ? 'opacity: 0.35; filter: grayscale(1); pointer-events: none;' : ''}">
+          <button class="btn-icon ${isSharp && !isMulti ? 'active' : ''}" id="btn-node-sharp" ${isParametric ? 'disabled' : ''} title="${isParametric ? 'Requiere convertir a curvas de Bézier' : 'Sin tiradores (Cúspide / Recto)'}">
             ${ToolIcons.nodeSharp}
           </button>
-          <button class="btn-icon ${!isSharp && !isMulti && v.nodeType === 'asymmetric' ? 'active' : ''}" id="btn-node-asym" title="Asymmetric Node (Independent Handles)">
+          <button class="btn-icon ${!isSharp && !isMulti && v.nodeType === 'asymmetric' ? 'active' : ''}" id="btn-node-asym" ${isParametric ? 'disabled' : ''} title="${isParametric ? 'Requiere convertir a curvas de Bézier' : 'Asymmetric Node (Independent Handles)'}">
             ${ToolIcons.nodeAsymmetric}
           </button>
-          <button class="btn-icon ${!isSharp && !isMulti && v.nodeType === 'smooth' ? 'active' : ''}" id="btn-node-smooth" title="Uniform / Smooth Node">
+          <button class="btn-icon ${!isSharp && !isMulti && v.nodeType === 'smooth' ? 'active' : ''}" id="btn-node-smooth" ${isParametric ? 'disabled' : ''} title="${isParametric ? 'Requiere convertir a curvas de Bézier' : 'Uniform / Smooth Node'}">
             ${ToolIcons.nodeSmooth}
           </button>
-          <button class="btn-icon ${!isSharp && !isMulti && v.nodeType === 'symmetric' ? 'active' : ''}" id="btn-node-sym" title="Symmetric Node">
+          <button class="btn-icon ${!isSharp && !isMulti && v.nodeType === 'symmetric' ? 'active' : ''}" id="btn-node-sym" ${isParametric ? 'disabled' : ''} title="${isParametric ? 'Requiere convertir a curvas de Bézier' : 'Symmetric Node'}">
             ${ToolIcons.nodeSymmetric}
           </button>
         </div>
@@ -73,7 +89,7 @@ export class NodeInspector {
             <div style="font-size:11px; color:var(--text-muted); text-align:center; padding: 3px 0;">✓ Contorno cerrado (Z)</div>
           `}
           ${!isMulti ? `
-          <button class="prop-input" id="btn-split-node" style="cursor:pointer; background:var(--bg-active); text-align:center;">
+          <button class="prop-input" id="btn-split-node" style="cursor:${isParametric ? 'not-allowed' : 'pointer'}; background:var(--bg-active); text-align:center; ${isParametric ? 'opacity: 0.35; filter: grayscale(1); pointer-events: none;' : ''}" ${isParametric ? 'disabled' : ''} title="${isParametric ? 'Requiere convertir a curvas de Bézier' : 'Split Node into 2 Vertices'}">
             ${ToolIcons.splitNode} Split Node into 2 Vertices
           </button>
           ` : ''}
@@ -85,7 +101,7 @@ export class NodeInspector {
           <button class="prop-input" id="btn-segment-to-line" style="cursor:pointer; background:var(--bg-active); text-align:center; flex:1;" title="Convertir tramo a recta pura (L)">
             ― A Recta
           </button>
-          <button class="prop-input" id="btn-segment-to-curve" style="cursor:pointer; background:var(--bg-active); text-align:center; flex:1;" title="Convertir tramo a curva Bézier (C)">
+          <button class="prop-input" id="btn-segment-to-curve" style="cursor:${isParametric ? 'not-allowed' : 'pointer'}; background:var(--bg-active); text-align:center; flex:1; ${isParametric ? 'opacity: 0.35; filter: grayscale(1); pointer-events: none;' : ''}" ${isParametric ? 'disabled' : ''} title="${isParametric ? 'Requiere convertir a curvas de Bézier' : 'Convertir tramo a curva Bézier (C)'}">
             ∿ A Curva
           </button>
         </div>
@@ -97,7 +113,16 @@ export class NodeInspector {
    * Binds mouse interaction events for node operations.
    * Uses mousedown + preventDefault + stopPropagation to preserve canvas focus.
    */
-  public static bindEvents(container: HTMLElement, callbacks: PropertyPanelCallbacks): void {
+  public static bindEvents(
+    container: HTMLElement,
+    callbacks: PropertyPanelCallbacks,
+    el?: VectorElement
+  ): void {
+    bindInspectorMouseDown(container, 'btn-convert-to-curves-node', () => {
+      if (callbacks.onConvertToCurves && el) {
+        callbacks.onConvertToCurves(el);
+      }
+    });
     bindInspectorMouseDown(container, 'btn-node-sharp', () => callbacks.onNodeTypeChange('sharp'));
     bindInspectorMouseDown(container, 'btn-node-asym', () => callbacks.onNodeTypeChange('asymmetric'));
     bindInspectorMouseDown(container, 'btn-node-smooth', () => callbacks.onNodeTypeChange('smooth'));

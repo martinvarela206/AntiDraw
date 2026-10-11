@@ -950,9 +950,22 @@ export class NodeToolHandler implements IToolHandler {
     this.ctx.syncToHost();
   }
 
-  public handleConvertSegmentToCurve(): void {
+  public async handleConvertSegmentToCurve(): Promise<void> {
     const selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
     if (!selectedEl || !selectedEl.vertices || selectedEl.vertices.length < 2) return;
+
+    if (this.ctx.model.isParametricElement(selectedEl)) {
+      const confirmed = await this.ctx.confirm({
+        title: 'Convertir Primitiva a Curvas',
+        message: `Para curvar este segmento, es necesario convertir <${selectedEl.shapeType || selectedEl.tagName}> a curvas de Bézier <path>.`,
+        details: 'Las figuras paramétricas como polilíneas solo admiten segmentos rectos nativos en SVG.',
+        confirmText: 'Convertir y Curvar',
+        cancelText: 'Cancelar',
+      });
+      if (!confirmed) return;
+      this.ctx.pushUndo();
+      this.ctx.model.convertToCurves(selectedEl);
+    }
 
     let segIdx = this.nodeEditorTool.selectedSegmentIdx;
     if (segIdx === null && this.nodeEditorTool.selectedVertexId) {
@@ -970,6 +983,12 @@ export class NodeToolHandler implements IToolHandler {
     selectedEl.vertices = this.nodeEditorTool.convertSegmentToCurve(selectedEl.vertices, segIdx, isClosed);
     selectedEl.attributes.d = this.ctx.model.compilePathD(selectedEl.vertices, isClosed);
     this.ctx.render();
+    if (this.nodeEditorTool.selectedVertexId && this.callbacks.onNodeSelected) {
+      const activeV = selectedEl.vertices.find((v) => v.id === this.nodeEditorTool.selectedVertexId);
+      if (activeV) {
+        this.callbacks.onNodeSelected(activeV, selectedEl, 1);
+      }
+    }
     this.ctx.syncToHost();
   }
 
@@ -990,9 +1009,25 @@ export class NodeToolHandler implements IToolHandler {
     this.ctx.syncToHost();
   }
 
-  public handleNodeTypeChange(type: NodeType): void {
+  public async handleNodeTypeChange(type: NodeType): Promise<void> {
     const selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
-    if (!selectedEl || this.ctx.model.isParametricElement(selectedEl)) return;
+    if (!selectedEl) return;
+
+    if (this.ctx.model.isParametricElement(selectedEl)) {
+      if (type === 'sharp') return;
+      const typeLabel = type === 'smooth' ? 'suave' : type === 'symmetric' ? 'simétrico' : 'asimétrico';
+      const confirmed = await this.ctx.confirm({
+        title: 'Convertir Primitiva a Curvas',
+        message: `Para cambiar el tipo de nodo a ${typeLabel}, es necesario convertir <${selectedEl.shapeType || selectedEl.tagName}> a curvas de Bézier <path>.`,
+        details: 'Las figuras paramétricas como polilíneas no admiten curvatura Bézier ni tiradores tangenciales sin convertirse en trazados libres.',
+        confirmText: 'Convertir y Aplicar',
+        cancelText: 'Cancelar',
+      });
+      if (!confirmed) return;
+      this.ctx.pushUndo();
+      this.ctx.model.convertToCurves(selectedEl);
+    }
+
     const idsToChange = new Set(this.marqueeSelector.selectedVertexIds);
     if (this.nodeEditorTool.selectedVertexId) {
       idsToChange.add(this.nodeEditorTool.selectedVertexId);
@@ -1022,13 +1057,33 @@ export class NodeToolHandler implements IToolHandler {
       const savedVertexId = this.nodeEditorTool.selectedVertexId;
       this.ctx.render();
       this.nodeEditorTool.selectedVertexId = savedVertexId;
+      if (savedVertexId && this.callbacks.onNodeSelected) {
+        const activeV = selectedEl.vertices.find((v) => v.id === savedVertexId);
+        if (activeV) {
+          this.callbacks.onNodeSelected(activeV, selectedEl, idsToChange.size);
+        }
+      }
       this.ctx.syncToHost();
     }
   }
 
-  public handleSplitNode(): void {
+  public async handleSplitNode(): Promise<void> {
     const selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
-    if (!selectedEl || this.ctx.model.isParametricElement(selectedEl)) return;
+    if (!selectedEl || !selectedEl.vertices || !this.nodeEditorTool.selectedVertexId) return;
+
+    if (this.ctx.model.isParametricElement(selectedEl)) {
+      const confirmed = await this.ctx.confirm({
+        title: 'Convertir Primitiva a Curvas',
+        message: `Para separar este nodo, es necesario convertir <${selectedEl.shapeType || selectedEl.tagName}> a trazado libre <path>.`,
+        details: 'La figura dejará de ser una primitiva nativa para convertirse en trazados independientes.',
+        confirmText: 'Convertir y Separar',
+        cancelText: 'Cancelar',
+      });
+      if (!confirmed) return;
+      this.ctx.pushUndo();
+      this.ctx.model.convertToCurves(selectedEl);
+    }
+
     if (selectedEl.vertices && this.nodeEditorTool.selectedVertexId) {
       this.ctx.pushUndo();
       const isClosed = this.isElementClosed(selectedEl);
