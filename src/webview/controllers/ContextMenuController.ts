@@ -6,6 +6,7 @@ import { Toolbar } from '../ui/Toolbar.js';
 import { PropertyPanel } from '../ui/PropertyPanel.js';
 import { ClipboardService } from '../services/ClipboardService.js';
 import { CommandRegistry } from '../engine/commands/CommandRegistry.js';
+import { ExportModal } from '../ui/ExportModal.js';
 
 export interface ContextMenuControllerContext {
   contextMenu: ContextMenu;
@@ -171,6 +172,14 @@ export class ContextMenuController {
             } else {
               this.ctx.duplicateSelection();
             }
+          },
+        },
+        {
+          id: 'export-asset',
+          label: 'Exportar Recurso (1x, 2x, 3x)...',
+          shortcut: 'Ctrl+Shift+E',
+          action: () => {
+            ExportModal.show(this.ctx.model, this.ctx.selectionTool);
           },
         },
         { id: 'separator', label: '', action: () => {} },

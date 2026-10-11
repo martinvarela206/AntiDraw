@@ -31,8 +31,9 @@ async function main() {
   const ok1 = await runSuite(path.join(__dirname, 'test-validator.ts'), 'runValidatorTests');
   const ok2 = await runSuite(path.join(__dirname, 'test-metadata-fusion.ts'), 'runMetadataFusionTests');
   const ok3 = await runSuite(path.join(__dirname, 'test-clipboard.ts'), 'runClipboardTests');
+  const ok4 = await runSuite(path.join(__dirname, 'test-export.ts'), 'runExportTests');
 
-  const allSuccess = ok1 && ok2 && ok3;
+  const allSuccess = ok1 && ok2 && ok3 && ok4;
   process.exit(allSuccess ? 0 : 1);
 }
 

@@ -175,6 +175,14 @@ export class KeyboardShortcutController {
       }
     }
 
+    if (isCtrl && e.shiftKey && (e.key === 'e' || e.key === 'E')) {
+      if (cmdRegistry.has('file.exportAsset') && cmdRegistry.isEnabled('file.exportAsset')) {
+        e.preventDefault();
+        cmdRegistry.execute('file.exportAsset');
+        return;
+      }
+    }
+
     if (isCtrl && (e.key === 'z' || e.key === 'Z')) {
       e.preventDefault();
       const undoCmd = e.shiftKey ? 'edit.redo' : 'edit.undo';

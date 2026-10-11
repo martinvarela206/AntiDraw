@@ -5,6 +5,7 @@
 
 import { CommandRegistry, CommandSpec, CommandContext } from './CommandRegistry.js';
 import { registerAllDomainCommands } from '../../commands/index.js';
+import { ExportModal } from '../../ui/ExportModal.js';
 
 export function registerSystemCommands(registry: CommandRegistry): void {
   // Registrar comandos de dominio formalizados (shape.*, path.*, transform.*, node.*)
@@ -292,6 +293,18 @@ export function registerSystemCommands(registry: CommandRegistry): void {
         return { success: true };
       }
       return { success: false, error: 'Función recenterViewBox no disponible' };
+    },
+  });
+
+  // --- ARCHIVO Y EXPORTACIÓN ---
+  registry.register({
+    id: 'file.exportAsset',
+    label: 'Exportar Recurso (Asset Export)',
+    category: 'edit',
+    shortcut: 'Ctrl+Shift+E',
+    execute: (ctx: CommandContext) => {
+      ExportModal.show(ctx.model, ctx.selectionTool);
+      return { success: true };
     },
   });
 }
