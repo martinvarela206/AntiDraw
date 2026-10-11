@@ -118,9 +118,14 @@ class AntiDrawApp {
       onApplyCanvasSize: () => this.services.workspaceLayout.applyCanvasSize(),
       onRenderOverlay: () => this.services.workspaceLayout.renderOverlay(),
       onSyncRulers: (x, y) => this.layoutMgr.rulerView?.renderRulers(x, y),
-      onResizeRulers: (w, h) => this.layoutMgr.rulerView?.updateSize(w, h),
-      onZoomChanged: () => this.hostSyncService.syncMetadataToHostDebounced(),
-      onCameraOffsetChanged: () => this.hostSyncService.syncMetadataToHostDebounced(),
+      onZoomChanged: () => {
+        this.services.workspaceLayout.updateGridLayer();
+        this.hostSyncService.syncMetadataToHostDebounced();
+      },
+      onCameraOffsetChanged: () => {
+        this.services.workspaceLayout.updateGridLayer();
+        this.hostSyncService.syncMetadataToHostDebounced();
+      },
     });
     this.canvasMgr.visibleBoundsProvider = () => this.viewportCtrl.getVisibleCanvasBounds();
 

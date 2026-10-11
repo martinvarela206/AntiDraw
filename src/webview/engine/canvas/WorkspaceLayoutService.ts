@@ -49,6 +49,8 @@ export class WorkspaceLayoutService {
   private lastAppliedVb: string = '';
   private lastAppliedDisplayW: number = -1;
   private lastAppliedDisplayH: number = -1;
+  private overlayRafId: number | null = null;
+  private pendingOverlayRender: boolean = false;
 
   constructor(private ctx: WorkspaceLayoutContext) {}
 
@@ -67,6 +69,7 @@ export class WorkspaceLayoutService {
     const displayW = Math.round(workBounds.width * zoom);
     const displayH = Math.round(workBounds.height * zoom);
     const vb = `${workBounds.minX} ${workBounds.minY} ${workBounds.width} ${workBounds.height}`;
+    let layoutChanged = false;
 
     if (this.lastAppliedDisplayW !== displayW || this.lastAppliedDisplayH !== displayH) {
       this.lastAppliedDisplayW = displayW;
@@ -77,6 +80,7 @@ export class WorkspaceLayoutService {
       svgCanvas.style.height = `${displayH}px`;
       overlaySvg.style.width = `${displayW}px`;
       overlaySvg.style.height = `${displayH}px`;
+      layoutChanged = true;
     }
 
     if (this.lastAppliedVb !== vb) {
@@ -89,6 +93,11 @@ export class WorkspaceLayoutService {
         svg.setAttribute('viewBox', vb);
       });
       this.ctx.getRulerView()?.updateSize(workBounds.width, workBounds.height);
+      layoutChanged = true;
+    }
+
+    if (layoutChanged) {
+      this.updateGridLayer();
     }
   }
 
@@ -128,7 +137,7 @@ export class WorkspaceLayoutService {
       this.ctx.svgDomRenderer.render(svgCanvas, this.ctx.model);
     }
 
-    this.renderOverlay();
+    this.renderOverlayImmediate();
 
     const selectedEl = this.ctx.model.elements.find(
       (el) => el.id === this.ctx.selectionTool.selectedElementId
@@ -170,13 +179,47 @@ export class WorkspaceLayoutService {
     );
   }
 
-  public renderOverlay(): void {
+  /**
+   * Coalesces high-frequency cursor and interaction overlays to browser VSync (60/120 FPS).
+   * Prevents layout thrashing and DOM saturation during intense pointer movements.
+   * If immediate is true, executes synchronously.
+   */
+  public renderOverlay(immediate: boolean = false): void {
+    if (immediate) {
+      this.renderOverlayImmediate();
+      return;
+    }
+
+    if (this.pendingOverlayRender) return;
+    this.pendingOverlayRender = true;
+
+    if (typeof requestAnimationFrame === 'function') {
+      this.overlayRafId = requestAnimationFrame(() => {
+        this.pendingOverlayRender = false;
+        this.overlayRafId = null;
+        this.renderOverlayImmediate();
+      });
+    } else {
+      this.pendingOverlayRender = false;
+      this.renderOverlayImmediate();
+    }
+  }
+
+  /**
+   * Immediate synchronous rendering of ephemeral UI marks (gizmos, bounds, guides, nodes).
+   * Notice: updateGridLayer is strictly decoupled here to maintain 120 FPS without canvas recalculation.
+   */
+  public renderOverlayImmediate(): void {
+    if (this.overlayRafId !== null && typeof cancelAnimationFrame === 'function') {
+      cancelAnimationFrame(this.overlayRafId);
+      this.overlayRafId = null;
+    }
+    this.pendingOverlayRender = false;
+
     const overlaySvg = this.ctx.getOverlaySvg();
     if (!overlaySvg) return;
 
     const z = this.ctx.canvasMgr.zoom || 1;
-    this.updateGridLayer();
-
     const session = this.ctx.getSession();
     const toolbar = this.ctx.getToolbar();
 

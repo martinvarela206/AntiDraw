@@ -114,14 +114,14 @@ export class AppLayoutManager {
 
     const overlaySvgEl = document.createElementNS(svgNS, 'svg') as SVGSVGElement;
     overlaySvgEl.id = 'overlay-svg';
-    overlaySvgEl.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;overflow:visible;';
+    overlaySvgEl.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;overflow:visible;will-change:transform;';
     this.canvasWrapper.appendChild(overlaySvgEl);
     this.overlaySvg = overlaySvgEl;
 
     // Viewport-bounded Grid Canvas: sized strictly to canvasScrollArea viewport to guarantee 60+ FPS zoom and 1px stroke invariance
     const gridCanvasEl = document.createElement('canvas');
     gridCanvasEl.id = 'grid-canvas';
-    gridCanvasEl.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;';
+    gridCanvasEl.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;will-change:transform;';
     this.canvasScrollArea.appendChild(gridCanvasEl);
     this.gridCanvas = gridCanvasEl;
     this.gridCanvasRenderer = new GridCanvasRenderer(this.gridCanvas);

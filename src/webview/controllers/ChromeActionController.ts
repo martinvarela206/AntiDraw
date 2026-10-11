@@ -72,6 +72,7 @@ export class ChromeActionController {
       onToggleGrid: () => {
         this.ctx.canvasMgr.showGrid = !this.ctx.canvasMgr.showGrid;
         this.ctx.getLayoutMgr()?.topBar.update();
+        this.ctx.workspaceLayout().updateGridLayer();
         this.ctx.workspaceLayout().render();
         this.ctx.hostSyncService().syncMetadataToHost();
       },
