@@ -74,6 +74,7 @@ class AntiDrawApp {
 
     // 3. Action Controllers (Chrome TopBar/Ruler & Inspector PropertyPanel)
     this.chromeCtrl = new ChromeActionController({
+      model: this.model,
       canvasMgr: this.canvasMgr,
       selectionTool: this.selectionTool,
       historyService: () => this.services.historyService,
@@ -102,6 +103,7 @@ class AntiDrawApp {
       model: this.model,
       selectionTool: this.selectionTool,
       onToolChange: (tool) => this.chromeCtrl.onToolChange(tool),
+      onToolDoubleClick: (tool) => this.chromeCtrl.onToolDoubleClick(tool),
       topBarCallbacks: this.chromeCtrl.createTopBarCallbacks(),
       rulerCallbacks: this.chromeCtrl.createRulerCallbacks(),
       propertyPanelCallbacks: this.propertyPanelCtrl.createCallbacks(),

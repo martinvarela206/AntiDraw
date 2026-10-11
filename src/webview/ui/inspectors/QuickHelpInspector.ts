@@ -63,6 +63,7 @@ export class QuickHelpInspector {
         { keys: ['Doble clic'], description: 'Entra directamente al modo de edición de nodos' },
         { keys: ['Ctrl+C / Ctrl+V'], description: 'Copia y pega con desplazamiento automático de 15px' },
         { keys: ['Ctrl+D'], description: 'Duplica instantáneamente los elementos seleccionados' },
+        { keys: ['Doble clic icono (V)'], description: 'Abre el diálogo de transformación numérica (posición X/Y y desplazamiento)' },
         { keys: ['Supr / Backspace'], description: 'Elimina los elementos seleccionados' },
       ],
     },
@@ -206,6 +207,7 @@ export class QuickHelpInspector {
         { keys: ['Espacio', 'Arrastre'], description: 'Paneo libre por el área de trabajo (también botón central)' },
         { keys: ['Ctrl', 'Rueda ratón'], description: 'Zoom continuo hacia dentro o hacia fuera' },
         { keys: ['Shift', 'Rueda ratón'], description: 'Desplazamiento horizontal del lienzo' },
+        { keys: ['Doble clic icono (Z)'], description: 'Ajuste automático de zoom al área de trabajo (Fit to Screen)' },
       ],
     },
     ruler: {

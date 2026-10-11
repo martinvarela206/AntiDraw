@@ -13,6 +13,7 @@ export interface AppLayoutConfig {
   model: VectorModel;
   selectionTool: SelectionTool;
   onToolChange: (tool: ToolType) => void;
+  onToolDoubleClick?: (tool: ToolType) => void;
   topBarCallbacks: TopBarCallbacks;
   rulerCallbacks: RulerViewCallbacks;
   propertyPanelCallbacks: PropertyPanelCallbacks;
@@ -129,7 +130,8 @@ export class AppLayoutManager {
     // Initialize Left Toolbar
     this.toolbar = new Toolbar(
       document.getElementById('left-toolbar')!,
-      (tool) => this.config.onToolChange(tool)
+      (tool) => this.config.onToolChange(tool),
+      (tool) => this.config.onToolDoubleClick?.(tool)
     );
 
     // Initialize Top Bar

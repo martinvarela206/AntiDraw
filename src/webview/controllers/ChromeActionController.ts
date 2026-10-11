@@ -11,8 +11,11 @@ import { Session } from '../engine/session/Session.js';
 import { ViewportController } from '../engine/ViewportController.js';
 import { CanvasView } from '../engine/canvas/CanvasView.js';
 import { AppLayoutManager } from '../ui/AppLayoutManager.js';
+import { VectorModel } from '../engine/VectorModel.js';
+import { TransformNumericModal } from '../ui/TransformNumericModal.js';
 
 export interface ChromeActionContext {
+  model: VectorModel;
   canvasMgr: CanvasManager;
   selectionTool: SelectionTool;
   historyService: () => HistoryService;
@@ -50,6 +53,35 @@ export class ChromeActionController {
       this.ctx.canvasMgr.activeGuideTransformId = null;
     }
     this.ctx.session().setTool(tool);
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Tool Double-Click Quick Actions (09.2)
+   * - Select Tool double-click: Opens precision numeric transformation modal dialog (X, Y, ΔX, ΔY).
+   * - Zoom Tool double-click: Fits the SVG artboard / ViewBox seamlessly to the screen (Fit to Screen).
+   */
+  public onToolDoubleClick(tool: ToolType): void {
+    if (tool === 'select') {
+      const selectedEls = this.ctx.model.elements.filter((el) =>
+        this.ctx.selectionTool.isSelected(el.id)
+      );
+      let groupBox: { x: number; y: number; width: number; height: number } | null = null;
+      if (selectedEls.length === 1) {
+        groupBox = this.ctx.selectionTool.getBoundingBox(selectedEls[0]);
+      } else if (selectedEls.length > 1) {
+        groupBox = this.ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls);
+      }
+
+      TransformNumericModal.show({
+        currentBox: groupBox,
+        selectedCount: selectedEls.length,
+        onApply: (dx, dy, duplicate) => {
+          this.ctx.actionDispatcher().translateSelection(dx, dy, duplicate);
+        },
+      });
+    } else if (tool === 'zoom') {
+      this.ctx.getViewportCtrl()?.fitToScreen(32);
+    }
   }
 
   public createTopBarCallbacks(): TopBarCallbacks {

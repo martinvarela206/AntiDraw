@@ -275,6 +275,49 @@ export class ViewportController {
   }
 
   /**
+   * ARCHITECTURAL RATIONALE: Viewport Fit to Screen (09.2)
+   * Dynamically adjusts canvas zoom and centers camera offset so the SVG artboard / ViewBox
+   * is fully visible within the current scroll area, preserving aesthetic margins (padding).
+   */
+  public fitToScreen(padding: number = 32): void {
+    if (!this.canvasScrollArea) return;
+    const areaW = this.canvasScrollArea.clientWidth;
+    const areaH = this.canvasScrollArea.clientHeight;
+    if (areaW <= 0 || areaH <= 0) return;
+
+    const vb = this.model.getViewBoxBounds();
+    const vbW = Math.max(10, vb.width);
+    const vbH = Math.max(10, vb.height);
+
+    const availW = Math.max(50, areaW - padding * 2);
+    const availH = Math.max(50, areaH - padding * 2);
+
+    const targetZoom = Math.min(availW / vbW, availH / vbH);
+    const clampedZoom = Math.max(CanvasManager.MIN_ZOOM, Math.min(CanvasManager.MAX_ZOOM, targetZoom));
+    const newZoom = Math.round(clampedZoom * 1000) / 1000;
+
+    this.canvasMgr.zoom = newZoom;
+    this.onApplyCanvasSize();
+
+    const workBounds = this.model.getWorkingCanvasBounds(16);
+    const vbCenterX = (vb.minX + vb.width / 2 - workBounds.minX) * newZoom;
+    const vbCenterY = (vb.minY + vb.height / 2 - workBounds.minY) * newZoom;
+
+    this.cameraOffset.x = Math.round(areaW / 2 - vbCenterX);
+    this.cameraOffset.y = Math.round(areaH / 2 - vbCenterY);
+
+    this.applyCameraTransform();
+    this.syncRulerScroll();
+    if (this.onRenderOverlay) {
+      this.onRenderOverlay();
+    } else {
+      this.onRender();
+    }
+    this.updateStatusZoom();
+    this.onZoomChanged?.(newZoom);
+  }
+
+  /**
    * ARCHITECTURAL RATIONALE: High-FPS Camera Zoom Pipeline Decoupling
    *
    * Problem:

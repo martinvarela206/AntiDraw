@@ -3,6 +3,7 @@ import { SelectionTool } from '../engine/SelectionTool.js';
 import { BooleanOperations } from '../engine/BooleanOperations.js';
 import { ConfirmationModal } from '../ui/ConfirmationModal.js';
 import { CrashGuard } from './CrashGuard.js';
+import { VectorCloneHelper } from '../engine/selection/VectorCloneHelper.js';
 
 export interface CanvasActionDispatcherContext {
   model: VectorModel;
@@ -375,5 +376,106 @@ export class CanvasActionDispatcher {
     this.ctx.render();
     this.ctx.syncToHost();
   }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Numeric Translation and Direct Coordinate Repositioning (09.2)
+   * Moves or clones currently selected elements by an exact numeric delta (dx, dy).
+   * Recompiles parametric primitives and Bézier paths, updates custom rotation pivots,
+   * compensates gradient positioning, registers atomic undo, and syncs telemetry to host.
+   */
+  public translateSelection(dx: number, dy: number, duplicate: boolean = false): void {
+    if (dx === 0 && dy === 0) return;
+
+    const selectedIds = Array.from(this.ctx.selectionTool.selectedElementIds);
+    const selectedEls: VectorElement[] = [];
+    selectedIds.forEach((id) => {
+      const el = this.ctx.model.elements.find((e) => e.id === id);
+      if (el) selectedEls.push(el);
+    });
+
+    if (selectedEls.length === 0) return;
+
+    this.ctx.pushUndo();
+
+    if (duplicate) {
+      const clonedElements: VectorElement[] = [];
+      const newIds: string[] = [];
+
+      selectedEls.forEach((srcEl) => {
+        const clone = VectorCloneHelper.cloneWithOffset(srcEl, { x: dx, y: dy }, this.ctx.model);
+        clonedElements.push(clone);
+        newIds.push(clone.id);
+      });
+
+      clonedElements.forEach((c) => this.ctx.model.elements.push(c));
+
+      this.ctx.selectionTool.deselectAll();
+      newIds.forEach((id) => this.ctx.selectionTool.selectedElementIds.add(id));
+
+      clonedElements.forEach((el) => {
+        if (el.attributes['data-gradient']) {
+          const box = this.ctx.selectionTool.getBoundingBox(el);
+          if (box) {
+            this.ctx.selectionTool.compensateGradientOnTranslate(el, dx, dy, box);
+          }
+        }
+      });
+    } else {
+      selectedEls.forEach((el) => {
+        if (el.vertices && el.vertices.length > 0) {
+          el.vertices = el.vertices.map((v) => ({
+            ...v,
+            x: v.x + dx,
+            y: v.y + dy,
+            handleIn: v.handleIn ? { x: v.handleIn.x + dx, y: v.handleIn.y + dy } : undefined,
+            handleOut: v.handleOut ? { x: v.handleOut.x + dx, y: v.handleOut.y + dy } : undefined,
+          }));
+
+          const isClosed = this.ctx.model.isElementClosed(el);
+          const isPieOrArc =
+            el.attributes['data-ellipse-type'] === 'pie' || el.attributes['data-ellipse-type'] === 'arc';
+          const innerRatio = parseFloat(el.attributes['data-inner-ratio'] || '0');
+
+          if (this.ctx.model.isParametricElement(el) && (isPieOrArc || innerRatio > 0)) {
+            const oldCx = parseFloat(el.attributes.cx || '0');
+            const oldCy = parseFloat(el.attributes.cy || '0');
+            const newCx = Math.round((oldCx + dx) * 100) / 100;
+            const newCy = Math.round((oldCy + dy) * 100) / 100;
+            el.attributes.cx = newCx.toString();
+            el.attributes.cy = newCy.toString();
+            const rx = parseFloat(el.attributes.rx || el.attributes.r || '1');
+            const ry = parseFloat(el.attributes.ry || el.attributes.r || '1');
+            const type = (el.attributes['data-ellipse-type'] as 'ellipse' | 'pie' | 'arc') || 'ellipse';
+            const s = parseFloat(el.attributes['data-start-angle'] || '0');
+            const e = parseFloat(el.attributes['data-end-angle'] || '360');
+            el.attributes.d = this.ctx.model.compileEllipseD(newCx, newCy, rx, ry, type, s, e, innerRatio);
+            if (innerRatio > 0) {
+              el.attributes['fill-rule'] = 'evenodd';
+            }
+          } else {
+            el.attributes.d = this.ctx.model.compilePathD(el.vertices, isClosed);
+            if (this.ctx.model.isParametricElement(el)) {
+              this.ctx.model.syncParametricAttributes(el);
+            }
+          }
+        }
+
+        if (el.attributes['data-gradient']) {
+          const box = this.ctx.selectionTool.getBoundingBox(el);
+          if (box) {
+            this.ctx.selectionTool.compensateGradientOnTranslate(el, dx, dy, box);
+          }
+        }
+      });
+
+      this.ctx.selectionTool.updatePivotOnTranslate(dx, dy, selectedEls);
+    }
+
+    this.ctx.onResetPropertyPanel();
+    this.ctx.onUpdatePropertyPanel(this.ctx.getActiveTool());
+    this.ctx.render();
+    this.ctx.syncToHost();
+  }
 }
+
 

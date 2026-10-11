@@ -7,10 +7,16 @@ export class Toolbar {
   public activeTool: ToolType = 'select';
   private container: HTMLElement;
   private onToolChangeCallback: (tool: ToolType) => void;
+  private onToolDoubleClickCallback?: (tool: ToolType) => void;
 
-  constructor(container: HTMLElement, onToolChange: (tool: ToolType) => void) {
+  constructor(
+    container: HTMLElement,
+    onToolChange: (tool: ToolType) => void,
+    onToolDoubleClick?: (tool: ToolType) => void
+  ) {
     this.container = container;
     this.onToolChangeCallback = onToolChange;
+    this.onToolDoubleClickCallback = onToolDoubleClick;
     this.render();
   }
 
@@ -57,6 +63,11 @@ export class Toolbar {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         this.setTool(t.id);
+      });
+      btn.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.onToolDoubleClickCallback?.(t.id);
       });
       this.container.appendChild(btn);
     });
