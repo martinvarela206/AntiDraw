@@ -246,6 +246,10 @@ export class HitTestService {
     mode: 'move' | 'scale' | 'rotate' | 'distort' | 'transform' = 'scale',
     currentQuad?: QuadCorners | null
   ): HandleType | null {
+    if (mode === 'move') {
+      return null;
+    }
+
     if (mode === 'distort') {
       const q = currentQuad || {
         nw: { x: box.x, y: box.y },

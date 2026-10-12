@@ -167,18 +167,18 @@ export class PivotManager {
     const isCustomPivot = ctx.selectionTool.customPivot !== null;
 
     let html = '';
-    if (isCustomPivot) {
-      const leverColor = mode === 'rotate' ? '#f59e0b' : '#0284c7';
+    if (isCustomPivot && mode === 'rotate') {
+      const leverColor = '#8b5cf6';
       html += `<line x1="${groupBox.cx}" y1="${groupBox.cy}" x2="${pivot.x}" y2="${pivot.y}" stroke="${leverColor}" stroke-width="1" stroke-dasharray="2 2" opacity="0.75" vector-effect="non-scaling-stroke" />`;
     }
 
-    if (mode !== 'scale') {
+    if (mode === 'rotate') {
       /**
        * ARCHITECTURAL RATIONALE: High-Fidelity Optical Crosshair Reticle (Mira con Centro en Pivote - ITEM-07)
        *
        * 1. Universal Readability (Dual-Stroke Contrast):
        *    Renders dual-pass crosshairs with a dark backing stroke (#0f172a at 2.4px) under a vibrant
-       *    foreground stroke (#f59e0b / #0284c7 at 1.2px), guaranteeing razor-sharp visibility on
+       *    foreground stroke (#8b5cf6 at 1.2px), guaranteeing razor-sharp visibility on
        *    dark themes, white backgrounds, and noisy vector drawings.
        *
        * 2. CorelDraw Optical Target Benchmark:
@@ -187,7 +187,7 @@ export class PivotManager {
        */
       const pR = 6.5 / z;
       const tick = 10.5 / z;
-      const pColor = mode === 'rotate' ? '#f59e0b' : '#0284c7';
+      const pColor = '#8b5cf6';
       const pCursor = 'move';
       const pPointerEvents = 'auto';
       const pOpacity = '1.0';

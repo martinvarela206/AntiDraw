@@ -39,8 +39,9 @@ async function main() {
   const ok6 = await runSuite(path.join(__dirname, 'test-fuzzing.ts'), 'runFuzzingTests');
   const ok7 = await runSuite(path.join(__dirname, 'test-drag-modifiers.ts'), 'runDragModifiersTests');
   const ok8 = await runSuite(path.join(__dirname, 'test-toolbar-dblclick.ts'), 'runToolbarDblClickTests');
+  const ok9 = await runSuite(path.join(__dirname, 'test-selection-modes.ts'), 'runSelectionModesTests');
 
-  const allSuccess = ok1 && ok2 && ok3 && ok4 && ok5 && ok6 && ok7 && ok8;
+  const allSuccess = ok1 && ok2 && ok3 && ok4 && ok5 && ok6 && ok7 && ok8 && ok9;
   process.exit(allSuccess ? 0 : 1);
 }
 

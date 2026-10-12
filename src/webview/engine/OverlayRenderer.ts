@@ -217,7 +217,7 @@ export class OverlayRenderer {
     if (
       selectedEls.length > 0 &&
       !ctx.hasGhostNodeVertices &&
-      (ctx.activeTool === 'node' || ctx.selectionTool.selectionMode === 'move')
+      ctx.activeTool === 'node'
     ) {
       selectedEls.forEach((el) => {
         if (ctx.model.isEllipse(el)) {

@@ -109,6 +109,8 @@ export class TransformInteraction {
         }
         return (h === 'skew-n' || h === 'skew-s') ? 'ew-resize' : 'ns-resize';
       }
+    } else if (ctx.selectionTool.selectionMode === 'move') {
+      // Pure move mode: no perimeter transform handles
     } else {
       const h = ctx.selectionTool.hitTestHandle(box, pt, 12 / z, 18 / z, 'transform');
       if (h) {
@@ -550,7 +552,7 @@ export class TransformInteraction {
       const groupBox = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 0);
       if (groupBox) {
         const mode = ctx.selectionTool.selectionMode;
-        const boxStroke = mode === 'distort' ? '#8b5cf6' : mode === 'rotate' ? '#f59e0b' : mode === 'move' ? '#10b981' : '#38bdf8';
+        const boxStroke = mode === 'distort' ? '#8b5cf6' : mode === 'rotate' ? '#8b5cf6' : mode === 'move' ? '#10b981' : '#6366f1';
         
         // Render bounding box outline across scale/rotate/move modes, visually distinguishing states by hue
         if (mode !== 'distort') {
@@ -576,7 +578,7 @@ export class TransformInteraction {
             const hHalf = hSize / 2;
             const hRx = 1 / z;
             handles.forEach((hPos) => {
-              html += `<rect x="${hPos.x - hHalf}" y="${hPos.y - hHalf}" width="${hSize}" height="${hSize}" fill="#ffffff" stroke="#0284c7" stroke-width="1" rx="${hRx}" vector-effect="non-scaling-stroke" />`;
+              html += `<rect x="${hPos.x - hHalf}" y="${hPos.y - hHalf}" width="${hSize}" height="${hSize}" fill="#ffffff" stroke="#6366f1" stroke-width="1.2" rx="${hRx}" vector-effect="non-scaling-stroke" />`;
             });
           } else if (mode === 'distort') {
             const q = this.currentDistortQuad || {
@@ -649,16 +651,6 @@ export class TransformInteraction {
           } else if (mode === 'rotate') {
             /**
              * ARCHITECTURAL RATIONALE: High-Fidelity Curved Circular Rotation & Skew Handle Iconography (ITEM-07)
-             *
-             * 1. Industrial Parity (CorelDraw Benchmark):
-             *    In CorelDraw, rotation mode replaces standard corner square sizing handles with
-             *    tangential curved circular arrows that visually convey bidirectional angular rotation,
-             *    and midpoint handles with bidirectional linear arrows for skew/shear manipulation.
-             *
-             * 2. Zoom-Invariant Vector Geometry:
-             *    Icons are rendered inside `<g transform="translate(x,y) scale(1/z) rotate(angle)">`,
-             *    ensuring pixel-crisp display at all zoom levels (10% to 3200%) with dark high-contrast
-             *    backing discs that stand out universally over light, dark, or transparent canvases.
              */
             const rotCorners = [
               { x: groupBox.x, y: groupBox.y, rot: -45 },
@@ -669,14 +661,14 @@ export class TransformInteraction {
             rotCorners.forEach((c) => {
               html += `
                 <g class="rotate-corner-handle" transform="translate(${c.x}, ${c.y}) scale(${1 / z}) rotate(${c.rot})" style="cursor: grab;">
-                  <!-- High-contrast dark disc with amber border -->
-                  <circle cx="0" cy="0" r="8.5" fill="#0f172a" fill-opacity="0.88" stroke="#f59e0b" stroke-width="1.2" vector-effect="non-scaling-stroke" />
+                  <!-- High-contrast dark disc with purple border -->
+                  <circle cx="0" cy="0" r="8.5" fill="#0f172a" fill-opacity="0.88" stroke="#8b5cf6" stroke-width="1.2" vector-effect="non-scaling-stroke" />
                   <!-- Curved circular rotation arc -->
-                  <path d="M -3.8 4.2 A 5.8 5.8 0 0 1 -3.8 -4.2" fill="none" stroke="#fbbf24" stroke-width="1.5" stroke-linecap="round" vector-effect="non-scaling-stroke" />
+                  <path d="M -3.8 4.2 A 5.8 5.8 0 0 1 -3.8 -4.2" fill="none" stroke="#c4b5fd" stroke-width="1.5" stroke-linecap="round" vector-effect="non-scaling-stroke" />
                   <!-- Top arrowhead -->
-                  <polygon points="-3.8,-4.2 -6.5,-1.6 -1.2,-2.2" fill="#fbbf24" />
+                  <polygon points="-3.8,-4.2 -6.5,-1.6 -1.2,-2.2" fill="#c4b5fd" />
                   <!-- Bottom arrowhead -->
-                  <polygon points="-3.8,4.2 -1.2,2.2 -6.5,1.6" fill="#fbbf24" />
+                  <polygon points="-3.8,4.2 -1.2,2.2 -6.5,1.6" fill="#c4b5fd" />
                 </g>
               `;
             });
@@ -691,8 +683,8 @@ export class TransformInteraction {
             ];
             skewMidpoints.forEach((m) => {
               const handleCursor = canSkew ? (m.isHoriz ? 'ew-resize' : 'ns-resize') : 'not-allowed';
-              const strokeColor = canSkew ? '#f59e0b' : '#64748b';
-              const arrowColor = canSkew ? '#fbbf24' : '#64748b';
+              const strokeColor = canSkew ? '#8b5cf6' : '#64748b';
+              const arrowColor = canSkew ? '#c4b5fd' : '#64748b';
               const titleText = canSkew
                 ? 'Arrastrar para inclinar / sesgar (Ctrl: pasos de 15°, Alt: simétrico)'
                 : 'Las primitivas paramétricas rígidas requieren conversión a curvas (Ctrl+Q) para inclinarse';
@@ -721,15 +713,57 @@ export class TransformInteraction {
             });
           }
         } else {
-          // Mode: Move - Render vertices for visualization and snapping reference
-          const hSize = 5 / z;
+          // Mode: Move (Mover Puro) - High-visibility magnetic snap targets for vertices and geometric center
           selectedEls.forEach((el) => {
-            if (el.vertices) {
+            if (ctx.model.isEllipse(el)) {
+              const cx = parseFloat(el.attributes.cx || '0');
+              const cy = parseFloat(el.attributes.cy || '0');
+              const rx = parseFloat(el.attributes.rx || el.attributes.r || '1');
+              const ry = parseFloat(el.attributes.ry || el.attributes.r || '1');
+              const quadrantAngles = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2];
+              quadrantAngles.forEach((rad) => {
+                const qx = cx + rx * Math.cos(rad);
+                const qy = cy + ry * Math.sin(rad);
+                html += `
+                  <g class="move-anchor-snap-target" transform="translate(${qx}, ${qy}) scale(${1 / z})" style="pointer-events: none;">
+                    <circle cx="0" cy="0" r="5" fill="#ffffff" stroke="#10b981" stroke-width="1.5" vector-effect="non-scaling-stroke" />
+                    <line x1="-3.5" y1="0" x2="3.5" y2="0" stroke="#10b981" stroke-width="1" vector-effect="non-scaling-stroke" />
+                    <line x1="0" y1="-3.5" x2="0" y2="3.5" stroke="#10b981" stroke-width="1" vector-effect="non-scaling-stroke" />
+                    <circle cx="0" cy="0" r="1.5" fill="#10b981" />
+                  </g>
+                `;
+              });
+            } else if (el.vertices) {
               el.vertices.forEach((v) => {
-                html += `<circle cx="${v.x}" cy="${v.y}" r="${hSize}" fill="#ffffff" stroke="#38bdf8" stroke-width="1.5" vector-effect="non-scaling-stroke" style="pointer-events: none;" />`;
+                html += `
+                  <g class="move-anchor-snap-target" transform="translate(${v.x}, ${v.y}) scale(${1 / z})" style="pointer-events: none;">
+                    <!-- High-contrast backing halo with emerald border -->
+                    <circle cx="0" cy="0" r="5" fill="#ffffff" stroke="#10b981" stroke-width="1.5" vector-effect="non-scaling-stroke" />
+                    <!-- Optical magnetic center reticle -->
+                    <line x1="-3.5" y1="0" x2="3.5" y2="0" stroke="#10b981" stroke-width="1" vector-effect="non-scaling-stroke" />
+                    <line x1="0" y1="-3.5" x2="0" y2="3.5" stroke="#10b981" stroke-width="1" vector-effect="non-scaling-stroke" />
+                    <circle cx="0" cy="0" r="1.5" fill="#10b981" />
+                  </g>
+                `;
               });
             }
           });
+
+          // Geometric center illuminated with magnetic snapping crosshair reticle
+          html += `
+            <g class="move-center-snap-reticle" transform="translate(${groupBox.cx}, ${groupBox.cy}) scale(${1 / z})" style="pointer-events: none;">
+              <!-- Dark high-contrast backing crosshairs -->
+              <line x1="-8" y1="0" x2="8" y2="0" stroke="#0f172a" stroke-width="2.2" vector-effect="non-scaling-stroke" />
+              <line x1="0" y1="-8" x2="0" y2="8" stroke="#0f172a" stroke-width="2.2" vector-effect="non-scaling-stroke" />
+              <!-- Emerald precision crosshairs -->
+              <line x1="-8" y1="0" x2="8" y2="0" stroke="#10b981" stroke-width="1.2" vector-effect="non-scaling-stroke" />
+              <line x1="0" y1="-8" x2="0" y2="8" stroke="#10b981" stroke-width="1.2" vector-effect="non-scaling-stroke" />
+              <!-- Outer optical target ring -->
+              <circle cx="0" cy="0" r="5" fill="#0f172a" fill-opacity="0.8" stroke="#10b981" stroke-width="1.2" vector-effect="non-scaling-stroke" />
+              <!-- Bullseye center dot -->
+              <circle cx="0" cy="0" r="1.8" fill="#ffffff" />
+            </g>
+          `;
         }
 
         html += this.pivotManager.renderOverlay(ctx, groupBox, selectedEls, mode, activeHandle, ghostDragOffset, z);
