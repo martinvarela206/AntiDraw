@@ -5,6 +5,10 @@ import { TransformInteraction } from '../src/webview/tools/interactions/Transfor
 import { PivotManager } from '../src/webview/tools/interactions/PivotManager.js';
 import { TranslateInteraction } from '../src/webview/tools/interactions/TranslateInteraction.js';
 import { ToolContext } from '../src/webview/tools/IToolHandler.js';
+import { SelectToolHandler } from '../src/webview/tools/SelectToolHandler.js';
+import { KeyboardShortcutController } from '../src/webview/controllers/KeyboardShortcutController.js';
+import { Toolbar } from '../src/webview/ui/Toolbar.js';
+import { QuickHelpInspector } from '../src/webview/ui/inspectors/QuickHelpInspector.js';
 
 let passed = 0;
 let failed = 0;
@@ -19,10 +23,47 @@ function assert(condition: boolean, msg: string) {
   }
 }
 
+// Minimal DOM mock for Node environment when KeyboardShortcutController attaches listeners
+function ensureDomMock() {
+  const listeners: Record<string, Function[]> = {};
+  const win = (globalThis as any).window || {};
+  const oldAdd = win.addEventListener;
+
+  win.addEventListener = (type: string, fn: Function) => {
+    if (!listeners[type]) listeners[type] = [];
+    listeners[type].push(fn);
+    if (oldAdd) oldAdd(type, fn);
+  };
+
+  win.dispatchEvent = (e: any) => {
+    const fns = listeners[e.type] || [];
+    fns.forEach((f) => f(e));
+  };
+
+  (globalThis as any).window = win;
+
+  if (typeof (globalThis as any).document === 'undefined') {
+    (globalThis as any).document = {
+      activeElement: null,
+      createElement: () => ({
+        tagName: 'DIV',
+        style: {},
+        innerHTML: '',
+        children: [],
+        appendChild: () => {},
+        setAttribute: () => {},
+        getAttribute: () => null,
+      }),
+    };
+  }
+}
+
 export async function runSelectionModesTests(): Promise<boolean> {
   console.log('\n======================================================');
-  console.log('🧪 Running 3 Modal Selection States Suite (10.1)');
+  console.log('🧪 Running 3 Modal Selection States & Hotkeys Suite (10.1 & 10.2)');
   console.log('======================================================');
+
+  ensureDomMock();
 
   // Setup sample model with a rectangle
   const model = new VectorModel();
@@ -46,7 +87,8 @@ export async function runSelectionModesTests(): Promise<boolean> {
   const pivotManager = new PivotManager();
   const translateInteraction = new TranslateInteraction();
 
-  const mockCanvasMgr: any = { zoom: 1.0, panX: 0, panY: 0 };
+  let overlayRenderedCount = 0;
+  const mockCanvasMgr: any = { zoom: 1.0, panX: 0, panY: 0, selectedGuideId: null, activeGuideTransformId: null };
   const mockCtx: ToolContext = {
     model,
     canvasMgr: mockCanvasMgr,
@@ -54,7 +96,7 @@ export async function runSelectionModesTests(): Promise<boolean> {
     activeTool: 'select',
     snapMgr: { snapPoint: (p: any) => ({ point: p, didSnap: false }) } as any,
     render: () => {},
-    renderOverlay: () => {},
+    renderOverlay: () => { overlayRenderedCount++; },
     syncToHost: () => {},
     pushUndo: () => {},
     confirm: async () => true,
@@ -160,16 +202,138 @@ export async function runSelectionModesTests(): Promise<boolean> {
   assert(!rotateOverlay.includes('move-anchor-snap-target'), 'Rotate Mode: Does not render move magnetic targets');
 
   // -----------------------------------------------------------------------------------
+  // 4. CONMUTACIÓN DE MODOS POR TECLADO (10.2: W, R, E)
+  // -----------------------------------------------------------------------------------
+  let selectionChangedFired = 0;
+  const selectHandler = new SelectToolHandler(mockCtx, {} as any, {
+    onSelectionChanged: () => { selectionChangedFired++; },
+  });
+
+  // 4.1 SelectToolHandler onKeyDown: W -> move
+  selectionTool.selectionMode = 'scale';
+  const consumedW = selectHandler.onKeyDown({ key: 'w', ctrlKey: false, metaKey: false, altKey: false } as any);
+  assert(consumedW === true, 'Hotkeys: SelectToolHandler consumes key "w"');
+  assert(selectionTool.selectionMode === 'move', 'Hotkeys: Pressing "w" switches selectionMode to "move"');
+  assert(selectionChangedFired === 1, 'Hotkeys: Pressing "w" triggers onSelectionChanged callback');
+
+  // 4.2 SelectToolHandler onKeyDown: R -> scale
+  const consumedR = selectHandler.onKeyDown({ key: 'R', ctrlKey: false, metaKey: false, altKey: false } as any);
+  assert(consumedR === true, 'Hotkeys: SelectToolHandler consumes key "R"');
+  assert(selectionTool.selectionMode === 'scale', 'Hotkeys: Pressing "R" switches selectionMode to "scale"');
+  assert(selectionChangedFired === 2, 'Hotkeys: Pressing "R" triggers onSelectionChanged callback');
+
+  // 4.3 SelectToolHandler onKeyDown: E -> rotate
+  const consumedE = selectHandler.onKeyDown({ key: 'e', ctrlKey: false, metaKey: false, altKey: false } as any);
+  assert(consumedE === true, 'Hotkeys: SelectToolHandler consumes key "e"');
+  assert(selectionTool.selectionMode === 'rotate', 'Hotkeys: Pressing "e" switches selectionMode to "rotate"');
+  assert(selectionChangedFired === 3, 'Hotkeys: Pressing "e" triggers onSelectionChanged callback');
+
+  // 4.4 KeyboardShortcutController Integration
+  let propertyPanelUpdated = 0;
+  let activeToolName: any = 'select';
+  const mockToolbar: any = {
+    get activeTool() { return activeToolName; },
+    getActiveTool: () => activeToolName,
+    setTool: (t: any) => { activeToolName = t; },
+  };
+
+  const keyboardCtrl = new KeyboardShortcutController({
+    toolbar: mockToolbar,
+    selectionTool,
+    canvasMgr: mockCanvasMgr,
+    nodeEditorTool: {} as any,
+    model,
+    propertyPanel: { update: () => { propertyPanelUpdated++; }, resetPanelMode: () => {} } as any,
+    clipboardService: {} as any,
+    nodeToolHandler: {} as any,
+    shapeToolHandler: { shapeStartPt: null, onKeyDown: () => false, onKeyUp: () => false } as any,
+    penToolHandler: {} as any,
+    polylineToolHandler: {} as any,
+    isDragging: () => false,
+    activeHandle: () => null,
+    copySelection: () => {},
+    cutSelection: () => {},
+    pasteClipboard: () => {},
+    duplicateSelection: () => {},
+    handleConvertToCurves: () => {},
+    undo: () => {},
+    redo: () => {},
+    cancelCurrentAction: () => {},
+    pushUndo: () => {},
+    render: () => {},
+    renderOverlay: () => { overlayRenderedCount++; },
+    syncToHost: () => {},
+    syncMetadataToHost: () => {},
+  });
+
+  // Test KeyboardShortcutController dispatch with window keydown event
+  // Test W:
+  selectionTool.selectionMode = 'scale';
+  (globalThis as any).window.dispatchEvent({
+    type: 'keydown',
+    key: 'w',
+    ctrlKey: false,
+    metaKey: false,
+    preventDefault: () => {},
+  });
+  assert(selectionTool.selectionMode === 'move', 'Keyboard Controller: Dispatched "w" sets mode to "move"');
+  assert(propertyPanelUpdated >= 1, 'Keyboard Controller: Dispatched "w" triggers propertyPanel.update()');
+
+  // Test R (when select active): switches mode to scale without switching tool to rect
+  (globalThis as any).window.dispatchEvent({
+    type: 'keydown',
+    key: 'r',
+    ctrlKey: false,
+    metaKey: false,
+    preventDefault: () => {},
+  });
+  assert(selectionTool.selectionMode === 'scale', 'Keyboard Controller: Dispatched "r" sets mode to "scale"');
+  assert(mockToolbar.activeTool === 'select', 'Keyboard Controller: Dispatched "r" preserves "select" tool instead of switching to "rect"');
+
+  // Test E (when select active): switches mode to rotate without switching tool to ellipse
+  (globalThis as any).window.dispatchEvent({
+    type: 'keydown',
+    key: 'e',
+    ctrlKey: false,
+    metaKey: false,
+    preventDefault: () => {},
+  });
+  assert(selectionTool.selectionMode === 'rotate', 'Keyboard Controller: Dispatched "e" sets mode to "rotate"');
+  assert(mockToolbar.activeTool === 'select', 'Keyboard Controller: Dispatched "e" preserves "select" tool instead of switching to "ellipse"');
+
+  // Test W when another tool was active: activates select tool and sets move mode
+  activeToolName = 'pen';
+  (globalThis as any).window.dispatchEvent({
+    type: 'keydown',
+    key: 'w',
+    ctrlKey: false,
+    metaKey: false,
+    preventDefault: () => {},
+  });
+  assert(mockToolbar.activeTool === 'select', 'Keyboard Controller: Pressing "w" in other tool switches active tool to "select"');
+  assert(selectionTool.selectionMode === 'move', 'Keyboard Controller: Tool switched via "w" initializes directly into "move" mode');
+
+  // 4.5 QuickHelpInspector Documentation
+  const selectHelp = (QuickHelpInspector as any).TOOL_HELP_MAP['select'];
+  assert(selectHelp !== undefined, 'QuickHelpInspector contains select tool documentation');
+  const hasWHotkey = selectHelp.shortcuts.some((s: any) => s.keys.includes('W') && s.description.includes('Mover'));
+  const hasRHotkey = selectHelp.shortcuts.some((s: any) => s.keys.includes('R') && s.description.includes('Escala'));
+  const hasEHotkey = selectHelp.shortcuts.some((s: any) => s.keys.includes('E') && s.description.includes('Rotar'));
+  assert(hasWHotkey, 'QuickHelpInspector documents "W" hotkey for Modo Mover');
+  assert(hasRHotkey, 'QuickHelpInspector documents "R" hotkey for Modo Escala');
+  assert(hasEHotkey, 'QuickHelpInspector documents "E" hotkey for Modo Rotar');
+
+  // -----------------------------------------------------------------------------------
   // Summary
   // -----------------------------------------------------------------------------------
   console.log('------------------------------------------------------');
   console.log(`Summary: ${passed} passed, ${failed} failed of ${passed + failed} assertions.`);
 
   if (failed === 0) {
-    console.log('🎉 3 Modal Selection States passed all tests!\n');
+    console.log('🎉 3 Modal Selection States & Hotkeys passed all tests!\n');
     return true;
   } else {
-    console.error('💥 3 Modal Selection States failed test assertions!\n');
+    console.error('💥 3 Modal Selection States & Hotkeys failed test assertions!\n');
     return false;
   }
 }

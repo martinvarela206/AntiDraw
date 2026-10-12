@@ -575,6 +575,27 @@ export class SelectToolHandler implements IToolHandler {
   }
 
   public onKeyDown(e: KeyboardEvent): boolean {
+    if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (e.key === 'w' || e.key === 'W') {
+        this.ctx.selectionTool.selectionMode = 'move';
+        this.callbacks.onSelectionChanged?.();
+        this.ctx.renderOverlay();
+        return true;
+      }
+      if (e.key === 'r' || e.key === 'R') {
+        this.ctx.selectionTool.selectionMode = 'scale';
+        this.callbacks.onSelectionChanged?.();
+        this.ctx.renderOverlay();
+        return true;
+      }
+      if (e.key === 'e' || e.key === 'E') {
+        this.ctx.selectionTool.selectionMode = 'rotate';
+        this.callbacks.onSelectionChanged?.();
+        this.ctx.renderOverlay();
+        return true;
+      }
+    }
+
     if (e.key === 'Escape') {
       if (this.cancel()) {
         return true;

@@ -98,8 +98,38 @@ export class KeyboardShortcutController {
 
     if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'SELECT') return;
 
-    // Single-key Tool Switches (when not holding Ctrl/Meta)
+    // Single-key Tool Switches & Selection Mode Shortcuts (when not holding Ctrl/Meta)
     if (!e.ctrlKey && !e.metaKey) {
+      const isSelectActive = this.ctx.toolbar.activeTool === 'select' || this.ctx.selectionTool.selectedElementIds.size > 0;
+
+      // 3 Selection Modes Direct Hotkeys (W: Move, R: Scale, E: Rotate)
+      if (e.key === 'w' || e.key === 'W') {
+        e.preventDefault();
+        if (this.ctx.toolbar.activeTool !== 'select') {
+          this.ctx.toolbar.setTool('select');
+        }
+        this.ctx.selectionTool.selectionMode = 'move';
+        this.ctx.propertyPanel.update();
+        this.ctx.renderOverlay();
+        return;
+      }
+
+      if (isSelectActive && (e.key === 'r' || e.key === 'R')) {
+        e.preventDefault();
+        this.ctx.selectionTool.selectionMode = 'scale';
+        this.ctx.propertyPanel.update();
+        this.ctx.renderOverlay();
+        return;
+      }
+
+      if (isSelectActive && (e.key === 'e' || e.key === 'E')) {
+        e.preventDefault();
+        this.ctx.selectionTool.selectionMode = 'rotate';
+        this.ctx.propertyPanel.update();
+        this.ctx.renderOverlay();
+        return;
+      }
+
       if (e.key === 'v' || e.key === 'V') this.ctx.toolbar.setTool('select');
       if (e.key === 't' || e.key === 'T') this.ctx.toolbar.setTool('stroke');
       if (e.key === 'n' || e.key === 'N') this.ctx.toolbar.setTool('node');
