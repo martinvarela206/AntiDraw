@@ -88,7 +88,16 @@ export async function runSelectionModesTests(): Promise<boolean> {
   const translateInteraction = new TranslateInteraction();
 
   let overlayRenderedCount = 0;
-  const mockCanvasMgr: any = { zoom: 1.0, panX: 0, panY: 0, selectedGuideId: null, activeGuideTransformId: null };
+  const mockCanvasMgr: any = {
+    zoom: 1.0,
+    panX: 0,
+    panY: 0,
+    selectedGuideId: null,
+    activeGuideTransformId: null,
+    hitTestGuide: () => null,
+    getGuideById: () => null,
+    guides: [],
+  };
   const mockCtx: ToolContext = {
     model,
     canvasMgr: mockCanvasMgr,
@@ -319,9 +328,92 @@ export async function runSelectionModesTests(): Promise<boolean> {
   const hasWHotkey = selectHelp.shortcuts.some((s: any) => s.keys.includes('W') && s.description.includes('Mover'));
   const hasRHotkey = selectHelp.shortcuts.some((s: any) => s.keys.includes('R') && s.description.includes('Escala'));
   const hasEHotkey = selectHelp.shortcuts.some((s: any) => s.keys.includes('E') && s.description.includes('Rotar'));
+  const hasMiniHud = selectHelp.shortcuts.some((s: any) => s.keys.includes('Mini-HUD') && s.description.includes('Mover'));
   assert(hasWHotkey, 'QuickHelpInspector documents "W" hotkey for Modo Mover');
   assert(hasRHotkey, 'QuickHelpInspector documents "R" hotkey for Modo Escala');
   assert(hasEHotkey, 'QuickHelpInspector documents "E" hotkey for Modo Rotar');
+  assert(hasMiniHud, 'QuickHelpInspector documents "Mini-HUD" floating widget on Bounding Box');
+
+  // -----------------------------------------------------------------------------------
+  // 5. Contextual Floating Mini-HUD ([ ✥ Mover | ⤢ Escalar | ⟳ Rotar ]) Suite
+  // -----------------------------------------------------------------------------------
+  console.log('\n--- 5. Contextual Floating Mini-HUD Tests ---');
+  const miniHud = transformInteraction.miniHud;
+  const groupBox = selectionTool.getGroupSelectionBoundingBox([rectEl], 0)!;
+  assert(groupBox !== null, 'Mini-HUD: Selection bounding box calculated (100x100 at 100,100)');
+
+  // 5.1 Hit Testing on Mini-HUD Segments
+  const hudY = groupBox.y - 23; // Default screen offset with zoom 1.0
+  const hitMove = miniHud.hitTest(groupBox, { x: groupBox.cx - 68, y: hudY }, 1.0);
+  assert(hitMove === 'move', 'Mini-HUD: Hit test at left segment returns "move"');
+
+  const hitScale = miniHud.hitTest(groupBox, { x: groupBox.cx, y: hudY }, 1.0);
+  assert(hitScale === 'scale', 'Mini-HUD: Hit test at middle segment returns "scale"');
+
+  const hitRotate = miniHud.hitTest(groupBox, { x: groupBox.cx + 68, y: hudY }, 1.0);
+  assert(hitRotate === 'rotate', 'Mini-HUD: Hit test at right segment returns "rotate"');
+
+  const hitOutside = miniHud.hitTest(groupBox, { x: groupBox.cx, y: hudY - 30 }, 1.0);
+  assert(hitOutside === null, 'Mini-HUD: Hit test outside boundary returns null');
+
+  // 5.2 Hover Cursor
+  const hoverCursorInside = miniHud.getHoverCursor(groupBox, { x: groupBox.cx, y: hudY }, 1.0);
+  assert(hoverCursorInside === 'pointer', 'Mini-HUD: Hover cursor returns "pointer" when hovering over HUD');
+
+  const hoverCursorOutside = miniHud.getHoverCursor(groupBox, { x: groupBox.cx, y: hudY - 30 }, 1.0);
+  assert(hoverCursorOutside === null, 'Mini-HUD: Hover cursor returns null when outside HUD');
+
+  const transformHoverCursor = transformInteraction.getHoverCursor(mockCtx, { x: groupBox.cx - 68, y: hudY }, [rectEl]);
+  assert(transformHoverCursor === 'pointer', 'TransformInteraction.getHoverCursor returns "pointer" for Mini-HUD');
+
+  // 5.3 SVG Overlay Markup
+  const hudSvgMove = miniHud.renderOverlay(groupBox, 'move', 1.0);
+  assert(hudSvgMove.includes('class="selection-mini-hud"'), 'Mini-HUD SVG: Contains selection-mini-hud class');
+  assert(hudSvgMove.includes('✥ Mover'), 'Mini-HUD SVG: Contains "✥ Mover" label');
+  assert(hudSvgMove.includes('⤢ Escalar'), 'Mini-HUD SVG: Contains "⤢ Escalar" label');
+  assert(hudSvgMove.includes('⟳ Rotar'), 'Mini-HUD SVG: Contains "⟳ Rotar" label');
+  assert(hudSvgMove.includes('fill="#10b981"'), 'Mini-HUD SVG: Move mode highlights with emerald hue (#10b981)');
+
+  const hudSvgScale = miniHud.renderOverlay(groupBox, 'scale', 1.0);
+  assert(hudSvgScale.includes('fill="#6366f1"'), 'Mini-HUD SVG: Scale mode highlights with indigo hue (#6366f1)');
+
+  const hudSvgRotate = miniHud.renderOverlay(groupBox, 'rotate', 1.0);
+  assert(hudSvgRotate.includes('fill="#8b5cf6"'), 'Mini-HUD SVG: Rotate mode highlights with purple hue (#8b5cf6)');
+
+  // 5.4 One-Click Mode Switching via SelectToolHandler
+  let hudSelectionChanged = 0;
+  const hudCallbacks = {
+    onSelectionChanged: () => {
+      hudSelectionChanged++;
+    },
+  };
+  const hudSelectHandler = new SelectToolHandler(mockCtx, {} as any, hudCallbacks);
+
+  // Click on "move" segment
+  selectionTool.selectionMode = 'scale';
+  const handledMoveClick = hudSelectHandler.onPointerDown(
+    { button: 0, shiftKey: false, altKey: false, ctrlKey: false, metaKey: false } as any,
+    { x: groupBox.cx - 68, y: hudY }
+  );
+  assert(handledMoveClick === true, 'SelectToolHandler: Pointer down on Move HUD segment consumed event');
+  assert(selectionTool.selectionMode === 'move', 'SelectToolHandler: Clicking Move HUD segment switched selectionMode to "move"');
+  assert(hudSelectionChanged >= 1, 'SelectToolHandler: Clicking Move HUD segment triggered onSelectionChanged');
+
+  // Click on "rotate" segment
+  const handledRotateClick = hudSelectHandler.onPointerDown(
+    { button: 0, shiftKey: false, altKey: false, ctrlKey: false, metaKey: false } as any,
+    { x: groupBox.cx + 68, y: hudY }
+  );
+  assert(handledRotateClick === true, 'SelectToolHandler: Pointer down on Rotate HUD segment consumed event');
+  assert(selectionTool.selectionMode === 'rotate', 'SelectToolHandler: Clicking Rotate HUD segment switched selectionMode to "rotate"');
+
+  // Click on "scale" segment
+  const handledScaleClick = hudSelectHandler.onPointerDown(
+    { button: 0, shiftKey: false, altKey: false, ctrlKey: false, metaKey: false } as any,
+    { x: groupBox.cx, y: hudY }
+  );
+  assert(handledScaleClick === true, 'SelectToolHandler: Pointer down on Scale HUD segment consumed event');
+  assert(selectionTool.selectionMode === 'scale', 'SelectToolHandler: Clicking Scale HUD segment switched selectionMode to "scale"');
 
   // -----------------------------------------------------------------------------------
   // Summary

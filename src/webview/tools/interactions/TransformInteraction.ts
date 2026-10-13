@@ -8,6 +8,7 @@ import { DistortTransformer } from './DistortTransformer.js';
 import { QuadCorners } from '../../engine/geometry/ProjectiveHomography.js';
 import { PivotManager } from './PivotManager.js';
 import { GradientGizmoController } from './GradientGizmoController.js';
+import { SelectionMiniHud } from './SelectionMiniHud.js';
 import type { SelectToolCallbacks } from '../SelectToolHandler.js';
 
 /**
@@ -33,6 +34,7 @@ import type { SelectToolCallbacks } from '../SelectToolHandler.js';
  */
 export class TransformInteraction {
   public readonly gradientGizmo: GradientGizmoController = new GradientGizmoController();
+  public readonly miniHud: SelectionMiniHud = new SelectionMiniHud();
 
   public get activeGradientElementId(): string | null {
     return this.gradientGizmo.activeGradientElementId;
@@ -88,6 +90,9 @@ export class TransformInteraction {
     const z = ctx.canvasMgr.zoom || 1;
     const box = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 0);
     if (!box) return null;
+
+    const hudCursor = this.miniHud.getHoverCursor(box, pt, z);
+    if (hudCursor) return hudCursor;
 
     if (ctx.selectionTool.selectionMode === 'distort') {
       const h = ctx.selectionTool.hitTestHandle(box, pt, 12 / z, 18 / z, 'distort', this.currentDistortQuad);
@@ -779,6 +784,9 @@ export class TransformInteraction {
         if (activeHandle?.startsWith('distort-') && this.currentScaleSnappedPt) {
           html += `<circle cx="${this.currentScaleSnappedPt.x}" cy="${this.currentScaleSnappedPt.y}" r="${6 / z}" fill="none" stroke="#10b981" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
         }
+
+        // Contextual Floating Mini-HUD ([ ✥ Mover | ⤢ Escalar | ⟳ Rotar ])
+        html += this.miniHud.renderOverlay(groupBox, mode, z);
       }
 
       // Radial & Linear Gradient overlay

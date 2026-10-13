@@ -89,6 +89,24 @@ export class SelectToolHandler implements IToolHandler {
       this.ctx.selectionTool.isSelected(el.id)
     );
 
+    // 2. Check hit on Contextual Floating Mini-HUD ([ ✥ Mover | ⤢ Escalar | ⟳ Rotar ])
+    if (selectedEls.length > 0) {
+      const groupBox = this.ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 0);
+      if (groupBox) {
+        const hudMode = this.transformInteraction.miniHud.hitTest(
+          groupBox,
+          pt,
+          this.ctx.canvasMgr.zoom
+        );
+        if (hudMode) {
+          this.ctx.selectionTool.selectionMode = hudMode;
+          this.callbacks.onSelectionChanged?.();
+          this.ctx.renderOverlay();
+          return true;
+        }
+      }
+    }
+
     const now = Date.now();
     const timeSinceLast = now - this.lastClickTime;
     const z = this.ctx.canvasMgr.zoom || 1;
