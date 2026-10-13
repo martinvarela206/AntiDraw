@@ -489,6 +489,63 @@ export async function runSelectionModesTests(): Promise<boolean> {
   assert(selectionTool.selectionMode === 'move', 'Third paused click on selected object body advances mode from "rotate" back to "move"');
 
   // -----------------------------------------------------------------------------------
+  // 7. AISLAMIENTO DE DEFORMACIÓN LIBRE ('distort') Y CONTROLES DEDICADOS
+  // -----------------------------------------------------------------------------------
+  console.log('\n--- 7. Distort (Free Transform / Homography) Isolation Tests ---');
+  
+  // 7.1 SelectionCursorHelper provides amber micro-badge for distort
+  const distortCursor = SelectionCursorHelper.getModeCursor('distort');
+  assert(distortCursor.includes('%23f59e0b') && distortCursor.endsWith('crosshair'), 'SelectionCursorHelper: Distort cursor contains #f59e0b and fallback "crosshair"');
+  assert(SelectionCursorHelper.getFallbackCursor('distort') === 'crosshair', 'SelectionCursorHelper: Fallback cursor for distort is "crosshair"');
+
+  // 7.2 Overlay in distort mode uses distinctive amber hue (#f59e0b)
+  selectionTool.selectionMode = 'distort';
+  const distortOverlay = transformInteraction.renderOverlay(mockCtx, 1.0, null, null);
+  assert(distortOverlay.includes('stroke="#f59e0b"'), 'Distort Mode: Bounding quadrilateral rendered with amber hue (#f59e0b)');
+  assert(distortOverlay.includes('distort-corner-handle'), 'Distort Mode: Renders 4 corner diamond deformation handles');
+  assert(distortOverlay.includes('fill="#f59e0b"'), 'Distort Mode: Active corner diamond filled with amber hue (#f59e0b)');
+
+  // 7.3 Hotkey 'd' toggles distort mode on and off in SelectToolHandler
+  selectionTool.selectionMode = 'scale';
+  const consumedD = selectHandler.onKeyDown({ key: 'd', ctrlKey: false, metaKey: false, altKey: false } as any);
+  assert(consumedD === true, 'SelectToolHandler: Consumes key "d"');
+  assert(selectionTool.selectionMode === 'distort', 'SelectToolHandler: Pressing "d" toggles mode to "distort"');
+
+  const consumedD2 = selectHandler.onKeyDown({ key: 'D', ctrlKey: false, metaKey: false, altKey: false } as any);
+  assert(consumedD2 === true, 'SelectToolHandler: Consumes key "D"');
+  assert(selectionTool.selectionMode === 'scale', 'SelectToolHandler: Pressing "D" toggles mode back to "scale"');
+
+  // 7.4 Hotkey 'd' in KeyboardShortcutController
+  selectionTool.selectionMode = 'scale';
+  (globalThis as any).window.dispatchEvent({
+    type: 'keydown',
+    key: 'd',
+    ctrlKey: false,
+    metaKey: false,
+    preventDefault: () => {},
+  });
+  assert(selectionTool.selectionMode === 'distort', 'KeyboardShortcutController: Pressing "d" toggles mode to "distort"');
+
+  // 7.5 Direct hotkeys (W, R, E) cleanly exit distort mode
+  selectHandler.onKeyDown({ key: 'w', ctrlKey: false, metaKey: false, altKey: false } as any);
+  assert(selectionTool.selectionMode === 'move', 'Hotkeys: Pressing "w" while in distort mode exits to "move"');
+
+  selectionTool.selectionMode = 'distort';
+  selectHandler.onKeyDown({ key: 'e', ctrlKey: false, metaKey: false, altKey: false } as any);
+  assert(selectionTool.selectionMode === 'rotate', 'Hotkeys: Pressing "e" while in distort mode exits to "rotate"');
+
+  // 7.6 Paused click while in distort mode cleanly exits to scale/move without entering loop
+  selectionTool.selectionMode = 'distort';
+  transformInteraction.toggleSelectionMode(mockCtx, { setCursor: () => {}, onSelectionChanged: () => {} } as any);
+  assert(selectionTool.selectionMode === 'scale', 'TransformInteraction: toggleSelectionMode while in distort exits to "scale"');
+
+  // 7.7 QuickHelpInspector documentation for distort
+  const hasDHotkey = selectHelp.shortcuts.some((s: any) => s.keys.includes('D') && s.description.includes('Deformación Libre'));
+  const hasDistortButton = selectHelp.shortcuts.some((s: any) => s.keys.some((k: string) => k.includes('▱')) && s.description.includes('Deformación Libre'));
+  assert(hasDHotkey, 'QuickHelpInspector documents "D" hotkey for Deformación Libre');
+  assert(hasDistortButton, 'QuickHelpInspector documents dedicated "Botón ▱" for Deformación Libre');
+
+  // -----------------------------------------------------------------------------------
   // Summary
   // -----------------------------------------------------------------------------------
   console.log('------------------------------------------------------');

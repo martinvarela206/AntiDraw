@@ -130,6 +130,15 @@ export class KeyboardShortcutController {
         return;
       }
 
+      // Dedicated Free Transform / Homography Shortcut (D) outside selection cycle
+      if (isSelectActive && (e.key === 'd' || e.key === 'D')) {
+        e.preventDefault();
+        this.ctx.selectionTool.selectionMode = this.ctx.selectionTool.selectionMode === 'distort' ? 'scale' : 'distort';
+        this.ctx.propertyPanel.update();
+        this.ctx.renderOverlay();
+        return;
+      }
+
       if (e.key === 'v' || e.key === 'V') this.ctx.toolbar.setTool('select');
       if (e.key === 't' || e.key === 'T') this.ctx.toolbar.setTool('stroke');
       if (e.key === 'n' || e.key === 'N') this.ctx.toolbar.setTool('node');

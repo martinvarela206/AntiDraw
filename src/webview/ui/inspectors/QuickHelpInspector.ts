@@ -44,6 +44,8 @@ export class QuickHelpInspector {
         { keys: ['W'], description: 'Modo Mover: oculta tiradores de escala y activa snap a vértices y centro' },
         { keys: ['R'], description: 'Modo Escala: activa los 8 tiradores clásicos de redimensionamiento' },
         { keys: ['E'], description: 'Modo Rotar: activa tiradores de giro, inclinación y diana de pivote libre' },
+        { keys: ['D'], description: 'Deformación Libre / Perspectiva: activa/desactiva tiradores de homografía 3x3' },
+        { keys: ['Botón ▱'], description: 'Botón dedicado en inspector para activar/desactivar Deformación Libre' },
         { keys: ['Mini-HUD'], description: 'Píldora flotante sobre Bounding Box para alternar con 1 clic: Mover, Escalar, Rotar' },
         { keys: ['Clic'], description: 'Selecciona elemento bajo el cursor o deselecciona en vacío' },
         { keys: ['Shift', 'Clic'], description: 'Añade o remueve el elemento de la selección múltiple' },

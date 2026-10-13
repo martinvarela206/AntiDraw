@@ -525,7 +525,7 @@ export class TransformInteraction {
     } else if (ctx.selectionTool.selectionMode === 'rotate') {
       ctx.selectionTool.selectionMode = 'move';
     } else {
-      ctx.selectionTool.selectionMode = 'move';
+      ctx.selectionTool.selectionMode = 'scale';
     }
     this.lastToggleTime = Date.now();
     callbacks.setCursor?.(SelectionCursorHelper.getModeCursor(ctx.selectionTool.selectionMode));
@@ -560,7 +560,7 @@ export class TransformInteraction {
       const groupBox = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 0);
       if (groupBox) {
         const mode = ctx.selectionTool.selectionMode;
-        const boxStroke = mode === 'distort' ? '#8b5cf6' : mode === 'rotate' ? '#8b5cf6' : mode === 'move' ? '#10b981' : '#6366f1';
+        const boxStroke = mode === 'distort' ? '#f59e0b' : mode === 'rotate' ? '#8b5cf6' : mode === 'move' ? '#10b981' : '#6366f1';
         
         // Render bounding box outline across scale/rotate/move modes, visually distinguishing states by hue
         if (mode !== 'distort') {
@@ -596,8 +596,8 @@ export class TransformInteraction {
               sw: { x: groupBox.x, y: groupBox.y + groupBox.height },
             };
 
-            // Render quadrilateral bounding boundary
-            html += `<polygon points="${q.nw.x},${q.nw.y} ${q.ne.x},${q.ne.y} ${q.se.x},${q.se.y} ${q.sw.x},${q.sw.y}" fill="none" stroke="#8b5cf6" stroke-width="1.2" stroke-dasharray="3 3" vector-effect="non-scaling-stroke" />`;
+            // Render quadrilateral bounding boundary with amber hue (#f59e0b)
+            html += `<polygon points="${q.nw.x},${q.nw.y} ${q.ne.x},${q.ne.y} ${q.se.x},${q.se.y} ${q.sw.x},${q.sw.y}" fill="none" stroke="#f59e0b" stroke-width="1.2" stroke-dasharray="3 3" vector-effect="non-scaling-stroke" />`;
 
             // 4 Corner distort diamond handles
             const corners: { key: string; x: number; y: number; title: string }[] = [
@@ -611,8 +611,8 @@ export class TransformInteraction {
             const selectedCorners = ctx.selectionTool.selectedDistortCorners;
             corners.forEach((c) => {
               const isSelected = selectedCorners ? selectedCorners.has(c.key as any) : (c.key === activeCornerKey);
-              const fillCol = isSelected ? '#8b5cf6' : '#0f172a';
-              const strokeCol = isSelected ? '#c4b5fd' : '#a78bfa';
+              const fillCol = isSelected ? '#f59e0b' : '#0f172a';
+              const strokeCol = isSelected ? '#fde68a' : '#fbbf24';
               const strokeWidth = isSelected ? '2' : '1.4';
               html += `
                 <g class="distort-corner-handle" transform="translate(${c.x}, ${c.y}) scale(${1 / z})" style="cursor: crosshair;">

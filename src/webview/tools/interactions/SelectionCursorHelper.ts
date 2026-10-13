@@ -30,6 +30,10 @@ export class SelectionCursorHelper {
       svgUrl: SelectionCursorHelper.buildSvgCursorUrl('#8b5cf6', '#4c1d95', '⟳'),
       fallback: 'grab',
     },
+    distort: {
+      svgUrl: SelectionCursorHelper.buildSvgCursorUrl('#f59e0b', '#78350f', '▱'),
+      fallback: 'crosshair',
+    },
   };
 
   /**

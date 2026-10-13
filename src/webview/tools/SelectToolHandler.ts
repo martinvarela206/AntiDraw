@@ -620,6 +620,13 @@ export class SelectToolHandler implements IToolHandler {
         this.ctx.renderOverlay();
         return true;
       }
+      if (e.key === 'd' || e.key === 'D') {
+        this.ctx.selectionTool.selectionMode = this.ctx.selectionTool.selectionMode === 'distort' ? 'scale' : 'distort';
+        this.callbacks.setCursor?.(SelectionCursorHelper.getModeCursor(this.ctx.selectionTool.selectionMode));
+        this.callbacks.onSelectionChanged?.();
+        this.ctx.renderOverlay();
+        return true;
+      }
     }
 
     if (e.key === 'Escape') {

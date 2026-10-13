@@ -34,10 +34,15 @@ export class GeometryInspector {
         <div class="prop-row">
           <span class="prop-label">Modo</span>
           <div style="display:flex; gap:4px; flex:1;">
-            <button class="prop-input" id="btn-mode-move" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'move' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Modo Mover: Mover elementos y anclar vértices">✛</button>
-            <button class="prop-input" id="btn-mode-scale" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'scale' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Modo Escalar: Redimensionar con 8 tiradores">⤡</button>
-            <button class="prop-input" id="btn-mode-rotate" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'rotate' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Modo Rotar: Girar elementos interactivamente">↻</button>
-            <button class="prop-input" id="btn-mode-distort" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'distort' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Modo Deformar: Deformación libre de esquinas y cizalla">▱</button>
+            <button class="prop-input" id="btn-mode-move" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'move' ? 'background:#10b981; color:#ffffff;' : ''}" title="Modo Mover (W): Mover elementos y anclar vértices">✛ Mover</button>
+            <button class="prop-input" id="btn-mode-scale" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'scale' ? 'background:#6366f1; color:#ffffff;' : ''}" title="Modo Escalar (R): Redimensionar con 8 tiradores">⤡ Escalar</button>
+            <button class="prop-input" id="btn-mode-rotate" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'rotate' ? 'background:#8b5cf6; color:#ffffff;' : ''}" title="Modo Rotar (E): Girar elementos interactivamente">↻ Rotar</button>
+          </div>
+        </div>
+        <div class="prop-row" style="margin-top:2px;">
+          <span class="prop-label" style="font-size:11px;">Avanzado</span>
+          <div style="display:flex; gap:6px; flex:1;">
+            <button class="prop-input" id="btn-mode-distort" style="flex:1; cursor:pointer; font-weight:600; padding:3px 6px; font-size:11px; display:flex; align-items:center; justify-content:center; gap:4px; ${selectionTool.selectionMode === 'distort' ? 'background:#f59e0b; color:#0f172a; border-color:#d97706;' : 'background:transparent; border:1px solid var(--border-color);'}" title="Deformación Libre y Perspectiva Proyectiva (D): Deformación homográfica 3x3">${selectionTool.selectionMode === 'distort' ? '▰ Deformación Libre (Activa)' : '▱ Deformación Libre (D)'}</button>
           </div>
         </div>
         <div class="prop-row" style="margin-top:2px;">
@@ -368,7 +373,7 @@ export class GeometryInspector {
       onReRender();
     });
     btnModeDistort?.addEventListener('click', () => {
-      selectionTool.selectionMode = 'distort';
+      selectionTool.selectionMode = selectionTool.selectionMode === 'distort' ? 'scale' : 'distort';
       callbacks.onRenderOverlay?.();
       onReRender();
     });
