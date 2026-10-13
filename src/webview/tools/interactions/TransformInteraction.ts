@@ -9,6 +9,7 @@ import { QuadCorners } from '../../engine/geometry/ProjectiveHomography.js';
 import { PivotManager } from './PivotManager.js';
 import { GradientGizmoController } from './GradientGizmoController.js';
 import { SelectionMiniHud } from './SelectionMiniHud.js';
+import { SelectionCursorHelper } from './SelectionCursorHelper.js';
 import type { SelectToolCallbacks } from '../SelectToolHandler.js';
 
 /**
@@ -517,18 +518,20 @@ export class TransformInteraction {
    * Cycles deterministically: scale -> rotate -> distort -> move -> scale.
    */
   public toggleSelectionMode(ctx: ToolContext, callbacks: SelectToolCallbacks): void {
-    if (ctx.selectionTool.selectionMode === 'scale') {
+    if (ctx.selectionTool.selectionMode === 'move') {
+      ctx.selectionTool.selectionMode = 'scale';
+    } else if (ctx.selectionTool.selectionMode === 'scale') {
       ctx.selectionTool.selectionMode = 'rotate';
     } else if (ctx.selectionTool.selectionMode === 'rotate') {
-      ctx.selectionTool.selectionMode = 'distort';
-    } else if (ctx.selectionTool.selectionMode === 'distort') {
       ctx.selectionTool.selectionMode = 'move';
     } else {
-      ctx.selectionTool.selectionMode = 'scale';
+      ctx.selectionTool.selectionMode = 'move';
     }
     this.lastToggleTime = Date.now();
+    callbacks.setCursor?.(SelectionCursorHelper.getModeCursor(ctx.selectionTool.selectionMode));
     callbacks.onSelectionChanged?.();
     ctx.render();
+    ctx.renderOverlay();
   }
 
   public onDoubleClick(ctx: ToolContext, pt: Point, callbacks: SelectToolCallbacks): boolean {

@@ -8,6 +8,7 @@ import { GuideInteraction, GuideHandleType } from './interactions/GuideInteracti
 import { BoxSelectInteraction } from './interactions/BoxSelectInteraction.js';
 import { TranslateInteraction } from './interactions/TranslateInteraction.js';
 import { TransformInteraction } from './interactions/TransformInteraction.js';
+import { SelectionCursorHelper } from './interactions/SelectionCursorHelper.js';
 import { OverlayDescriptor } from '../engine/canvas/OverlayDescriptor.js';
 
 export interface SelectToolCallbacks {
@@ -100,6 +101,7 @@ export class SelectToolHandler implements IToolHandler {
         );
         if (hudMode) {
           this.ctx.selectionTool.selectionMode = hudMode;
+          this.callbacks.setCursor?.(SelectionCursorHelper.getModeCursor(hudMode));
           this.callbacks.onSelectionChanged?.();
           this.ctx.renderOverlay();
           return true;
@@ -426,7 +428,10 @@ export class SelectToolHandler implements IToolHandler {
         const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, this.ctx.canvasMgr.zoom, this.ctx.model.spatialIndex);
         this.ctx.selectionTool.hoveredElementId = hit ? hit.element.id : null;
         if (hit) {
-          cursor = 'move';
+          const isSelected = this.ctx.selectionTool.isSelected(hit.element.id);
+          cursor = isSelected
+            ? SelectionCursorHelper.getModeCursor(this.ctx.selectionTool.selectionMode)
+            : 'move';
         }
       }
 
@@ -596,18 +601,21 @@ export class SelectToolHandler implements IToolHandler {
     if (!e.ctrlKey && !e.metaKey && !e.altKey) {
       if (e.key === 'w' || e.key === 'W') {
         this.ctx.selectionTool.selectionMode = 'move';
+        this.callbacks.setCursor?.(SelectionCursorHelper.getModeCursor('move'));
         this.callbacks.onSelectionChanged?.();
         this.ctx.renderOverlay();
         return true;
       }
       if (e.key === 'r' || e.key === 'R') {
         this.ctx.selectionTool.selectionMode = 'scale';
+        this.callbacks.setCursor?.(SelectionCursorHelper.getModeCursor('scale'));
         this.callbacks.onSelectionChanged?.();
         this.ctx.renderOverlay();
         return true;
       }
       if (e.key === 'e' || e.key === 'E') {
         this.ctx.selectionTool.selectionMode = 'rotate';
+        this.callbacks.setCursor?.(SelectionCursorHelper.getModeCursor('rotate'));
         this.callbacks.onSelectionChanged?.();
         this.ctx.renderOverlay();
         return true;

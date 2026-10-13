@@ -9,6 +9,7 @@ import { SelectToolHandler } from '../src/webview/tools/SelectToolHandler.js';
 import { KeyboardShortcutController } from '../src/webview/controllers/KeyboardShortcutController.js';
 import { Toolbar } from '../src/webview/ui/Toolbar.js';
 import { QuickHelpInspector } from '../src/webview/ui/inspectors/QuickHelpInspector.js';
+import { SelectionCursorHelper } from '../src/webview/tools/interactions/SelectionCursorHelper.js';
 
 let passed = 0;
 let failed = 0;
@@ -414,6 +415,78 @@ export async function runSelectionModesTests(): Promise<boolean> {
   );
   assert(handledScaleClick === true, 'SelectToolHandler: Pointer down on Scale HUD segment consumed event');
   assert(selectionTool.selectionMode === 'scale', 'SelectToolHandler: Clicking Scale HUD segment switched selectionMode to "scale"');
+
+  // -----------------------------------------------------------------------------------
+  // 6. Ciclo Cromático Secundario por Clics Pausados y Cursores con Micro-Insignia
+  // -----------------------------------------------------------------------------------
+  console.log('\n--- 6. Paused Clicks Chromatic Cycle & Distinctive Mode Cursors Tests ---');
+
+  // 6.1 SelectionCursorHelper
+  const moveCursor = SelectionCursorHelper.getModeCursor('move');
+  const scaleCursor = SelectionCursorHelper.getModeCursor('scale');
+  const rotateCursor = SelectionCursorHelper.getModeCursor('rotate');
+
+  assert(moveCursor.includes('%2310b981') && moveCursor.endsWith('move'), 'SelectionCursorHelper: Move cursor contains #10b981 and fallback "move"');
+  assert(scaleCursor.includes('%236366f1') && scaleCursor.endsWith('default'), 'SelectionCursorHelper: Scale cursor contains #6366f1 and fallback "default"');
+  assert(rotateCursor.includes('%238b5cf6') && rotateCursor.endsWith('grab'), 'SelectionCursorHelper: Rotate cursor contains #8b5cf6 and fallback "grab"');
+
+  // 6.2 Deterministic 3-State Cycle (move -> scale -> rotate -> move)
+  let updatedCursor = '';
+  const cycleCallbacks: any = {
+    setCursor: (c: string) => { updatedCursor = c; },
+    onSelectionChanged: () => {},
+  };
+
+  selectionTool.selectionMode = 'move';
+  transformInteraction.toggleSelectionMode(mockCtx, cycleCallbacks);
+  assert(selectionTool.selectionMode === 'scale', 'Chromatic Cycle: toggleSelectionMode from "move" advances to "scale"');
+  assert(updatedCursor === scaleCursor, 'Chromatic Cycle: toggleSelectionMode immediately sets scale cursor');
+
+  transformInteraction.toggleSelectionMode(mockCtx, cycleCallbacks);
+  assert(selectionTool.selectionMode === 'rotate', 'Chromatic Cycle: toggleSelectionMode from "scale" advances to "rotate"');
+  assert(updatedCursor === rotateCursor, 'Chromatic Cycle: toggleSelectionMode immediately sets rotate cursor');
+
+  transformInteraction.toggleSelectionMode(mockCtx, cycleCallbacks);
+  assert(selectionTool.selectionMode === 'move', 'Chromatic Cycle: toggleSelectionMode from "rotate" returns to "move"');
+  assert(updatedCursor === moveCursor, 'Chromatic Cycle: toggleSelectionMode immediately sets move cursor');
+
+  // 6.3 Hover Cursor over Selected Element reflects Active Mode
+  let setHoverCursorVal = '';
+  const hoverHandler = new SelectToolHandler(mockCtx, {} as any, {
+    setCursor: (c: string) => { setHoverCursorVal = c; },
+  });
+
+  selectionTool.selectionMode = 'move';
+  hoverHandler.onPointerMove({} as any, { x: 150, y: 150 });
+  assert(setHoverCursorVal === moveCursor, 'SelectToolHandler.onPointerMove over selected element in "move" mode returns move cursor');
+
+  selectionTool.selectionMode = 'scale';
+  hoverHandler.onPointerMove({} as any, { x: 150, y: 150 });
+  assert(setHoverCursorVal === scaleCursor, 'SelectToolHandler.onPointerMove over selected element in "scale" mode returns scale cursor');
+
+  selectionTool.selectionMode = 'rotate';
+  hoverHandler.onPointerMove({} as any, { x: 130, y: 130 });
+  assert(setHoverCursorVal === rotateCursor, 'SelectToolHandler.onPointerMove over selected element in "rotate" mode returns rotate cursor');
+
+  // 6.4 Paused click on selected element body toggles mode in SelectToolHandler
+  selectionTool.selectionMode = 'move';
+  (hoverHandler as any).lastClickTime = 0;
+  (hoverHandler as any).lastClickUpTime = Date.now() - 500;
+  hoverHandler.onPointerDown({ button: 0 } as any, { x: 130, y: 130 });
+  hoverHandler.onPointerUp({ button: 0 } as any, { x: 130, y: 130 });
+  assert(selectionTool.selectionMode === 'scale', 'Paused click on selected object body advances mode from "move" to "scale"');
+
+  (hoverHandler as any).lastClickTime = 0;
+  (hoverHandler as any).lastClickUpTime = Date.now() - 500;
+  hoverHandler.onPointerDown({ button: 0 } as any, { x: 130, y: 130 });
+  hoverHandler.onPointerUp({ button: 0 } as any, { x: 130, y: 130 });
+  assert(selectionTool.selectionMode === 'rotate', 'Second paused click on selected object body advances mode from "scale" to "rotate"');
+
+  (hoverHandler as any).lastClickTime = 0;
+  (hoverHandler as any).lastClickUpTime = Date.now() - 500;
+  hoverHandler.onPointerDown({ button: 0 } as any, { x: 130, y: 130 });
+  hoverHandler.onPointerUp({ button: 0 } as any, { x: 130, y: 130 });
+  assert(selectionTool.selectionMode === 'move', 'Third paused click on selected object body advances mode from "rotate" back to "move"');
 
   // -----------------------------------------------------------------------------------
   // Summary
