@@ -511,7 +511,8 @@ export class SvgSerializer {
         svg += AppearanceStackManager.compileLayerTags(el, layer);
       }
 
-      if (ctx.isParametricElement(el) && el.tagName !== 'path') {
+      const isAutoPromotedShape = ctx.isRect(el) || el.attributes['data-shape'] === 'star' || el.attributes['data-shape'] === 'ellipse';
+      if (ctx.isParametricElement(el) && (el.tagName !== 'path' || isAutoPromotedShape)) {
         /**
          * ARCHITECTURAL RATIONALE: Native Parametric SVG Export (FEAT-01 & FEAT-02)
          * Preserves original SVG primitives (<rect>, <ellipse>, <circle>, <line>, <polyline>, <polygon>)
@@ -572,8 +573,13 @@ export class SvgSerializer {
           const isUniform = corners.mode === 'uniform' || (corners.tl === corners.tr && corners.tr === corners.br && corners.br === corners.bl);
 
           if (isUniform && corners.unit === 'px') {
-            cleanAttrs.rx = corners.tl.toString();
-            cleanAttrs.ry = corners.tl.toString();
+            if (corners.tl > 0) {
+              cleanAttrs.rx = corners.tl.toString();
+              cleanAttrs.ry = corners.tl.toString();
+            } else {
+              delete cleanAttrs.rx;
+              delete cleanAttrs.ry;
+            }
             delete cleanAttrs.d;
             delete cleanAttrs['data-node-types'];
             svg += `  <rect${serializeCleanAttrs(cleanAttrs)} />\n`;
@@ -583,6 +589,12 @@ export class SvgSerializer {
             cleanAttrs['data-shape'] = 'rect';
             cleanAttrs['data-parametric'] = 'true';
             delete cleanAttrs['data-node-types'];
+            delete cleanAttrs.x;
+            delete cleanAttrs.y;
+            delete cleanAttrs.width;
+            delete cleanAttrs.height;
+            delete cleanAttrs.rx;
+            delete cleanAttrs.ry;
             svg += `  <path${serializeCleanAttrs(cleanAttrs)} />\n`;
           }
         } else if (cleanAttrs['data-shape'] === 'star') {

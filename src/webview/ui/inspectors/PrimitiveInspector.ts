@@ -42,8 +42,8 @@ export class PrimitiveInspector {
   ): string {
     const isEllipse = model.isEllipse(el);
     const isRect = model.isRect(el);
-    const w = box ? Math.round(box.width) : 0;
-    const h = box ? Math.round(box.height) : 0;
+    const w = box ? Math.round(box.width) : Math.round(parseFloat(el.attributes.width || '100'));
+    const h = box ? Math.round(box.height) : Math.round(parseFloat(el.attributes.height || '100'));
     const rectCorners = model.getRectCorners(el, w, h);
 
     const isLine = model.isLine(el);
@@ -203,8 +203,16 @@ export class PrimitiveInspector {
      * Provides live bidirectional synchronization between the UI inputs (uniform radius, 4-corner inputs,
      * unit toggle px/%, mode toggle uniform/individual, quick presets) and the vector element model.
      */
-    if (isRect && box) {
-      RectInspector.bind(container, el, model, box, callbacks, onReRender);
+    const effectiveBox: BoundingBox = box || {
+      x: parseFloat(el.attributes.x || '0'),
+      y: parseFloat(el.attributes.y || '0'),
+      width: parseFloat(el.attributes.width || '100'),
+      height: parseFloat(el.attributes.height || '100'),
+      cx: parseFloat(el.attributes.x || '0') + parseFloat(el.attributes.width || '100') / 2,
+      cy: parseFloat(el.attributes.y || '0') + parseFloat(el.attributes.height || '100') / 2,
+    };
+    if (isRect && (box || el.attributes['width'] !== undefined || el.vertices?.length)) {
+      RectInspector.bind(container, el, model, effectiveBox, callbacks, onReRender);
     }
 
     LineInspector.bind(container, el, model, callbacks, onReRender);

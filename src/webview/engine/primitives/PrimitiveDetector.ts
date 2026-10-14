@@ -165,7 +165,7 @@ export class PrimitiveDetector {
     if (!this.isParametricElement(element) || !element.vertices || element.vertices.length === 0) return;
     const tag = element.shapeType || element.tagName;
 
-    if (tag === 'rect') {
+    if (tag === 'rect' || RectPrimitive.isRect(element)) {
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
       element.vertices.forEach((v) => {
         minX = Math.min(minX, v.x);
@@ -177,6 +177,10 @@ export class PrimitiveDetector {
       element.attributes.y = formatNum(minY);
       element.attributes.width = formatNum(Math.max(1, maxX - minX));
       element.attributes.height = formatNum(Math.max(1, maxY - minY));
+      element.attributes['data-rect-x'] = element.attributes.x;
+      element.attributes['data-rect-y'] = element.attributes.y;
+      element.attributes['data-rect-w'] = element.attributes.width;
+      element.attributes['data-rect-h'] = element.attributes.height;
     } else if (tag === 'circle' || tag === 'ellipse') {
       if (element.attributes['data-ellipse-type'] === 'pie' || element.attributes['data-ellipse-type'] === 'arc') {
         return;

@@ -213,16 +213,44 @@ export class RectCornerHandleDelegate {
     selectedEl.attributes['data-corner-bl'] = c.bl.toString();
     selectedEl.attributes['data-corner-radius'] = `${c.tl},${c.tr},${c.br},${c.bl}`;
 
-    if (c.mode === 'uniform') {
-      selectedEl.attributes['rx'] = c.unit === '%' ? `${c.tl}%` : c.tl.toString();
-      selectedEl.attributes['ry'] = selectedEl.attributes['rx'];
-    } else {
-      delete selectedEl.attributes['rx'];
-      delete selectedEl.attributes['ry'];
-    }
+    const isUniform =
+      c.mode === 'uniform' ||
+      (c.tl === c.tr && c.tr === c.br && c.br === c.bl && c.unit === 'px');
 
     selectedEl.vertices = ghostNodeVertices || initialVertices;
-    selectedEl.attributes.d = this.rectGhostD || this.ctx.model.compilePathD(selectedEl.vertices, true);
+
+    if (isUniform && c.unit === 'px') {
+      selectedEl.tagName = 'rect';
+      selectedEl.shapeType = 'rect';
+      selectedEl.isParametric = true;
+      selectedEl.attributes['data-shape'] = 'rect';
+      selectedEl.attributes['data-parametric'] = 'true';
+      selectedEl.attributes['data-corner-mode'] = 'uniform';
+      if (c.tl > 0) {
+        selectedEl.attributes['rx'] = c.tl.toString();
+        selectedEl.attributes['ry'] = c.tl.toString();
+      } else {
+        delete selectedEl.attributes['rx'];
+        delete selectedEl.attributes['ry'];
+      }
+      delete selectedEl.attributes.d;
+    } else {
+      selectedEl.tagName = 'path';
+      selectedEl.shapeType = 'rect';
+      selectedEl.isParametric = true;
+      selectedEl.attributes['data-shape'] = 'rect';
+      selectedEl.attributes['data-parametric'] = 'true';
+      selectedEl.attributes['data-corner-mode'] = 'independent';
+      delete selectedEl.attributes['rx'];
+      delete selectedEl.attributes['ry'];
+      selectedEl.attributes.d = this.rectGhostD || this.ctx.model.compilePathD(selectedEl.vertices, true);
+    }
+
+    selectedEl.attributes['data-rect-x'] = selectedEl.attributes.x || '0';
+    selectedEl.attributes['data-rect-y'] = selectedEl.attributes.y || '0';
+    selectedEl.attributes['data-rect-w'] = selectedEl.attributes.width || '100';
+    selectedEl.attributes['data-rect-h'] = selectedEl.attributes.height || '100';
+
     selectedEl.attributes['data-node-types'] = selectedEl.vertices.map((v) => v.nodeType).join(',');
 
     this.rectGhostD = '';

@@ -101,6 +101,7 @@ export class RectInspector {
             </div>
           </div>
           <div class="prop-row" style="gap: 4px;">
+            <button class="prop-input" id="btn-rect-unify-corners" style="flex:1.2; cursor:pointer; font-size:9px; height:22px; padding:0; font-weight:600;" title="Unificar todas las esquinas al valor de TL y revertir a <rect> W3C puro">⬭ Unificar Esquinas</button>
             <button class="prop-input" id="btn-rect-sync-tl" style="flex:1; cursor:pointer; font-size:9px; height:22px; padding:0;" title="Copiar el valor de TL a todas las esquinas">Copiar TL</button>
             <button class="prop-input" id="btn-rect-invert-corners" style="flex:1; cursor:pointer; font-size:9px; height:22px; padding:0;" title="Intercambiar / Alternar radios de esquinas opuestas">⇄ Alternar</button>
           </div>
@@ -141,17 +142,46 @@ export class RectInspector {
       el.attributes['data-corner-bl'] = newCorners.bl.toString();
       el.attributes['data-corner-radius'] = `${newCorners.tl},${newCorners.tr},${newCorners.br},${newCorners.bl}`;
 
-      if (newCorners.mode === 'uniform') {
-        el.attributes['rx'] = newCorners.unit === '%' ? `${newCorners.tl}%` : newCorners.tl.toString();
-        el.attributes['ry'] = el.attributes['rx'];
+      const isUniform =
+        newCorners.mode === 'uniform' ||
+        (newCorners.tl === newCorners.tr && newCorners.tr === newCorners.br && newCorners.br === newCorners.bl && newCorners.unit === 'px');
+
+      if (isUniform && newCorners.unit === 'px') {
+        el.tagName = 'rect';
+        el.shapeType = 'rect';
+        el.isParametric = true;
+        el.attributes['data-shape'] = 'rect';
+        el.attributes['data-parametric'] = 'true';
+        el.attributes['data-corner-mode'] = 'uniform';
+        if (newCorners.tl > 0) {
+          el.attributes['rx'] = newCorners.tl.toString();
+          el.attributes['ry'] = newCorners.tl.toString();
+        } else {
+          delete el.attributes['rx'];
+          delete el.attributes['ry'];
+        }
+        delete el.attributes.d;
       } else {
+        el.tagName = 'path';
+        el.shapeType = 'rect';
+        el.isParametric = true;
+        el.attributes['data-shape'] = 'rect';
+        el.attributes['data-parametric'] = 'true';
+        el.attributes['data-corner-mode'] = 'independent';
         delete el.attributes['rx'];
         delete el.attributes['ry'];
       }
 
+      el.attributes['data-rect-x'] = el.attributes.x || '0';
+      el.attributes['data-rect-y'] = el.attributes.y || '0';
+      el.attributes['data-rect-w'] = el.attributes.width || '100';
+      el.attributes['data-rect-h'] = el.attributes.height || '100';
+
       const eff = model.calculateEffectiveCorners(rw, rh, newCorners);
       el.vertices = model.convertRectToVertices(rx, ry, rw, rh, eff.tl, eff.tr, eff.br, eff.bl);
-      el.attributes.d = model.compilePathD(el.vertices, true);
+      if (el.tagName === 'path') {
+        el.attributes.d = model.compilePathD(el.vertices, true);
+      }
       el.attributes['data-node-types'] = el.vertices.map((v) => v.nodeType).join(',');
 
       callbacks.onUpdateElement(el);
@@ -172,9 +202,22 @@ export class RectInspector {
     const btnPreset10 = container.querySelector<HTMLButtonElement>('#btn-rect-preset-10');
     const btnPreset20 = container.querySelector<HTMLButtonElement>('#btn-rect-preset-20');
     const btnPresetPill = container.querySelector<HTMLButtonElement>('#btn-rect-preset-pill');
+    const btnUnifyCorners = container.querySelector<HTMLButtonElement>('#btn-rect-unify-corners');
     const btnSyncTL = container.querySelector<HTMLButtonElement>('#btn-rect-sync-tl');
     const btnInvertCorners = container.querySelector<HTMLButtonElement>('#btn-rect-invert-corners');
     const btnRectToPath = container.querySelector<HTMLButtonElement>('#btn-rect-to-path');
+
+    btnUnifyCorners?.addEventListener('click', () => {
+      const radius = rectCorners.tl;
+      applyRectGeometry({
+        ...rectCorners,
+        mode: 'uniform',
+        tl: radius,
+        tr: radius,
+        br: radius,
+        bl: radius,
+      });
+    });
 
     btnModeUniform?.addEventListener('click', () => {
       applyRectGeometry({

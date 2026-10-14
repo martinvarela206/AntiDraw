@@ -6,6 +6,8 @@ import {
 } from '../VectorModel.js';
 import { IVectorModelSerializerContext } from './SvgSerializer.js';
 import type { CompanionMetadata } from '../../bridge/VsCodeBridge.js';
+import { formatNum } from '../geometry/PathGeometryCompiler.js';
+import { RectPrimitive } from '../primitives/RectPrimitive.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Dedicated SVG Deserialization Service (SvgDeserializer)
@@ -430,7 +432,41 @@ export class SvgDeserializer {
             if (isParametricPath) {
               elem.isParametric = true;
               elem.shapeType = attrs['data-shape'] as ParametricShapeType | 'star';
-              elem.tagName = attrs['data-shape'] === 'star' ? 'path' : attrs['data-shape'];
+              if (attrs['data-shape'] === 'rect') {
+                const corners = RectPrimitive.parseCornersFromAttrs(attrs);
+                const isUniform = corners.mode === 'uniform' || (corners.tl === corners.tr && corners.tr === corners.br && corners.br === corners.bl);
+                elem.tagName = isUniform && corners.unit === 'px' ? 'rect' : 'path';
+
+                // Restore scalar geometry coordinates if stripped from clean <path>
+                if (attrs['data-rect-x'] && !attrs.x) attrs.x = attrs['data-rect-x'];
+                if (attrs['data-rect-y'] && !attrs.y) attrs.y = attrs['data-rect-y'];
+                if (attrs['data-rect-w'] && !attrs.width) attrs.width = attrs['data-rect-w'];
+                if (attrs['data-rect-h'] && !attrs.height) attrs.height = attrs['data-rect-h'];
+
+                if ((!attrs.x || !attrs.width) && elem.vertices && elem.vertices.length > 0) {
+                  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                  elem.vertices.forEach((v) => {
+                    minX = Math.min(minX, v.x);
+                    minY = Math.min(minY, v.y);
+                    maxX = Math.max(maxX, v.x);
+                    maxY = Math.max(maxY, v.y);
+                  });
+                  if (!attrs.x) attrs.x = formatNum(minX);
+                  if (!attrs.y) attrs.y = formatNum(minY);
+                  if (!attrs.width) attrs.width = formatNum(Math.max(1, maxX - minX));
+                  if (!attrs.height) attrs.height = formatNum(Math.max(1, maxY - minY));
+                }
+
+                if (isUniform && corners.unit === 'px') {
+                  if (corners.tl > 0) {
+                    attrs.rx = corners.tl.toString();
+                    attrs.ry = corners.tl.toString();
+                  }
+                  delete attrs.d;
+                }
+              } else {
+                elem.tagName = attrs['data-shape'] === 'star' ? 'path' : attrs['data-shape'];
+              }
             } else {
               shapeAttrs.forEach((sa) => delete elem.attributes[sa]);
               elem.isParametric = false;

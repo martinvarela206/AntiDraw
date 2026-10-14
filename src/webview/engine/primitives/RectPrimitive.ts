@@ -29,10 +29,24 @@ export class RectPrimitive {
     if (el.attributes && el.attributes['data-shape'] === 'rect') {
       return true;
     }
+    if (el.shapeType === 'rect') {
+      return true;
+    }
     if (el.tagName === 'rect') {
       return true;
     }
     return false;
+  }
+
+  /**
+   * Evaluates whether all 4 corner radii are uniform and in pixel units
+   */
+  public static isUniform(corners: RectCorners): boolean {
+    return (
+      (corners.mode === 'uniform' ||
+        (corners.tl === corners.tr && corners.tr === corners.br && corners.br === corners.bl)) &&
+      corners.unit === 'px'
+    );
   }
 
   /**
@@ -82,7 +96,12 @@ export class RectPrimitive {
       };
     }
 
-    if (tl !== tr || tr !== br || br !== bl) {
+    if (attrs['data-corner-mode'] === 'uniform') {
+      mode = 'uniform';
+      tr = tl;
+      br = tl;
+      bl = tl;
+    } else if (tl !== tr || tr !== br || br !== bl) {
       mode = 'independent';
     }
 
