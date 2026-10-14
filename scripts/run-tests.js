@@ -43,8 +43,9 @@ async function main() {
   const ok10 = await runSuite(path.join(__dirname, 'test-pixel-perfect.ts'), 'runPixelPerfectTests');
   const ok11 = await runSuite(path.join(__dirname, 'test-temporal-edge-anchor.ts'), 'runTemporalEdgeAnchorTests');
   const ok12 = await runSuite(path.join(__dirname, 'test-multi-candidate-snapping.ts'), 'runMultiCandidateSnappingTests');
+  const ok13 = await runSuite(path.join(__dirname, 'test-universal-intersections.ts'), 'runUniversalIntersectionsTests');
 
-  const allSuccess = ok1 && ok2 && ok3 && ok4 && ok5 && ok6 && ok7 && ok8 && ok9 && ok10 && ok11 && ok12;
+  const allSuccess = ok1 && ok2 && ok3 && ok4 && ok5 && ok6 && ok7 && ok8 && ok9 && ok10 && ok11 && ok12 && ok13;
   process.exit(allSuccess ? 0 : 1);
 }
 

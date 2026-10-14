@@ -3,6 +3,7 @@ import { GuideLine } from './GuideManager.js';
 import { GridConfig } from './GridManager.js';
 import { RulerConfig } from '../CanvasManager.js';
 import { EdgeSnappingService } from './EdgeSnappingService.js';
+import { IntersectionSnappingService } from './IntersectionSnappingService.js';
 
 export type SnapKind = 'none' | 'node' | 'edge' | 'intersection' | 'guide' | 'grid' | 'viewbox';
 
@@ -24,6 +25,7 @@ export interface SnappingContext {
   snapToVertices: boolean;
   snapToNodes?: boolean;
   snapToEdges?: boolean;
+  snapToIntersections?: boolean;
   snapToViewBox: boolean;
   snapAngular?: boolean;
   showGuides: boolean;
@@ -116,89 +118,67 @@ export class SnappingEngine {
       }
     }
 
-    // 2. Snap to Guide Lines and Guide Intersections
-    if (ctx.snapToGuides && ctx.showGuides && ctx.guides.length > 0) {
-      const activeGuides = ctx.guides.filter((g) => g.visible !== false && g.id !== excludeGuideId);
+    // 2. Universal Intersection Snapping (Path × Path, Path × Guide, Guide × Guide, Guide × Grid)
+    // ARCHITECTURAL RATIONALE: Canonical Snapping Hierarchy (Item 1.1 feat(snap))
+    // Anchor / Vertex ('node') > Universal Intersection ('intersection') > Edge / Guide ('edge' / 'guide')
+    const snapToInterActive = ctx.snapToIntersections ?? (ctx.snapToGuides || ctx.snapToVertices || ctx.snapToEdges);
+    if (snapToInterActive && (!xSnapped || !ySnapped)) {
+      const activeGuides = (ctx.snapToGuides && ctx.showGuides && ctx.guides) ? ctx.guides : [];
+      const activeElements = ctx.elements || [];
 
-      // Check intersections between active guide lines
-      if (!xSnapped || !ySnapped) {
-        let minInterDist = threshold;
-        let bestInter: Point | null = null;
+      let bestInterPt: Point | null = null;
+      let minInterDist = threshold;
 
-        for (let i = 0; i < activeGuides.length; i++) {
-          for (let j = i + 1; j < activeGuides.length; j++) {
-            const g1 = activeGuides[i];
-            const g2 = activeGuides[j];
-
-            const r1 = ((g1.angle || 0) * Math.PI) / 180;
-            const r2 = ((g2.angle || 0) * Math.PI) / 180;
-
-            const n1x = -Math.sin(r1), n1y = Math.cos(r1);
-            const n2x = -Math.sin(r2), n2y = Math.cos(r2);
-
-            const g1px = g1.pivotX ?? (g1.orientation === 'vertical' ? g1.position : 0);
-            const g1py = g1.pivotY ?? (g1.orientation === 'horizontal' ? g1.position : 0);
-            const g2px = g2.pivotX ?? (g2.orientation === 'vertical' ? g2.position : 0);
-            const g2py = g2.pivotY ?? (g2.orientation === 'horizontal' ? g2.position : 0);
-
-            const d1 = n1x * g1px + n1y * g1py;
-            const d2 = n2x * g2px + n2y * g2py;
-
-            const det = n1x * n2y - n1y * n2x;
-            if (Math.abs(det) > 1e-4) {
-              const ix = (d1 * n2y - d2 * n1y) / det;
-              const iy = (n1x * d2 - n2x * d1) / det;
-              const dist = Math.hypot(pt.x - ix, pt.y - iy);
-              if (dist <= minInterDist) {
-                minInterDist = dist;
-                bestInter = { x: ix, y: iy };
-              }
-            }
-          }
+      // a) Universal Intersections: Path × Path, Path × Guide, Guide × Guide with Meeting Algorithm
+      const univInter = IntersectionSnappingService.findClosestIntersection(
+        pt,
+        activeElements,
+        activeGuides,
+        ctx.excludeElementIds,
+        excludeGuideId,
+        threshold
+      );
+      if (univInter) {
+        const d = Math.hypot(pt.x - univInter.x, pt.y - univInter.y);
+        if (d <= minInterDist) {
+          minInterDist = d;
+          bestInterPt = univInter;
         }
+      }
 
-        if (bestInter) {
-          snappedX = bestInter.x;
-          snappedY = bestInter.y;
-          xSnapped = true;
-          ySnapped = true;
-          detectedKind = 'intersection';
-          targetPt = { x: bestInter.x, y: bestInter.y };
-        }
-
-        // Compound Intersections: Guides ∩ Grids & Guides ∩ Vector Contours
-        if ((!xSnapped || !ySnapped) && ctx.elements && ctx.elements.length > 0) {
-          const compInters = EdgeSnappingService.collectCompoundIntersections(
-            pt,
-            ctx.guides,
-            ctx.grids,
-            ctx.elements,
-            excludeGuideId,
-            threshold
-          );
-          let minCompDist = threshold;
-          let bestCompInter: Point | null = null;
-          for (const ci of compInters) {
-            const d = Math.hypot(pt.x - ci.x, pt.y - ci.y);
-            if (d < minCompDist) {
-              minCompDist = d;
-              bestCompInter = ci;
-            }
-          }
-          if (bestCompInter) {
-            snappedX = bestCompInter.x;
-            snappedY = bestCompInter.y;
-            xSnapped = true;
-            ySnapped = true;
-            detectedKind = 'intersection';
-            targetPt = bestCompInter;
+      // b) Compound Intersections with Grids: Guides ∩ Grids
+      if (activeGuides.length > 0 && ctx.grids && ctx.grids.length > 0) {
+        const compInters = EdgeSnappingService.collectCompoundIntersections(
+          pt,
+          activeGuides,
+          ctx.grids,
+          [],
+          excludeGuideId,
+          threshold
+        );
+        for (const ci of compInters) {
+          const d = Math.hypot(pt.x - ci.x, pt.y - ci.y);
+          if (d <= minInterDist) {
+            minInterDist = d;
+            bestInterPt = ci;
           }
         }
       }
 
-      // Check individual guide lines
-      if (!xSnapped || !ySnapped) {
-        for (const g of activeGuides) {
+      if (bestInterPt) {
+        snappedX = bestInterPt.x;
+        snappedY = bestInterPt.y;
+        xSnapped = true;
+        ySnapped = true;
+        detectedKind = 'intersection';
+        targetPt = { x: bestInterPt.x, y: bestInterPt.y };
+      }
+    }
+
+    // 3. Snap to 1D Guide Lines
+    if (ctx.snapToGuides && ctx.showGuides && ctx.guides.length > 0 && (!xSnapped || !ySnapped)) {
+      const activeGuides = ctx.guides.filter((g) => g.visible !== false && g.id !== excludeGuideId);
+      for (const g of activeGuides) {
           const isHoriz = g.orientation === 'horizontal';
           const isVert = g.orientation === 'vertical';
 
@@ -232,7 +212,6 @@ export class SnappingEngine {
           }
         }
       }
-    }
 
     // 3. Snap to ViewBox Frame (Artboard boundaries & keypoints)
     // ARCHITECTURAL RATIONALE: ViewBox frame snapping is decoupled from guideline snapping (snapToGuides).
