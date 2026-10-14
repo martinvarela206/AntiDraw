@@ -181,8 +181,12 @@ export class PrimitiveDetector {
       element.attributes['data-rect-y'] = element.attributes.y;
       element.attributes['data-rect-w'] = element.attributes.width;
       element.attributes['data-rect-h'] = element.attributes.height;
-    } else if (tag === 'circle' || tag === 'ellipse') {
+    } else if (tag === 'circle' || tag === 'ellipse' || EllipsePrimitive.isEllipse(element)) {
       if (element.attributes['data-ellipse-type'] === 'pie' || element.attributes['data-ellipse-type'] === 'arc') {
+        element.attributes['data-ellipse-cx'] = element.attributes.cx || '0';
+        element.attributes['data-ellipse-cy'] = element.attributes.cy || '0';
+        element.attributes['data-ellipse-rx'] = element.attributes.rx || element.attributes.r || '50';
+        element.attributes['data-ellipse-ry'] = element.attributes.ry || element.attributes.r || '50';
         return;
       }
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -213,6 +217,10 @@ export class PrimitiveDetector {
         element.attributes.rx = formatNum(rx);
         element.attributes.ry = formatNum(ry);
       }
+      element.attributes['data-ellipse-cx'] = element.attributes.cx;
+      element.attributes['data-ellipse-cy'] = element.attributes.cy;
+      element.attributes['data-ellipse-rx'] = element.attributes.rx || element.attributes.r || formatNum(rx);
+      element.attributes['data-ellipse-ry'] = element.attributes.ry || element.attributes.r || formatNum(ry);
     } else if (tag === 'line') {
       if (element.vertices.length >= 2) {
         element.attributes.x1 = formatNum(element.vertices[0].x);

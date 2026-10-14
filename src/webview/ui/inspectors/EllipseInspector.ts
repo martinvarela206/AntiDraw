@@ -196,6 +196,39 @@ export class EllipseInspector {
       el.attributes['data-inner-ratio'] = clampedInner.toString();
       el.isClosed = newType !== 'arc';
 
+      const isFull = newType === 'ellipse' && Math.abs(newEnd - newStart) >= 360 && clampedInner === 0;
+
+      if (isFull) {
+        const isCircle = Math.abs(clampedRx - clampedRy) < 0.5;
+        el.tagName = isCircle ? 'circle' : 'ellipse';
+        el.shapeType = isCircle ? 'circle' : 'ellipse';
+        el.isParametric = true;
+        el.attributes['data-shape'] = isCircle ? 'circle' : 'ellipse';
+        el.attributes['data-parametric'] = 'true';
+        delete el.attributes.d;
+        delete el.attributes['fill-rule'];
+        if (isCircle) {
+          el.attributes['r'] = clampedRx.toString();
+          delete el.attributes['rx'];
+          delete el.attributes['ry'];
+        } else {
+          el.attributes['rx'] = clampedRx.toString();
+          el.attributes['ry'] = clampedRy.toString();
+          delete el.attributes['r'];
+        }
+      } else {
+        el.tagName = 'path';
+        el.shapeType = 'ellipse';
+        el.isParametric = true;
+        el.attributes['data-shape'] = 'ellipse';
+        el.attributes['data-parametric'] = 'true';
+      }
+
+      el.attributes['data-ellipse-cx'] = newCx.toString();
+      el.attributes['data-ellipse-cy'] = newCy.toString();
+      el.attributes['data-ellipse-rx'] = clampedRx.toString();
+      el.attributes['data-ellipse-ry'] = clampedRy.toString();
+
       if (clampedInner > 0) {
         el.attributes['fill-rule'] = 'evenodd';
       } else {
@@ -221,16 +254,18 @@ export class EllipseInspector {
         newEnd,
         clampedInner
       );
-      el.attributes.d = model.compileEllipseD(
-        newCx,
-        newCy,
-        clampedRx,
-        clampedRy,
-        newType,
-        newStart,
-        newEnd,
-        clampedInner
-      );
+      if (el.tagName === 'path') {
+        el.attributes.d = model.compileEllipseD(
+          newCx,
+          newCy,
+          clampedRx,
+          clampedRy,
+          newType,
+          newStart,
+          newEnd,
+          clampedInner
+        );
+      }
       el.attributes['data-node-types'] = el.vertices.map((v) => v.nodeType).join(',');
 
       const newBox = selectionTool.getBoundingBox(el);

@@ -31,6 +31,9 @@ export class EllipsePrimitive {
     if (el.attributes && (el.attributes['data-shape'] === 'ellipse' || el.attributes['data-shape'] === 'circle')) {
       return true;
     }
+    if (el.shapeType === 'ellipse' || el.shapeType === 'circle') {
+      return true;
+    }
     if (el.tagName === 'ellipse' || el.tagName === 'circle') {
       return true;
     }
@@ -40,6 +43,17 @@ export class EllipsePrimitive {
       );
     }
     return false;
+  }
+
+  /**
+   * Evaluates whether an ellipse or circle element is a complete, unpierced 360° closed solid
+   */
+  public static isFullSolid(el: VectorElement): boolean {
+    const type = (el.attributes?.['data-ellipse-type'] as 'ellipse' | 'pie' | 'arc') || 'ellipse';
+    const sAngle = parseFloat(el.attributes?.['data-start-angle'] || '0');
+    const eAngle = parseFloat(el.attributes?.['data-end-angle'] || '360');
+    const innerRatio = parseFloat(el.attributes?.['data-inner-ratio'] || '0');
+    return type === 'ellipse' && Math.abs(eAngle - sAngle) >= 360 && innerRatio === 0;
   }
 
   public static isCircle(el: VectorElement): boolean {

@@ -23,6 +23,7 @@ export interface IVectorModelSerializerContext {
   convertShapeToVertices(tag: string, attrs: Record<string, string>): PathVertex[];
   isParametricElement(el: VectorElement): boolean;
   syncParametricAttributes(el: VectorElement): void;
+  isEllipse(el: VectorElement): boolean;
   isRect(el: VectorElement): boolean;
   getRectCorners(el: VectorElement, w: number, h: number): RectCorners;
   calculateEffectiveCorners(w: number, h: number, corners: RectCorners): { tl: number; tr: number; br: number; bl: number };
@@ -511,7 +512,7 @@ export class SvgSerializer {
         svg += AppearanceStackManager.compileLayerTags(el, layer);
       }
 
-      const isAutoPromotedShape = ctx.isRect(el) || el.attributes['data-shape'] === 'star' || el.attributes['data-shape'] === 'ellipse';
+      const isAutoPromotedShape = ctx.isRect(el) || ctx.isEllipse(el) || el.attributes['data-shape'] === 'star';
       if (ctx.isParametricElement(el) && (el.tagName !== 'path' || isAutoPromotedShape)) {
         /**
          * ARCHITECTURAL RATIONALE: Native Parametric SVG Export (FEAT-01 & FEAT-02)
@@ -526,36 +527,51 @@ export class SvgSerializer {
         const ellipseType = (cleanAttrs['data-ellipse-type'] as 'ellipse' | 'pie' | 'arc') || 'ellipse';
         const innerRatio = parseFloat(cleanAttrs['data-inner-ratio'] || '0');
 
-        /**
-         * ARCHITECTURAL RATIONALE: Donut, Rosca Parcial & Arc Path Serialization (FIX-RoscaRender)
-         * Native SVG specifications lack built-in attributes for inner donut radii or arc sectors on <circle> and <ellipse>.
-         * Consequently, whenever an element has data-inner-ratio > 0 (donut/ring or annular sector) or is in 'pie'/'arc' mode,
-         * it MUST be serialized as a compliant <path> utilizing SVG arc commands ('A') and fill-rule="evenodd".
-         * Serializing a full donut (innerRatio > 0) as <ellipse> or <circle> previously caused standard SVG engines and the
-         * AntiDraw canvas parser to completely discard the hole, leaving the real vector visually solid.
-         */
-        if (ellipseType === 'pie' || ellipseType === 'arc' || innerRatio > 0) {
+        if (ctx.isEllipse(el)) {
           const cx = parseFloat(cleanAttrs.cx || '0');
           const cy = parseFloat(cleanAttrs.cy || '0');
           const rx = parseFloat(cleanAttrs.rx || cleanAttrs.r || '1');
           const ry = parseFloat(cleanAttrs.ry || cleanAttrs.r || '1');
           const startAngle = parseFloat(cleanAttrs['data-start-angle'] || '0');
           const endAngle = parseFloat(cleanAttrs['data-end-angle'] || '360');
+          const isFull = ellipseType === 'ellipse' && Math.abs(endAngle - startAngle) >= 360;
 
-          cleanAttrs.d = ctx.compileEllipseD(cx, cy, rx, ry, ellipseType, startAngle, endAngle, innerRatio);
-          cleanAttrs['data-shape'] = 'ellipse';
-          cleanAttrs['data-parametric'] = 'true';
+          if (!isFull || innerRatio > 0) {
+            cleanAttrs.d = ctx.compileEllipseD(cx, cy, rx, ry, ellipseType, startAngle, endAngle, innerRatio);
+            cleanAttrs['data-shape'] = 'ellipse';
+            cleanAttrs['data-parametric'] = 'true';
 
-          if (innerRatio > 0) {
-            cleanAttrs['fill-rule'] = 'evenodd';
+            if (innerRatio > 0) {
+              cleanAttrs['fill-rule'] = 'evenodd';
+            }
+
+            if (ellipseType === 'arc') {
+              cleanAttrs.fill = 'none';
+              delete cleanAttrs['data-gradient'];
+            }
+
+            delete cleanAttrs.cx;
+            delete cleanAttrs.cy;
+            delete cleanAttrs.rx;
+            delete cleanAttrs.ry;
+            delete cleanAttrs.r;
+            delete cleanAttrs['data-node-types'];
+
+            svg += `  <path${serializeCleanAttrs(cleanAttrs)} />\n`;
+          } else {
+            delete cleanAttrs.d;
+            delete cleanAttrs['data-node-types'];
+            delete cleanAttrs['fill-rule'];
+            const isCircle = Math.abs(rx - ry) < 0.5;
+            if (isCircle && cleanAttrs.r) {
+              svg += `  <circle${serializeCleanAttrs(cleanAttrs)} />\n`;
+            } else {
+              delete cleanAttrs.r;
+              cleanAttrs.rx = rx.toString();
+              cleanAttrs.ry = ry.toString();
+              svg += `  <ellipse${serializeCleanAttrs(cleanAttrs)} />\n`;
+            }
           }
-
-          if (ellipseType === 'arc') {
-            cleanAttrs.fill = 'none';
-            delete cleanAttrs['data-gradient'];
-          }
-
-          svg += `  <path${serializeCleanAttrs(cleanAttrs)} />\n`;
         } else if (ctx.isRect(el)) {
           /**
            * ARCHITECTURAL RATIONALE: Native Parametric Rect Serialization (FEAT-03)

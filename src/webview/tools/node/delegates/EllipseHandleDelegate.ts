@@ -414,16 +414,50 @@ export class EllipseHandleDelegate {
       }
 
       selectedEl.vertices = ghostNodeVertices || initialVertices;
-      selectedEl.attributes.d = this.quadrantGhostD || this.ctx.model.compileEllipseD(
-        this.quadrantCenter.x,
-        this.quadrantCenter.y,
-        this.quadrantRadii.rx,
-        this.quadrantRadii.ry,
-        this.quadrantGhostMode,
-        this.quadrantGhostStartAngle,
-        this.quadrantGhostEndAngle,
-        innerRatio
-      );
+
+      const isFull = this.quadrantGhostMode === 'ellipse' && Math.abs(this.quadrantGhostEndAngle - this.quadrantGhostStartAngle) >= 360 && innerRatio === 0;
+
+      if (isFull) {
+        const isCircle = Math.abs(this.quadrantRadii.rx - this.quadrantRadii.ry) < 0.5;
+        selectedEl.tagName = isCircle ? 'circle' : 'ellipse';
+        selectedEl.shapeType = isCircle ? 'circle' : 'ellipse';
+        selectedEl.isParametric = true;
+        selectedEl.attributes['data-shape'] = isCircle ? 'circle' : 'ellipse';
+        selectedEl.attributes['data-parametric'] = 'true';
+        delete selectedEl.attributes.d;
+        delete selectedEl.attributes['fill-rule'];
+        if (isCircle) {
+          selectedEl.attributes['r'] = this.quadrantRadii.rx.toString();
+          delete selectedEl.attributes['rx'];
+          delete selectedEl.attributes['ry'];
+        } else {
+          selectedEl.attributes['rx'] = this.quadrantRadii.rx.toString();
+          selectedEl.attributes['ry'] = this.quadrantRadii.ry.toString();
+          delete selectedEl.attributes['r'];
+        }
+      } else {
+        selectedEl.tagName = 'path';
+        selectedEl.shapeType = 'ellipse';
+        selectedEl.isParametric = true;
+        selectedEl.attributes['data-shape'] = 'ellipse';
+        selectedEl.attributes['data-parametric'] = 'true';
+        selectedEl.attributes.d = this.quadrantGhostD || this.ctx.model.compileEllipseD(
+          this.quadrantCenter.x,
+          this.quadrantCenter.y,
+          this.quadrantRadii.rx,
+          this.quadrantRadii.ry,
+          this.quadrantGhostMode,
+          this.quadrantGhostStartAngle,
+          this.quadrantGhostEndAngle,
+          innerRatio
+        );
+      }
+
+      selectedEl.attributes['data-ellipse-cx'] = this.quadrantCenter.x.toString();
+      selectedEl.attributes['data-ellipse-cy'] = this.quadrantCenter.y.toString();
+      selectedEl.attributes['data-ellipse-rx'] = this.quadrantRadii.rx.toString();
+      selectedEl.attributes['data-ellipse-ry'] = this.quadrantRadii.ry.toString();
+
       selectedEl.attributes['data-node-types'] = selectedEl.vertices.map((v) => v.nodeType).join(',');
 
       this.quadrantGhostD = '';
@@ -443,16 +477,50 @@ export class EllipseHandleDelegate {
       }
 
       selectedEl.vertices = ghostNodeVertices || initialVertices;
-      selectedEl.attributes.d = this.quadrantGhostD || this.ctx.model.compileEllipseD(
-        this.quadrantCenter.x,
-        this.quadrantCenter.y,
-        this.quadrantRadii.rx,
-        this.quadrantRadii.ry,
-        this.quadrantGhostMode,
-        this.quadrantGhostStartAngle,
-        this.quadrantGhostEndAngle,
-        this.ellipseInnerGhostRatio
-      );
+
+      const isFull = this.quadrantGhostMode === 'ellipse' && Math.abs(this.quadrantGhostEndAngle - this.quadrantGhostStartAngle) >= 360 && this.ellipseInnerGhostRatio === 0;
+
+      if (isFull) {
+        const isCircle = Math.abs(this.quadrantRadii.rx - this.quadrantRadii.ry) < 0.5;
+        selectedEl.tagName = isCircle ? 'circle' : 'ellipse';
+        selectedEl.shapeType = isCircle ? 'circle' : 'ellipse';
+        selectedEl.isParametric = true;
+        selectedEl.attributes['data-shape'] = isCircle ? 'circle' : 'ellipse';
+        selectedEl.attributes['data-parametric'] = 'true';
+        delete selectedEl.attributes.d;
+        delete selectedEl.attributes['fill-rule'];
+        if (isCircle) {
+          selectedEl.attributes['r'] = this.quadrantRadii.rx.toString();
+          delete selectedEl.attributes['rx'];
+          delete selectedEl.attributes['ry'];
+        } else {
+          selectedEl.attributes['rx'] = this.quadrantRadii.rx.toString();
+          selectedEl.attributes['ry'] = this.quadrantRadii.ry.toString();
+          delete selectedEl.attributes['r'];
+        }
+      } else {
+        selectedEl.tagName = 'path';
+        selectedEl.shapeType = 'ellipse';
+        selectedEl.isParametric = true;
+        selectedEl.attributes['data-shape'] = 'ellipse';
+        selectedEl.attributes['data-parametric'] = 'true';
+        selectedEl.attributes.d = this.quadrantGhostD || this.ctx.model.compileEllipseD(
+          this.quadrantCenter.x,
+          this.quadrantCenter.y,
+          this.quadrantRadii.rx,
+          this.quadrantRadii.ry,
+          this.quadrantGhostMode,
+          this.quadrantGhostStartAngle,
+          this.quadrantGhostEndAngle,
+          this.ellipseInnerGhostRatio
+        );
+      }
+
+      selectedEl.attributes['data-ellipse-cx'] = this.quadrantCenter.x.toString();
+      selectedEl.attributes['data-ellipse-cy'] = this.quadrantCenter.y.toString();
+      selectedEl.attributes['data-ellipse-rx'] = this.quadrantRadii.rx.toString();
+      selectedEl.attributes['data-ellipse-ry'] = this.quadrantRadii.ry.toString();
+
       selectedEl.attributes['data-node-types'] = selectedEl.vertices.map((v) => v.nodeType).join(',');
 
       this.quadrantGhostD = '';

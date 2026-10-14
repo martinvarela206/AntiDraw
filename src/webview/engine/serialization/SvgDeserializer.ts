@@ -464,6 +464,38 @@ export class SvgDeserializer {
                   }
                   delete attrs.d;
                 }
+              } else if (attrs['data-shape'] === 'ellipse' || attrs['data-shape'] === 'circle') {
+                const ellipseType = (attrs['data-ellipse-type'] as 'ellipse' | 'pie' | 'arc') || 'ellipse';
+                const sAngle = parseFloat(attrs['data-start-angle'] || '0');
+                const eAngle = parseFloat(attrs['data-end-angle'] || '360');
+                const innerRatio = parseFloat(attrs['data-inner-ratio'] || '0');
+                const isFull = ellipseType === 'ellipse' && Math.abs(eAngle - sAngle) >= 360 && innerRatio === 0;
+
+                elem.tagName = isFull ? (attrs['data-shape'] === 'circle' ? 'circle' : 'ellipse') : 'path';
+
+                // Restore scalar center & radii if stripped from clean <path>
+                if (attrs['data-ellipse-cx'] && !attrs.cx) attrs.cx = attrs['data-ellipse-cx'];
+                if (attrs['data-ellipse-cy'] && !attrs.cy) attrs.cy = attrs['data-ellipse-cy'];
+                if (attrs['data-ellipse-rx'] && !attrs.rx) attrs.rx = attrs['data-ellipse-rx'];
+                if (attrs['data-ellipse-ry'] && !attrs.ry) attrs.ry = attrs['data-ellipse-ry'];
+
+                if ((!attrs.cx || !attrs.rx) && elem.vertices && elem.vertices.length > 0) {
+                  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                  elem.vertices.forEach((v) => {
+                    minX = Math.min(minX, v.x);
+                    minY = Math.min(minY, v.y);
+                    maxX = Math.max(maxX, v.x);
+                    maxY = Math.max(maxY, v.y);
+                  });
+                  if (!attrs.cx) attrs.cx = formatNum((minX + maxX) / 2);
+                  if (!attrs.cy) attrs.cy = formatNum((minY + maxY) / 2);
+                  if (!attrs.rx) attrs.rx = formatNum(Math.max(1, (maxX - minX) / 2));
+                  if (!attrs.ry) attrs.ry = formatNum(Math.max(1, (maxY - minY) / 2));
+                }
+
+                if (isFull) {
+                  delete attrs.d;
+                }
               } else {
                 elem.tagName = attrs['data-shape'] === 'star' ? 'path' : attrs['data-shape'];
               }
