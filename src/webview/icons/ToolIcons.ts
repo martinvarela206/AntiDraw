@@ -26,6 +26,7 @@ import chevronDownSvg from '../assets/icons/chevron_down.svg';
 import circleToolSvg from '../assets/icons/circle_tool.svg';
 import combineSvg from '../assets/icons/combine.svg';
 import ellipseToolSvg from '../assets/icons/ellipse_tool.svg';
+import eraserToolSvg from '../assets/icons/eraser_tool.svg';
 import excludeSvg from '../assets/icons/exclude.svg';
 import flipHorizontalSvg from '../assets/icons/flip_horizontal.svg';
 import flipVerticalSvg from '../assets/icons/flip_vertical.svg';
@@ -35,6 +36,7 @@ import guideDoubleArrowVerticalLeftRotateSvg from '../assets/icons/guide_double_
 import guideDoubleArrowVerticalRightRotateSvg from '../assets/icons/guide_double_arrow_vertical_right_rotate.svg';
 import guidesVisibilitySvg from '../assets/icons/guides_visibility.svg';
 import intersectSvg from '../assets/icons/intersect.svg';
+import knifeToolSvg from '../assets/icons/knife_tool.svg';
 import lineToolSvg from '../assets/icons/line_tool.svg';
 import nodeAsymmetricSvg from '../assets/icons/node_asymmetric.svg';
 import nodeSharpSvg from '../assets/icons/node_sharp.svg';
@@ -48,9 +50,12 @@ import rectToolSvg from '../assets/icons/rect_tool.svg';
 import redoSvg from '../assets/icons/redo.svg';
 import rulerCornerSvg from '../assets/icons/ruler_corner.svg';
 import rulersVisibilitySvg from '../assets/icons/rulers_visibility.svg';
+import scissorsToolSvg from '../assets/icons/scissors_tool.svg';
 import selectToolSvg from '../assets/icons/select_tool.svg';
 import sendBackSvg from '../assets/icons/send_back.svg';
 import sendBackwardSvg from '../assets/icons/send_backward.svg';
+import shapeBuilderToolSvg from '../assets/icons/shape_builder_tool.svg';
+import smartFillToolSvg from '../assets/icons/smart_fill_tool.svg';
 import snapAngularSvg from '../assets/icons/snap_angular.svg';
 import snapEdgeSvg from '../assets/icons/snap_edge.svg';
 import snapGridSvg from '../assets/icons/snap_grid.svg';
@@ -81,6 +86,7 @@ export const ToolIcons = {
   circleTool: circleToolSvg,
   combine: combineSvg,
   ellipseTool: ellipseToolSvg,
+  eraserTool: eraserToolSvg,
   exclude: excludeSvg,
   flipHorizontal: flipHorizontalSvg,
   flipVertical: flipVerticalSvg,
@@ -90,6 +96,7 @@ export const ToolIcons = {
   guideDoubleArrowVerticalRightRotate: guideDoubleArrowVerticalRightRotateSvg,
   guidesVisibility: guidesVisibilitySvg,
   intersect: intersectSvg,
+  knifeTool: knifeToolSvg,
   lineTool: lineToolSvg,
   nodeAsymmetric: nodeAsymmetricSvg,
   nodeSharp: nodeSharpSvg,
@@ -103,9 +110,12 @@ export const ToolIcons = {
   redo: redoSvg,
   rulerCorner: rulerCornerSvg,
   rulersVisibility: rulersVisibilitySvg,
+  scissorsTool: scissorsToolSvg,
   selectTool: selectToolSvg,
   sendBack: sendBackSvg,
   sendBackward: sendBackwardSvg,
+  shapeBuilderTool: shapeBuilderToolSvg,
+  smartFillTool: smartFillToolSvg,
   snapAngular: snapAngularSvg,
   snapEdge: snapEdgeSvg,
   snapGrid: snapGridSvg,

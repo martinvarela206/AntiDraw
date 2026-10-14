@@ -153,6 +153,75 @@ body {
   box-shadow: 0 0 8px #60a5fa;
 }
 
+/* TOOLBAR DRAWERS, SEPARATORS & FLYOUTS */
+.toolbar-divider {
+  width: 22px;
+  height: 1px;
+  background-color: var(--border-color);
+  margin: 3px 0;
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.btn-drawer-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.drawer-indicator {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 0;
+  height: 0;
+  border-left: 3.5px solid transparent;
+  border-top: 3.5px solid transparent;
+  border-right: 3.5px solid var(--text-muted);
+  border-bottom: 3.5px solid var(--text-muted);
+  pointer-events: none;
+  transition: border-color 0.15s ease;
+}
+
+.btn-icon:hover .drawer-indicator {
+  border-right-color: var(--text-main);
+  border-bottom-color: var(--text-main);
+}
+
+.btn-icon.active .drawer-indicator,
+.btn-icon[data-active="true"] .drawer-indicator {
+  border-right-color: #ffffff;
+  border-bottom-color: #ffffff;
+}
+
+.tool-drawer-flyout {
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 0;
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 4px;
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  z-index: 1000;
+  animation: flyoutFadeIn 0.12s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes flyoutFadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
 /* CANVAS AREA & RULERS */
 .canvas-container {
   grid-area: canvas;

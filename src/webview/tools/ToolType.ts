@@ -21,4 +21,11 @@ export type ToolType =
   | 'star'
   | 'addVertex'
   | 'canvas'
-  | 'zoom';
+  | 'zoom'
+  // Operaciones de Topología - Sub-cajón A (Corte / Partición)
+  | 'scissors'
+  | 'knife'
+  | 'eraser'
+  // Operaciones de Topología - Sub-cajón B (Construcción)
+  | 'smartFill'
+  | 'shapeBuilder';

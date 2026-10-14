@@ -151,10 +151,15 @@ export class KeyboardShortcutController {
       if (e.key === 'p' || e.key === 'P') this.ctx.toolbar.setTool('pen');
       if (e.key === 'r' || e.key === 'R') this.ctx.toolbar.setTool('rect');
       if (e.key === 'o' || e.key === 'O') this.ctx.toolbar.setTool('circle');
-      if (e.key === 'e' || e.key === 'E') this.ctx.toolbar.setTool('ellipse');
+      if (e.shiftKey && (e.key === 'E' || e.key === 'e')) {
+        this.ctx.toolbar.setTool('eraser');
+      } else if (e.key === 'e' || e.key === 'E') {
+        this.ctx.toolbar.setTool('ellipse');
+      }
       if (e.key === 'l' || e.key === 'L') this.ctx.toolbar.setTool('line');
       if (e.key === 'g' || e.key === 'G') this.ctx.toolbar.setTool('polygon');
       if (e.key === 's' || e.key === 'S') this.ctx.toolbar.setTool('star');
+      if (e.key === 'c' || e.key === 'C') this.ctx.toolbar.setTool('scissors');
       if (e.key === 'z' || e.key === 'Z') this.ctx.toolbar.setTool('zoom');
     }
 
