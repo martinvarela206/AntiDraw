@@ -54,6 +54,7 @@ import SnapAngularSvg from '../../assets/icons/snap_angular.svg';
 import SnapEdgeSvg from '../../assets/icons/snap_edge.svg';
 import SnapGridSvg from '../../assets/icons/snap_grid.svg';
 import SnapGuideSvg from '../../assets/icons/snap_guide.svg';
+import SnapPixelSvg from '../../assets/icons/snap_pixel.svg';
 import SnapVertexSvg from '../../assets/icons/snap_vertex.svg';
 import SnapViewBoxSvg from '../../assets/icons/snap_view_box.svg';
 import SplitNodeSvg from '../../assets/icons/split_node.svg';
@@ -108,6 +109,7 @@ export const ICONS = {
   snapEdge: SnapEdgeSvg,
   snapGrid: SnapGridSvg,
   snapGuide: SnapGuideSvg,
+  snapPixel: SnapPixelSvg,
   snapVertex: SnapVertexSvg,
   snapViewBox: SnapViewBoxSvg,
   splitNode: SplitNodeSvg,

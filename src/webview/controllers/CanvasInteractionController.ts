@@ -449,14 +449,14 @@ export class CanvasInteractionController implements CanvasViewDelegate {
     });
   }
 
-  private snapPoint(pt: Point, otherVertices: Point[] = [], excludeGuideId?: string): Point {
+  private snapPoint(pt: Point, otherVertices: Point[] = [], excludeGuideId?: string, strokeWidth?: number, halfPixel?: boolean): Point {
     const vb = this.ctx.model.getViewBoxBounds();
     const origin = {
       x: vb.minX + (this.ctx.canvasMgr.rulerConfig.originX || 0),
       y: vb.minY + (this.ctx.canvasMgr.rulerConfig.originY || 0),
     };
     const excludeElementIds = this.ctx.selectionTool ? Array.from(this.ctx.selectionTool.selectedElementIds) : undefined;
-    return this.ctx.canvasMgr.snapPoint(pt, otherVertices, origin, vb, excludeGuideId, this.ctx.model.elements, excludeElementIds);
+    return this.ctx.canvasMgr.snapPoint(pt, otherVertices, origin, vb, excludeGuideId, this.ctx.model.elements, excludeElementIds, strokeWidth, halfPixel);
   }
 
   public getOtherVertices(excludeIds: string[] = []): Point[] {

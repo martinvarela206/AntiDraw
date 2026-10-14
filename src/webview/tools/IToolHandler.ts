@@ -20,7 +20,7 @@ export interface ToolContext {
   syncToHost(): void;
   render(): void;
   renderOverlay(): void;
-  snapPoint(pt: Point, otherVertices?: Point[], excludeGuideId?: string): Point;
+  snapPoint(pt: Point, otherVertices?: Point[], excludeGuideId?: string, strokeWidth?: number, halfPixel?: boolean): Point;
   getOtherVertices(excludeIds?: string[]): Point[];
   setTool(tool: ToolType): void;
   getActiveTool(): ToolType;

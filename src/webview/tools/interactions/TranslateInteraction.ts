@@ -247,6 +247,17 @@ export class TranslateInteraction {
     // Collect other unselected nodes (structural, handles, positional)
     const otherVertices = ctx.getOtherVertices(Array.from(ctx.selectionTool.selectedElementIds));
 
+    // Detect stroke-width of single selected element for half-pixel awareness
+    let strokeW: number | undefined;
+    if (ctx.selectionTool.selectedElementIds.size === 1) {
+      const elId = Array.from(ctx.selectionTool.selectedElementIds)[0];
+      const el = ctx.model.elements.find((item) => item.id === elId);
+      if (el) {
+        const sw = parseFloat(el.attributes['stroke-width'] || el.attributes.strokeWidth || '0');
+        if (!isNaN(sw) && sw > 0) strokeW = sw;
+      }
+    }
+
     /**
      * ARCHITECTURAL RATIONALE: Strict Orthogonal Constraint on Translation (Ctrl / Ctrl+Alt)
      * When Ctrl is active, movement is projected strictly onto the dominant Cartesian axis (0° or 90°):
@@ -257,16 +268,16 @@ export class TranslateInteraction {
     if (this.isOrthogonal) {
       if (Math.abs(dx) >= Math.abs(dy)) {
         const rawTarget: Point = { x: this.dragAnchorPt.x + dx, y: this.dragAnchorPt.y };
-        const snappedTarget = ctx.snapPoint(rawTarget, otherVertices);
+        const snappedTarget = ctx.snapPoint(rawTarget, otherVertices, undefined, strokeW);
         this.ghostDragOffset = { x: snappedTarget.x - this.dragAnchorPt.x, y: 0 };
       } else {
         const rawTarget: Point = { x: this.dragAnchorPt.x, y: this.dragAnchorPt.y + dy };
-        const snappedTarget = ctx.snapPoint(rawTarget, otherVertices);
+        const snappedTarget = ctx.snapPoint(rawTarget, otherVertices, undefined, strokeW);
         this.ghostDragOffset = { x: 0, y: snappedTarget.y - this.dragAnchorPt.y };
       }
     } else {
       const rawTarget: Point = { x: this.dragAnchorPt.x + dx, y: this.dragAnchorPt.y + dy };
-      const snappedTarget = ctx.snapPoint(rawTarget, otherVertices);
+      const snappedTarget = ctx.snapPoint(rawTarget, otherVertices, undefined, strokeW);
       this.ghostDragOffset = {
         x: snappedTarget.x - this.dragAnchorPt.x,
         y: snappedTarget.y - this.dragAnchorPt.y,

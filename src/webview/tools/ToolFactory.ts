@@ -65,7 +65,7 @@ export class ToolFactory {
       syncToHost: () => ctx.getHostSyncService().syncToHost(),
       render: () => ctx.getWorkspaceLayout().render(),
       renderOverlay: () => ctx.getWorkspaceLayout().renderOverlay(),
-      snapPoint: (pt, others, exclude) =>
+      snapPoint: (pt, others, exclude, strokeWidth, halfPixel) =>
         ctx.canvasMgr.snapPoint(
           pt,
           others,
@@ -76,7 +76,9 @@ export class ToolFactory {
           ctx.model.getViewBoxBounds(),
           exclude,
           ctx.model.elements,
-          Array.from(ctx.selectionTool.selectedElementIds)
+          Array.from(ctx.selectionTool.selectedElementIds),
+          strokeWidth,
+          halfPixel
         ),
       getOtherVertices: (exclude) => ctx.getInteractionCtrl()?.getOtherVertices(exclude) || [],
       setTool: (t) => ctx.getToolbar()?.setTool(t),

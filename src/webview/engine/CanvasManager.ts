@@ -145,7 +145,8 @@ export class CanvasManager {
     polygonSides: 5,
   };
 
-  // Quad-Group Snap Activators (Grid, Guides/ViewBox, Vector Nodes, Vector Edges)
+  // Quad-Group Snap Activators (Grid, Guides/ViewBox, Vector Nodes, Vector Edges, Pixel-Perfect)
+  public snapToPixelGrid: boolean = true;
   public snapToGrid: boolean = false;
   public snapToGuides: boolean = false;
   public snapToNodes: boolean = false;
@@ -215,11 +216,14 @@ export class CanvasManager {
     viewBoxBounds?: { minX: number; minY: number; width: number; height: number },
     excludeGuideId?: string,
     elements?: VectorElement[],
-    excludeElementIds?: string[]
+    excludeElementIds?: string[],
+    strokeWidth?: number,
+    halfPixel?: boolean
   ): Point {
     const ctx: SnappingContext = {
       snapThreshold: this.snapThreshold,
       zoom: this.zoom || 1,
+      snapToPixelGrid: this.snapToPixelGrid,
       snapToGrid: this.snapToGrid,
       snapToGuides: this.snapToGuides,
       snapToVertices: this.snapToVertices,
@@ -234,6 +238,8 @@ export class CanvasManager {
       rulerConfig: this.rulerConfig,
       elements: elements || this.elements,
       excludeElementIds: excludeElementIds,
+      strokeWidth: strokeWidth,
+      halfPixel: halfPixel,
     };
     return SnappingEngine.snapPoint(pt, ctx, otherVertices, origin, viewBoxBounds, excludeGuideId);
   }

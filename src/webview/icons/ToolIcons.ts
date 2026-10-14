@@ -55,6 +55,7 @@ import snapAngularSvg from '../assets/icons/snap_angular.svg';
 import snapEdgeSvg from '../assets/icons/snap_edge.svg';
 import snapGridSvg from '../assets/icons/snap_grid.svg';
 import snapGuideSvg from '../assets/icons/snap_guide.svg';
+import snapPixelSvg from '../assets/icons/snap_pixel.svg';
 import snapVertexSvg from '../assets/icons/snap_vertex.svg';
 import snapViewBoxSvg from '../assets/icons/snap_view_box.svg';
 import splitNodeSvg from '../assets/icons/split_node.svg';
@@ -109,6 +110,7 @@ export const ToolIcons = {
   snapEdge: snapEdgeSvg,
   snapGrid: snapGridSvg,
   snapGuide: snapGuideSvg,
+  snapPixel: snapPixelSvg,
   snapVertex: snapVertexSvg,
   snapViewBox: snapViewBoxSvg,
   splitNode: splitNodeSvg,

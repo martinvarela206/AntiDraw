@@ -101,6 +101,7 @@ export class HostSyncService {
       showGuides: this.ctx.canvasMgr.showGuides,
       gridSpacing: this.ctx.canvasMgr.gridSpacing,
       gridAlignmentMode: this.ctx.canvasMgr.gridAlignmentMode,
+      snapToPixelGrid: this.ctx.canvasMgr.snapToPixelGrid,
       snapToGrid: this.ctx.canvasMgr.snapToGrid,
       snapToGuides: this.ctx.canvasMgr.snapToGuides,
       snapToNodes: this.ctx.canvasMgr.snapToNodes,
@@ -187,6 +188,7 @@ export class HostSyncService {
           this.ctx.canvasMgr.gridAlignmentMode = payload.metadata.gridAlignmentMode;
           this.updateStatusGridAlignment();
         }
+        if (payload.metadata.snapToPixelGrid !== undefined) this.ctx.canvasMgr.snapToPixelGrid = payload.metadata.snapToPixelGrid;
         if (payload.metadata.snapToGrid !== undefined) this.ctx.canvasMgr.snapToGrid = payload.metadata.snapToGrid;
         if (payload.metadata.snapToGuides !== undefined) this.ctx.canvasMgr.snapToGuides = payload.metadata.snapToGuides;
         if (payload.metadata.snapToNodes !== undefined) this.ctx.canvasMgr.snapToNodes = payload.metadata.snapToNodes;

@@ -115,6 +115,7 @@ export class ChromeActionController {
         this.ctx.hostSyncService().syncMetadataToHost();
       },
       onToggleSnap: (type) => {
+        if (type === 'pixel') this.ctx.canvasMgr.snapToPixelGrid = !this.ctx.canvasMgr.snapToPixelGrid;
         if (type === 'grid') this.ctx.canvasMgr.snapToGrid = !this.ctx.canvasMgr.snapToGrid;
         if (type === 'guide') this.ctx.canvasMgr.snapToGuides = !this.ctx.canvasMgr.snapToGuides;
         if (type === 'nodes' || type === 'vertex') this.ctx.canvasMgr.snapToNodes = !this.ctx.canvasMgr.snapToNodes;

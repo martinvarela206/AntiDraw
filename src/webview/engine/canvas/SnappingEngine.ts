@@ -16,6 +16,7 @@ export interface SnapResult {
 export interface SnappingContext {
   snapThreshold: number;
   zoom: number;
+  snapToPixelGrid?: boolean;
   snapToGrid: boolean;
   snapToGuides: boolean;
   snapToVertices: boolean;
@@ -30,6 +31,8 @@ export interface SnappingContext {
   rulerConfig: RulerConfig;
   elements?: VectorElement[];
   excludeElementIds?: string[];
+  strokeWidth?: number;
+  halfPixel?: boolean;
 }
 
 export interface AngledGuideSnapResult {
@@ -611,13 +614,34 @@ export class SnappingEngine {
       }
     }
 
-    if (xSnapped || ySnapped) {
+    const hasMagneticSnap = xSnapped || ySnapped;
+    if (hasMagneticSnap) {
       if (detectedKind === 'none') {
         detectedKind = 'grid';
       }
     }
 
-    SnappingEngine.lastSnapResult = (xSnapped || ySnapped)
+    // 6. Snap to Pixel Grid (Pixel-Perfect with Half-Pixel Awareness)
+    // Acota coordenadas a la cuadrícula de píxeles enteros (o ±0.5px para trazos impares como 1px).
+    // Al desactivarse (false), habilita libertad analítica continua subpíxel en R^2.
+    const snapToPixel = ctx.snapToPixelGrid ?? true;
+    if (snapToPixel) {
+      const isOddStroke =
+        ctx.halfPixel === true ||
+        (ctx.strokeWidth !== undefined &&
+          Math.round(ctx.strokeWidth) > 0 &&
+          Math.round(ctx.strokeWidth) % 2 === 1);
+      const halfOffset = isOddStroke ? 0.5 : 0.0;
+
+      if (!xSnapped) {
+        snappedX = Math.round(snappedX - halfOffset) + halfOffset;
+      }
+      if (!ySnapped) {
+        snappedY = Math.round(snappedY - halfOffset) + halfOffset;
+      }
+    }
+
+    SnappingEngine.lastSnapResult = hasMagneticSnap
       ? {
           x: Math.round(snappedX * 100) / 100,
           y: Math.round(snappedY * 100) / 100,
