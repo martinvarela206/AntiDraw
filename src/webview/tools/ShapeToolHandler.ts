@@ -48,6 +48,16 @@ export class ShapeToolHandler implements IToolHandler {
     ctrlKey: false,
     altKey: false,
   };
+  public frozenStarBounds: {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    cx: number;
+    cy: number;
+    rx: number;
+    ry: number;
+  } | null = null;
 
   constructor(ctx: ToolContext) {
     this.ctx = ctx;
@@ -67,6 +77,7 @@ export class ShapeToolHandler implements IToolHandler {
     this.ghostShapeElement = null;
     this.isSpacePressed = false;
     this.frozenSpaceDelta = null;
+    this.frozenStarBounds = null;
     this.lastMovePt = snappedPt;
     this.lastModifiers = { shiftKey: e.shiftKey, ctrlKey: e.ctrlKey, altKey: e.altKey };
     return ActionIntentFactory.begin('shape.create', { startPoint: snappedPt, tool: activeTool });
@@ -105,6 +116,37 @@ export class ShapeToolHandler implements IToolHandler {
     const activeTool = this.ctx.getActiveTool();
     if (!this.toolTypes.includes(activeTool)) return;
 
+    if (activeTool === 'star') {
+      if (ctrlKey) {
+        if (!this.frozenStarBounds) {
+          this.frozenStarBounds = this.calculateShapeBounds(
+            this.shapeStartPt,
+            this.lastMovePt,
+            shiftKey,
+            false,
+            altKey
+          );
+        }
+        const maxRadius = Math.max(this.frozenStarBounds.rx, this.frozenStarBounds.ry, 2);
+        const dist = Math.hypot(this.lastMovePt.x - this.frozenStarBounds.cx, this.lastMovePt.y - this.frozenStarBounds.cy);
+        const computedRatio = Math.max(0.05, Math.min(0.95, dist / maxRadius));
+        const roundedRatio = Math.round(computedRatio * 100) / 100;
+        if (!this.ctx.canvasMgr.shapeConfig) {
+          this.ctx.canvasMgr.shapeConfig = {
+            aspectRatioW: 4,
+            aspectRatioH: 3,
+            starPoints: 5,
+            starInnerRatio: 0.4,
+            rectCornerRadius: 0,
+            polygonSides: 5,
+          };
+        }
+        this.ctx.canvasMgr.shapeConfig.starInnerRatio = roundedRatio;
+      } else {
+        this.frozenStarBounds = null;
+      }
+    }
+
     let currentPt = this.lastMovePt;
     if (activeTool === 'line' && shiftKey) {
       const dx = currentPt.x - this.shapeStartPt.x;
@@ -125,7 +167,8 @@ export class ShapeToolHandler implements IToolHandler {
       'ghost_shape_preview',
       shiftKey,
       ctrlKey,
-      altKey
+      altKey,
+      this.frozenStarBounds || undefined
     );
   }
 
@@ -172,6 +215,38 @@ export class ShapeToolHandler implements IToolHandler {
       };
     }
 
+    // 09.1 & 10.3: Ctrl en creación de estrella - fija el radio exterior y ajusta interactivamente el radio interior
+    if (activeTool === 'star') {
+      if (e.ctrlKey) {
+        if (!this.frozenStarBounds) {
+          this.frozenStarBounds = this.calculateShapeBounds(
+            this.shapeStartPt,
+            this.lastMovePt,
+            e.shiftKey,
+            false,
+            e.altKey
+          );
+        }
+        const maxRadius = Math.max(this.frozenStarBounds.rx, this.frozenStarBounds.ry, 2);
+        const dist = Math.hypot(currentPt.x - this.frozenStarBounds.cx, currentPt.y - this.frozenStarBounds.cy);
+        const computedRatio = Math.max(0.05, Math.min(0.95, dist / maxRadius));
+        const roundedRatio = Math.round(computedRatio * 100) / 100;
+        if (!this.ctx.canvasMgr.shapeConfig) {
+          this.ctx.canvasMgr.shapeConfig = {
+            aspectRatioW: 4,
+            aspectRatioH: 3,
+            starPoints: 5,
+            starInnerRatio: 0.4,
+            rectCornerRadius: 0,
+            polygonSides: 5,
+          };
+        }
+        this.ctx.canvasMgr.shapeConfig.starInnerRatio = roundedRatio;
+      } else {
+        this.frozenStarBounds = null;
+      }
+    }
+
     this.ghostShapeElement = this.createShapeElement(
       activeTool,
       this.shapeStartPt,
@@ -179,7 +254,8 @@ export class ShapeToolHandler implements IToolHandler {
       'ghost_shape_preview',
       e.shiftKey,
       e.ctrlKey,
-      e.altKey
+      e.altKey,
+      this.frozenStarBounds || undefined
     );
 
     return ActionIntentFactory.preview('shape.preview', { ghost: this.ghostShapeElement });
@@ -249,6 +325,7 @@ export class ShapeToolHandler implements IToolHandler {
     this.ghostShapeElement = null;
     this.isSpacePressed = false;
     this.frozenSpaceDelta = null;
+    this.frozenStarBounds = null;
     this.lastMovePt = null;
     this.ctx.renderOverlay();
     return true;
@@ -305,7 +382,8 @@ export class ShapeToolHandler implements IToolHandler {
           'ghost_shape_preview',
           this.lastModifiers.shiftKey,
           this.lastModifiers.ctrlKey,
-          this.lastModifiers.altKey
+          this.lastModifiers.altKey,
+          this.frozenStarBounds || undefined
         );
         this.ctx.renderOverlay();
         return true;
@@ -338,6 +416,7 @@ export class ShapeToolHandler implements IToolHandler {
       this.ghostShapeElement = null;
       this.isSpacePressed = false;
       this.frozenSpaceDelta = null;
+      this.frozenStarBounds = null;
       this.lastMovePt = null;
       this.ctx.renderOverlay();
       return true;
@@ -489,7 +568,8 @@ export class ShapeToolHandler implements IToolHandler {
     id: string,
     shiftKey: boolean = false,
     ctrlKey: boolean = false,
-    altKey: boolean = false
+    altKey: boolean = false,
+    overrideBounds?: { x: number; y: number; w: number; h: number; cx: number; cy: number; rx: number; ry: number }
   ): VectorElement {
     // 1. Direct SVG Native Line Creation
     if (tool === 'line') {
@@ -530,9 +610,9 @@ export class ShapeToolHandler implements IToolHandler {
     const isClosed = true;
     let vertices: PathVertex[] = [];
 
-    // Circle tool intrinsically enforces 1:1 aspect ratio constraint
-    const effectiveCtrl = tool === 'circle' ? true : ctrlKey;
-    const bounds = this.calculateShapeBounds(start, current, shiftKey, effectiveCtrl, altKey);
+    // Circle tool intrinsically enforces 1:1 aspect ratio constraint. Star tool uses Ctrl for inner ratio modulation.
+    const effectiveCtrl = tool === 'circle' ? true : (tool === 'star' ? false : ctrlKey);
+    const bounds = overrideBounds || this.calculateShapeBounds(start, current, shiftKey, effectiveCtrl, altKey);
 
     if (tool === 'rect') {
       vertices = this.ctx.model.convertShapeToVertices('rect', {

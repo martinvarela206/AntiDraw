@@ -49,8 +49,9 @@ async function main() {
   const ok16 = await runSuite(path.join(__dirname, 'test-rect-autopromote.ts'), 'runRectAutoPromoteTests');
   const ok17 = await runSuite(path.join(__dirname, 'test-ellipse-autopromote.ts'), 'runEllipseAutoPromoteTests');
   const ok18 = await runSuite(path.join(__dirname, 'test-shape-keyboard-sides.ts'), 'runShapeKeyboardSidesTests');
+  const ok19 = await runSuite(path.join(__dirname, 'test-star-inner-ratio-ctrl.ts'), 'runStarInnerRatioCtrlTests');
 
-  const allSuccess = ok1 && ok2 && ok3 && ok4 && ok5 && ok6 && ok7 && ok8 && ok9 && ok10 && ok11 && ok12 && ok13 && ok14 && ok15 && ok16 && ok17 && ok18;
+  const allSuccess = ok1 && ok2 && ok3 && ok4 && ok5 && ok6 && ok7 && ok8 && ok9 && ok10 && ok11 && ok12 && ok13 && ok14 && ok15 && ok16 && ok17 && ok18 && ok19;
   process.exit(allSuccess ? 0 : 1);
 }
 
