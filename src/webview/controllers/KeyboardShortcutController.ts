@@ -96,6 +96,11 @@ export class KeyboardShortcutController {
       }
     }
 
+    if (this.ctx.toolbar.activeTool === 'node' && this.ctx.nodeToolHandler.onKeyDown(e)) {
+      e.preventDefault();
+      return;
+    }
+
     if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'SELECT') return;
 
     // Single-key Tool Switches & Selection Mode Shortcuts (when not holding Ctrl/Meta)

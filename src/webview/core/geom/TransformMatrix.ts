@@ -89,6 +89,21 @@ export class AffineMatrix {
   }
 
   /**
+   * Crea una matriz de inclinación o sesgo (shear/skew) en radianes en los ejes X e Y alrededor del origen (o center).
+   */
+  public static skew(skewXRad: number, skewYRad: number, center?: Point): AffineMatrix {
+    const tanX = Math.tan(skewXRad);
+    const tanY = Math.tan(skewYRad);
+    const skewMat = new AffineMatrix(1, tanY, tanX, 1, 0, 0);
+    if (!center || (center.x === 0 && center.y === 0)) {
+      return skewMat;
+    }
+    return AffineMatrix.translation(center.x, center.y)
+      .multiply(skewMat)
+      .multiply(AffineMatrix.translation(-center.x, -center.y));
+  }
+
+  /**
    * Multiplica esta matriz por otra (this * other).
    */
   public multiply(other: AffineMatrix): AffineMatrix {

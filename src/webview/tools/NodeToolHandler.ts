@@ -5,11 +5,13 @@ import { NodeEditorTool } from '../engine/NodeEditorTool.js';
 import { ParametricHandleController } from './node/ParametricHandleController.js';
 import { NodeMarqueeSelector } from './node/NodeMarqueeSelector.js';
 import { NodeOverlayBuilder } from './node/NodeOverlayBuilder.js';
+import { NodeSubgroupTransformController } from './node/NodeSubgroupTransformController.js';
 import { OverlayDescriptor } from '../engine/canvas/OverlayDescriptor.js';
 
 export interface NodeToolCallbacks {
   onNodeSelected?: (vertex: PathVertex, element: VectorElement, selectedCount?: number) => void;
   onDeselectNode?: () => void;
+  setCursor?: (cursor: string) => void;
 }
 
 /**
@@ -42,6 +44,7 @@ export class NodeToolHandler implements IToolHandler {
   public readonly parametricController: ParametricHandleController;
   public readonly marqueeSelector: NodeMarqueeSelector;
   public readonly overlayBuilder: NodeOverlayBuilder;
+  public readonly subgroupController: NodeSubgroupTransformController;
 
   public ghostNodeVertices: PathVertex[] | null = null;
   public activeHandle:
@@ -100,6 +103,7 @@ export class NodeToolHandler implements IToolHandler {
     this.parametricController = new ParametricHandleController(ctx);
     this.marqueeSelector = new NodeMarqueeSelector();
     this.overlayBuilder = new NodeOverlayBuilder(ctx, nodeEditorTool);
+    this.subgroupController = new NodeSubgroupTransformController();
     // Unify single source of truth for selected vertex IDs
     this.nodeEditorTool.selectedVertexIds = this.marqueeSelector.selectedVertexIds;
   }
@@ -304,6 +308,43 @@ export class NodeToolHandler implements IToolHandler {
 
       const isClosed = this.isElementClosed(selectedEl);
 
+      // 0.5 Check if clicking on Subgroup Transformation handles or Mini-HUD for N >= 2 selected nodes
+      if (this.marqueeSelector.selectedVertexIds.size >= 2 && !this.ctx.model.isEllipse(selectedEl)) {
+        const subHit = this.subgroupController.hitTest(
+          selectedEl,
+          this.marqueeSelector.selectedVertexIds,
+          pt,
+          z
+        );
+        if (subHit) {
+          if (subHit.type === 'hud' && subHit.hudMode) {
+            this.subgroupController.setMode(subHit.hudMode);
+            this.callbacks.setCursor?.('default');
+            this.ctx.renderOverlay();
+            return true;
+          }
+          if (subHit.type === 'handle' && subHit.handle) {
+            // Prioritize direct click on an anchor vertex if cursor is immediately over one
+            const directVertexHit = this.nodeEditorTool.hitTestVertices(selectedEl.vertices, pt, 8 / z);
+            if (!directVertexHit) {
+              this.activeHandle = ('subgroup-' + subHit.handle) as any;
+              this.dragStartPt = { x: pt.x, y: pt.y };
+              this.initialVertices = JSON.parse(JSON.stringify(selectedEl.vertices));
+              this.subgroupController.startTransform(
+                subHit.handle,
+                pt,
+                selectedEl.vertices,
+                this.marqueeSelector.selectedVertexIds
+              );
+              this.ghostNodeVertices = null;
+              this.isDragging = true;
+              this.ctx.renderOverlay();
+              return true;
+            }
+          }
+        }
+      }
+
       // 1. Check if clicking on an existing vertex or Bézier handle
       /**
        * ARCHITECTURAL RATIONALE: Parametric Ellipse & Donut Vertex Immutability (FIX-08)
@@ -499,6 +540,21 @@ export class NodeToolHandler implements IToolHandler {
         }
       }
 
+      if (this.activeHandle && (this.activeHandle as string).startsWith('subgroup-')) {
+        const transformed = this.subgroupController.updateTransform(
+          pt,
+          isShift,
+          isCtrl,
+          e.altKey,
+          this.marqueeSelector.selectedVertexIds
+        );
+        if (transformed) {
+          this.ghostNodeVertices = transformed;
+          this.ctx.renderOverlay();
+          return true;
+        }
+      }
+
       if (this.activeHandle === 'vertex' && this.nodeEditorTool.selectedVertexId) {
         const otherVertices = this.ctx.getOtherVertices([selectedEl.id]);
         if (selectedEl.vertices) {
@@ -676,6 +732,25 @@ export class NodeToolHandler implements IToolHandler {
       }
     }
 
+    if (!this.isDragging) {
+      const selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
+      if (selectedEl && this.marqueeSelector.selectedVertexIds.size >= 2) {
+        const z = this.ctx.canvasMgr.zoom || 1;
+        const hoverCursor = this.subgroupController.getHoverCursor(
+          selectedEl,
+          this.marqueeSelector.selectedVertexIds,
+          pt,
+          z
+        );
+        if (hoverCursor) {
+          this.callbacks.setCursor?.(hoverCursor);
+          return true;
+        } else {
+          this.callbacks.setCursor?.('default');
+        }
+      }
+    }
+
     return false;
   }
 
@@ -683,6 +758,10 @@ export class NodeToolHandler implements IToolHandler {
     if (this.isDragging) {
       this.isDragging = false;
       const selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
+
+      if (this.activeHandle && (this.activeHandle as string).startsWith('subgroup-')) {
+        this.subgroupController.finishTransform();
+      }
 
       /**
        * ARCHITECTURAL RATIONALE: Multi-Selection Narrowing on Click
@@ -871,6 +950,23 @@ export class NodeToolHandler implements IToolHandler {
   }
 
   public onKeyDown(e: KeyboardEvent): boolean {
+    if (this.marqueeSelector.selectedVertexIds.size >= 2) {
+      if (e.key === 'w' || e.key === 'W') {
+        this.subgroupController.setMode('move');
+        this.ctx.renderOverlay();
+        return true;
+      }
+      if (e.key === 'e' || e.key === 'E') {
+        this.subgroupController.setMode('rotate');
+        this.ctx.renderOverlay();
+        return true;
+      }
+      if (e.key === 'r' || e.key === 'R') {
+        this.subgroupController.setMode('scale');
+        this.ctx.renderOverlay();
+        return true;
+      }
+    }
     if (e.key === 'Escape') {
       return this.cancel();
     }
@@ -1181,6 +1277,26 @@ export class NodeToolHandler implements IToolHandler {
       const multiSelectedHtml = this.overlayBuilder.renderMultiSelectedVertices(selectedEls[0], this.marqueeSelector, z);
       if (multiSelectedHtml) {
         descriptors.push({ type: 'raw', html: multiSelectedHtml });
+      }
+    }
+
+    // 7. Micro-Bounding Box and Subgroup Transform Overlay for N >= 2 Selected Nodes
+    if (
+      selectedEls.length === 1 &&
+      this.marqueeSelector.selectedVertexIds.size >= 2 &&
+      this.ctx.getActiveTool() === 'node'
+    ) {
+      const activeEl = this.ghostNodeVertices
+        ? { ...selectedEls[0], vertices: this.ghostNodeVertices }
+        : selectedEls[0];
+      const subgroupHtml = this.subgroupController.renderOverlay(
+        activeEl,
+        this.marqueeSelector.selectedVertexIds,
+        z,
+        this.activeHandle
+      );
+      if (subgroupHtml) {
+        descriptors.push({ type: 'raw', html: subgroupHtml });
       }
     }
 

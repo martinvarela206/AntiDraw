@@ -122,6 +122,7 @@ export class ToolFactory {
           cnt
         ),
       onDeselectNode: () => ctx.getPropertyPanel()?.resetPanelMode(),
+      setCursor: (cursor) => ctx.getCanvasView()?.setCursor(cursor),
     });
 
     const session = new Session(
