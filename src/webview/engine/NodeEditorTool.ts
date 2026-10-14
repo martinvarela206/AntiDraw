@@ -319,6 +319,123 @@ export class NodeEditorTool {
   }
 
   /**
+   * ARCHITECTURAL RATIONALE: Coincident Vertex Welding & Zero-Length Segment Elimination (Join - Ctrl+J)
+   *
+   * 1. Elimination of Spurious Zero-Length Segments:
+   *    Boolean operations, knife slicing, and manual vertex alignment often leave degenerate,
+   *    coincident vertices (distance <= epsilon). Standard rendering engines may produce artifacts
+   *    or divide-by-zero tangents on zero-length segments.
+   *    `fuseCoincidentVertices` merges coincident selected nodes into a single unified anchor vertex,
+   *    averaging their positions and welding their incoming (handleIn) and outgoing (handleOut) tangents.
+   *
+   * 2. Topological Seam Closure:
+   *    If the first vertex (index 0) and the terminal vertex (index n - 1) of an open path are selected
+   *    and coincident within tolerance, the duplicate terminal vertex is pruned and the path is promoted
+   *    to a closed contour (isClosed = true) without creating an overlapping vertex seam.
+   *
+   * 3. Tolerance Window:
+   *    Uses Euclidean distance <= epsilon (default 2.0px) for robust magnetic node fusion.
+   */
+  public fuseCoincidentVertices(
+    vertices: PathVertex[],
+    selectedIds: Set<string>,
+    epsilon: number = 2.0,
+    isClosed: boolean = false
+  ): { updatedVertices: PathVertex[]; fusedCount: number; isClosed: boolean } {
+    if (!vertices || vertices.length < 2) {
+      return { updatedVertices: vertices || [], fusedCount: 0, isClosed };
+    }
+
+    let updated = vertices.map((v) => ({ ...v }));
+    let fusedCount = 0;
+    let closed = isClosed;
+
+    // 1. Check open path terminal endpoints (first and last vertex)
+    if (!closed && updated.length >= 2) {
+      const firstV = updated[0];
+      const lastV = updated[updated.length - 1];
+      const bothSelected = selectedIds.has(firstV.id) && selectedIds.has(lastV.id);
+
+      if (bothSelected) {
+        const dEnds = Math.hypot(lastV.x - firstV.x, lastV.y - firstV.y);
+        if (dEnds <= epsilon) {
+          // Coincident terminal endpoints: weld into a single unified vertex at index 0
+          const mx = (firstV.x + lastV.x) / 2;
+          const my = (firstV.y + lastV.y) / 2;
+
+          // Tangents: handleIn from lastV (incoming to the weld), handleOut from firstV (outgoing from the weld)
+          const hIn = lastV.handleIn ? { x: lastV.handleIn.x + (mx - lastV.x), y: lastV.handleIn.y + (my - lastV.y) } : undefined;
+          const hOut = firstV.handleOut ? { x: firstV.handleOut.x + (mx - firstV.x), y: firstV.handleOut.y + (my - firstV.y) } : undefined;
+
+          firstV.x = mx;
+          firstV.y = my;
+          firstV.handleIn = hIn;
+          firstV.handleOut = hOut;
+          if (firstV.nodeType === 'sharp' && (hIn || hOut)) {
+            firstV.nodeType = 'smooth';
+          }
+
+          updated.pop();
+          closed = true;
+          fusedCount++;
+        } else if (selectedIds.size === 2) {
+          // Exactly the two endpoints selected on open path, but distance > epsilon:
+          // Join the endpoints by closing the path
+          closed = true;
+          fusedCount++;
+        }
+      }
+    }
+
+    // 2. Iterate to fuse adjacent consecutive coincident vertices in selectedIds
+    let hasMerged = true;
+    while (hasMerged && updated.length >= 2) {
+      hasMerged = false;
+      const limit = closed ? updated.length : updated.length - 1;
+
+      for (let i = 0; i < limit; i++) {
+        const vA = updated[i];
+        const nextIdx = (i + 1) % updated.length;
+        const vB = updated[nextIdx];
+
+        if (selectedIds.has(vA.id) && selectedIds.has(vB.id)) {
+          const d = Math.hypot(vB.x - vA.x, vB.y - vA.y);
+          if (d <= epsilon) {
+            // Weld vA and vB into a single vertex
+            const mx = (vA.x + vB.x) / 2;
+            const my = (vA.y + vB.y) / 2;
+
+            const hIn = vA.handleIn ? { x: vA.handleIn.x + (mx - vA.x), y: vA.handleIn.y + (my - vA.y) } : undefined;
+            const hOut = vB.handleOut ? { x: vB.handleOut.x + (mx - vB.x), y: vB.handleOut.y + (my - vB.y) } : undefined;
+
+            vA.x = mx;
+            vA.y = my;
+            vA.handleIn = hIn;
+            vA.handleOut = hOut;
+            if (vA.nodeType === 'sharp' && (hIn || hOut)) {
+              vA.nodeType = vB.nodeType === 'smooth' ? 'smooth' : 'asymmetric';
+            }
+
+            // Remove vB
+            if (nextIdx === 0) {
+              // Wrap-around in closed path (last merged with first)
+              updated.splice(updated.length - 1, 1);
+            } else {
+              updated.splice(nextIdx, 1);
+            }
+
+            fusedCount++;
+            hasMerged = true;
+            break; // Restart loop to handle updated indices cleanly
+          }
+        }
+      }
+    }
+
+    return { updatedVertices: updated, fusedCount, isClosed: closed };
+  }
+
+  /**
    * ARCHITECTURAL RATIONALE: Topological Endpoint Auto-Fusion (FIX-03)
    * Why this solution is engineered this way:
    * 1. Scope Restriction (isFreeEndpoint): Auto-fusion is strictly limited to the first (index 0)

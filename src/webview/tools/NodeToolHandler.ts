@@ -967,6 +967,10 @@ export class NodeToolHandler implements IToolHandler {
         return true;
       }
     }
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'j' || e.key === 'J')) {
+      e.preventDefault();
+      return this.handleJoinSelectedNodes();
+    }
     if (e.key === 'Escape') {
       return this.cancel();
     }
@@ -1103,6 +1107,95 @@ export class NodeToolHandler implements IToolHandler {
     }
     this.ctx.render();
     this.ctx.syncToHost();
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Coincident Node Join & Welding (Ctrl+J)
+   *
+   * 1. Multi-Node Welding:
+   *    Fuses coincident selected vertices (Delta x, Delta y <= epsilon = 2px) into a single unified
+   *    anchor node, welding their incoming (handleIn) and outgoing (handleOut) tangents and eliminating
+   *    spurious zero-length segments.
+   *
+   * 2. Path Closure on Coincident Endpoints:
+   *    If the first and last vertices of an open path are selected and coincident, welds them together
+   *    at their midpoint and sets isClosed = true without creating an overlapping seam vertex.
+   */
+  public handleJoinSelectedNodes(): boolean {
+    const selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
+    if (!selectedEl || !selectedEl.vertices || selectedEl.vertices.length < 2) return false;
+
+    // Convert parametric primitives to curves before modifying topology
+    if (this.ctx.model.isParametricElement(selectedEl)) {
+      this.ctx.pushUndo();
+      this.ctx.model.convertToCurves(selectedEl);
+    }
+
+    const selectedIds = new Set(this.marqueeSelector.selectedVertexIds);
+    if (this.nodeEditorTool.selectedVertexId) {
+      selectedIds.add(this.nodeEditorTool.selectedVertexId);
+    }
+
+    if (selectedIds.size < 2) {
+      // If fewer than 2 vertices are selected, check if open path has coincident endpoints
+      const isClosed = this.isElementClosed(selectedEl);
+      if (!isClosed && selectedEl.vertices.length >= 2) {
+        const first = selectedEl.vertices[0];
+        const last = selectedEl.vertices[selectedEl.vertices.length - 1];
+        if (Math.hypot(last.x - first.x, last.y - first.y) <= 8.0) {
+          selectedIds.add(first.id);
+          selectedIds.add(last.id);
+        } else {
+          return false;
+        }
+      } else {
+        return false;
+      }
+    }
+
+    const wasClosed = this.isElementClosed(selectedEl);
+    const result = this.nodeEditorTool.fuseCoincidentVertices(
+      selectedEl.vertices,
+      selectedIds,
+      3.0,
+      wasClosed
+    );
+
+    if (result.fusedCount > 0) {
+      this.ctx.pushUndo();
+      selectedEl.vertices = result.updatedVertices;
+      selectedEl.isClosed = result.isClosed;
+      selectedEl.attributes.d = this.ctx.model.compilePathD(selectedEl.vertices, selectedEl.isClosed);
+      selectedEl.attributes['data-node-types'] = selectedEl.vertices.map((v) => v.nodeType).join(',');
+      if (selectedEl.isClosed && (!selectedEl.attributes.fill || selectedEl.attributes.fill === 'none')) {
+        selectedEl.attributes.fill = '#6366f1';
+      }
+
+      // Prune any deleted vertex IDs from active selection
+      const remainingIds = new Set(selectedEl.vertices.map((v) => v.id));
+      for (const id of Array.from(this.marqueeSelector.selectedVertexIds)) {
+        if (!remainingIds.has(id)) {
+          this.marqueeSelector.deselectVertex(id);
+        }
+      }
+      if (this.nodeEditorTool.selectedVertexId && !remainingIds.has(this.nodeEditorTool.selectedVertexId)) {
+        const remainingArr = Array.from(this.marqueeSelector.selectedVertexIds);
+        this.nodeEditorTool.selectedVertexId = remainingArr.length > 0 ? remainingArr[0] : null;
+      }
+
+      if (this.callbacks.onNodeSelected && this.nodeEditorTool.selectedVertexId) {
+        const v = selectedEl.vertices.find((vert) => vert.id === this.nodeEditorTool.selectedVertexId);
+        if (v) this.callbacks.onNodeSelected(v, selectedEl, this.marqueeSelector.selectedVertexIds.size);
+      } else if (this.callbacks.onDeselectNode) {
+        this.callbacks.onDeselectNode();
+      }
+
+      this.ctx.render();
+      this.ctx.syncToHost();
+      return true;
+    }
+
+    return false;
   }
 
   public async handleNodeTypeChange(type: NodeType): Promise<void> {

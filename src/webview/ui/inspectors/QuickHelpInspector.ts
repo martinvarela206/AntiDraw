@@ -86,6 +86,8 @@ export class QuickHelpInspector {
         { keys: ['Alt', 'Arrastre en vacío'], description: 'Selección de nodos por área en modo toque/intersección' },
         { keys: ['Doble clic en segmento'], description: 'Inserta un nuevo vértice en el punto exacto de la curva' },
         { keys: ['Doble clic en nodo'], description: 'Alterna el tipo de nodo (asimétrico ↔ uniforme ↔ simétrico)' },
+        { keys: ['Ctrl', 'J'], description: 'Une y suelda vértices seleccionados coincidentes eliminando segmentos espurios' },
+        { keys: ['W / R / E'], description: 'Alterna micro-Bounding Box entre Mover, Escalar y Rotar (subselección N ≥ 2)' },
         { keys: ['Supr / Backspace'], description: 'Elimina los nodos seleccionados preservando el trazo' },
       ],
     },

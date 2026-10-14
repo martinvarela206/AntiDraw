@@ -88,11 +88,15 @@ export class NodeInspector {
           ` : `
             <div style="font-size:11px; color:var(--text-muted); text-align:center; padding: 3px 0;">✓ Contorno cerrado (Z)</div>
           `}
-          ${!isMulti ? `
+          ${isMulti ? `
+          <button class="prop-input" id="btn-join-nodes" style="cursor:${isParametric ? 'not-allowed' : 'pointer'}; background:var(--bg-active); text-align:center; font-weight:600; color:var(--text-primary); ${isParametric ? 'opacity: 0.35; filter: grayscale(1); pointer-events: none;' : ''}" ${isParametric ? 'disabled' : ''} title="${isParametric ? 'Requiere convertir a curvas de Bézier' : 'Unir y soldar vértices coincidentes (Ctrl+J)'}">
+            ⛙ Unir Nodos (Ctrl+J)
+          </button>
+          ` : `
           <button class="prop-input" id="btn-split-node" style="cursor:${isParametric ? 'not-allowed' : 'pointer'}; background:var(--bg-active); text-align:center; ${isParametric ? 'opacity: 0.35; filter: grayscale(1); pointer-events: none;' : ''}" ${isParametric ? 'disabled' : ''} title="${isParametric ? 'Requiere convertir a curvas de Bézier' : 'Split Node into 2 Vertices'}">
             ${ToolIcons.splitNode} Split Node into 2 Vertices
           </button>
-          ` : ''}
+          `}
         </div>
       </div>
       <div class="panel-section">
@@ -131,6 +135,9 @@ export class NodeInspector {
       if (callbacks.onClosePath) callbacks.onClosePath();
     });
     bindInspectorMouseDown(container, 'btn-split-node', () => callbacks.onSplitNode());
+    bindInspectorMouseDown(container, 'btn-join-nodes', () => {
+      if (callbacks.onJoinNodes) callbacks.onJoinNodes();
+    });
     bindInspectorMouseDown(container, 'btn-segment-to-line', () => {
       if (callbacks.onConvertSegmentToLine) callbacks.onConvertSegmentToLine();
     });

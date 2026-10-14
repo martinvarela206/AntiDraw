@@ -60,6 +60,7 @@ export class PropertyPanelActionController {
       onNodeTypeChange: (type: NodeType) => tools.nodeToolHandler.handleNodeTypeChange(type),
       onSplitNode: () => tools.nodeToolHandler.handleSplitNode(),
       onClosePath: () => tools.nodeToolHandler.handleCloseOpenPath(),
+      onJoinNodes: () => tools.nodeToolHandler.handleJoinSelectedNodes(),
       onConvertSegmentToLine: () => tools.nodeToolHandler.handleConvertSegmentToLine(),
       onConvertSegmentToCurve: () => tools.nodeToolHandler.handleConvertSegmentToCurve(),
       onPenNodeTypeChange: (nodeType: NodeType) => {

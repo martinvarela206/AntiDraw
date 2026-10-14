@@ -9,6 +9,7 @@ export interface PropertyPanelCallbacks {
   onNodeTypeChange: (nodeType: NodeType) => void;
   onSplitNode: () => void;
   onClosePath?: () => void;
+  onJoinNodes?: () => void;
   onConvertSegmentToLine?: () => void;
   onConvertSegmentToCurve?: () => void;
   onPenNodeTypeChange?: (nodeType: NodeType) => void;

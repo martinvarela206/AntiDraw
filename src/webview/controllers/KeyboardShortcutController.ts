@@ -173,6 +173,18 @@ export class KeyboardShortcutController {
       }
     }
 
+    if (isCtrl && (e.key === 'j' || e.key === 'J')) {
+      if (cmdRegistry.has('node.join') && cmdRegistry.isEnabled('node.join')) {
+        e.preventDefault();
+        cmdRegistry.execute('node.join');
+        return;
+      } else if (this.ctx.toolbar.activeTool === 'node') {
+        e.preventDefault();
+        this.ctx.nodeToolHandler.handleJoinSelectedNodes();
+        return;
+      }
+    }
+
     if (isCtrl && (e.key === 'q' || e.key === 'Q')) {
       if (cmdRegistry.has('object.convertToCurves') && cmdRegistry.isEnabled('object.convertToCurves')) {
         e.preventDefault();

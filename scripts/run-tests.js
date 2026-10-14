@@ -45,8 +45,9 @@ async function main() {
   const ok12 = await runSuite(path.join(__dirname, 'test-multi-candidate-snapping.ts'), 'runMultiCandidateSnappingTests');
   const ok13 = await runSuite(path.join(__dirname, 'test-universal-intersections.ts'), 'runUniversalIntersectionsTests');
   const ok14 = await runSuite(path.join(__dirname, 'test-node-subgroup-transform.ts'), 'runNodeSubgroupTransformTests');
+  const ok15 = await runSuite(path.join(__dirname, 'test-node-join-fusion.ts'), 'runNodeJoinFusionTests');
 
-  const allSuccess = ok1 && ok2 && ok3 && ok4 && ok5 && ok6 && ok7 && ok8 && ok9 && ok10 && ok11 && ok12 && ok13 && ok14;
+  const allSuccess = ok1 && ok2 && ok3 && ok4 && ok5 && ok6 && ok7 && ok8 && ok9 && ok10 && ok11 && ok12 && ok13 && ok14 && ok15;
   process.exit(allSuccess ? 0 : 1);
 }
 
