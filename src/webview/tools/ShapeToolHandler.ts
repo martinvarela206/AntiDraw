@@ -272,6 +272,45 @@ export class ShapeToolHandler implements IToolHandler {
         return true;
       }
     }
+    const activeTool = this.ctx.getActiveTool();
+    if (this.shapeStartPt && (activeTool === 'polygon' || activeTool === 'star')) {
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        const delta = e.key === 'ArrowUp' ? 1 : -1;
+        if (!this.ctx.canvasMgr.shapeConfig) {
+          this.ctx.canvasMgr.shapeConfig = {
+            aspectRatioW: 4,
+            aspectRatioH: 3,
+            starPoints: 5,
+            starInnerRatio: 0.4,
+            rectCornerRadius: 0,
+            polygonSides: 5,
+          };
+        }
+
+        if (activeTool === 'polygon') {
+          const currentSides = this.ctx.canvasMgr.shapeConfig.polygonSides || 5;
+          const nextSides = Math.max(3, Math.min(64, currentSides + delta));
+          this.ctx.canvasMgr.shapeConfig.polygonSides = nextSides;
+        } else if (activeTool === 'star') {
+          const currentPoints = this.ctx.canvasMgr.shapeConfig.starPoints || 5;
+          const nextPoints = Math.max(3, Math.min(64, currentPoints + delta));
+          this.ctx.canvasMgr.shapeConfig.starPoints = nextPoints;
+        }
+
+        const currentPt = this.lastMovePt || this.shapeStartPt;
+        this.ghostShapeElement = this.createShapeElement(
+          activeTool,
+          this.shapeStartPt,
+          currentPt,
+          'ghost_shape_preview',
+          this.lastModifiers.shiftKey,
+          this.lastModifiers.ctrlKey,
+          this.lastModifiers.altKey
+        );
+        this.ctx.renderOverlay();
+        return true;
+      }
+    }
     return false;
   }
 
