@@ -11,6 +11,8 @@ export interface SnapResult {
   y: number;
   kind: SnapKind;
   targetPt?: Point;
+  xSnapped?: boolean;
+  ySnapped?: boolean;
 }
 
 export interface SnappingContext {
@@ -647,6 +649,8 @@ export class SnappingEngine {
           y: Math.round(snappedY * 100) / 100,
           kind: detectedKind,
           targetPt: targetPt ? { x: Math.round(targetPt.x * 100) / 100, y: Math.round(targetPt.y * 100) / 100 } : undefined,
+          xSnapped,
+          ySnapped,
         }
       : null;
 

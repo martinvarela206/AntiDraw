@@ -3,7 +3,7 @@ import { VectorElement, PathVertex, Point } from '../../engine/VectorModel.js';
 import type { SelectToolCallbacks } from '../SelectToolHandler.js';
 import { NodeCatalogService } from '../../engine/selection/NodeCatalogService.js';
 import { BaseHelper } from '../../engine/canvas/helpers/index.js';
-import { SnappingEngine } from '../../engine/canvas/SnappingEngine.js';
+import { SnappingEngine, SnapResult } from '../../engine/canvas/SnappingEngine.js';
 import { EdgeSnappingService } from '../../engine/canvas/EdgeSnappingService.js';
 import { VectorCloneHelper } from '../../engine/selection/VectorCloneHelper.js';
 
@@ -37,6 +37,9 @@ export class TranslateInteraction {
   public isDuplicateMode: boolean = false;
   public isOrthogonal: boolean = false;
   public isEdgeAnchor: boolean = false;
+  public isMultiCandidate: boolean = false;
+  public candidateLandmarks: Point[] = [];
+  public activeSnapLandmark: Point | null = null;
 
   /**
    * ARCHITECTURAL RATIONALE: Proximity Anchor Detection (FIX-05)
@@ -233,6 +236,63 @@ export class TranslateInteraction {
     return false;
   }
 
+  /**
+   * ARCHITECTURAL RATIONALE: Dynamic Multi-Candidate Landmark Collection (Item 1.1 feat(snap))
+   * Collects all potential geometric landmarks of the selected elements/bounding box:
+   * - 4 Bounding Box Corners (TL, TR, BL, BR)
+   * - 4 Bounding Box Edge Midpoints (TC, BC, LC, RC)
+   * - Centroid / Pivot
+   * - Structural / Positional Nodes of the vector elements
+   * These landmarks are reactively evaluated at 60fps during interior fill drag against the snapping environment.
+   */
+  public collectSelectionLandmarks(
+    ctx: ToolContext,
+    selectedEls: VectorElement[],
+    groupBox: any
+  ): Point[] {
+    const pts: Point[] = [];
+
+    if (groupBox) {
+      const singleEl = selectedEls.length === 1 ? selectedEls[0] : undefined;
+      const pivot = ctx.selectionTool.getPivot(groupBox, singleEl);
+
+      // Centroid / Pivot
+      pts.push({ x: pivot.x, y: pivot.y });
+
+      // 4 Bounding Box Corners
+      pts.push({ x: groupBox.x, y: groupBox.y });
+      pts.push({ x: groupBox.x + groupBox.width, y: groupBox.y });
+      pts.push({ x: groupBox.x, y: groupBox.y + groupBox.height });
+      pts.push({ x: groupBox.x + groupBox.width, y: groupBox.y + groupBox.height });
+
+      // 4 Bounding Box Edge Midpoints
+      pts.push({ x: groupBox.x + groupBox.width / 2, y: groupBox.y });
+      pts.push({ x: groupBox.x + groupBox.width / 2, y: groupBox.y + groupBox.height });
+      pts.push({ x: groupBox.x, y: groupBox.y + groupBox.height / 2 });
+      pts.push({ x: groupBox.x + groupBox.width, y: groupBox.y + groupBox.height / 2 });
+    }
+
+    // Structural and positional nodes from selected elements
+    const snappable = NodeCatalogService.collectSnappableNodes(selectedEls, {
+      structural: true,
+      positional: true,
+      handles: false,
+    });
+    for (const sp of snappable) {
+      pts.push({ x: sp.x, y: sp.y });
+    }
+
+    // Deduplicate points within 0.1px
+    const unique: Point[] = [];
+    for (const p of pts) {
+      if (!unique.some((u) => Math.hypot(u.x - p.x, u.y - p.y) < 0.1)) {
+        unique.push(p);
+      }
+    }
+
+    return unique;
+  }
+
   public start(
     ctx: ToolContext,
     pt: Point,
@@ -244,6 +304,8 @@ export class TranslateInteraction {
     this.dragAnchorPt = anchorInfo.point;
     this.isAnchorPicked = anchorInfo.isPickedNode;
     this.isEdgeAnchor = !!anchorInfo.isEdgeAnchor;
+    this.isMultiCandidate = !anchorInfo.isPickedNode;
+    this.activeSnapLandmark = null;
     this.initialElementsMap.clear();
     this.isDuplicateMode = false;
     this.isOrthogonal = false;
@@ -256,6 +318,9 @@ export class TranslateInteraction {
       }
     });
     this.initialBox = groupBox ? { ...groupBox } : null;
+    this.candidateLandmarks = this.isMultiCandidate
+      ? this.collectSelectionLandmarks(ctx, selectedEls, groupBox)
+      : [];
     this.ghostDragOffset = null;
   }
 
@@ -292,34 +357,167 @@ export class TranslateInteraction {
       }
     }
 
-    /**
-     * ARCHITECTURAL RATIONALE: Strict Orthogonal Constraint on Translation (Ctrl / Ctrl+Alt)
-     * When Ctrl is active, movement is projected strictly onto the dominant Cartesian axis (0° or 90°):
-     * - If |dx| >= |dy|, vertical delta is locked to 0. Snapping is performed with target Y fixed to anchor Y,
-     *   and the resulting vertical delta is clamped to 0 to prevent cross-axis jump.
-     * - If |dy| > |dx|, horizontal delta is locked to 0 with equivalent X clamping.
-     */
+    let effDx = dx;
+    let effDy = dy;
     if (this.isOrthogonal) {
       if (Math.abs(dx) >= Math.abs(dy)) {
-        const rawTarget: Point = { x: this.dragAnchorPt.x + dx, y: this.dragAnchorPt.y };
-        const snappedTarget = ctx.snapPoint(rawTarget, otherVertices, undefined, strokeW);
-        this.ghostDragOffset = { x: snappedTarget.x - this.dragAnchorPt.x, y: 0 };
+        effDy = 0;
       } else {
-        const rawTarget: Point = { x: this.dragAnchorPt.x, y: this.dragAnchorPt.y + dy };
-        const snappedTarget = ctx.snapPoint(rawTarget, otherVertices, undefined, strokeW);
-        this.ghostDragOffset = { x: 0, y: snappedTarget.y - this.dragAnchorPt.y };
+        effDx = 0;
       }
+    }
+
+    if (!this.isMultiCandidate) {
+      // Direct Single-Anchor Snapping (user clicked directly on a vertex, handle, box corner or edge)
+      if (this.isOrthogonal) {
+        if (Math.abs(dx) >= Math.abs(dy)) {
+          const rawTarget: Point = { x: this.dragAnchorPt.x + effDx, y: this.dragAnchorPt.y };
+          const snappedTarget = ctx.snapPoint(rawTarget, otherVertices, undefined, strokeW);
+          this.ghostDragOffset = { x: snappedTarget.x - this.dragAnchorPt.x, y: 0 };
+        } else {
+          const rawTarget: Point = { x: this.dragAnchorPt.x, y: this.dragAnchorPt.y + effDy };
+          const snappedTarget = ctx.snapPoint(rawTarget, otherVertices, undefined, strokeW);
+          this.ghostDragOffset = { x: 0, y: snappedTarget.y - this.dragAnchorPt.y };
+        }
+      } else {
+        const rawTarget: Point = { x: this.dragAnchorPt.x + effDx, y: this.dragAnchorPt.y + effDy };
+        const snappedTarget = ctx.snapPoint(rawTarget, otherVertices, undefined, strokeW);
+        this.ghostDragOffset = {
+          x: snappedTarget.x - this.dragAnchorPt.x,
+          y: snappedTarget.y - this.dragAnchorPt.y,
+        };
+      }
+      this.activeSnapLandmark = this.dragAnchorPt;
     } else {
-      const rawTarget: Point = { x: this.dragAnchorPt.x + dx, y: this.dragAnchorPt.y + dy };
-      const snappedTarget = ctx.snapPoint(rawTarget, otherVertices, undefined, strokeW);
-      this.ghostDragOffset = {
-        x: snappedTarget.x - this.dragAnchorPt.x,
-        y: snappedTarget.y - this.dragAnchorPt.y,
-      };
+      // Dynamic Multi-Candidate Snapping from Fill/Interior
+      this.resolveMultiCandidateSnapping(ctx, effDx, effDy, otherVertices, strokeW);
     }
 
     ctx.renderOverlay();
     return true;
+  }
+
+  public resolveMultiCandidateSnapping(
+    ctx: ToolContext,
+    effDx: number,
+    effDy: number,
+    otherVertices: Point[],
+    strokeW?: number
+  ): void {
+    interface CandidateEval {
+      candidate: Point;
+      snapped: Point;
+      snapResult: SnapResult;
+      xSnapped: boolean;
+      ySnapped: boolean;
+      distX: number;
+      distY: number;
+      distTotal: number;
+      is2D: boolean;
+    }
+
+    const evals: CandidateEval[] = [];
+
+    // Evaluate all candidate landmarks against magnetic snap environment
+    for (const cand of this.candidateLandmarks) {
+      const targetPt: Point = { x: cand.x + effDx, y: cand.y + effDy };
+      const snapped = ctx.snapPoint(targetPt, otherVertices, undefined, strokeW);
+      const snapRes = SnappingEngine.lastSnapResult;
+
+      if (snapRes) {
+        let xSnapped = snapRes.xSnapped ?? (snapRes.kind === 'intersection' || snapRes.kind === 'node' || Math.abs(snapped.x - targetPt.x) > 1e-4);
+        let ySnapped = snapRes.ySnapped ?? (snapRes.kind === 'intersection' || snapRes.kind === 'node' || Math.abs(snapped.y - targetPt.y) > 1e-4);
+
+        if (this.isOrthogonal) {
+          if (Math.abs(effDx) >= Math.abs(effDy)) {
+            ySnapped = false;
+          } else {
+            xSnapped = false;
+          }
+        }
+
+        const distX = xSnapped ? Math.abs(snapped.x - targetPt.x) : Infinity;
+        const distY = ySnapped ? Math.abs(snapped.y - targetPt.y) : Infinity;
+        const is2D = xSnapped && ySnapped;
+        const distTotal = is2D ? Math.hypot(distX, distY) : (xSnapped ? distX : distY);
+
+        if (xSnapped || ySnapped) {
+          evals.push({
+            candidate: cand,
+            snapped,
+            snapResult: snapRes,
+            xSnapped,
+            ySnapped,
+            distX,
+            distY,
+            distTotal,
+            is2D,
+          });
+        }
+      }
+    }
+
+    // 1. Check for 2D snaps (both X and Y snap on the SAME landmark)
+    const snaps2D = evals.filter((e) => e.is2D);
+    if (snaps2D.length > 0) {
+      snaps2D.sort((a, b) => a.distTotal - b.distTotal);
+      const winner = snaps2D[0];
+      this.ghostDragOffset = {
+        x: winner.snapped.x - winner.candidate.x,
+        y: winner.snapped.y - winner.candidate.y,
+      };
+      this.activeSnapLandmark = winner.candidate;
+      SnappingEngine.lastSnapResult = winner.snapResult;
+      return;
+    }
+
+    // 2. Check for 1D snaps (one candidate snaps on X, another or same snaps on Y)
+    const xSnaps = evals.filter((e) => e.xSnapped).sort((a, b) => a.distX - b.distX);
+    const ySnaps = evals.filter((e) => e.ySnapped).sort((a, b) => a.distY - b.distY);
+
+    if (xSnaps.length > 0 || ySnaps.length > 0) {
+      let finalOffsetX = effDx;
+      let finalOffsetY = effDy;
+      let winningSnapRes: SnapResult | null = null;
+      let winningLandmark: Point | null = null;
+
+      if (xSnaps.length > 0) {
+        const winX = xSnaps[0];
+        finalOffsetX = winX.snapped.x - winX.candidate.x;
+        winningLandmark = winX.candidate;
+        winningSnapRes = winX.snapResult;
+      }
+      if (ySnaps.length > 0) {
+        const winY = ySnaps[0];
+        finalOffsetY = winY.snapped.y - winY.candidate.y;
+        winningLandmark = winningLandmark || winY.candidate;
+        winningSnapRes = winningSnapRes
+          ? {
+              ...winningSnapRes,
+              y: winY.snapped.y,
+              ySnapped: true,
+              kind: winY.snapResult.kind === 'intersection' ? 'intersection' : winningSnapRes.kind,
+            }
+          : winY.snapResult;
+      }
+
+      this.ghostDragOffset = { x: finalOffsetX, y: finalOffsetY };
+      this.activeSnapLandmark = winningLandmark;
+      SnappingEngine.lastSnapResult = winningSnapRes;
+      return;
+    }
+
+    // 3. Free displacement (no candidate near any magnetic guide/vertex)
+    let freeX = effDx;
+    let freeY = effDy;
+    const snapToPixel = (ctx.canvasMgr as any)?.snapToPixelGrid ?? true;
+    if (snapToPixel) {
+      freeX = Math.round(freeX);
+      freeY = Math.round(freeY);
+    }
+    this.ghostDragOffset = { x: freeX, y: freeY };
+    this.activeSnapLandmark = null;
+    SnappingEngine.lastSnapResult = null;
   }
 
   public onPointerUp(
@@ -457,6 +655,9 @@ export class TranslateInteraction {
     this.initialBox = null;
     this.isDuplicateMode = false;
     this.isOrthogonal = false;
+    this.isMultiCandidate = false;
+    this.candidateLandmarks = [];
+    this.activeSnapLandmark = null;
 
     if (hasChanges) {
       callbacks.onSelectionChanged?.();
@@ -474,6 +675,9 @@ export class TranslateInteraction {
       this.initialBox = null;
       this.isDuplicateMode = false;
       this.isOrthogonal = false;
+      this.isMultiCandidate = false;
+      this.candidateLandmarks = [];
+      this.activeSnapLandmark = null;
       return true;
     }
     return false;
@@ -502,41 +706,56 @@ export class TranslateInteraction {
       }
     });
 
-    // Visual halo for active drag anchor
+    // Visual halo for active drag anchor or dynamically snapped candidate
     const z = ctx.canvasMgr.zoom || 1;
     const inv = BaseHelper.getInverseScale(z);
-    const curAnchorX = this.dragAnchorPt.x + this.ghostDragOffset.x;
-    const curAnchorY = this.dragAnchorPt.y + this.ghostDragOffset.y;
     const isSnapped = SnappingEngine.lastSnapResult !== null;
+    const activePt = this.isAnchorPicked
+      ? this.dragAnchorPt
+      : this.activeSnapLandmark;
 
-    const haloRingR = isSnapped ? 9 : 7;
-    const strokeColor = this.isEdgeAnchor
-      ? (isSnapped ? '#00f0ff' : '#06b6d4')
-      : (isSnapped ? '#00f0ff' : '#38bdf8');
-    const centerColor = this.isEdgeAnchor
-      ? (isSnapped ? '#00f0ff' : '#0891b2')
-      : (isSnapped ? '#00f0ff' : '#0284c7');
+    let anchorHtml = '';
+    if (activePt && (this.isAnchorPicked || isSnapped)) {
+      const curAnchorX = activePt.x + this.ghostDragOffset.x;
+      const curAnchorY = activePt.y + this.ghostDragOffset.y;
+
+      const haloRingR = isSnapped ? 9 : 7;
+      const strokeColor = this.isEdgeAnchor
+        ? (isSnapped ? '#00f0ff' : '#06b6d4')
+        : (isSnapped ? '#00f0ff' : '#38bdf8');
+      const centerColor = this.isEdgeAnchor
+        ? (isSnapped ? '#00f0ff' : '#0891b2')
+        : (isSnapped ? '#00f0ff' : '#0284c7');
+
+      anchorHtml = `
+        <g transform="translate(${curAnchorX}, ${curAnchorY}) scale(${inv})" pointer-events="none">
+          <circle cx="0" cy="0" r="${haloRingR}" fill="none" stroke="${strokeColor}" stroke-width="1.5" stroke-dasharray="3 2" />
+          ${isSnapped ? `<circle cx="0" cy="0" r="13" fill="none" stroke="#00f0ff" stroke-width="1" opacity="0.4" />` : ''}
+          ${this.isEdgeAnchor ? `<rect x="-3" y="-3" width="6" height="6" transform="rotate(45)" fill="${centerColor}" stroke="#ffffff" stroke-width="0.75" />` : `<circle cx="0" cy="0" r="2.5" fill="${centerColor}" />`}
+        </g>
+      `;
+    }
 
     // Duplicate badge indicator when dragging with Alt
     let badgeHtml = '';
     if (this.isDuplicateMode) {
+      const badgeAnchorX = activePt
+        ? activePt.x + this.ghostDragOffset.x
+        : (this.initialBox ? this.initialBox.x + this.ghostDragOffset.x : this.ghostDragOffset.x);
+      const badgeAnchorY = activePt
+        ? activePt.y + this.ghostDragOffset.y
+        : (this.initialBox ? this.initialBox.y + this.ghostDragOffset.y : this.ghostDragOffset.y);
+
       badgeHtml = `
-        <g transform="translate(10, -10)">
+        <g transform="translate(${badgeAnchorX + 10 * inv}, ${badgeAnchorY - 10 * inv}) scale(${inv})" pointer-events="none">
           <circle cx="0" cy="0" r="6" fill="#22c55e" stroke="#ffffff" stroke-width="1.5" />
           <path d="M-3 0 L3 0 M0 -3 L0 3" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" />
         </g>
       `;
     }
 
-    html += `
-      <g transform="translate(${curAnchorX}, ${curAnchorY}) scale(${inv})" pointer-events="none">
-        <circle cx="0" cy="0" r="${haloRingR}" fill="none" stroke="${strokeColor}" stroke-width="1.5" stroke-dasharray="3 2" />
-        ${isSnapped ? `<circle cx="0" cy="0" r="13" fill="none" stroke="#00f0ff" stroke-width="1" opacity="0.4" />` : ''}
-        ${this.isEdgeAnchor ? `<rect x="-3" y="-3" width="6" height="6" transform="rotate(45)" fill="${centerColor}" stroke="#ffffff" stroke-width="0.75" />` : `<circle cx="0" cy="0" r="2.5" fill="${centerColor}" />`}
-        ${badgeHtml}
-      </g>
-    `;
-
+    html += anchorHtml;
+    html += badgeHtml;
     return html;
   }
 }
