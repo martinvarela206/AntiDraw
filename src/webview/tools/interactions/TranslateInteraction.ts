@@ -4,6 +4,7 @@ import type { SelectToolCallbacks } from '../SelectToolHandler.js';
 import { NodeCatalogService } from '../../engine/selection/NodeCatalogService.js';
 import { BaseHelper } from '../../engine/canvas/helpers/index.js';
 import { SnappingEngine } from '../../engine/canvas/SnappingEngine.js';
+import { EdgeSnappingService } from '../../engine/canvas/EdgeSnappingService.js';
 import { VectorCloneHelper } from '../../engine/selection/VectorCloneHelper.js';
 
 /**
@@ -35,6 +36,7 @@ export class TranslateInteraction {
   public isAnchorPicked: boolean = false;
   public isDuplicateMode: boolean = false;
   public isOrthogonal: boolean = false;
+  public isEdgeAnchor: boolean = false;
 
   /**
    * ARCHITECTURAL RATIONALE: Proximity Anchor Detection (FIX-05)
@@ -51,11 +53,12 @@ export class TranslateInteraction {
     pt: Point,
     groupBox: any,
     zoom: number
-  ): { point: Point; isPickedNode: boolean } {
+  ): { point: Point; isPickedNode: boolean; isEdgeAnchor: boolean } {
     const threshold = 24 / (zoom || 1);
     let bestPt: Point = { x: pt.x, y: pt.y };
     let bestDist = threshold;
     let isPickedNode = false;
+    let isEdgeAnchor = false;
 
     // 1. High-priority evaluation of real vector nodes, centers, and handles
     const snappable = NodeCatalogService.collectSnappableNodes(selectedEls, {
@@ -99,6 +102,29 @@ export class TranslateInteraction {
           bestPt = bp;
           isPickedNode = true;
         }
+      }
+    }
+
+    /**
+     * ARCHITECTURAL RATIONALE: Temporal Contour Anchor on Curve P(t) (Item 1.1 feat(snap))
+     * When dragging an element by clicking on its contour/stroke farther than 24/zoom px from any vertex,
+     * naive approaches either jump to an arbitrary distant vertex or drop magnetic alignment entirely.
+     * By analytically projecting an ephemeral point P(t) onto the closest segment or Bézier curve,
+     * this temporal anchor acts as the exact reference pivot for Smart Guides and magnetic snapping.
+     */
+    if (!isPickedNode) {
+      const edgeThreshold = 14 / (zoom || 1);
+      const edgeCand = EdgeSnappingService.snapToVectorEdges(
+        pt,
+        selectedEls,
+        [],
+        edgeThreshold
+      );
+
+      if (edgeCand) {
+        bestPt = edgeCand.snappedPt;
+        isPickedNode = true;
+        isEdgeAnchor = true;
       }
     }
 
@@ -151,7 +177,7 @@ export class TranslateInteraction {
       }
     }
 
-    return { point: bestPt, isPickedNode };
+    return { point: bestPt, isPickedNode, isEdgeAnchor };
   }
 
   public isNearSelectionAnchor(
@@ -197,6 +223,13 @@ export class TranslateInteraction {
       }
     }
 
+    // 3. Contour / Edge Anchor on Curve P(t)
+    const edgeThreshold = 14 / (zoom || 1);
+    const edgeCand = EdgeSnappingService.snapToVectorEdges(pt, selectedEls, [], edgeThreshold);
+    if (edgeCand) {
+      return true;
+    }
+
     return false;
   }
 
@@ -210,6 +243,7 @@ export class TranslateInteraction {
     const anchorInfo = this.findClosestMoveAnchor(ctx, selectedEls, pt, groupBox, z);
     this.dragAnchorPt = anchorInfo.point;
     this.isAnchorPicked = anchorInfo.isPickedNode;
+    this.isEdgeAnchor = !!anchorInfo.isEdgeAnchor;
     this.initialElementsMap.clear();
     this.isDuplicateMode = false;
     this.isOrthogonal = false;
@@ -476,8 +510,12 @@ export class TranslateInteraction {
     const isSnapped = SnappingEngine.lastSnapResult !== null;
 
     const haloRingR = isSnapped ? 9 : 7;
-    const strokeColor = isSnapped ? '#00f0ff' : '#38bdf8';
-    const centerColor = isSnapped ? '#00f0ff' : '#0284c7';
+    const strokeColor = this.isEdgeAnchor
+      ? (isSnapped ? '#00f0ff' : '#06b6d4')
+      : (isSnapped ? '#00f0ff' : '#38bdf8');
+    const centerColor = this.isEdgeAnchor
+      ? (isSnapped ? '#00f0ff' : '#0891b2')
+      : (isSnapped ? '#00f0ff' : '#0284c7');
 
     // Duplicate badge indicator when dragging with Alt
     let badgeHtml = '';
@@ -494,7 +532,7 @@ export class TranslateInteraction {
       <g transform="translate(${curAnchorX}, ${curAnchorY}) scale(${inv})" pointer-events="none">
         <circle cx="0" cy="0" r="${haloRingR}" fill="none" stroke="${strokeColor}" stroke-width="1.5" stroke-dasharray="3 2" />
         ${isSnapped ? `<circle cx="0" cy="0" r="13" fill="none" stroke="#00f0ff" stroke-width="1" opacity="0.4" />` : ''}
-        <circle cx="0" cy="0" r="2.5" fill="${centerColor}" />
+        ${this.isEdgeAnchor ? `<rect x="-3" y="-3" width="6" height="6" transform="rotate(45)" fill="${centerColor}" stroke="#ffffff" stroke-width="0.75" />` : `<circle cx="0" cy="0" r="2.5" fill="${centerColor}" />`}
         ${badgeHtml}
       </g>
     `;
