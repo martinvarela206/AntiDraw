@@ -57,19 +57,19 @@ export class TranslateInteraction {
     groupBox: any,
     zoom: number
   ): { point: Point; isPickedNode: boolean; isEdgeAnchor: boolean } {
-    const threshold = 24 / (zoom || 1);
+    const threshold = 12 / (zoom || 1);
     let bestPt: Point = { x: pt.x, y: pt.y };
     let bestDist = threshold;
     let isPickedNode = false;
     let isEdgeAnchor = false;
 
-    // 1. High-priority evaluation of real vector nodes, centers, and handles
-    const snappable = NodeCatalogService.collectSnappableNodes(selectedEls, {
+    // 1. High-priority evaluation of real structural vector vertices (corners/anchors)
+    const structuralNodes = NodeCatalogService.collectSnappableNodes(selectedEls, {
       structural: true,
-      handles: true,
-      positional: true,
+      handles: false,
+      positional: false,
     });
-    for (const p of snappable) {
+    for (const p of structuralNodes) {
       const d = Math.hypot(pt.x - p.x, pt.y - p.y);
       if (d < bestDist) {
         bestDist = d;
@@ -78,56 +78,75 @@ export class TranslateInteraction {
       }
     }
 
-    // 2. Secondary fallback to bounding box pivot and keypoints
-    if (groupBox && !isPickedNode) {
-      const singleEl = selectedEls.length === 1 ? selectedEls[0] : undefined;
-      const pivot = ctx.selectionTool.getPivot(groupBox, singleEl);
-      const dPivot = Math.hypot(pt.x - pivot.x, pt.y - pivot.y);
-      if (dPivot < bestDist) {
-        bestDist = dPivot;
-        bestPt = { x: pivot.x, y: pivot.y };
-        isPickedNode = true;
-      }
-      const boxPts: Point[] = [
-        { x: groupBox.x, y: groupBox.y },
-        { x: groupBox.x + groupBox.width, y: groupBox.y },
-        { x: groupBox.x, y: groupBox.y + groupBox.height },
-        { x: groupBox.x + groupBox.width, y: groupBox.y + groupBox.height },
-        { x: groupBox.x + groupBox.width / 2, y: groupBox.y },
-        { x: groupBox.x + groupBox.width / 2, y: groupBox.y + groupBox.height },
-        { x: groupBox.x, y: groupBox.y + groupBox.height / 2 },
-        { x: groupBox.x + groupBox.width, y: groupBox.y + groupBox.height / 2 },
-      ];
-      for (const bp of boxPts) {
-        const d = Math.hypot(pt.x - bp.x, pt.y - bp.y);
-        if (d < bestDist) {
-          bestDist = d;
-          bestPt = bp;
-          isPickedNode = true;
-        }
-      }
-    }
-
     /**
-     * ARCHITECTURAL RATIONALE: Temporal Contour Anchor on Curve P(t) (Item 1.1 feat(snap))
-     * When dragging an element by clicking on its contour/stroke farther than 24/zoom px from any vertex,
-     * naive approaches either jump to an arbitrary distant vertex or drop magnetic alignment entirely.
-     * By analytically projecting an ephemeral point P(t) onto the closest segment or Bézier curve,
-     * this temporal anchor acts as the exact reference pivot for Smart Guides and magnetic snapping.
+     * ARCHITECTURAL RATIONALE: Temporal Contour Anchor on Curve P(t) (Priority over Midpoints/AABB)
+     * When dragging an element by clicking on its contour/stroke, the user expects to drag and snap
+     * using the exact edge point P(t) under the cursor.
+     * Evaluating P(t) before positional midpoints and bounding box keypoints prevents artificial midpoints
+     * (especially those floating in empty space on rotated or irregular shapes) from hijacking the click.
      */
     if (!isPickedNode) {
-      const edgeThreshold = 14 / (zoom || 1);
       const edgeCand = EdgeSnappingService.snapToVectorEdges(
         pt,
         selectedEls,
         [],
-        edgeThreshold
+        threshold
       );
 
       if (edgeCand) {
         bestPt = edgeCand.snappedPt;
+        bestDist = edgeCand.distance;
         isPickedNode = true;
         isEdgeAnchor = true;
+      }
+    }
+
+    // 3. Secondary fallback to bounding box pivot, positional centers, and keypoints (only if not near vertex or contour)
+    if (!isPickedNode) {
+      if (groupBox) {
+        const singleEl = selectedEls.length === 1 ? selectedEls[0] : undefined;
+        const pivot = ctx.selectionTool.getPivot(groupBox, singleEl);
+        const dPivot = Math.hypot(pt.x - pivot.x, pt.y - pivot.y);
+        if (dPivot < bestDist) {
+          bestDist = dPivot;
+          bestPt = { x: pivot.x, y: pivot.y };
+          isPickedNode = true;
+        }
+      }
+
+      const positionalNodes = NodeCatalogService.collectSnappableNodes(selectedEls, {
+        structural: false,
+        handles: true,
+        positional: true,
+      });
+      for (const p of positionalNodes) {
+        const d = Math.hypot(pt.x - p.x, pt.y - p.y);
+        if (d < bestDist) {
+          bestDist = d;
+          bestPt = p;
+          isPickedNode = true;
+        }
+      }
+
+      if (groupBox && !isPickedNode) {
+        const boxPts: Point[] = [
+          { x: groupBox.x, y: groupBox.y },
+          { x: groupBox.x + groupBox.width, y: groupBox.y },
+          { x: groupBox.x, y: groupBox.y + groupBox.height },
+          { x: groupBox.x + groupBox.width, y: groupBox.y + groupBox.height },
+          { x: groupBox.x + groupBox.width / 2, y: groupBox.y },
+          { x: groupBox.x + groupBox.width / 2, y: groupBox.y + groupBox.height },
+          { x: groupBox.x, y: groupBox.y + groupBox.height / 2 },
+          { x: groupBox.x + groupBox.width, y: groupBox.y + groupBox.height / 2 },
+        ];
+        for (const bp of boxPts) {
+          const d = Math.hypot(pt.x - bp.x, pt.y - bp.y);
+          if (d < bestDist) {
+            bestDist = d;
+            bestPt = bp;
+            isPickedNode = true;
+          }
+        }
       }
     }
 
@@ -143,7 +162,12 @@ export class TranslateInteraction {
       let nearestFeatureDist = Infinity;
       let nearestFeaturePt: Point = pt;
 
-      for (const p of snappable) {
+      const allLandmarks = NodeCatalogService.collectSnappableNodes(selectedEls, {
+        structural: true,
+        handles: true,
+        positional: true,
+      });
+      for (const p of allLandmarks) {
         const d = Math.hypot(pt.x - p.x, pt.y - p.y);
         if (d < nearestFeatureDist) {
           nearestFeatureDist = d;
@@ -190,7 +214,7 @@ export class TranslateInteraction {
     groupBox: any,
     zoom: number
   ): boolean {
-    const threshold = 24 / (zoom || 1);
+    const threshold = 12 / (zoom || 1);
 
     // 1. High-priority evaluation of real vector nodes, centers, and handles
     const snappable = NodeCatalogService.collectSnappableNodes(selectedEls, {
@@ -204,7 +228,13 @@ export class TranslateInteraction {
       }
     }
 
-    // 2. Secondary fallback to bounding box pivot and keypoints
+    // 2. Contour / Edge Anchor on Curve P(t) (Priority over AABB keypoints)
+    const edgeCand = EdgeSnappingService.snapToVectorEdges(pt, selectedEls, [], threshold);
+    if (edgeCand) {
+      return true;
+    }
+
+    // 3. Secondary fallback to bounding box pivot and keypoints
     if (groupBox) {
       const singleEl = selectedEls.length === 1 ? selectedEls[0] : undefined;
       const pivot = ctx.selectionTool.getPivot(groupBox, singleEl);
@@ -224,13 +254,6 @@ export class TranslateInteraction {
       for (const bp of boxPts) {
         if (Math.hypot(pt.x - bp.x, pt.y - bp.y) <= threshold) return true;
       }
-    }
-
-    // 3. Contour / Edge Anchor on Curve P(t)
-    const edgeThreshold = 14 / (zoom || 1);
-    const edgeCand = EdgeSnappingService.snapToVectorEdges(pt, selectedEls, [], edgeThreshold);
-    if (edgeCand) {
-      return true;
     }
 
     return false;

@@ -102,6 +102,35 @@ export async function runTemporalEdgeAnchorTests(): Promise<boolean> {
   assert(interaction.dragAnchorPt.x === 160 && interaction.dragAnchorPt.y === 100, `dragAnchorPt set to projected contour anchor (160, 100) -> got (${interaction.dragAnchorPt.x}, ${interaction.dragAnchorPt.y})`);
   assert(interaction.isEdgeAnchor === true, 'interaction.isEdgeAnchor flag set to true');
 
+  // Test 8: Click on contour adjacent to an AABB midpoint (e.g. x = 195, y = 102, only 5px from midpoint (200, 100))
+  // Verifies that edge anchor takes absolute priority over the AABB midpoint
+  const nearMidpoint = interaction.findClosestMoveAnchor(mockCtx, [rectEl], { x: 195, y: 102 }, groupBox, 1);
+  assert(nearMidpoint.isEdgeAnchor === true, 'Click near midpoint prioritizes contour edge anchor over AABB midpoint');
+  assert(nearMidpoint.point.x === 195 && nearMidpoint.point.y === 100, `Snaps to exact edge point (195, 100), not midpoint (200, 100) -> got (${nearMidpoint.point.x}, ${nearMidpoint.point.y})`);
+
+  // Test 9: Rotated/Sheared Shape with Floating AABB Midpoints in Empty Space
+  // Quadrilateral with slanted left edge: (60, 50) to (40, 250)
+  // AABB has minX = 40, minY = 50, maxX = 200, maxY = 250, so AABB mid-left handle is at (40, 150)
+  // At y = 150, the slanted edge is at x = 50. The AABB mid-left handle at (40, 150) is in EMPTY SPACE (10px away).
+  const shearedEl: VectorElement = {
+    id: 'quad1',
+    tagName: 'polygon',
+    attributes: {},
+    isClosed: true,
+    vertices: [
+      { id: 'q1', x: 60, y: 50, nodeType: 'sharp', command: 'M' },
+      { id: 'q2', x: 200, y: 50, nodeType: 'sharp', command: 'L' },
+      { id: 'q3', x: 180, y: 250, nodeType: 'sharp', command: 'L' },
+      { id: 'q4', x: 40, y: 250, nodeType: 'sharp', command: 'L' },
+    ],
+  };
+  const shearedBox = { x: 40, y: 50, width: 160, height: 200 };
+  // Click on the slanted edge at (50, 152): within 12px of edge AND within 12px of floating AABB midpoint (40, 150)
+  const onShearedEdge = interaction.findClosestMoveAnchor(mockCtx, [shearedEl], { x: 50, y: 152 }, shearedBox, 1);
+  assert(onShearedEdge.isEdgeAnchor === true, 'Slanted edge click locks onto contour P(t), rejecting empty-space AABB midpoint');
+  assert(Math.abs(onShearedEdge.point.x - 50) < 1, `Anchor X stays on slanted contour (~50) instead of floating midpoint (40) -> got ${onShearedEdge.point.x}`);
+  assert(Math.abs(onShearedEdge.point.y - 150) <= 2, `Anchor Y stays at edge height -> got ${onShearedEdge.point.y}`);
+
   console.log('--- Temporal Contour Anchor Snapping Suite Complete ---\n');
   return true;
 }
