@@ -46,6 +46,7 @@ export interface GuideGeometry {
 export class GuideManager {
   public guides: GuideLine[] = [];
   public showGuides: boolean = true;
+  public lockGuides: boolean = false;
   public selectedGuideIds: Set<string> = new Set();
   public activeGuideTransformId: string | null = null;
 
@@ -143,7 +144,7 @@ export class GuideManager {
     zoom: number = 1,
     tolerance: number = 8
   ): GuideLine | null {
-    if (!this.showGuides) return null;
+    if (!this.showGuides || this.lockGuides) return null;
     const threshold = tolerance / (zoom || 1);
 
     for (let i = this.guides.length - 1; i >= 0; i--) {
@@ -165,6 +166,15 @@ export class GuideManager {
 
   public visibleBoundsProvider?: () => { minX: number; minY: number; maxX: number; maxY: number };
 
+  public clipInfiniteLineToRect(
+    p0: Point,
+    cos: number,
+    sin: number,
+    rect: { minX: number; minY: number; maxX: number; maxY: number }
+  ): { tMin: number; tMax: number; arrow1: Point; visualCenter: Point; arrow2: Point } | null {
+    return GuideManager.clipInfiniteLineToRect(p0, cos, sin, rect);
+  }
+
   /**
    * ARCHITECTURAL RATIONALE: Liang-Barsky Infinite Line Viewport Clipper
    * Computes the exact segment where an infinite guide line intersects the visible viewport bounds.
@@ -176,7 +186,7 @@ export class GuideManager {
    * This guarantees that rotation and positioning markers dynamically adjust to the user's
    * visible screen area, remaining visible and uncluttered under any camera pan and zoom.
    */
-  public clipInfiniteLineToRect(
+  public static clipInfiniteLineToRect(
     p0: Point,
     cos: number,
     sin: number,

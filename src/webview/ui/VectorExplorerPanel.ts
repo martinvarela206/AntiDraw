@@ -174,6 +174,7 @@ export class VectorExplorerPanel {
         const isSelected = this.selectionTool.selectedElementIds.has(el.id);
         const isHidden = el.attributes.display === 'none';
         const isLocked = el.attributes['data-locked'] === 'true';
+        const isContextual = el.attributes['data-contextual'] === 'true';
         const isGroup = el.tagName === 'g' || (el.children && el.children.length > 0);
         const isCollapsed = this.collapsedGroups.has(el.id);
         const name = el.attributes['data-name'] || `${el.shapeType || el.tagName} (${el.id.slice(0, 8)})`;
@@ -189,15 +190,19 @@ export class VectorExplorerPanel {
           ? `<span class="group-collapse-btn ${isCollapsed ? '' : 'expanded'}" data-group-id="${el.id}">▸</span>`
           : `<span class="group-spacer"></span>`;
 
+        const contextBadge = isContextual
+          ? `<span class="contextual-badge" style="font-size:9px; font-weight:600; background:rgba(0,240,255,0.15); color:#00f0ff; border:1px solid rgba(0,240,255,0.4); border-radius:3px; padding:1px 4px; margin-left:4px;" title="Elemento Contextual Efímero (Guía)">Guía</span>`
+          : '';
+
         return `
-          <div class="tree-item element-item ${isSelected ? 'selected' : ''}" 
+          <div class="tree-item element-item ${isSelected ? 'selected' : ''} ${isContextual ? 'contextual-guide-item' : ''}" 
                data-element-id="${el.id}" 
                data-is-group="${isGroup ? 'true' : 'false'}"
                draggable="true"
                style="padding-left: ${paddingLeft}px;">
             ${groupToggle}
             <span class="tree-item-icon">${icon}</span>
-            <span class="tree-item-label" title="${el.id}">${name}</span>
+            <span class="tree-item-label" title="${el.id}">${name}${contextBadge}</span>
             <div class="tree-item-actions">
               <button class="tree-action-btn btn-elem-vis" data-element-id="${el.id}" title="${isHidden ? 'Mostrar elemento' : 'Ocultar elemento'}">
                 ${isHidden ? '🚫' : '👁'}

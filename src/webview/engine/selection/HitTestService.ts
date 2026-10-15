@@ -76,15 +76,20 @@ export class HitTestService {
     elements: VectorElement[],
     pt: Point,
     zoomScale: number = 1.0,
-    hoverTolerance: number = 3.0
+    hoverTolerance: number = 3.0,
+    options?: { lockGuides?: boolean }
   ): HitTestResult | null {
     const effectiveTolerance = Math.max((hoverTolerance / 2) / (zoomScale || 1), 3);
 
     // Search top-to-bottom (reverse array)
     for (let i = elements.length - 1; i >= 0; i--) {
       const el = elements[i];
+      if (el.attributes?.['data-locked'] === 'true') continue;
+      if (options?.lockGuides && el.attributes?.['data-contextual'] === 'true') continue;
+
       if (el.tagName === 'g' && el.children && el.children.length > 0) {
-        const childHit = this.hitTest(el.children, pt, zoomScale, hoverTolerance);
+        if (options?.lockGuides && el.attributes?.['data-contextual'] === 'true') continue;
+        const childHit = this.hitTest(el.children, pt, zoomScale, hoverTolerance, options);
         if (childHit) {
           return childHit;
         }
@@ -132,7 +137,8 @@ export class HitTestService {
     spatialIndex: SpatialIndex,
     pt: Point,
     zoomScale: number = 1.0,
-    hoverTolerance: number = 3.0
+    hoverTolerance: number = 3.0,
+    options?: { lockGuides?: boolean }
   ): HitTestResult | null {
     const effectiveTolerance = Math.max((hoverTolerance / 2) / (zoomScale || 1), 3);
     const candidates = spatialIndex.queryPoint(pt, effectiveTolerance);
@@ -141,6 +147,8 @@ export class HitTestService {
     // Search top-to-bottom among spatial candidates
     for (let i = candidates.length - 1; i >= 0; i--) {
       const el = candidates[i];
+      if (el.attributes?.['data-locked'] === 'true') continue;
+      if (options?.lockGuides && el.attributes?.['data-contextual'] === 'true') continue;
       if (!el.vertices || el.vertices.length === 0) continue;
 
       const fill = el.attributes.fill || 'none';

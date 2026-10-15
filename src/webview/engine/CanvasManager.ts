@@ -113,6 +113,13 @@ export class CanvasManager {
     this.guideManager.activeGuideTransformId = val;
   }
 
+  public get lockGuides(): boolean {
+    return this.guideManager.lockGuides;
+  }
+  public set lockGuides(val: boolean) {
+    this.guideManager.lockGuides = val;
+  }
+
   public get showGrid(): boolean {
     return this.grids.some((g) => g.visible);
   }

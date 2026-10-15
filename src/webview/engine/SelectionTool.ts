@@ -321,12 +321,13 @@ export class SelectionTool {
     elements: VectorElement[],
     pt: Point,
     zoomScale: number = 1.0,
-    spatialIndex?: SpatialIndex
+    spatialIndex?: SpatialIndex,
+    options?: { lockGuides?: boolean }
   ): HitTestResult | null {
     if (spatialIndex && spatialIndex.size > 0) {
-      return HitTestService.hitTestSpatial(spatialIndex, pt, zoomScale, this.hoverTolerance);
+      return HitTestService.hitTestSpatial(spatialIndex, pt, zoomScale, this.hoverTolerance, options);
     }
-    return HitTestService.hitTest(elements, pt, zoomScale, this.hoverTolerance);
+    return HitTestService.hitTest(elements, pt, zoomScale, this.hoverTolerance, options);
   }
 
   public hitTestHandle(

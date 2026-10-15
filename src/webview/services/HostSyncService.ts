@@ -65,7 +65,7 @@ export class HostSyncService {
   }
 
   public syncToHost(): boolean {
-    const svgText = this.ctx.model.toSvgString();
+    const svgText = this.ctx.model.toFinalSvgString();
     const success = this.vscodeBridge.updateDocument(svgText);
     if (!success) {
       console.warn('[HostSyncService] Document sync aborted: SVG integrity validation failed.');
@@ -99,6 +99,7 @@ export class HostSyncService {
       showRulers: this.ctx.canvasMgr.showRulers,
       showGrid: this.ctx.canvasMgr.showGrid,
       showGuides: this.ctx.canvasMgr.showGuides,
+      lockGuides: this.ctx.canvasMgr.lockGuides,
       gridSpacing: this.ctx.canvasMgr.gridSpacing,
       gridAlignmentMode: this.ctx.canvasMgr.gridAlignmentMode,
       snapToPixelGrid: this.ctx.canvasMgr.snapToPixelGrid,
@@ -183,6 +184,7 @@ export class HostSyncService {
         if (Array.isArray(payload.metadata.grids)) this.ctx.canvasMgr.grids = payload.metadata.grids;
         if (payload.metadata.showGrid !== undefined) this.ctx.canvasMgr.showGrid = payload.metadata.showGrid;
         if (payload.metadata.showGuides !== undefined) this.ctx.canvasMgr.showGuides = payload.metadata.showGuides;
+        if (payload.metadata.lockGuides !== undefined) this.ctx.canvasMgr.lockGuides = payload.metadata.lockGuides;
         if (payload.metadata.gridSpacing !== undefined) this.ctx.canvasMgr.gridSpacing = payload.metadata.gridSpacing;
         if (payload.metadata.gridAlignmentMode !== undefined) {
           this.ctx.canvasMgr.gridAlignmentMode = payload.metadata.gridAlignmentMode;

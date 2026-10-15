@@ -241,6 +241,9 @@ export class PropertyPanelActionController {
         s.workspaceLayout.render();
         host.syncToHost();
       },
+      onConvertGuideToVector: () => {
+        CommandRegistry.getInstance().execute('guide.convertToVector');
+      },
     };
   }
 }

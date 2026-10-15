@@ -12,6 +12,7 @@ export interface TopBarCallbacks {
   onToggleRulers?: () => void;
   onToggleGrid: () => void;
   onToggleGuides: () => void;
+  onToggleLockGuides?: () => void;
   onToggleSnap: (type: 'pixel' | 'grid' | 'guide' | 'vertex' | 'nodes' | 'edges' | 'viewbox' | 'angular') => void;
 }
 
@@ -79,6 +80,7 @@ export class TopBar {
         <button class="btn-icon ${this.canvasMgr.showRulers ? 'active' : ''}" id="btn-toggle-rulers" title="Toggle Rulers">${ToolIcons.rulersVisibility}</button>
         <button class="btn-icon ${this.canvasMgr.showGrid ? 'active' : ''}" id="btn-toggle-grid" title="Toggle Grid Overlay">${ToolIcons.gridVisibility}</button>
         <button class="btn-icon ${this.canvasMgr.showGuides ? 'active' : ''}" id="btn-toggle-guides" title="Toggle Guide Lines">${ToolIcons.guidesVisibility}</button>
+        <button class="btn-icon ${this.canvasMgr.lockGuides ? 'active' : ''}" id="btn-lock-guides" title="Bloquear Guías y Elementos Contextuales (Ctrl+Alt+;)">${this.canvasMgr.lockGuides ? '🔒' : '🔓'}</button>
         <button class="btn-icon ${this.canvasMgr.snapToPixelGrid ? 'active' : ''}" id="btn-snap-pixel-grid" title="Snap to Pixel Grid (Pixel-Perfect)">${ToolIcons.snapPixel}</button>
         <button class="btn-icon ${this.canvasMgr.snapToGrid ? 'active' : ''}" id="btn-snap-grid" title="Snap to Grid (Lines &amp; Cells)">${ToolIcons.snapGrid}</button>
         <button class="btn-icon ${this.canvasMgr.snapToGuides ? 'active' : ''}" id="btn-snap-guide" title="Snap to Guides (Infinite Guidelines &amp; Intersections)">${ToolIcons.snapGuide}</button>
@@ -112,6 +114,7 @@ export class TopBar {
     this.bindClick('btn-toggle-rulers', () => this.callbacks.onToggleRulers?.());
     this.bindClick('btn-toggle-grid', () => this.callbacks.onToggleGrid());
     this.bindClick('btn-toggle-guides', () => this.callbacks.onToggleGuides());
+    this.bindClick('btn-lock-guides', () => this.callbacks.onToggleLockGuides?.());
     this.bindClick('btn-snap-pixel-grid', () => this.callbacks.onToggleSnap('pixel'));
     this.bindClick('btn-snap-grid', () => this.callbacks.onToggleSnap('grid'));
     this.bindClick('btn-snap-guide', () => this.callbacks.onToggleSnap('guide'));

@@ -54,9 +54,9 @@ export class SvgDomRenderer {
 
     svgCanvas.style.color = model.canvas.currentColor || '#000000';
 
-    // 2. Render all vector elements
+    // 2. Render all vector elements (including ephemeral contextual guides on live canvas)
     const tempSvg = document.createElement('div');
-    tempSvg.innerHTML = model.toSvgString();
+    tempSvg.innerHTML = model.toSvgString({ excludeContextual: false });
     const parsedSvg = tempSvg.querySelector('svg');
     if (parsedSvg) {
       Array.from(parsedSvg.children).forEach((child) => {

@@ -7,6 +7,8 @@ import { CommandRegistry, CommandSpec, CommandContext } from './CommandRegistry.
 import { registerAllDomainCommands } from '../../commands/index.js';
 import { ExportModal } from '../../ui/ExportModal.js';
 import { SceneLayerService } from '../scene/SceneLayerService.js';
+import { ContextElementService } from '../scene/ContextElementService.js';
+import { VectorElement } from '../VectorModel.js';
 
 export function registerSystemCommands(registry: CommandRegistry): void {
   // Registrar comandos de dominio formalizados (shape.*, path.*, transform.*, node.*)
@@ -398,15 +400,119 @@ export function registerSystemCommands(registry: CommandRegistry): void {
     },
   });
 
-  // --- ARCHIVO Y EXPORTACIÓN ---
+  // --- GUÍAS Y ELEMENTOS CONTEXTUALES ---
   registry.register({
-    id: 'file.exportAsset',
-    label: 'Exportar Recurso (Asset Export)',
-    category: 'edit',
-    shortcut: 'Ctrl+Shift+E',
+    id: 'vector.convertToContext',
+    label: 'Convertir a Guía / Elemento Contextual',
+    category: 'object',
+    isEnabled: (ctx: CommandContext) => (ctx.selectionTool?.selectedElementIds?.size || 0) > 0,
     execute: (ctx: CommandContext) => {
-      ExportModal.show(ctx.model, ctx.selectionTool);
-      return { success: true };
+      if (!ctx.model || !ctx.selectionTool) return { success: false, error: 'Contexto no disponible' };
+      const selected = ctx.model.elements.filter((el: VectorElement) => ctx.selectionTool.isSelected(el.id));
+      if (selected.length === 0) return { success: false, error: 'Ningún elemento seleccionado' };
+
+      ctx.pushUndo?.();
+      for (const el of selected) {
+        ContextElementService.convertToContextElement(el);
+      }
+      ctx.layoutMgr?.vectorExplorerPanel?.update();
+      ctx.render?.();
+      ctx.syncToHost?.();
+      return { success: true, value: { count: selected.length } };
+    },
+  });
+
+  registry.register({
+    id: 'vector.convertToOrdinary',
+    label: 'Desconvertir a Vector Ordinario',
+    category: 'object',
+    isEnabled: (ctx: CommandContext) => (ctx.selectionTool?.selectedElementIds?.size || 0) > 0,
+    execute: (ctx: CommandContext) => {
+      if (!ctx.model || !ctx.selectionTool) return { success: false, error: 'Contexto no disponible' };
+      const selected = ctx.model.elements.filter((el: VectorElement) => ctx.selectionTool.isSelected(el.id));
+      if (selected.length === 0) return { success: false, error: 'Ningún elemento seleccionado' };
+
+      ctx.pushUndo?.();
+      for (const el of selected) {
+        ContextElementService.convertToOrdinaryVector(el);
+      }
+      ctx.layoutMgr?.vectorExplorerPanel?.update();
+      ctx.render?.();
+      ctx.syncToHost?.();
+      return { success: true, value: { count: selected.length } };
+    },
+  });
+
+  registry.register({
+    id: 'guide.convertToVector',
+    label: 'Convertir Guía a Vector Ordinario',
+    category: 'object',
+    execute: (ctx: CommandContext) => {
+      if (!ctx.model || !ctx.canvasMgr) return { success: false, error: 'Contexto no disponible' };
+      const guidesToConvert = ctx.canvasMgr.getSelectedGuides();
+      if (guidesToConvert.length === 0 && ctx.canvasMgr.selectedGuideId) {
+        const single = ctx.canvasMgr.getGuide(ctx.canvasMgr.selectedGuideId);
+        if (single) guidesToConvert.push(single);
+      }
+      if (guidesToConvert.length === 0) return { success: false, error: 'Ninguna guía seleccionada' };
+
+      const vb = ctx.model.getViewBoxBounds();
+      ctx.pushUndo?.();
+
+      const newIds: string[] = [];
+      for (const guide of guidesToConvert) {
+        const vec = ContextElementService.convertGuideToVector(guide, {
+          x: vb.minX,
+          y: vb.minY,
+          width: vb.width,
+          height: vb.height,
+        });
+        if (vec) {
+          ctx.canvasMgr.removeGuide(guide.id);
+          ctx.model.addElement(vec);
+          newIds.push(vec.id);
+        }
+      }
+
+      if (newIds.length > 0 && ctx.selectionTool) {
+        ctx.selectionTool.deselectAll();
+        for (const id of newIds) {
+          ctx.selectionTool.select(id);
+        }
+      }
+
+      ctx.layoutMgr?.vectorExplorerPanel?.update();
+      ctx.render?.();
+      ctx.renderOverlay?.();
+      ctx.syncToHost?.();
+      return { success: true, value: { convertedCount: newIds.length } };
+    },
+  });
+
+  registry.register({
+    id: 'guide.toggleLock',
+    label: 'Bloquear Guías',
+    category: 'view',
+    shortcut: 'Ctrl+Alt+;',
+    execute: (ctx: CommandContext) => {
+      if (!ctx.canvasMgr) return { success: false, error: 'CanvasManager no disponible' };
+      ctx.canvasMgr.lockGuides = !ctx.canvasMgr.lockGuides;
+      if (ctx.canvasMgr.lockGuides) {
+        ctx.canvasMgr.clearSelectedGuides();
+        if (ctx.selectionTool && ctx.model) {
+          const selected = ctx.model.elements.filter((el: VectorElement) => ctx.selectionTool.isSelected(el.id));
+          for (const el of selected) {
+            if (ContextElementService.isContextElement(el)) {
+              ctx.selectionTool.deselect(el.id);
+            }
+          }
+        }
+      }
+      ctx.renderOverlay?.();
+      ctx.render?.();
+      ctx.syncToHost?.();
+      return { success: true, value: { lockGuides: ctx.canvasMgr.lockGuides } };
     },
   });
 }
+

@@ -121,6 +121,15 @@ export class ChromeActionController {
         this.ctx.workspaceLayout().render();
         this.ctx.hostSyncService().syncMetadataToHost();
       },
+      onToggleLockGuides: () => {
+        this.ctx.canvasMgr.lockGuides = !this.ctx.canvasMgr.lockGuides;
+        if (this.ctx.canvasMgr.lockGuides) {
+          this.ctx.canvasMgr.clearSelectedGuides();
+        }
+        this.ctx.getLayoutMgr()?.topBar.update();
+        this.ctx.workspaceLayout().render();
+        this.ctx.hostSyncService().syncMetadataToHost();
+      },
       onToggleSnap: (type) => {
         if (type === 'pixel') this.ctx.canvasMgr.snapToPixelGrid = !this.ctx.canvasMgr.snapToPixelGrid;
         if (type === 'grid') this.ctx.canvasMgr.snapToGrid = !this.ctx.canvasMgr.snapToGrid;

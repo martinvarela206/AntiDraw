@@ -412,7 +412,10 @@ export class SvgSerializer {
   /**
    * Serializes the model canvas and elements into an XML-compliant SVG string.
    */
-  public static toSvgString(ctx: IVectorModelSerializerContext): string {
+  public static toSvgString(
+    ctx: IVectorModelSerializerContext,
+    options?: { excludeContextual?: boolean }
+  ): string {
     const {
       width,
       height,
@@ -450,9 +453,16 @@ export class SvgSerializer {
     const bgStyle = hasExplicitBg ? ` style="background-color: ${backgroundColor};"` : '';
     let svg = `<svg ${rootAttrs}${bgStyle}>\n`;
 
+    const excludeContextual = options?.excludeContextual === true;
+    const filterContextual = (el: VectorElement): boolean => {
+      if (!excludeContextual) return true;
+      return el.attributes?.['data-contextual'] !== 'true';
+    };
+
     const collectAllElements = (list: VectorElement[]): VectorElement[] => {
       const res: VectorElement[] = [];
       for (const el of list) {
+        if (!filterContextual(el)) continue;
         res.push(el);
         if (el.children && el.children.length > 0) {
           res.push(...collectAllElements(el.children));
@@ -504,13 +514,21 @@ export class SvgSerializer {
     };
 
     ctx.elements.forEach((el) => {
+      if (!filterContextual(el)) return;
+
       // HISTORICAL ARCHITECTURE (FIX-19): Guarantee attributes.id strictly reflects model el.id upon serialization
       el.attributes.id = el.id;
 
       if (el.tagName === 'g') {
+        const childrenToSerialize = (el.children || []).filter(filterContextual);
+        if (excludeContextual && childrenToSerialize.length === 0 && (el.children || []).length > 0) {
+          // All children were contextual, skip the empty group entirely
+          return;
+        }
+
         svg += `  <g${serializeCleanAttrs(el.attributes)}>\n`;
-        if (el.children && el.children.length > 0) {
-          el.children.forEach((child) => {
+        if (childrenToSerialize.length > 0) {
+          childrenToSerialize.forEach((child) => {
             child.attributes.id = child.id;
             if (child.vertices && child.vertices.length > 0 && child.tagName === 'path') {
               child.attributes.d = ctx.compilePathD(child.vertices, child.isClosed);

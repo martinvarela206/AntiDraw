@@ -455,6 +455,9 @@ export class RulerGuideInspector {
       <div class="panel-section">
         <div class="panel-title">Acciones de Guía</div>
         <div class="prop-row" style="flex-direction:column; gap:6px;">
+          <button class="prop-input" id="btn-convert-guide-to-vector" style="cursor:pointer; background:var(--accent-primary, #007acc); color:#fff; text-align:center; font-weight:600;">
+            ➔ Convertir a Vector Ordinario
+          </button>
           <button class="prop-input" id="btn-lock-guides" style="cursor:pointer; background:var(--bg-panel-hover); text-align:center; font-weight:500;">
             ${allLocked ? '🔓 Desbloquear Guía(s)' : '🔒 Bloquear Guía(s)'}
           </button>
@@ -465,6 +468,7 @@ export class RulerGuideInspector {
       </div>
     `;
 
+    const convertBtn = container.querySelector<HTMLButtonElement>('#btn-convert-guide-to-vector');
     const posXInput = container.querySelector<HTMLInputElement>('#guide-pos-x');
     const posYInput = container.querySelector<HTMLInputElement>('#guide-pos-y');
     const angleInput = container.querySelector<HTMLInputElement>('#guide-angle');
@@ -564,6 +568,12 @@ export class RulerGuideInspector {
           callbacks.onUpdateGuide?.(g);
         }
         callbacks.onRenderOverlay?.();
+      });
+    }
+
+    if (convertBtn) {
+      convertBtn.addEventListener('click', () => {
+        callbacks.onConvertGuideToVector?.();
       });
     }
 

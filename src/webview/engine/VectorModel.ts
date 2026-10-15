@@ -189,8 +189,12 @@ export class VectorModel {
    * Serializes the model canvas and elements into an XML-compliant SVG string.
    * Delegated to SvgSerializer.
    */
-  public toSvgString(): string {
-    return SvgSerializer.toSvgString(this);
+  public toSvgString(options?: { excludeContextual?: boolean }): string {
+    return SvgSerializer.toSvgString(this, options);
+  }
+
+  public toFinalSvgString(): string {
+    return SvgSerializer.toSvgString(this, { excludeContextual: true });
   }
 
   public getViewBoxBounds(): { minX: number; minY: number; width: number; height: number } {

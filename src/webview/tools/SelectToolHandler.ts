@@ -147,7 +147,7 @@ export class SelectToolHandler implements IToolHandler {
      *    - Shift + Marquee Drag: toggles selection state for all elements intersected by the marquee box.
      */
     if (e.shiftKey) {
-      const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, this.ctx.canvasMgr.zoom, this.ctx.model.spatialIndex);
+      const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, this.ctx.canvasMgr.zoom, this.ctx.model.spatialIndex, { lockGuides: this.ctx.canvasMgr.lockGuides });
       if (hit) {
         const targetId = GroupHierarchyService.resolveAdditiveSelection(
           this.ctx.model.elements,
@@ -331,7 +331,7 @@ export class SelectToolHandler implements IToolHandler {
     }
 
     // 7. Hit test vector elements under cursor
-    const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, this.ctx.canvasMgr.zoom, this.ctx.model.spatialIndex);
+    const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, this.ctx.canvasMgr.zoom, this.ctx.model.spatialIndex, { lockGuides: this.ctx.canvasMgr.lockGuides });
 
     let resolvedHitId: string | null = null;
     let resolvedElement: any = null;
@@ -447,7 +447,7 @@ export class SelectToolHandler implements IToolHandler {
 
       // 3. Vector element hover cursor
       if (cursor === 'default') {
-        const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, this.ctx.canvasMgr.zoom, this.ctx.model.spatialIndex);
+        const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, this.ctx.canvasMgr.zoom, this.ctx.model.spatialIndex, { lockGuides: this.ctx.canvasMgr.lockGuides });
         this.ctx.selectionTool.hoveredElementId = hit ? hit.element.id : null;
         if (hit) {
           const isSelected = this.ctx.selectionTool.isSelected(hit.element.id);
@@ -564,7 +564,7 @@ export class SelectToolHandler implements IToolHandler {
       pt.y >= groupBox.y &&
       pt.y <= groupBox.y + groupBox.height;
 
-    const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, this.ctx.canvasMgr.zoom, this.ctx.model.spatialIndex);
+    const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, this.ctx.canvasMgr.zoom, this.ctx.model.spatialIndex, { lockGuides: this.ctx.canvasMgr.lockGuides });
     const targetEl = hit ? hit.element : (isInsideBox && selectedEls.length === 1 ? selectedEls[0] : null);
 
     if (targetEl) {

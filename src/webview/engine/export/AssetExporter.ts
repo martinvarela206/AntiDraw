@@ -61,7 +61,7 @@ export class AssetExporter {
     if (elementsToExport.length === 0 || target === 'artboard') {
       const width = model.canvas.width || 800;
       const height = model.canvas.height || 600;
-      const svgString = SvgSerializer.toSvgString(model);
+      const svgString = SvgSerializer.toSvgString(model, { excludeContextual: true });
       return {
         svgString,
         width,
@@ -91,7 +91,7 @@ export class AssetExporter {
     tempModel.swatches = model.swatches;
     tempModel.customDefs = model.customDefs;
 
-    const svgString = SvgSerializer.toSvgString(tempModel);
+    const svgString = SvgSerializer.toSvgString(tempModel, { excludeContextual: true });
     const defaultName = elementsToExport.length === 1 ? elementsToExport[0].id : 'selection';
 
     return {

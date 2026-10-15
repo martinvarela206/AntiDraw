@@ -7,6 +7,7 @@ import { PropertyPanel } from '../ui/PropertyPanel.js';
 import { ClipboardService } from '../services/ClipboardService.js';
 import { CommandRegistry } from '../engine/commands/CommandRegistry.js';
 import { ExportModal } from '../ui/ExportModal.js';
+import { ContextElementService } from '../engine/scene/ContextElementService.js';
 
 export interface ContextMenuControllerContext {
   contextMenu: ContextMenu;
@@ -28,6 +29,7 @@ export interface ContextMenuControllerContext {
   render: () => void;
   syncToHost: () => void;
   cancelCurrentAction: () => void;
+  renderOverlay?: () => void;
 }
 
 /**
@@ -73,6 +75,41 @@ export class ContextMenuController {
         this.ctx.render();
       }
     } else {
+      const guideHit = this.ctx.canvasMgr.hitTestGuide(pt, this.ctx.model.canvas.width, this.ctx.model.canvas.height, 8);
+      if (guideHit) {
+        this.ctx.canvasMgr.selectGuide(guideHit.id);
+        this.ctx.renderOverlay?.();
+        const cmdRegistry = CommandRegistry.getInstance();
+        const guideMenuItems: ContextMenuItem[] = [
+          {
+            id: 'convert-guide-to-vector',
+            label: 'Convertir Guía a Vector Ordinario',
+            action: () => cmdRegistry.execute('guide.convertToVector'),
+          },
+          {
+            id: 'toggle-lock-guides',
+            label: this.ctx.canvasMgr.lockGuides ? 'Desbloquear Guías' : 'Bloquear Guías',
+            shortcut: 'Ctrl+Alt+;',
+            action: () => cmdRegistry.execute('guide.toggleLock'),
+          },
+          { id: 'separator', label: '', action: () => {} },
+          {
+            id: 'delete-guide',
+            label: 'Eliminar Guía',
+            shortcut: 'Supr',
+            action: () => {
+              this.ctx.pushUndo();
+              this.ctx.canvasMgr.removeGuide(guideHit.id);
+              this.ctx.propertyPanel.resetPanelMode();
+              this.ctx.renderOverlay?.();
+              this.ctx.syncToHost();
+            },
+          },
+        ];
+        this.ctx.contextMenu.show(e.clientX, e.clientY, guideMenuItems);
+        return;
+      }
+
       // Right-clicked on empty canvas space: dismiss active context menu and clear selection
       this.ctx.contextMenu.hide();
       this.ctx.selectionTool.deselectAll();
@@ -247,6 +284,28 @@ export class ContextMenuController {
               },
             ]
           : []),
+        { id: 'separator-context', label: '', action: () => {} },
+        ...(selectedEls.some((el) => ContextElementService.isContextElement(el))
+          ? [
+              {
+                id: 'convert-to-ordinary',
+                label: 'Desconvertir a Vector Ordinario',
+                action: () => cmdRegistry.execute('vector.convertToOrdinary'),
+              },
+            ]
+          : [
+              {
+                id: 'convert-to-context',
+                label: 'Convertir a Guía / Elemento Contextual',
+                action: () => cmdRegistry.execute('vector.convertToContext'),
+              },
+            ]),
+        {
+          id: 'toggle-lock-guides',
+          label: this.ctx.canvasMgr.lockGuides ? 'Desbloquear Guías' : 'Bloquear Guías',
+          shortcut: 'Ctrl+Alt+;',
+          action: () => cmdRegistry.execute('guide.toggleLock'),
+        },
         { id: 'separator', label: '', action: () => {} },
         {
           id: 'delete',

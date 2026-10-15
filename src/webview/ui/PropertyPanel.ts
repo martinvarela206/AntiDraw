@@ -45,6 +45,7 @@ export interface PropertyPanelCallbacks {
   onResetDistortCorner?: (cornerKey: 'nw' | 'ne' | 'se' | 'sw') => void;
   onResetAllDistortCorners?: () => void;
   onResetSkew?: () => void;
+  onConvertGuideToVector?: () => void;
   syncMetadataToHost?: () => void;
 }
 
