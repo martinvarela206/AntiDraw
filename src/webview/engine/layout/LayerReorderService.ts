@@ -169,8 +169,9 @@ export class LayerReorderService {
         const [extracted] = elements.splice(i, 1);
         return { element: extracted, parent: null };
       }
-      if (elements[i].children && elements[i].children.length > 0) {
-        const res = this.extractElement(elements[i].children, targetId);
+      const children = elements[i].children;
+      if (children && children.length > 0) {
+        const res = this.extractElement(children, targetId);
         if (res.element) {
           if (!res.parent) res.parent = elements[i];
           return res;

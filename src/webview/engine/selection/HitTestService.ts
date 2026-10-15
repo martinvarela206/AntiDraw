@@ -83,6 +83,13 @@ export class HitTestService {
     // Search top-to-bottom (reverse array)
     for (let i = elements.length - 1; i >= 0; i--) {
       const el = elements[i];
+      if (el.tagName === 'g' && el.children && el.children.length > 0) {
+        const childHit = this.hitTest(el.children, pt, zoomScale, hoverTolerance);
+        if (childHit) {
+          return childHit;
+        }
+        continue;
+      }
       if (!el.vertices || el.vertices.length === 0) continue;
 
       // Fast AABB early rejection

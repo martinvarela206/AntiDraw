@@ -37,6 +37,9 @@ export class BoundingBoxCalculator {
    * Computes the axis-aligned bounding box bounding all outermost anchor vertices of an element.
    */
   public static getBoundingBox(element: VectorElement): BoundingBox | null {
+    if (element.tagName === 'g' && element.children && element.children.length > 0) {
+      return this.getGroupBoundingBox(element.children);
+    }
     if (!element.vertices || element.vertices.length === 0) return null;
     return this.getVerticesBoundingBox(element.vertices);
   }

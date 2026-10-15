@@ -11,6 +11,7 @@ import { ShapeToolHandler } from '../tools/ShapeToolHandler.js';
 import { PenToolHandler } from '../tools/PenToolHandler.js';
 import { PolylineToolHandler } from '../tools/PolylineToolHandler.js';
 import { CommandRegistry } from '../engine/commands/CommandRegistry.js';
+import { GroupHierarchyService } from '../engine/selection/GroupHierarchyService.js';
 
 export interface KeyboardControllerContext {
   toolbar: Toolbar;
@@ -295,6 +296,19 @@ export class KeyboardShortcutController {
       if (hasActiveDrag) {
         this.ctx.cancelCurrentAction();
       } else {
+        const currentSelectedId = this.ctx.selectionTool.selectedElementId;
+        if (currentSelectedId) {
+          const ascendResult = GroupHierarchyService.ascend(this.ctx.model.elements, currentSelectedId);
+          if (ascendResult.handled && ascendResult.nextSelectedId) {
+            this.ctx.selectionTool.activeGroupContextId = ascendResult.nextContextId;
+            const parentEl = this.ctx.model.getElementById(ascendResult.nextSelectedId);
+            this.ctx.selectionTool.select(ascendResult.nextSelectedId, parentEl);
+            this.ctx.selectionTool.selectionMode = 'scale';
+            this.ctx.propertyPanel.resetPanelMode();
+            this.ctx.render();
+            return;
+          }
+        }
         this.ctx.selectionTool.deselectAll();
         this.ctx.canvasMgr.selectedGuideId = null;
         this.ctx.canvasMgr.activeGuideTransformId = null;

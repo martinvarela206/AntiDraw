@@ -53,8 +53,9 @@ async function main() {
   const ok20 = await runSuite(path.join(__dirname, 'test-toolbar-topology-drawers.ts'), 'runToolbarTopologyDrawersTests');
   const ok21 = await runSuite(path.join(__dirname, 'test-smart-fill.ts'), 'runSmartFillTests');
   const ok22 = await runSuite(path.join(__dirname, 'test-vector-explorer.ts'), 'runVectorExplorerTests');
+  const ok23 = await runSuite(path.join(__dirname, 'test-group-hierarchy.ts'), 'runGroupHierarchyTests');
 
-  const allSuccess = ok1 && ok2 && ok3 && ok4 && ok5 && ok6 && ok7 && ok8 && ok9 && ok10 && ok11 && ok12 && ok13 && ok14 && ok15 && ok16 && ok17 && ok18 && ok19 && ok20 && ok21 && ok22;
+  const allSuccess = ok1 && ok2 && ok3 && ok4 && ok5 && ok6 && ok7 && ok8 && ok9 && ok10 && ok11 && ok12 && ok13 && ok14 && ok15 && ok16 && ok17 && ok18 && ok19 && ok20 && ok21 && ok22 && ok23;
   process.exit(allSuccess ? 0 : 1);
 }
 

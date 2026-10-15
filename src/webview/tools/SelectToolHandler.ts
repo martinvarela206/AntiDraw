@@ -10,6 +10,7 @@ import { TranslateInteraction } from './interactions/TranslateInteraction.js';
 import { TransformInteraction } from './interactions/TransformInteraction.js';
 import { SelectionCursorHelper } from './interactions/SelectionCursorHelper.js';
 import { OverlayDescriptor } from '../engine/canvas/OverlayDescriptor.js';
+import { GroupHierarchyService } from '../engine/selection/GroupHierarchyService.js';
 
 export interface SelectToolCallbacks {
   onSelectionChanged?: () => void;
@@ -148,7 +149,12 @@ export class SelectToolHandler implements IToolHandler {
     if (e.shiftKey) {
       const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, this.ctx.canvasMgr.zoom, this.ctx.model.spatialIndex);
       if (hit) {
-        this.ctx.selectionTool.toggleSelect(hit.element.id);
+        const targetId = GroupHierarchyService.resolveAdditiveSelection(
+          this.ctx.model.elements,
+          hit.element.id,
+          this.ctx.selectionTool.activeGroupContextId
+        );
+        this.ctx.selectionTool.toggleSelect(targetId);
         this.callbacks.onClearPanelMode?.();
         this.callbacks.onSelectionChanged?.();
         this.ctx.render();
@@ -327,9 +333,22 @@ export class SelectToolHandler implements IToolHandler {
     // 7. Hit test vector elements under cursor
     const hit = this.ctx.selectionTool.hitTest(this.ctx.model.elements, pt, this.ctx.canvasMgr.zoom, this.ctx.model.spatialIndex);
 
+    let resolvedHitId: string | null = null;
+    let resolvedElement: any = null;
+    if (hit) {
+      const res = GroupHierarchyService.resolveSelection(
+        this.ctx.model.elements,
+        hit.element.id,
+        this.ctx.selectionTool.activeGroupContextId
+      );
+      resolvedHitId = res.targetId;
+      this.ctx.selectionTool.activeGroupContextId = res.nextContextId;
+      resolvedElement = this.ctx.model.getElementById(resolvedHitId) || hit.element;
+    }
+
     // Case 1: Clicked on a different, unselected vector element -> switch selection
-    if (hit && !this.ctx.selectionTool.isSelected(hit.element.id)) {
-      this.ctx.selectionTool.select(hit.element.id, hit.element);
+    if (resolvedHitId && !this.ctx.selectionTool.isSelected(resolvedHitId)) {
+      this.ctx.selectionTool.select(resolvedHitId, resolvedElement);
       this.callbacks.onSelectionChanged?.();
 
       const nowSelected = this.ctx.model.elements.filter((el) => this.ctx.selectionTool.isSelected(el.id));
@@ -348,7 +367,9 @@ export class SelectToolHandler implements IToolHandler {
     if (selectedEls.length > 0) {
       const z = this.ctx.canvasMgr.zoom || 1;
       const groupBox = this.ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 0);
-      const isHitSelected = hit && this.ctx.selectionTool.isSelected(hit.element.id);
+      const isHitSelected = resolvedHitId
+        ? this.ctx.selectionTool.isSelected(resolvedHitId)
+        : hit && this.ctx.selectionTool.isSelected(hit.element.id);
       const isNearAnchor = this.translateInteraction.isNearSelectionAnchor(this.ctx, selectedEls, pt, groupBox, z);
       const isInsideBox =
         groupBox &&
@@ -386,6 +407,7 @@ export class SelectToolHandler implements IToolHandler {
     }
 
     // Case 4: Clicked on empty canvas space: start Marquee selection
+    this.ctx.selectionTool.activeGroupContextId = null;
     const hadSelection =
       this.ctx.selectionTool.selectedElementIds.size > 0 ||
       this.ctx.canvasMgr.selectedGuideId !== null ||
@@ -546,6 +568,35 @@ export class SelectToolHandler implements IToolHandler {
     const targetEl = hit ? hit.element : (isInsideBox && selectedEls.length === 1 ? selectedEls[0] : null);
 
     if (targetEl) {
+      const currentSelectedId = this.ctx.selectionTool.selectedElementId;
+      if (currentSelectedId) {
+        const drillRes = GroupHierarchyService.drillDown(this.ctx.model.elements, currentSelectedId, targetEl.id);
+        if (drillRes.nextSelectedId && drillRes.nextSelectedId !== currentSelectedId) {
+          this.ctx.selectionTool.activeGroupContextId = drillRes.nextContextId;
+          const childEl = this.ctx.model.getElementById(drillRes.nextSelectedId);
+          if (childEl) {
+            this.ctx.selectionTool.select(childEl.id, childEl);
+            this.ctx.selectionTool.selectionMode = 'scale';
+            this.callbacks.onSelectionChanged?.();
+            this.ctx.render();
+            return true;
+          }
+        }
+      } else if (targetEl.tagName === 'g') {
+        const drillRes = GroupHierarchyService.drillDown(this.ctx.model.elements, targetEl.id);
+        if (drillRes.nextSelectedId) {
+          this.ctx.selectionTool.activeGroupContextId = drillRes.nextContextId;
+          const childEl = this.ctx.model.getElementById(drillRes.nextSelectedId);
+          if (childEl) {
+            this.ctx.selectionTool.select(childEl.id, childEl);
+            this.ctx.selectionTool.selectionMode = 'scale';
+            this.callbacks.onSelectionChanged?.();
+            this.ctx.render();
+            return true;
+          }
+        }
+      }
+
       /**
        * ARCHITECTURAL RATIONALE: CorelDraw Benchmark Direct Double-Click Tool Conmutation (ITEM-06)
        *
@@ -632,6 +683,20 @@ export class SelectToolHandler implements IToolHandler {
     if (e.key === 'Escape') {
       if (this.cancel()) {
         return true;
+      }
+      const currentSelectedId = this.ctx.selectionTool.selectedElementId;
+      if (currentSelectedId) {
+        const ascendRes = GroupHierarchyService.ascend(this.ctx.model.elements, currentSelectedId);
+        if (ascendRes.handled && ascendRes.nextSelectedId) {
+          this.ctx.selectionTool.activeGroupContextId = ascendRes.nextContextId;
+          const parentEl = this.ctx.model.getElementById(ascendRes.nextSelectedId);
+          this.ctx.selectionTool.select(ascendRes.nextSelectedId, parentEl);
+          this.ctx.selectionTool.selectionMode = 'scale';
+          this.callbacks.onClearPanelMode?.();
+          this.callbacks.onSelectionChanged?.();
+          this.ctx.render();
+          return true;
+        }
       }
       if (
         this.ctx.selectionTool.selectedElementIds.size > 0 ||

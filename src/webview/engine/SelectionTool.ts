@@ -29,6 +29,7 @@ export class SelectionTool {
   public isToggleMarquee: boolean = false;
   public isDeselectMarquee: boolean = false;
   public isTouchingMarquee: boolean = false;
+  public activeGroupContextId: string | null = null;
 
   /**
    * ARCHITECTURAL RATIONALE: Vector-Relative Rotation Pivot Lifecyle & Persistence
@@ -115,6 +116,7 @@ export class SelectionTool {
     this.selectedElementIds.delete(id);
     if (this.selectedElementIds.size === 0) {
       this.selectionMode = 'scale';
+      this.activeGroupContextId = null;
     }
   }
 
@@ -122,6 +124,7 @@ export class SelectionTool {
     this.customPivot = null;
     this.selectedElementIds.clear();
     this.selectionMode = 'scale';
+    this.activeGroupContextId = null;
   }
 
   /**
