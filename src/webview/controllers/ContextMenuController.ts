@@ -205,6 +205,23 @@ export class ContextMenuController {
             }
           },
         },
+        { id: 'separator', label: '', action: () => {} },
+        {
+          id: 'lock-all-above',
+          label: 'Bloquear Capas Superiores',
+          shortcut: 'Ctrl+Alt+L',
+          action: () => {
+            cmdRegistry.execute('object.lockAllAbove');
+          },
+        },
+        {
+          id: 'hide-all-above',
+          label: 'Ocultar Capas Superiores',
+          shortcut: 'Ctrl+Alt+3',
+          action: () => {
+            cmdRegistry.execute('object.hideAllAbove');
+          },
+        },
         ...(this.ctx.selectionTool.selectedElementIds.size >= 2
           ? [
               { id: 'separator-bool', label: '', action: () => {} },

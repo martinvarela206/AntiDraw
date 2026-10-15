@@ -6,6 +6,7 @@
 import { CommandRegistry, CommandSpec, CommandContext } from './CommandRegistry.js';
 import { registerAllDomainCommands } from '../../commands/index.js';
 import { ExportModal } from '../../ui/ExportModal.js';
+import { SceneLayerService } from '../scene/SceneLayerService.js';
 
 export function registerSystemCommands(registry: CommandRegistry): void {
   // Registrar comandos de dominio formalizados (shape.*, path.*, transform.*, node.*)
@@ -293,6 +294,107 @@ export function registerSystemCommands(registry: CommandRegistry): void {
         return { success: true };
       }
       return { success: false, error: 'Función recenterViewBox no disponible' };
+    },
+  });
+
+  // --- CAPAS Y ORDEN Z (SCENE LAYERS) ---
+  const executeLockAllAbove = (ctx: CommandContext) => {
+    if (!ctx.model || !ctx.selectionTool) {
+      return { success: false, error: 'Contexto no disponible' };
+    }
+    const res = SceneLayerService.lockAllAbove(ctx.model.elements, ctx.selectionTool.selectedElementIds);
+    if (res.affectedCount > 0) {
+      ctx.pushUndo?.();
+      ctx.layoutMgr?.vectorExplorerPanel?.update();
+      ctx.render?.();
+      ctx.syncToHost?.();
+    }
+    return { success: true, value: res };
+  };
+
+  registry.register({
+    id: 'layer.lockAllAbove',
+    label: 'Bloquear Capas Superiores',
+    category: 'layer',
+    shortcut: 'Ctrl+Alt+L',
+    isEnabled: (ctx: CommandContext) => (ctx.selectionTool?.selectedElementIds?.size || 0) > 0,
+    execute: executeLockAllAbove,
+  });
+
+  registry.register({
+    id: 'object.lockAllAbove',
+    label: 'Bloquear Capas Superiores',
+    category: 'object',
+    shortcut: 'Ctrl+Alt+L',
+    isEnabled: (ctx: CommandContext) => (ctx.selectionTool?.selectedElementIds?.size || 0) > 0,
+    execute: executeLockAllAbove,
+  });
+
+  const executeHideAllAbove = (ctx: CommandContext) => {
+    if (!ctx.model || !ctx.selectionTool) {
+      return { success: false, error: 'Contexto no disponible' };
+    }
+    const res = SceneLayerService.hideAllAbove(ctx.model.elements, ctx.selectionTool.selectedElementIds);
+    if (res.affectedCount > 0) {
+      ctx.pushUndo?.();
+      ctx.layoutMgr?.vectorExplorerPanel?.update();
+      ctx.render?.();
+      ctx.syncToHost?.();
+    }
+    return { success: true, value: res };
+  };
+
+  registry.register({
+    id: 'layer.hideAllAbove',
+    label: 'Ocultar Capas Superiores',
+    category: 'layer',
+    shortcut: 'Ctrl+Alt+3',
+    isEnabled: (ctx: CommandContext) => (ctx.selectionTool?.selectedElementIds?.size || 0) > 0,
+    execute: executeHideAllAbove,
+  });
+
+  registry.register({
+    id: 'object.hideAllAbove',
+    label: 'Ocultar Capas Superiores',
+    category: 'object',
+    shortcut: 'Ctrl+Alt+3',
+    isEnabled: (ctx: CommandContext) => (ctx.selectionTool?.selectedElementIds?.size || 0) > 0,
+    execute: executeHideAllAbove,
+  });
+
+  registry.register({
+    id: 'layer.unlockAll',
+    label: 'Desbloquear Todo',
+    category: 'layer',
+    shortcut: 'Ctrl+Alt+2',
+    execute: (ctx: CommandContext) => {
+      if (!ctx.model) return { success: false, error: 'Modelo no disponible' };
+      const res = SceneLayerService.unlockAll(ctx.model.elements);
+      if (res.affectedCount > 0) {
+        ctx.pushUndo?.();
+        ctx.layoutMgr?.vectorExplorerPanel?.update();
+        ctx.render?.();
+        ctx.syncToHost?.();
+      }
+      return { success: true, value: res };
+    },
+  });
+
+  registry.register({
+    id: 'layer.showAll',
+    label: 'Mostrar Todo',
+    category: 'layer',
+    shortcut: 'Ctrl+Alt+Shift+3',
+    execute: (ctx: CommandContext) => {
+      if (!ctx.model) return { success: false, error: 'Modelo no disponible' };
+      const res = SceneLayerService.showAll(ctx.model.elements);
+      if (res.affectedCount > 0) {
+        ctx.pushUndo?.();
+        ctx.layoutMgr?.vectorExplorerPanel?.update();
+        ctx.render?.();
+        ctx.syncToHost?.();
+      }
+      return { success: true, value: res };
     },
   });
 
