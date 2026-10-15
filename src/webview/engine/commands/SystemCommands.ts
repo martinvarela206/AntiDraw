@@ -12,6 +12,7 @@ import { ContextualVectorGridService } from '../scene/ContextualVectorGridServic
 import { ContextualGridModal } from '../../ui/ContextualGridModal.js';
 import { VectorElement } from '../VectorModel.js';
 import { SpineCurveService } from '../stroke/SpineCurveService.js';
+import { BlendEngine } from '../blend/BlendEngine.js';
 
 export function registerSystemCommands(registry: CommandRegistry): void {
   // Registrar comandos de dominio formalizados (shape.*, path.*, transform.*, node.*)
@@ -638,6 +639,76 @@ export function registerSystemCommands(registry: CommandRegistry): void {
       ctx.render?.();
       ctx.syncToHost?.();
       return { success: true, value: { affectedCount: selected.length } };
+    },
+  });
+
+  // --- FUSIÓN PARAMÉTRICA (BLEND TOOL - MDWiki 8.8) ---
+  registry.register({
+    id: 'blend.create',
+    label: 'Crear Fusión Paramétrica (Blend)',
+    category: 'object',
+    shortcut: 'W',
+    execute: (ctx: CommandContext) => {
+      if (!ctx.model || !ctx.selectionTool) return { success: false, error: 'Contexto no disponible' };
+      const selected = ctx.model.elements.filter((el: VectorElement) => ctx.selectionTool.isSelected(el.id));
+      if (selected.length !== 2) return { success: false, error: 'Se requieren exactamente 2 figuras seleccionadas para fusionar' };
+
+      ctx.pushUndo?.();
+      const blendGroup = BlendEngine.createBlendGroup(selected[0], selected[1]);
+      const idxA = ctx.model.elements.findIndex((e: VectorElement) => e.id === selected[0].id);
+      const idxB = ctx.model.elements.findIndex((e: VectorElement) => e.id === selected[1].id);
+      const minIdx = Math.max(0, Math.min(idxA, idxB));
+
+      ctx.model.elements = ctx.model.elements.filter((e: VectorElement) => e.id !== selected[0].id && e.id !== selected[1].id);
+      ctx.model.elements.splice(minIdx, 0, blendGroup);
+
+      ctx.selectionTool.deselectAll();
+      ctx.selectionTool.select(blendGroup.id);
+      ctx.render?.();
+      ctx.syncToHost?.();
+      return { success: true, value: { blendGroupId: blendGroup.id } };
+    },
+  });
+
+  registry.register({
+    id: 'blend.toggleReverseB',
+    label: 'Invertir Sentido de Recorrido B (Anti-Twisting)',
+    category: 'object',
+    execute: (ctx: CommandContext) => {
+      if (!ctx.model || !ctx.selectionTool) return { success: false, error: 'Contexto no disponible' };
+      const selected = ctx.model.elements.filter((el: VectorElement) => ctx.selectionTool.isSelected(el.id));
+      const blend = selected.find((el: VectorElement) => BlendEngine.isBlendGroup(el));
+      if (!blend) return { success: false, error: 'Ningún grupo de fusión seleccionado' };
+
+      ctx.pushUndo?.();
+      BlendEngine.toggleReverseDirectionB(blend);
+      ctx.render?.();
+      ctx.syncToHost?.();
+      return { success: true };
+    },
+  });
+
+  registry.register({
+    id: 'blend.expand',
+    label: 'Expandir Fusión a Vectores Independientes',
+    category: 'object',
+    execute: (ctx: CommandContext) => {
+      if (!ctx.model || !ctx.selectionTool) return { success: false, error: 'Contexto no disponible' };
+      const selected = ctx.model.elements.filter((el: VectorElement) => ctx.selectionTool.isSelected(el.id));
+      const blend = selected.find((el: VectorElement) => BlendEngine.isBlendGroup(el));
+      if (!blend) return { success: false, error: 'Ningún grupo de fusión seleccionado' };
+
+      ctx.pushUndo?.();
+      const expanded = BlendEngine.expandBlendGroup(blend);
+      const idx = ctx.model.elements.findIndex((e: VectorElement) => e.id === blend.id);
+      if (idx >= 0) {
+        ctx.model.elements.splice(idx, 1, ...expanded);
+        ctx.selectionTool.deselectAll();
+        expanded.forEach((e: VectorElement) => ctx.selectionTool.select(e.id));
+      }
+      ctx.render?.();
+      ctx.syncToHost?.();
+      return { success: true, value: { expandedCount: expanded.length } };
     },
   });
 }

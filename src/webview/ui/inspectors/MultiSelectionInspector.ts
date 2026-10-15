@@ -5,6 +5,7 @@ import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
 import { bindInspectorMouseDown } from './CanvasInspector.js';
 import { degreesToMiterLimit } from './AppearanceInspector.js';
 import { DistortInspectorControls } from './DistortInspectorControls.js';
+import { BlendEngine } from '../../engine/blend/BlendEngine.js';
 
 /**
  * MultiSelectionInspector
@@ -156,7 +157,35 @@ export class MultiSelectionInspector {
           <button class="btn-icon" id="btn-prop-bool-fragment" title="Divide / Fragment (Intersección y exclusión a la vez)">${ToolIcons.fragment}</button>
         </div>
       </div>
+
+      ${elements.length === 2 ? `
+        <div class="panel-section">
+          <div class="panel-title">Fusión Paramétrica (Blend)</div>
+          <div class="prop-row">
+            <button class="prop-input" id="btn-prop-blend-create" style="flex:1; cursor:pointer; font-weight:600; padding:6px; background:linear-gradient(135deg, rgba(99,102,241,0.2), rgba(168,85,247,0.2)); color:var(--text-main); border:1px solid rgba(99,102,241,0.4);" title="Crear una fusión paramétrica viva de K pasos entre las 2 figuras seleccionadas">
+              🧬 Crear Fusión (Blend)
+            </button>
+          </div>
+        </div>
+      ` : ''}
     `;
+
+    const btnBlendCreate = container.querySelector<HTMLButtonElement>('#btn-prop-blend-create');
+    if (btnBlendCreate && elements.length === 2) {
+      btnBlendCreate.addEventListener('click', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        const blendGroup = BlendEngine.createBlendGroup(elements[0], elements[1]);
+        const idxA = model.elements.findIndex((e) => e.id === elements[0].id);
+        const idxB = model.elements.findIndex((e) => e.id === elements[1].id);
+        const minIdx = Math.max(0, Math.min(idxA, idxB));
+        model.elements = model.elements.filter((e) => e.id !== elements[0].id && e.id !== elements[1].id);
+        model.elements.splice(minIdx, 0, blendGroup);
+        selectionTool.deselectAll();
+        selectionTool.select(blendGroup.id);
+        callbacks.onUpdateElement(blendGroup);
+        onReRender();
+      });
+    }
 
     const bFillColor = container.querySelector<HTMLInputElement>('#batch-fill-color');
     const bFillHex = container.querySelector<HTMLInputElement>('#batch-fill-hex');

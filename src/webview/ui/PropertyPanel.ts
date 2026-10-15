@@ -63,6 +63,8 @@ import { MultiSelectionInspector } from './inspectors/MultiSelectionInspector.js
 import { SwatchPaletteInspector } from './inspectors/SwatchPaletteInspector.js';
 import { StrokeInspector, StrokeInspectorProps } from './inspectors/StrokeInspector.js';
 import { QuickHelpInspector } from './inspectors/QuickHelpInspector.js';
+import { BlendEngine } from '../engine/blend/BlendEngine.js';
+import { BlendInspector } from './inspectors/BlendInspector.js';
 
 export class PropertyPanel {
   private container: HTMLElement;
@@ -581,7 +583,11 @@ export class PropertyPanel {
       ? this.model.detectPrimitiveFromPath(el)
       : null;
 
+    const isBlend = BlendEngine.isBlendGroup(el);
+
     this.inspectorContainer.innerHTML = `
+      ${isBlend ? BlendInspector.renderHtml(el) : ''}
+
       ${GeometryInspector.renderHtml(el, this.model, this.selectionTool, box, pivot, isClosed, detectedPrimitive)}
 
       ${PrimitiveInspector.renderElementPrimitives(el, this.model, box)}
@@ -670,6 +676,10 @@ export class PropertyPanel {
     this.bindMouseDown('btn-prop-bool-fragment-single', () => this.callbacks.onBoolean && this.callbacks.onBoolean('fragment'));
 
     EffectsInspector.bindEvents(this.inspectorContainer, el, ds, is, this.callbacks);
+
+    if (isBlend) {
+      BlendInspector.bindEvents(this.inspectorContainer, el, this.model, this.callbacks, () => this.renderPanel());
+    }
   }
 
   // Render Stroke Tool Empty State (No vector selected)
