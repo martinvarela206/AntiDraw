@@ -62,8 +62,9 @@ async function main() {
   const ok29 = await runSuite(path.join(__dirname, 'test-blend-tool.ts'), 'runBlendToolTests');
   const ok30 = await runSuite(path.join(__dirname, 'test-svg-deserializer-fidelity.ts'), 'runSvgDeserializerFidelityTests');
   const ok31 = await runSuite(path.join(__dirname, 'test-warp-arc.ts'), 'runWarpArcTests');
+  const ok32 = await runSuite(path.join(__dirname, 'test-pattern-tile-cache.ts'), 'runPatternTileCacheTests');
 
-  const allSuccess = ok1 && ok2 && ok3 && ok4 && ok5 && ok6 && ok7 && ok8 && ok9 && ok10 && ok11 && ok12 && ok13 && ok14 && ok15 && ok16 && ok17 && ok18 && ok19 && ok20 && ok21 && ok22 && ok23 && ok24 && ok25 && ok26 && ok27 && ok28 && ok29 && ok30 && ok31;
+  const allSuccess = ok1 && ok2 && ok3 && ok4 && ok5 && ok6 && ok7 && ok8 && ok9 && ok10 && ok11 && ok12 && ok13 && ok14 && ok15 && ok16 && ok17 && ok18 && ok19 && ok20 && ok21 && ok22 && ok23 && ok24 && ok25 && ok26 && ok27 && ok28 && ok29 && ok30 && ok31 && ok32;
   process.exit(allSuccess ? 0 : 1);
 }
 

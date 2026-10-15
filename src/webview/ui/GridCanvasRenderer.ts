@@ -1,4 +1,5 @@
 import { CanvasManager } from '../engine/CanvasManager.js';
+import { PatternTileCacheService, PatternTileDescriptor } from '../engine/canvas/PatternTileCacheService.js';
 
 export interface GridRenderOptions {
   scrollArea: HTMLElement;
@@ -8,6 +9,7 @@ export interface GridRenderOptions {
   zoom: number;
   originX: number;
   originY: number;
+  enablePatternTileCache?: boolean;
 }
 
 /**
@@ -44,14 +46,24 @@ export interface GridRenderOptions {
 export class GridCanvasRenderer {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
+  private patternCache: PatternTileCacheService;
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, patternCache?: PatternTileCacheService) {
     this.canvas = canvas;
     const context = this.canvas.getContext('2d', { alpha: true });
     if (!context) {
       throw new Error('Failed to acquire 2D rendering context for GridCanvasRenderer.');
     }
     this.ctx = context;
+    this.patternCache = patternCache || new PatternTileCacheService();
+  }
+
+  public getPatternCacheService(): PatternTileCacheService {
+    return this.patternCache;
+  }
+
+  public setPatternCacheService(service: PatternTileCacheService): void {
+    this.patternCache = service;
   }
 
   public render(options: GridRenderOptions): void {
@@ -121,6 +133,36 @@ export class GridCanvasRenderer {
       this.ctx.strokeStyle = grid.color || 'rgba(255, 255, 255, 0.15)';
       this.ctx.lineWidth = 1;
       this.ctx.setLineDash([2, 2]);
+
+      // Fast-path: Check Multi-Scale Zoom-Indexed Pattern Tile Cache for complex grids
+      const usePatternCache = options.enablePatternTileCache ?? true;
+      if (usePatternCache && (grid.type === 'axonometric' || grid.type === 'isometric')) {
+        const targetRect = {
+          x: clipLeft,
+          y: clipTop,
+          width: clipRight - clipLeft,
+          height: clipBottom - clipTop,
+        };
+        const descriptor =
+          grid.type === 'isometric'
+            ? PatternTileCacheService.createIsometricGridDescriptor(S, grid.color)
+            : PatternTileCacheService.createAxonometricGridDescriptor(S, grid.color);
+
+        const rendered = this.patternCache.renderTiledRect(
+          this.ctx,
+          targetRect,
+          descriptor,
+          zoom,
+          cameraOffset,
+          { x: originX, y: originY },
+          { minX: workBounds.minX, minY: workBounds.minY },
+          dpr
+        );
+
+        if (rendered) {
+          return;
+        }
+      }
 
       if (grid.type === 'axonometric') {
         this.ctx.beginPath();

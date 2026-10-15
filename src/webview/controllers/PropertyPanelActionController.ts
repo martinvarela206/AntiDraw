@@ -249,7 +249,7 @@ export class PropertyPanelActionController {
       onApplyWarpArc: (options: WarpArcOptions) => {
         const selectedEls = this.ctx.model.elements.filter((el) => this.ctx.selectionTool.isSelected(el.id));
         if (selectedEls.length === 0) return;
-        this.ctx.canvasMgr?.pushUndo();
+        s.historyService.pushUndo();
         selectedEls.forEach((el) => {
           if (this.ctx.model.isParametricElement(el)) {
             this.ctx.model.convertToCurves(el);
@@ -267,7 +267,7 @@ export class PropertyPanelActionController {
       onResetWarp: () => {
         const selectedEls = this.ctx.model.elements.filter((el) => this.ctx.selectionTool.isSelected(el.id));
         if (selectedEls.length === 0) return;
-        this.ctx.canvasMgr?.pushUndo();
+        s.historyService.pushUndo();
         selectedEls.forEach((el) => {
           WarpEngine.resetWarp(el);
         });
