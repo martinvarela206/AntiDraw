@@ -41,6 +41,7 @@ export interface VectorElement {
   isParametric?: boolean;
   shapeType?: ParametricShapeType | 'path' | 'star';
   children?: VectorElement[];
+  textContent?: string;
 }
 
 export interface CanvasSettings {

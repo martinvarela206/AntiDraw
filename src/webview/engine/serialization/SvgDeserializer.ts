@@ -205,6 +205,15 @@ export class SvgDeserializer {
         'stroke-opacity',
         'opacity',
         'color',
+        'font-family',
+        'font-size',
+        'font-weight',
+        'font-style',
+        'font-variant',
+        'line-height',
+        'letter-spacing',
+        'word-spacing',
+        'text-anchor',
       ];
 
       const extractPresentationAttrs = (el: Element): Record<string, string> => {
@@ -224,6 +233,11 @@ export class SvgDeserializer {
               const val = d.substring(colon + 1).trim();
               if (INHERITABLE_PRESENTATION_ATTRS.includes(prop) && val) {
                 res[prop] = val;
+              } else if (prop === 'font' && val) {
+                const expanded = SvgDeserializer.parseFontShorthand(val);
+                if (expanded) {
+                  Object.assign(res, expanded);
+                }
               }
             }
           }
@@ -240,8 +254,181 @@ export class SvgDeserializer {
       const parseNode = (node: Element, inherited: Record<string, string>) => {
         const tag = node.tagName.toLowerCase();
         if (tag === 'g') {
-          const groupInherited = { ...inherited, ...extractPresentationAttrs(node) };
+          const gAttrs: Record<string, string> = {};
+          if (node.hasAttribute('style')) gAttrs.style = node.getAttribute('style')!;
+          if (node.hasAttribute('transform')) gAttrs.transform = node.getAttribute('transform')!;
+          SvgDeserializer.cleanStyleAttr(gAttrs);
+          if (gAttrs.transform) {
+            gAttrs.transform = SvgDeserializer.normalizeTransform(gAttrs.transform);
+          }
+          const groupInherited = { ...inherited, ...extractPresentationAttrs(node), ...gAttrs };
           Array.from(node.children).forEach((ch) => parseNode(ch, groupInherited));
+          return;
+        }
+
+        // Inkscape SVG 1.2 <flowRoot> flowing text compatibility
+        if (tag === 'flowroot') {
+          const flowRegion = node.querySelector('flowRegion');
+          const flowRect = flowRegion ? flowRegion.querySelector('rect') : null;
+          const rx = flowRect ? parseFloat(flowRect.getAttribute('x') || '0') : 0;
+          const ry = flowRect ? parseFloat(flowRect.getAttribute('y') || '0') : 0;
+          const rw = flowRect ? parseFloat(flowRect.getAttribute('width') || '100') : 100;
+          const rh = flowRect ? parseFloat(flowRect.getAttribute('height') || '50') : 50;
+
+          const paraEls = Array.from(node.querySelectorAll('flowPara'));
+
+          const idx = elementIdx++;
+          let textElemId = node.getAttribute('id') || `flow_${idx}_${Date.now().toString(36)}`;
+          if (usedIds.has(textElemId)) {
+            textElemId = `flow_${idx}_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
+          }
+          usedIds.add(textElemId);
+
+          const elemAttrs: Record<string, string> = {};
+          for (let i = 0; i < node.attributes.length; i++) {
+            const attr = node.attributes[i];
+            elemAttrs[attr.name] = attr.value;
+          }
+
+          const inlinePres = extractPresentationAttrs(node);
+          for (const [k, v] of Object.entries(inlinePres)) {
+            if (elemAttrs[k] === undefined) elemAttrs[k] = v;
+          }
+          for (const [k, v] of Object.entries(inherited)) {
+            if (elemAttrs[k] === undefined) elemAttrs[k] = v;
+          }
+
+          SvgDeserializer.cleanStyleAttr(elemAttrs);
+          if (elemAttrs.transform) {
+            elemAttrs.transform = SvgDeserializer.normalizeTransform(elemAttrs.transform);
+          }
+
+          const fontSize = parseFloat(elemAttrs['font-size'] || '14') || 14;
+          elemAttrs.id = textElemId;
+          elemAttrs.x = rx.toString();
+          elemAttrs.y = (ry + fontSize).toString();
+          elemAttrs['data-area-type'] = 'true';
+          elemAttrs['data-flow-region-x'] = rx.toString();
+          elemAttrs['data-flow-region-y'] = ry.toString();
+          elemAttrs['data-flow-region-width'] = rw.toString();
+          elemAttrs['data-flow-region-height'] = rh.toString();
+
+          const textElem: VectorElement = {
+            id: textElemId,
+            tagName: 'text',
+            attributes: elemAttrs,
+            children: [],
+            isClosed: true,
+            vertices: [
+              { id: `${textElemId}_v0`, x: rx, y: ry, nodeType: 'sharp', command: 'M' },
+              { id: `${textElemId}_v1`, x: rx + rw, y: ry, nodeType: 'sharp', command: 'L' },
+              { id: `${textElemId}_v2`, x: rx + rw, y: ry + rh, nodeType: 'sharp', command: 'L' },
+              { id: `${textElemId}_v3`, x: rx, y: ry + rh, nodeType: 'sharp', command: 'L' },
+            ],
+          };
+
+          const textLines: string[] = [];
+          paraEls.forEach((pEl, pIdx) => {
+            const pText = pEl.textContent || '';
+            textLines.push(pText);
+            const pPres = extractPresentationAttrs(pEl);
+            const pAttrs: Record<string, string> = {};
+            for (let i = 0; i < pEl.attributes.length; i++) {
+              pAttrs[pEl.attributes[i].name] = pEl.attributes[i].value;
+            }
+            SvgDeserializer.cleanStyleAttr(pAttrs);
+            const tspanAttrs: Record<string, string> = {
+              x: rx.toString(),
+              dy: pIdx === 0 ? '0' : `${Math.round(fontSize * 1.25)}`,
+              ...pPres,
+              ...pAttrs,
+            };
+            textElem.children!.push({
+              id: `${textElemId}_para_${pIdx}`,
+              tagName: 'tspan',
+              attributes: tspanAttrs,
+              textContent: pText,
+            });
+          });
+
+          textElem.textContent = textLines.join('\n');
+          ctx.elements.push(textElem);
+          return;
+        }
+
+        // Standard W3C SVG <text> support
+        if (tag === 'text') {
+          const idx = elementIdx++;
+          let textElemId = node.getAttribute('id') || `text_${idx}_${Date.now().toString(36)}`;
+          if (usedIds.has(textElemId)) {
+            textElemId = `text_${idx}_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
+          }
+          usedIds.add(textElemId);
+
+          const elemAttrs: Record<string, string> = {};
+          for (let i = 0; i < node.attributes.length; i++) {
+            const attr = node.attributes[i];
+            elemAttrs[attr.name] = attr.value;
+          }
+
+          const inlinePres = extractPresentationAttrs(node);
+          for (const [k, v] of Object.entries(inlinePres)) {
+            if (elemAttrs[k] === undefined) elemAttrs[k] = v;
+          }
+          for (const [k, v] of Object.entries(inherited)) {
+            if (elemAttrs[k] === undefined) elemAttrs[k] = v;
+          }
+
+          SvgDeserializer.cleanStyleAttr(elemAttrs);
+          if (elemAttrs.transform) {
+            elemAttrs.transform = SvgDeserializer.normalizeTransform(elemAttrs.transform);
+          }
+
+          elemAttrs.id = textElemId;
+          const fontSize = parseFloat(elemAttrs['font-size'] || '14') || 14;
+          const tx = parseFloat(elemAttrs.x || '0') || 0;
+          const ty = parseFloat(elemAttrs.y || '0') || 0;
+
+          const textElem: VectorElement = {
+            id: textElemId,
+            tagName: 'text',
+            attributes: elemAttrs,
+            children: [],
+            isClosed: false,
+          };
+
+          const tspans = Array.from(node.querySelectorAll('tspan'));
+          if (tspans.length > 0) {
+            tspans.forEach((ts, tsIdx) => {
+              const tsAttrs: Record<string, string> = {};
+              for (let i = 0; i < ts.attributes.length; i++) {
+                tsAttrs[ts.attributes[i].name] = ts.attributes[i].value;
+              }
+              const tsPres = extractPresentationAttrs(ts);
+              SvgDeserializer.cleanStyleAttr(tsAttrs);
+              Object.assign(tsAttrs, tsPres);
+              textElem.children!.push({
+                id: ts.getAttribute('id') || `${textElemId}_ts_${tsIdx}`,
+                tagName: 'tspan',
+                attributes: tsAttrs,
+                textContent: ts.textContent || '',
+              });
+            });
+            textElem.textContent = tspans.map((t) => t.textContent || '').join('\n');
+          } else {
+            textElem.textContent = node.textContent || '';
+          }
+
+          const estWidth = Math.max(20, (textElem.textContent.length || 5) * (fontSize * 0.6));
+          const estHeight = fontSize * 1.2;
+          textElem.vertices = [
+            { id: `${textElemId}_v0`, x: tx, y: ty - fontSize, nodeType: 'sharp', command: 'M' },
+            { id: `${textElemId}_v1`, x: tx + estWidth, y: ty - fontSize, nodeType: 'sharp', command: 'L' },
+            { id: `${textElemId}_v2`, x: tx + estWidth, y: ty, nodeType: 'sharp', command: 'L' },
+            { id: `${textElemId}_v3`, x: tx, y: ty, nodeType: 'sharp', command: 'L' },
+          ];
+
+          ctx.elements.push(textElem);
           return;
         }
 
@@ -278,6 +465,11 @@ export class SvgDeserializer {
             if (attrs[k] === undefined) {
               attrs[k] = v;
             }
+          }
+
+          SvgDeserializer.cleanStyleAttr(attrs);
+          if (attrs.transform) {
+            attrs.transform = SvgDeserializer.normalizeTransform(attrs.transform);
           }
 
           const parseFinite = (val: string | null, defVal: number): number => {
@@ -531,6 +723,243 @@ export class SvgDeserializer {
     } catch (e) {
       console.error('Failed to parse SVG string', e);
       ctx.createDefaultCanvas();
+    }
+  }
+
+  /**
+   * Normalizes length strings (e.g., '10px', '12pt', '2in', '5mm') into unitless SVG scalar numbers.
+   */
+  public static normalizeLength(val: string): string {
+    val = val.trim();
+    const num = parseFloat(val);
+    if (!Number.isFinite(num)) return val;
+    if (val.endsWith('px')) {
+      return formatNum(num);
+    } else if (val.endsWith('pt')) {
+      return formatNum(num * (96 / 72));
+    } else if (val.endsWith('in')) {
+      return formatNum(num * 96);
+    } else if (val.endsWith('mm')) {
+      return formatNum(num * (96 / 25.4));
+    } else if (val.endsWith('cm')) {
+      return formatNum(num * (960 / 25.4));
+    }
+    return formatNum(num);
+  }
+
+  /**
+   * Normalizes angle strings ('45deg', '1.57rad', '100grad', '0.25turn') into canonical degrees.
+   */
+  public static normalizeAngle(val: string): string {
+    val = val.trim();
+    const num = parseFloat(val);
+    if (!Number.isFinite(num)) return val;
+    if (val.endsWith('deg')) {
+      return formatNum(num);
+    } else if (val.endsWith('grad')) {
+      return formatNum((num * 360) / 400);
+    } else if (val.endsWith('rad')) {
+      return formatNum((num * 180) / Math.PI);
+    } else if (val.endsWith('turn')) {
+      return formatNum(num * 360);
+    }
+    return formatNum(num);
+  }
+
+  /**
+   * Normalizes CSS transform declarations into canonical unitless SVG standard attribute format.
+   * Converts units (px, deg, rad, grad, turn) and remaps single-axis functions (translateX, translateY, scaleX, scaleY, skew).
+   */
+  public static normalizeTransform(transformStr: string): string {
+    if (!transformStr || !transformStr.trim()) return '';
+    const fnRegex = /([a-zA-Z]+)\s*\(([^)]*)\)/g;
+    const parts: string[] = [];
+    let match: RegExpExecArray | null;
+
+    while ((match = fnRegex.exec(transformStr)) !== null) {
+      const fn = match[1].toLowerCase();
+      const rawArgs = match[2].trim();
+      const args = rawArgs.split(/[\s,]+/).filter(Boolean);
+
+      switch (fn) {
+        case 'translatex': {
+          const x = SvgDeserializer.normalizeLength(args[0] || '0');
+          parts.push(`translate(${x}, 0)`);
+          break;
+        }
+        case 'translatey': {
+          const y = SvgDeserializer.normalizeLength(args[0] || '0');
+          parts.push(`translate(0, ${y})`);
+          break;
+        }
+        case 'translate': {
+          const x = SvgDeserializer.normalizeLength(args[0] || '0');
+          if (args.length >= 2) {
+            const y = SvgDeserializer.normalizeLength(args[1]);
+            parts.push(`translate(${x}, ${y})`);
+          } else {
+            parts.push(`translate(${x}, 0)`);
+          }
+          break;
+        }
+        case 'scalex': {
+          const sx = SvgDeserializer.normalizeLength(args[0] || '1');
+          parts.push(`scale(${sx}, 1)`);
+          break;
+        }
+        case 'scaley': {
+          const sy = SvgDeserializer.normalizeLength(args[0] || '1');
+          parts.push(`scale(1, ${sy})`);
+          break;
+        }
+        case 'scale': {
+          const sx = SvgDeserializer.normalizeLength(args[0] || '1');
+          if (args.length >= 2) {
+            const sy = SvgDeserializer.normalizeLength(args[1]);
+            parts.push(`scale(${sx}, ${sy})`);
+          } else {
+            parts.push(`scale(${sx})`);
+          }
+          break;
+        }
+        case 'rotate': {
+          const angle = SvgDeserializer.normalizeAngle(args[0] || '0');
+          if (args.length >= 3) {
+            const cx = SvgDeserializer.normalizeLength(args[1]);
+            const cy = SvgDeserializer.normalizeLength(args[2]);
+            parts.push(`rotate(${angle}, ${cx}, ${cy})`);
+          } else {
+            parts.push(`rotate(${angle})`);
+          }
+          break;
+        }
+        case 'skew': {
+          const ax = SvgDeserializer.normalizeAngle(args[0] || '0');
+          if (args.length >= 2) {
+            const ay = SvgDeserializer.normalizeAngle(args[1]);
+            parts.push(`skewX(${ax}) skewY(${ay})`);
+          } else {
+            parts.push(`skewX(${ax})`);
+          }
+          break;
+        }
+        case 'skewx': {
+          const ax = SvgDeserializer.normalizeAngle(args[0] || '0');
+          parts.push(`skewX(${ax})`);
+          break;
+        }
+        case 'skewy': {
+          const ay = SvgDeserializer.normalizeAngle(args[0] || '0');
+          parts.push(`skewY(${ay})`);
+          break;
+        }
+        case 'matrix': {
+          const normArgs = args.map((a) => SvgDeserializer.normalizeLength(a));
+          parts.push(`matrix(${normArgs.join(', ')})`);
+          break;
+        }
+        default: {
+          const normArgs = args.map((a) => SvgDeserializer.normalizeLength(a));
+          parts.push(`${fn}(${normArgs.join(', ')})`);
+          break;
+        }
+      }
+    }
+
+    return parts.join(' ');
+  }
+
+  /**
+   * Decomposes CSS font shorthand (e.g., 'italic bold 16px/1.5 "Inter", sans-serif') into its constituent SVG longhands.
+   */
+  public static parseFontShorthand(fontStr: string): Record<string, string> | null {
+    if (!fontStr || !fontStr.trim()) return null;
+    const trimmed = fontStr.trim();
+
+    const sizeFamilyRegex = /(?:^|\s)(?:(100|200|300|400|500|600|700|800|900)\s+)?([0-9.]+(?:px|pt|em|rem|%|vw|vh)?)(?:\/([0-9.]+(?:px|pt|em|rem|%)?))?\s+(.+)$/i;
+    const match = trimmed.match(sizeFamilyRegex);
+    if (!match) return null;
+
+    const optWeight = match[1];
+    const sizeStr = match[2];
+    const lineHeightStr = match[3];
+    const familyStr = match[4];
+
+    const matchStartIndex = trimmed.indexOf(match[0].trim());
+    const prefix = trimmed.substring(0, matchStartIndex).trim();
+    const result: Record<string, string> = {};
+
+    if (optWeight) {
+      result['font-weight'] = optWeight;
+    }
+
+    if (prefix) {
+      const tokens = prefix.split(/\s+/);
+      for (const token of tokens) {
+        const lower = token.toLowerCase();
+        if (['italic', 'oblique'].includes(lower)) {
+          result['font-style'] = lower;
+        } else if (['bold', 'bolder', 'lighter'].includes(lower) || /^[1-9]00$/.test(lower)) {
+          result['font-weight'] = lower;
+        } else if (lower === 'small-caps') {
+          result['font-variant'] = 'small-caps';
+        } else if (lower === 'normal') {
+          if (!result['font-style']) result['font-style'] = 'normal';
+        }
+      }
+    }
+
+    const numSize = parseFloat(sizeStr);
+    result['font-size'] = Number.isFinite(numSize) ? formatNum(numSize) : sizeStr;
+
+    if (lineHeightStr) {
+      result['line-height'] = lineHeightStr;
+    }
+
+    if (familyStr) {
+      result['font-family'] = familyStr.trim();
+    }
+
+    return result;
+  }
+
+  /**
+   * Cleans an element's inline style attribute, extracting and normalizing transform
+   * and expanding font shorthand into direct element attributes.
+   */
+  public static cleanStyleAttr(attrs: Record<string, string>): void {
+    if (!attrs.style) return;
+    const decls = attrs.style.split(';');
+    const remainingDecls: string[] = [];
+
+    for (const d of decls) {
+      const colon = d.indexOf(':');
+      if (colon <= 0) continue;
+      const prop = d.substring(0, colon).trim().toLowerCase();
+      const val = d.substring(colon + 1).trim();
+      if (!val) continue;
+
+      if (prop === 'transform') {
+        const norm = SvgDeserializer.normalizeTransform(val);
+        if (norm) {
+          attrs.transform = attrs.transform ? `${attrs.transform} ${norm}` : norm;
+        }
+      } else if (prop === 'font') {
+        const expanded = SvgDeserializer.parseFontShorthand(val);
+        if (expanded) {
+          for (const [k, v] of Object.entries(expanded)) {
+            if (attrs[k] === undefined) attrs[k] = v;
+          }
+        }
+      } else {
+        remainingDecls.push(`${prop}:${val}`);
+      }
+    }
+
+    if (remainingDecls.length > 0) {
+      attrs.style = remainingDecls.join(';');
+    } else {
+      delete attrs.style;
     }
   }
 }

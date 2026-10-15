@@ -698,7 +698,25 @@ export class SvgSerializer {
           delete el.attributes['data-gradient'];
         }
 
-        svg += `  <${el.tagName}${serializeCleanAttrs(el.attributes)} />\n`;
+        if (el.tagName === 'text' || el.children || el.textContent) {
+          if (el.children && el.children.length > 0) {
+            svg += `  <${el.tagName}${serializeCleanAttrs(el.attributes)}>\n`;
+            for (const ch of el.children) {
+              if (ch.textContent) {
+                svg += `    <${ch.tagName}${serializeCleanAttrs(ch.attributes)}>${escapeXml(ch.textContent)}</${ch.tagName}>\n`;
+              } else {
+                svg += `    <${ch.tagName}${serializeCleanAttrs(ch.attributes)} />\n`;
+              }
+            }
+            svg += `  </${el.tagName}>\n`;
+          } else if (el.textContent) {
+            svg += `  <${el.tagName}${serializeCleanAttrs(el.attributes)}>${escapeXml(el.textContent)}</${el.tagName}>\n`;
+          } else {
+            svg += `  <${el.tagName}${serializeCleanAttrs(el.attributes)} />\n`;
+          }
+        } else {
+          svg += `  <${el.tagName}${serializeCleanAttrs(el.attributes)} />\n`;
+        }
       }
 
       for (const layer of aboveLayers) {

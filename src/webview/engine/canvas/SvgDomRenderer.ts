@@ -91,6 +91,20 @@ export class SvgDomRenderer {
       for (const [key, value] of Object.entries(el.attributes)) {
         domEl.setAttribute(key, value);
       }
+      if (el.children && el.children.length > 0) {
+        for (const child of el.children) {
+          const childDom = document.createElementNS(SvgDomRenderer.SVG_NS, child.tagName);
+          for (const [ck, cv] of Object.entries(child.attributes)) {
+            childDom.setAttribute(ck, cv);
+          }
+          if (child.textContent) {
+            childDom.textContent = child.textContent;
+          }
+          domEl.appendChild(childDom);
+        }
+      } else if (el.textContent) {
+        domEl.textContent = el.textContent;
+      }
       svgCanvas.appendChild(domEl);
     }
   }
