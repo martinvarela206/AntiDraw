@@ -37,6 +37,7 @@ import guideDoubleArrowVerticalRightRotateSvg from '../assets/icons/guide_double
 import guidesVisibilitySvg from '../assets/icons/guides_visibility.svg';
 import intersectSvg from '../assets/icons/intersect.svg';
 import knifeToolSvg from '../assets/icons/knife_tool.svg';
+import layersSvg from '../assets/icons/layers.svg';
 import lineToolSvg from '../assets/icons/line_tool.svg';
 import nodeAsymmetricSvg from '../assets/icons/node_asymmetric.svg';
 import nodeSharpSvg from '../assets/icons/node_sharp.svg';
@@ -97,6 +98,7 @@ export const ToolIcons = {
   guidesVisibility: guidesVisibilitySvg,
   intersect: intersectSvg,
   knifeTool: knifeToolSvg,
+  layers: layersSvg,
   lineTool: lineToolSvg,
   nodeAsymmetric: nodeAsymmetricSvg,
   nodeSharp: nodeSharpSvg,

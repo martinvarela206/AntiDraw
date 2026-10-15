@@ -36,6 +36,7 @@ export interface ShapeToolConfig {
 export class CanvasManager {
   public showRulers: boolean = true;
   public showGuides: boolean = true;
+  public showVectorExplorer: boolean = false;
 
   /**
    * ARCHITECTURAL RATIONALE: Parametric Multi-Grid Architecture

@@ -108,6 +108,41 @@ class AntiDrawApp {
       rulerCallbacks: this.chromeCtrl.createRulerCallbacks(),
       propertyPanelCallbacks: this.propertyPanelCtrl.createCallbacks(),
       onScroll: () => this.services.workspaceLayout.syncRulerScroll(),
+      onExplorerSelectElement: (id, multi) => {
+        if (multi) {
+          if (this.selectionTool.selectedElementIds.has(id)) {
+            this.selectionTool.selectedElementIds.delete(id);
+          } else {
+            this.selectionTool.selectedElementIds.add(id);
+          }
+        } else {
+          this.selectionTool.selectedElementIds.clear();
+          this.selectionTool.selectedElementIds.add(id);
+        }
+        this.services.workspaceLayout.render();
+      },
+      onExplorerToggleVisibility: (id) => {
+        const el = this.model.getElementById(id);
+        if (el) {
+          el.attributes.display = el.attributes.display === 'none' ? 'inline' : 'none';
+          this.services.historyService.pushUndo();
+          this.services.workspaceLayout.render();
+          this.hostSyncService.syncToHost();
+        }
+      },
+      onExplorerToggleLock: (id) => {
+        const el = this.model.getElementById(id);
+        if (el) {
+          const locked = el.attributes['data-locked'] === 'true';
+          el.attributes['data-locked'] = locked ? 'false' : 'true';
+          this.services.historyService.pushUndo();
+          this.services.workspaceLayout.render();
+          this.hostSyncService.syncToHost();
+        }
+      },
+      onExplorerRecenter: () => {
+        this.viewportCtrl?.recenterViewBox();
+      },
     });
 
     this.viewportCtrl = new ViewportController({

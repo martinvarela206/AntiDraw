@@ -108,6 +108,13 @@ export class ChromeActionController {
         this.ctx.workspaceLayout().render();
         this.ctx.hostSyncService().syncMetadataToHost();
       },
+      onToggleVectorExplorer: () => {
+        this.ctx.canvasMgr.showVectorExplorer = !this.ctx.canvasMgr.showVectorExplorer;
+        const layout = this.ctx.getLayoutMgr();
+        layout?.vectorExplorerPanel.setVisible(this.ctx.canvasMgr.showVectorExplorer);
+        layout?.topBar.update();
+        this.ctx.hostSyncService().syncMetadataToHost();
+      },
       onToggleGuides: () => {
         this.ctx.canvasMgr.showGuides = !this.ctx.canvasMgr.showGuides;
         this.ctx.getLayoutMgr()?.topBar.update();

@@ -8,6 +8,7 @@ export interface TopBarCallbacks {
   onFlip?: (axis: 'horizontal' | 'vertical') => void;
   onBoolean?: (op: 'union' | 'subtract' | 'intersect' | 'exclude' | 'combine' | 'fragment') => void;
   onZOrder: (action: 'front' | 'forward' | 'backward' | 'back') => void;
+  onToggleVectorExplorer?: () => void;
   onToggleRulers?: () => void;
   onToggleGrid: () => void;
   onToggleGuides: () => void;
@@ -66,6 +67,13 @@ export class TopBar {
 
       <div class="top-bar-divider"></div>
 
+      <!-- Vector Explorer / Scene Tree -->
+      <div class="top-bar-group">
+        <button class="btn-icon ${this.canvasMgr.showVectorExplorer ? 'active' : ''}" id="btn-toggle-explorer" title="Toggle Vector Explorer (Scene Tree)">${ToolIcons.layers}</button>
+      </div>
+
+      <div class="top-bar-divider"></div>
+
       <!-- Grid, Guides & Snapping -->
       <div class="top-bar-group">
         <button class="btn-icon ${this.canvasMgr.showRulers ? 'active' : ''}" id="btn-toggle-rulers" title="Toggle Rulers">${ToolIcons.rulersVisibility}</button>
@@ -100,6 +108,7 @@ export class TopBar {
     this.bindClick('btn-z-backward', () => this.callbacks.onZOrder('backward'));
     this.bindClick('btn-z-back', () => this.callbacks.onZOrder('back'));
 
+    this.bindClick('btn-toggle-explorer', () => this.callbacks.onToggleVectorExplorer?.());
     this.bindClick('btn-toggle-rulers', () => this.callbacks.onToggleRulers?.());
     this.bindClick('btn-toggle-grid', () => this.callbacks.onToggleGrid());
     this.bindClick('btn-toggle-guides', () => this.callbacks.onToggleGuides());

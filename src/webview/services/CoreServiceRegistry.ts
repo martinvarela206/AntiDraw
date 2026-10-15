@@ -105,6 +105,7 @@ export class CoreServiceRegistry {
       getSession: () => ctx.getTools().session,
       getPenHandler: () => ctx.getTools().penToolHandler,
       getPolylineHandler: () => ctx.getTools().polylineToolHandler,
+      getVectorExplorerPanel: () => ctx.getLayoutMgr()?.vectorExplorerPanel,
     });
 
     return {

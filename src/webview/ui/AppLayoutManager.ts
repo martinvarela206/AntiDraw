@@ -6,6 +6,7 @@ import { Toolbar, ToolType } from './Toolbar.js';
 import { TopBar, TopBarCallbacks } from './TopBar.js';
 import { RulerView, RulerViewCallbacks } from './RulerView.js';
 import { PropertyPanel, PropertyPanelCallbacks } from './PropertyPanel.js';
+import { VectorExplorerPanel, VectorExplorerCallbacks } from './VectorExplorerPanel.js';
 import { ToolIcons } from '../icons/ToolIcons.js';
 
 export interface AppLayoutConfig {
@@ -18,6 +19,10 @@ export interface AppLayoutConfig {
   rulerCallbacks: RulerViewCallbacks;
   propertyPanelCallbacks: PropertyPanelCallbacks;
   onScroll: () => void;
+  onExplorerSelectElement?: (id: string, multiSelect?: boolean) => void;
+  onExplorerToggleVisibility?: (id: string) => void;
+  onExplorerToggleLock?: (id: string) => void;
+  onExplorerRecenter?: () => void;
 }
 
 /**
@@ -50,6 +55,7 @@ export class AppLayoutManager {
   public topBar!: TopBar;
   public rulerView!: RulerView;
   public propertyPanel!: PropertyPanel;
+  public vectorExplorerPanel!: VectorExplorerPanel;
 
   constructor(private config: AppLayoutConfig) {
     this.buildLayout();
@@ -61,6 +67,7 @@ export class AppLayoutManager {
     appEl.innerHTML = `
       <div class="top-bar" id="top-bar"></div>
       <div class="left-toolbar" id="left-toolbar"></div>
+      <div class="vector-explorer-panel hidden" id="vector-explorer-panel" style="display:none;"></div>
       <div class="canvas-container" id="canvas-container">
         <div class="ruler-corner" id="ruler-corner" title="Drag to set (0,0) Origin | Click for Ruler Settings | Double-click to Reset Origin">
           ${ToolIcons.rulerCorner}
@@ -160,6 +167,79 @@ export class AppLayoutManager {
       this.config.model,
       this.config.selectionTool,
       this.config.propertyPanelCallbacks
+    );
+
+    // Initialize Vector Explorer / Scene Tree
+    this.vectorExplorerPanel = new VectorExplorerPanel(
+      document.getElementById('vector-explorer-panel')!,
+      this.config.model,
+      this.config.canvasMgr,
+      this.config.selectionTool,
+      {
+        onSelectElement: (id, multi) => {
+          if (this.config.onExplorerSelectElement) {
+            this.config.onExplorerSelectElement(id, multi);
+          } else {
+            if (multi) {
+              if (this.config.selectionTool.selectedElementIds.has(id)) {
+                this.config.selectionTool.selectedElementIds.delete(id);
+              } else {
+                this.config.selectionTool.selectedElementIds.add(id);
+              }
+            } else {
+              this.config.selectionTool.selectedElementIds.clear();
+              this.config.selectionTool.selectedElementIds.add(id);
+            }
+            this.vectorExplorerPanel.update();
+          }
+        },
+        onToggleVisibility: (id) => {
+          if (this.config.onExplorerToggleVisibility) {
+            this.config.onExplorerToggleVisibility(id);
+          } else {
+            const el = this.config.model.getElementById(id);
+            if (el) {
+              el.attributes.display = el.attributes.display === 'none' ? 'inline' : 'none';
+              this.vectorExplorerPanel.update();
+            }
+          }
+        },
+        onToggleLock: (id) => {
+          if (this.config.onExplorerToggleLock) {
+            this.config.onExplorerToggleLock(id);
+          } else {
+            const el = this.config.model.getElementById(id);
+            if (el) {
+              const locked = el.attributes['data-locked'] === 'true';
+              el.attributes['data-locked'] = locked ? 'false' : 'true';
+              this.vectorExplorerPanel.update();
+            }
+          }
+        },
+        onSelectGuide: (guide) => {
+          this.config.canvasMgr.selectedGuideId = guide.id;
+          this.vectorExplorerPanel.update();
+        },
+        onToggleGuideVisibility: (guide) => {
+          guide.visible = guide.visible === false;
+          this.vectorExplorerPanel.update();
+        },
+        onToggleGridVisibility: (gridId) => {
+          const g = this.config.canvasMgr.grids.find((x) => x.id === gridId);
+          if (g) {
+            g.visible = !g.visible;
+            this.vectorExplorerPanel.update();
+          }
+        },
+        onRecenterViewBox: () => {
+          this.config.onExplorerRecenter?.();
+        },
+        onClose: () => {
+          this.config.canvasMgr.showVectorExplorer = false;
+          this.vectorExplorerPanel.setVisible(false);
+          this.topBar.update();
+        },
+      }
     );
   }
 }

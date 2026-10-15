@@ -12,6 +12,7 @@ import { Toolbar } from '../../ui/Toolbar.js';
 import { Session } from '../session/Session.js';
 import { PenToolHandler } from '../../tools/PenToolHandler.js';
 import { PolylineToolHandler } from '../../tools/PolylineToolHandler.js';
+import { VectorExplorerPanel } from '../../ui/VectorExplorerPanel.js';
 
 export interface WorkspaceLayoutContext {
   model: VectorModel;
@@ -32,6 +33,7 @@ export interface WorkspaceLayoutContext {
   getSession: () => Session | undefined;
   getPenHandler: () => PenToolHandler | undefined;
   getPolylineHandler: () => PolylineToolHandler | undefined;
+  getVectorExplorerPanel?: () => VectorExplorerPanel | undefined;
 }
 
 /**
@@ -177,6 +179,8 @@ export class WorkspaceLayoutService {
       this.ctx.canvasMgr.guides,
       selNodeCount
     );
+
+    this.ctx.getVectorExplorerPanel?.()?.update();
   }
 
   /**

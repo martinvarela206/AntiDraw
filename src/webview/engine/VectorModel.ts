@@ -143,6 +143,10 @@ export class VectorModel {
     this.spatialIndex.build(this.elements);
   }
 
+  public getElementById(id: string): VectorElement | undefined {
+    return this.elements.find((el) => el.id === id);
+  }
+
   constructor() {}
 
   /**
