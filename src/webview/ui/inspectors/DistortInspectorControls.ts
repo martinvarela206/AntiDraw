@@ -70,6 +70,23 @@ export class DistortInspectorControls {
         <span class="prop-label" style="font-size:11px;">Cizalla</span>
         <button class="prop-input" id="${idPrefix}btn-reset-skew" style="flex:1; padding:2px 4px; cursor:pointer; font-size:11px;" title="Restaurar inclinación / cizallamiento a su estado original">⟲ Restaurar Cizalla</button>
       </div>
+      <div class="prop-row" style="margin-top:6px; border-top:1px dashed var(--border-color); padding-top:4px; display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-size:11px; font-weight:600;">Distorsión en Arco (Warp Arc)</span>
+        <button class="prop-input" id="${idPrefix}btn-reset-warp" style="padding:2px 6px; cursor:pointer; font-size:10px;" title="Restaurar curvatura de arco original">⟲ Restaurar</button>
+      </div>
+      <div class="prop-row" style="margin-top:4px;">
+        <span class="prop-label" style="font-size:11px;">Curvatura</span>
+        <input type="range" min="-100" max="100" value="0" class="prop-slider" id="${idPrefix}warp-bend-slider" style="flex:1;" />
+        <input type="number" min="-100" max="100" value="0" class="prop-input" id="${idPrefix}warp-bend-input" style="width:45px; text-align:right;" />
+        <span style="font-size:10px; opacity:0.7;">%</span>
+      </div>
+      <div class="prop-row" style="margin-top:4px;">
+        <span class="prop-label" style="font-size:11px;">Eje</span>
+        <select class="prop-input" id="${idPrefix}warp-direction" style="flex:1;">
+          <option value="horizontal">Horizontal (Arco)</option>
+          <option value="vertical">Vertical</option>
+        </select>
+      </div>
     </div>`;
   }
 
@@ -129,6 +146,40 @@ export class DistortInspectorControls {
     const btnResetSkew = container.querySelector<HTMLButtonElement>(`#${idPrefix}btn-reset-skew`);
     btnResetSkew?.addEventListener('click', () => {
       callbacks.onResetSkew?.();
+    });
+
+    const warpSlider = container.querySelector<HTMLInputElement>(`#${idPrefix}warp-bend-slider`);
+    const warpInput = container.querySelector<HTMLInputElement>(`#${idPrefix}warp-bend-input`);
+    const warpDir = container.querySelector<HTMLSelectElement>(`#${idPrefix}warp-direction`);
+    const btnResetWarp = container.querySelector<HTMLButtonElement>(`#${idPrefix}btn-reset-warp`);
+
+    const applyWarp = (bendVal: number) => {
+      const dir = (warpDir?.value as 'horizontal' | 'vertical') || 'horizontal';
+      callbacks.onApplyWarpArc?.({ bend: bendVal / 100, direction: dir });
+    };
+
+    warpSlider?.addEventListener('input', () => {
+      const val = parseFloat(warpSlider.value) || 0;
+      if (warpInput) warpInput.value = val.toString();
+      applyWarp(val);
+    });
+
+    warpInput?.addEventListener('change', () => {
+      const val = Math.max(-100, Math.min(100, parseFloat(warpInput.value) || 0));
+      warpInput.value = val.toString();
+      if (warpSlider) warpSlider.value = val.toString();
+      applyWarp(val);
+    });
+
+    warpDir?.addEventListener('change', () => {
+      const val = parseFloat(warpSlider?.value || '0') || 0;
+      applyWarp(val);
+    });
+
+    btnResetWarp?.addEventListener('click', () => {
+      if (warpSlider) warpSlider.value = '0';
+      if (warpInput) warpInput.value = '0';
+      callbacks.onResetWarp?.();
     });
   }
 }

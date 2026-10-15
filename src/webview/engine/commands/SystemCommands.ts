@@ -13,6 +13,8 @@ import { ContextualGridModal } from '../../ui/ContextualGridModal.js';
 import { VectorElement } from '../VectorModel.js';
 import { SpineCurveService } from '../stroke/SpineCurveService.js';
 import { BlendEngine } from '../blend/BlendEngine.js';
+import { WarpEngine, WarpArcOptions } from '../warp/WarpEngine.js';
+import { BoundingBoxCalculator } from '../geometry/BoundingBoxCalculator.js';
 
 export function registerSystemCommands(registry: CommandRegistry): void {
   // Registrar comandos de dominio formalizados (shape.*, path.*, transform.*, node.*)
@@ -709,6 +711,69 @@ export function registerSystemCommands(registry: CommandRegistry): void {
       ctx.render?.();
       ctx.syncToHost?.();
       return { success: true, value: { expandedCount: expanded.length } };
+    },
+  });
+
+  // --- DEFORMACIÓN ENVOLVENTE (WARP ARC) ---
+  registry.register<WarpArcOptions>({
+    id: 'warp.applyArc',
+    label: 'Aplicar Distorsión en Arco (Warp Arc)',
+    category: 'object',
+    isEnabled: (ctx: CommandContext) => (ctx.selectionTool?.selectedElementIds?.size || 0) > 0,
+    execute: (ctx: CommandContext, params) => {
+      if (!ctx.model || !ctx.selectionTool) return { success: false, error: 'Contexto no disponible' };
+      if (!params || typeof params.bend !== 'number') {
+        return { success: false, error: 'Parámetro de curvatura bend requerido' };
+      }
+
+      const selected = ctx.model.elements.filter((el: VectorElement) => ctx.selectionTool.isSelected(el.id));
+      if (selected.length === 0) return { success: false, error: 'Ningún elemento seleccionado' };
+
+      ctx.pushUndo?.();
+
+      // Convert any rigid parametric primitives to curves before warping
+      selected.forEach((el: VectorElement) => {
+        if (ctx.model.isParametricElement(el)) {
+          ctx.model.convertToCurves(el);
+        }
+      });
+
+      const groupBox = BoundingBoxCalculator.getGroupBoundingBox(selected);
+      if (!groupBox) return { success: false, error: 'No se pudo calcular bounding box' };
+
+      selected.forEach((el: VectorElement) => {
+        WarpEngine.warpElement(el, params, groupBox);
+      });
+
+      ctx.render?.();
+      ctx.syncToHost?.();
+      return { success: true, value: { warpedCount: selected.length } };
+    },
+  });
+
+  registry.register({
+    id: 'warp.reset',
+    label: 'Restaurar Curvatura de Arco Original',
+    category: 'object',
+    isEnabled: (ctx: CommandContext) => {
+      if (!ctx.model || !ctx.selectionTool) return false;
+      const selected = ctx.model.elements.filter((el: VectorElement) => ctx.selectionTool.isSelected(el.id));
+      return selected.some((el: VectorElement) => !!el.attributes['data-warp-base']);
+    },
+    execute: (ctx: CommandContext) => {
+      if (!ctx.model || !ctx.selectionTool) return { success: false, error: 'Contexto no disponible' };
+      const selected = ctx.model.elements.filter((el: VectorElement) => ctx.selectionTool.isSelected(el.id));
+      const warped = selected.filter((el: VectorElement) => !!el.attributes['data-warp-base']);
+      if (warped.length === 0) return { success: false, error: 'Ningún elemento deformado con arco' };
+
+      ctx.pushUndo?.();
+      warped.forEach((el: VectorElement) => {
+        WarpEngine.resetWarp(el);
+      });
+
+      ctx.render?.();
+      ctx.syncToHost?.();
+      return { success: true, value: { resetCount: warped.length } };
     },
   });
 }

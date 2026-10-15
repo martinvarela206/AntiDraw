@@ -11,6 +11,8 @@ import { DistortTransformer } from '../tools/interactions/DistortTransformer.js'
 import { QuadCorners } from '../engine/geometry/ProjectiveHomography.js';
 import { Point } from '../core/geom/Point.js';
 import { CommandRegistry } from '../commands/CommandRegistry.js';
+import { WarpEngine, WarpArcOptions } from '../engine/warp/WarpEngine.js';
+import { BoundingBoxCalculator } from '../engine/geometry/BoundingBoxCalculator.js';
 
 import { ToolSuite } from '../tools/ToolFactory.js';
 import { CoreServices } from '../services/CoreServiceRegistry.js';
@@ -243,6 +245,35 @@ export class PropertyPanelActionController {
       },
       onConvertGuideToVector: () => {
         CommandRegistry.getInstance().execute('guide.convertToVector');
+      },
+      onApplyWarpArc: (options: WarpArcOptions) => {
+        const selectedEls = this.ctx.model.elements.filter((el) => this.ctx.selectionTool.isSelected(el.id));
+        if (selectedEls.length === 0) return;
+        this.ctx.canvasMgr?.pushUndo();
+        selectedEls.forEach((el) => {
+          if (this.ctx.model.isParametricElement(el)) {
+            this.ctx.model.convertToCurves(el);
+          }
+        });
+        const groupBox = BoundingBoxCalculator.getGroupBoundingBox(selectedEls);
+        if (!groupBox) return;
+        selectedEls.forEach((el) => {
+          WarpEngine.warpElement(el, options, groupBox);
+        });
+        this.ctx.getPropertyPanel()?.update(null, 'select');
+        s.workspaceLayout.render();
+        host.syncToHost();
+      },
+      onResetWarp: () => {
+        const selectedEls = this.ctx.model.elements.filter((el) => this.ctx.selectionTool.isSelected(el.id));
+        if (selectedEls.length === 0) return;
+        this.ctx.canvasMgr?.pushUndo();
+        selectedEls.forEach((el) => {
+          WarpEngine.resetWarp(el);
+        });
+        this.ctx.getPropertyPanel()?.update(null, 'select');
+        s.workspaceLayout.render();
+        host.syncToHost();
       },
     };
   }
