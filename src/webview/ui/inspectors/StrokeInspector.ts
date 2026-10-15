@@ -5,6 +5,7 @@ import { degreesToMiterLimit } from './AppearanceInspector.js';
 import { StrokeMarkerControls } from './StrokeMarkerControls.js';
 import { StrokeLayersControls } from './StrokeLayersControls.js';
 import { DashCornerAligner } from '../../engine/geometry/DashCornerAligner.js';
+import { SpineCurveService } from '../../engine/stroke/SpineCurveService.js';
 
 export interface StrokeInspectorProps {
   stroke: string;
@@ -80,6 +81,12 @@ export class StrokeInspector {
       isShapeRestricted,
       shapeTagName,
     } = props;
+
+    const widthProfile = SpineCurveService.getWidthProfile(el);
+    const profileMode = widthProfile ? (widthProfile.mode || 'variable') : 'uniform';
+    const isSketch = profileMode === 'sketch';
+    const sketchAmp = widthProfile?.sketchParams?.amplitude ?? 0.6;
+    const sketchRough = widthProfile?.sketchParams?.roughness ?? 0.3;
 
     const isCurrentColor = stroke === 'currentColor';
     const hasStroke = stroke !== 'none' && stroke !== '' && stroke !== undefined && strokeWidth !== '0';
@@ -158,6 +165,35 @@ export class StrokeInspector {
               <input type="number" class="prop-input" id="el-stroke-miter-angle" value="${miterAngleDeg}" min="1" max="170" step="1" style="width:45px; padding:2px 4px; text-align:right;" />
               <span style="font-size:11px; color:var(--text-muted); font-weight:600;">°</span>
             </div>
+          </div>
+        </div>
+        <div class="prop-row" style="align-items:flex-start;">
+          <span class="prop-label" style="margin-top:4px;">Perfil</span>
+          <div style="display:flex; flex-direction:column; gap:4px; flex:1;">
+            <div style="display:flex; gap:3px; flex-wrap:wrap;">
+              <button type="button" class="prop-input ${profileMode === 'uniform' ? 'active' : ''}" id="btn-profile-uniform" style="cursor:pointer; width:auto; padding:2px 6px; font-size:10px; font-weight:600;" title="Trazo con grosor uniforme clásico">Uniforme</button>
+              <button type="button" class="prop-input ${profileMode === 'variable' ? 'active' : ''}" id="btn-profile-tapered" style="cursor:pointer; width:auto; padding:2px 6px; font-size:10px; font-weight:600;" title="Trazo ahusado (puntas afiladas, centro grueso)">Ahusado</button>
+              <button type="button" class="prop-input ${isSketch ? 'active' : ''}" id="btn-profile-sketch" style="cursor:pointer; width:auto; padding:2px 6px; font-size:10px; font-weight:600; color:var(--accent, #00f0ff);" title="Modulación aleatoria / orgánica sobre w(t) estilo tinta de boceto">Boceto (Tinta)</button>
+            </div>
+            ${isSketch ? `
+              <div id="container-sketch-params" style="display:flex; flex-direction:column; gap:3px; background:var(--bg-subtle, rgba(0,0,0,0.15)); padding:5px 6px; border-radius:4px; margin-top:2px; border:1px solid rgba(255,255,255,0.06);">
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px;">
+                  <span style="color:var(--text-muted);">Amplitud:</span>
+                  <div style="display:flex; align-items:center; gap:3px;">
+                    <input type="range" id="el-sketch-amplitude" min="0.1" max="0.95" step="0.05" value="${sketchAmp}" style="width:70px; cursor:pointer;" />
+                    <span id="label-sketch-amp" style="width:24px; text-align:right; font-variant-numeric:tabular-nums; font-size:9.5px;">${Math.round(sketchAmp * 100)}%</span>
+                  </div>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px;">
+                  <span style="color:var(--text-muted);">Rugosidad:</span>
+                  <div style="display:flex; align-items:center; gap:3px;">
+                    <input type="range" id="el-sketch-roughness" min="0" max="0.8" step="0.05" value="${sketchRough}" style="width:70px; cursor:pointer;" />
+                    <span id="label-sketch-rough" style="width:24px; text-align:right; font-variant-numeric:tabular-nums; font-size:9.5px;">${Math.round(sketchRough * 100)}%</span>
+                  </div>
+                </div>
+                <button type="button" class="prop-input" id="btn-sketch-reseed" style="cursor:pointer; font-size:9.5px; padding:2px 4px; margin-top:2px; text-align:center;" title="Re-generar semilla de modulación orgánica">🎲 Re-sembrar variación</button>
+              </div>
+            ` : ''}
           </div>
         </div>
         ${StrokeMarkerControls.renderHtml({
@@ -445,6 +481,109 @@ export class StrokeInspector {
 
     // Delegate all terminal marker events to modular StrokeMarkerControls
     StrokeMarkerControls.bindEvents(container, el, model, callbacks, onReRender);
+
+    // Bind Width Profile & Sketch Ink modulation events
+    const btnProfileUniform = container.querySelector<HTMLButtonElement>('#btn-profile-uniform');
+    if (btnProfileUniform) {
+      btnProfileUniform.addEventListener('click', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        SpineCurveService.setWidthProfile(el, null);
+        callbacks.onUpdateElement(el);
+        onReRender();
+      });
+    }
+
+    const btnProfileTapered = container.querySelector<HTMLButtonElement>('#btn-profile-tapered');
+    if (btnProfileTapered) {
+      btnProfileTapered.addEventListener('click', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        SpineCurveService.applyTaperedProfile(el);
+        callbacks.onUpdateElement(el);
+        onReRender();
+      });
+    }
+
+    const btnProfileSketch = container.querySelector<HTMLButtonElement>('#btn-profile-sketch');
+    if (btnProfileSketch) {
+      btnProfileSketch.addEventListener('click', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        SpineCurveService.applySketchModulation(el);
+        callbacks.onUpdateElement(el);
+        onReRender();
+      });
+    }
+
+    const elSketchAmp = container.querySelector<HTMLInputElement>('#el-sketch-amplitude');
+    const labelSketchAmp = container.querySelector<HTMLElement>('#label-sketch-amp');
+    if (elSketchAmp) {
+      let isEditingAmp = false;
+      elSketchAmp.addEventListener('pointerdown', () => {
+        if (!isEditingAmp && callbacks.onPushUndo) {
+          callbacks.onPushUndo();
+          isEditingAmp = true;
+        }
+      });
+      elSketchAmp.addEventListener('input', () => {
+        const val = parseFloat(elSketchAmp.value) || 0.5;
+        if (labelSketchAmp) labelSketchAmp.textContent = `${Math.round(val * 100)}%`;
+        const profile = SpineCurveService.getWidthProfile(el);
+        if (profile) {
+          if (!profile.sketchParams) {
+            profile.sketchParams = { amplitude: val, frequency: 5, seed: 42, roughness: 0.3 };
+          } else {
+            profile.sketchParams.amplitude = val;
+          }
+          SpineCurveService.setWidthProfile(el, profile);
+          callbacks.onUpdateElement(el);
+        }
+      });
+      elSketchAmp.addEventListener('change', () => {
+        isEditingAmp = false;
+      });
+    }
+
+    const elSketchRough = container.querySelector<HTMLInputElement>('#el-sketch-roughness');
+    const labelSketchRough = container.querySelector<HTMLElement>('#label-sketch-rough');
+    if (elSketchRough) {
+      let isEditingRough = false;
+      elSketchRough.addEventListener('pointerdown', () => {
+        if (!isEditingRough && callbacks.onPushUndo) {
+          callbacks.onPushUndo();
+          isEditingRough = true;
+        }
+      });
+      elSketchRough.addEventListener('input', () => {
+        const val = parseFloat(elSketchRough.value) || 0.25;
+        if (labelSketchRough) labelSketchRough.textContent = `${Math.round(val * 100)}%`;
+        const profile = SpineCurveService.getWidthProfile(el);
+        if (profile) {
+          if (!profile.sketchParams) {
+            profile.sketchParams = { amplitude: 0.5, frequency: 5, seed: 42, roughness: val };
+          } else {
+            profile.sketchParams.roughness = val;
+          }
+          SpineCurveService.setWidthProfile(el, profile);
+          callbacks.onUpdateElement(el);
+        }
+      });
+      elSketchRough.addEventListener('change', () => {
+        isEditingRough = false;
+      });
+    }
+
+    const btnSketchReseed = container.querySelector<HTMLButtonElement>('#btn-sketch-reseed');
+    if (btnSketchReseed) {
+      btnSketchReseed.addEventListener('click', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        const profile = SpineCurveService.getWidthProfile(el);
+        if (profile && profile.sketchParams) {
+          profile.sketchParams.seed = Math.floor(Math.random() * 100000);
+          SpineCurveService.setWidthProfile(el, profile);
+          callbacks.onUpdateElement(el);
+          onReRender();
+        }
+      });
+    }
 
     // Delegate multi-stroke layers events
     StrokeLayersControls.bindEvents(container, el, callbacks, onReRender);

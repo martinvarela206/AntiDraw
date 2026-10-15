@@ -11,6 +11,7 @@ import { ContextElementService } from '../scene/ContextElementService.js';
 import { ContextualVectorGridService } from '../scene/ContextualVectorGridService.js';
 import { ContextualGridModal } from '../../ui/ContextualGridModal.js';
 import { VectorElement } from '../VectorModel.js';
+import { SpineCurveService } from '../stroke/SpineCurveService.js';
 
 export function registerSystemCommands(registry: CommandRegistry): void {
   // Registrar comandos de dominio formalizados (shape.*, path.*, transform.*, node.*)
@@ -582,6 +583,61 @@ export function registerSystemCommands(registry: CommandRegistry): void {
       ctx.render?.();
       ctx.syncToHost?.();
       return { success: true, value: { lockGuides: ctx.canvasMgr.lockGuides } };
+    },
+  });
+
+  // --- TRAZO Y MODULACIÓN (SPINE CURVE) ---
+  registry.register({
+    id: 'stroke.applySketchModulation',
+    label: 'Aplicar Modulación de Tinta (Boceto)',
+    category: 'object',
+    execute: (ctx: CommandContext) => {
+      if (!ctx.model || !ctx.selectionTool) return { success: false, error: 'Contexto no disponible' };
+      const selected = ctx.model.elements.filter((el: VectorElement) => ctx.selectionTool.isSelected(el.id));
+      if (selected.length === 0) return { success: false, error: 'Ningún elemento seleccionado' };
+      ctx.pushUndo?.();
+      for (const el of selected) {
+        SpineCurveService.applySketchModulation(el);
+      }
+      ctx.render?.();
+      ctx.syncToHost?.();
+      return { success: true, value: { affectedCount: selected.length } };
+    },
+  });
+
+  registry.register({
+    id: 'stroke.applyTaperedProfile',
+    label: 'Aplicar Perfil Ahusado',
+    category: 'object',
+    execute: (ctx: CommandContext) => {
+      if (!ctx.model || !ctx.selectionTool) return { success: false, error: 'Contexto no disponible' };
+      const selected = ctx.model.elements.filter((el: VectorElement) => ctx.selectionTool.isSelected(el.id));
+      if (selected.length === 0) return { success: false, error: 'Ningún elemento seleccionado' };
+      ctx.pushUndo?.();
+      for (const el of selected) {
+        SpineCurveService.applyTaperedProfile(el);
+      }
+      ctx.render?.();
+      ctx.syncToHost?.();
+      return { success: true, value: { affectedCount: selected.length } };
+    },
+  });
+
+  registry.register({
+    id: 'stroke.resetWidthProfile',
+    label: 'Restablecer Perfil a Uniforme',
+    category: 'object',
+    execute: (ctx: CommandContext) => {
+      if (!ctx.model || !ctx.selectionTool) return { success: false, error: 'Contexto no disponible' };
+      const selected = ctx.model.elements.filter((el: VectorElement) => ctx.selectionTool.isSelected(el.id));
+      if (selected.length === 0) return { success: false, error: 'Ningún elemento seleccionado' };
+      ctx.pushUndo?.();
+      for (const el of selected) {
+        SpineCurveService.setWidthProfile(el, null);
+      }
+      ctx.render?.();
+      ctx.syncToHost?.();
+      return { success: true, value: { affectedCount: selected.length } };
     },
   });
 }

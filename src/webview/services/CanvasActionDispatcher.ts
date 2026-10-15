@@ -4,6 +4,8 @@ import { BooleanOperations } from '../engine/BooleanOperations.js';
 import { ConfirmationModal } from '../ui/ConfirmationModal.js';
 import { CrashGuard } from './CrashGuard.js';
 import { VectorCloneHelper } from '../engine/selection/VectorCloneHelper.js';
+import { SpineCurveService } from '../engine/stroke/SpineCurveService.js';
+import { StrokeOutlineGenerator } from '../engine/boolean/StrokeOutlineGenerator.js';
 
 export interface CanvasActionDispatcherContext {
   model: VectorModel;
@@ -233,11 +235,41 @@ export class CanvasActionDispatcher {
    *    (Corel Draw "Convert Outline to Object", Illustrator "Outline Stroke") replace the stroked vector directly, avoiding
    *    accidental duplicate geometry and z-fighting.
    */
+  /**
+   * ARCHITECTURAL RATIONALE: High-Fidelity Stroke-to-Path Conversion (Item 6 - Spine Curve & Schneider Fit)
+   *
+   * 1. Analytical Normal Extrusion & Schneider Bézier Fitting:
+   *    Migrates strokeToPath from polygonal clipping and flattening to analytical normal projection
+   *    P(t) ± (w(t) / 2) * N(t) coupled with Schneider cubic Bézier fitting. Preserves C1 curvature
+   *    continuity and produces sleek, minimal vector nodes rather than hyper-fragmented polygons.
+   *
+   * 2. Variable Stroke & Sketch Ink Support:
+   *    Seamlessly respects variable width profiles w(t) and organic sketch ink modulations.
+   *
+   * 3. Swaps the element in-place in `model.elements` keeping layer ordering intact rather than appending to end.
+   * 4. Seamlessly updates `selectionTool` with the new element ID and re-renders the property panel.
+   */
   public strokeToPath(): void {
     const selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
     if (!selectedEl) return;
     this.ctx.pushUndo();
-    const newElements = BooleanOperations.outlineStrokeElements(selectedEl, this.ctx.model);
+
+    let newElements: VectorElement[] = [];
+
+    // 1. Prioritize analytical spine normal extrusion with Schneider Bézier fitting
+    const smoothOutline = SpineCurveService.outlineStrokeToSmoothPath(selectedEl, this.ctx.model);
+    if (smoothOutline) {
+      newElements = [smoothOutline];
+      // Attach independent SVG marker elements if present
+      const markers = StrokeOutlineGenerator.createMarkerElements(selectedEl, this.ctx.model);
+      if (markers.length > 0) {
+        newElements.push(...markers);
+      }
+    } else {
+      // 2. Fallback to BooleanOperations.outlineStrokeElements for composite loops
+      newElements = BooleanOperations.outlineStrokeElements(selectedEl, this.ctx.model);
+    }
+
     if (newElements.length > 0) {
       const idx = this.ctx.model.elements.findIndex((el) => el.id === selectedEl.id);
       if (idx >= 0) {
