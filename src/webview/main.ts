@@ -13,6 +13,7 @@ import { CanvasInteractionController } from './controllers/CanvasInteractionCont
 import { PropertyPanelActionController } from './controllers/PropertyPanelActionController.js';
 import { ChromeActionController } from './controllers/ChromeActionController.js';
 import { CommandShortcutController } from './controllers/CommandShortcutController.js';
+import { LayerReorderService } from './engine/layout/LayerReorderService.js';
 import './styles/main.css';
 
 /**
@@ -139,6 +140,12 @@ class AntiDrawApp {
           this.services.workspaceLayout.render();
           this.hostSyncService.syncToHost();
         }
+      },
+      onExplorerReorder: (sourceId, targetId, pos) => {
+        this.model.elements = LayerReorderService.moveToPosition(this.model.elements, sourceId, targetId, pos);
+        this.services.historyService.pushUndo();
+        this.services.workspaceLayout.render();
+        this.hostSyncService.syncToHost();
       },
       onExplorerRecenter: () => {
         this.viewportCtrl?.recenterViewBox();

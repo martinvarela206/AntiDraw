@@ -7,6 +7,7 @@ import { TopBar, TopBarCallbacks } from './TopBar.js';
 import { RulerView, RulerViewCallbacks } from './RulerView.js';
 import { PropertyPanel, PropertyPanelCallbacks } from './PropertyPanel.js';
 import { VectorExplorerPanel, VectorExplorerCallbacks } from './VectorExplorerPanel.js';
+import { DropPosition } from '../engine/layout/LayerReorderService.js';
 import { ToolIcons } from '../icons/ToolIcons.js';
 
 export interface AppLayoutConfig {
@@ -22,6 +23,7 @@ export interface AppLayoutConfig {
   onExplorerSelectElement?: (id: string, multiSelect?: boolean) => void;
   onExplorerToggleVisibility?: (id: string) => void;
   onExplorerToggleLock?: (id: string) => void;
+  onExplorerReorder?: (sourceId: string, targetId: string, position: DropPosition) => void;
   onExplorerRecenter?: () => void;
 }
 
@@ -215,6 +217,9 @@ export class AppLayoutManager {
               this.vectorExplorerPanel.update();
             }
           }
+        },
+        onReorderElement: (sourceId, targetId, pos) => {
+          this.config.onExplorerReorder?.(sourceId, targetId, pos);
         },
         onSelectGuide: (guide) => {
           this.config.canvasMgr.selectedGuideId = guide.id;

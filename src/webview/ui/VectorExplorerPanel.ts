@@ -2,11 +2,13 @@ import { VectorModel, VectorElement } from '../engine/VectorModel.js';
 import { CanvasManager, GuideLine } from '../engine/CanvasManager.js';
 import { SelectionTool } from '../engine/SelectionTool.js';
 import { ToolIcons } from '../icons/ToolIcons.js';
+import { DropPosition } from '../engine/layout/LayerReorderService.js';
 
 export interface VectorExplorerCallbacks {
   onSelectElement: (id: string, multiSelect?: boolean) => void;
   onToggleVisibility: (id: string) => void;
   onToggleLock: (id: string) => void;
+  onReorderElement?: (sourceId: string, targetId: string, position: DropPosition) => void;
   onSelectGuide?: (guide: GuideLine) => void;
   onToggleGuideVisibility?: (guide: GuideLine) => void;
   onToggleGridVisibility?: (gridId: string) => void;
@@ -163,7 +165,7 @@ export class VectorExplorerPanel {
     this.bindEvents();
   }
 
-  private renderElementTree(elements: VectorElement[]): string {
+  private renderElementTree(elements: VectorElement[], depth: number = 0): string {
     // Render from top in Z-stack (last in array) down to bottom
     const reversed = [...elements].reverse();
 
@@ -172,11 +174,28 @@ export class VectorExplorerPanel {
         const isSelected = this.selectionTool.selectedElementIds.has(el.id);
         const isHidden = el.attributes.display === 'none';
         const isLocked = el.attributes['data-locked'] === 'true';
+        const isGroup = el.tagName === 'g' || (el.children && el.children.length > 0);
+        const isCollapsed = this.collapsedGroups.has(el.id);
         const name = el.attributes['data-name'] || `${el.shapeType || el.tagName} (${el.id.slice(0, 8)})`;
         const icon = this.getShapeIcon(el);
+        const paddingLeft = 14 + depth * 14;
+
+        let childrenHtml = '';
+        if (isGroup && el.children && el.children.length > 0 && !isCollapsed) {
+          childrenHtml = `<div class="tree-group-children" data-group-container="${el.id}">${this.renderElementTree(el.children, depth + 1)}</div>`;
+        }
+
+        const groupToggle = isGroup
+          ? `<span class="group-collapse-btn ${isCollapsed ? '' : 'expanded'}" data-group-id="${el.id}">▸</span>`
+          : `<span class="group-spacer"></span>`;
 
         return `
-          <div class="tree-item element-item ${isSelected ? 'selected' : ''}" data-element-id="${el.id}">
+          <div class="tree-item element-item ${isSelected ? 'selected' : ''}" 
+               data-element-id="${el.id}" 
+               data-is-group="${isGroup ? 'true' : 'false'}"
+               draggable="true"
+               style="padding-left: ${paddingLeft}px;">
+            ${groupToggle}
             <span class="tree-item-icon">${icon}</span>
             <span class="tree-item-label" title="${el.id}">${name}</span>
             <div class="tree-item-actions">
@@ -188,6 +207,7 @@ export class VectorExplorerPanel {
               </button>
             </div>
           </div>
+          ${childrenHtml}
         `;
       })
       .join('');
@@ -295,6 +315,100 @@ export class VectorExplorerPanel {
         e.stopPropagation();
         const elemId = (e.currentTarget as HTMLElement).getAttribute('data-element-id');
         if (elemId) this.callbacks.onToggleLock(elemId);
+      });
+    });
+
+    // Group collapse / expand toggle
+    this.container.querySelectorAll('.group-collapse-btn').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const groupId = (e.currentTarget as HTMLElement).getAttribute('data-group-id');
+        if (groupId) {
+          if (this.collapsedGroups.has(groupId)) {
+            this.collapsedGroups.delete(groupId);
+          } else {
+            this.collapsedGroups.add(groupId);
+          }
+          this.render();
+        }
+      });
+    });
+
+    // Drag & Drop reordering and group nesting
+    let draggedElementId: string | null = null;
+
+    const clearDropIndicators = () => {
+      this.container.querySelectorAll('.drop-above, .drop-below, .drop-inside, .dragging').forEach((el) => {
+        el.classList.remove('drop-above', 'drop-below', 'drop-inside', 'dragging');
+      });
+    };
+
+    this.container.querySelectorAll('.element-item').forEach((item) => {
+      item.addEventListener('dragstart', (e) => {
+        const mouseEvt = e as DragEvent;
+        const elemId = (e.currentTarget as HTMLElement).getAttribute('data-element-id');
+        if (elemId) {
+          draggedElementId = elemId;
+          (e.currentTarget as HTMLElement).classList.add('dragging');
+          mouseEvt.dataTransfer?.setData('text/plain', elemId);
+          if (mouseEvt.dataTransfer) mouseEvt.dataTransfer.effectAllowed = 'move';
+        }
+      });
+
+      item.addEventListener('dragover', (e) => {
+        const mouseEvt = e as DragEvent;
+        mouseEvt.preventDefault();
+        const targetEl = e.currentTarget as HTMLElement;
+        const targetId = targetEl.getAttribute('data-element-id');
+        if (!draggedElementId || draggedElementId === targetId) return;
+
+        const rect = targetEl.getBoundingClientRect();
+        const relY = rect.height > 0 ? (mouseEvt.clientY - rect.top) / rect.height : 0.5;
+        const isGroup = targetEl.getAttribute('data-is-group') === 'true';
+
+        targetEl.classList.remove('drop-above', 'drop-below', 'drop-inside');
+
+        if (isGroup && relY > 0.25 && relY < 0.75) {
+          targetEl.classList.add('drop-inside');
+        } else if (relY < 0.5) {
+          // Top half in Tree UI corresponds to higher Z-order (above)
+          targetEl.classList.add('drop-above');
+        } else {
+          // Bottom half in Tree UI corresponds to lower Z-order (below)
+          targetEl.classList.add('drop-below');
+        }
+      });
+
+      item.addEventListener('dragleave', (e) => {
+        (e.currentTarget as HTMLElement).classList.remove('drop-above', 'drop-below', 'drop-inside');
+      });
+
+      item.addEventListener('drop', (e) => {
+        const mouseEvt = e as DragEvent;
+        mouseEvt.preventDefault();
+        const targetEl = e.currentTarget as HTMLElement;
+        const targetId = targetEl.getAttribute('data-element-id');
+        const sourceId = mouseEvt.dataTransfer?.getData('text/plain') || draggedElementId;
+
+        if (sourceId && targetId && sourceId !== targetId) {
+          let pos: DropPosition = 'below';
+          if (targetEl.classList.contains('drop-inside')) {
+            pos = 'inside';
+          } else if (targetEl.classList.contains('drop-above')) {
+            pos = 'above';
+          } else {
+            pos = 'below';
+          }
+          this.callbacks.onReorderElement?.(sourceId, targetId, pos);
+        }
+
+        clearDropIndicators();
+        draggedElementId = null;
+      });
+
+      item.addEventListener('dragend', () => {
+        clearDropIndicators();
+        draggedElementId = null;
       });
     });
   }

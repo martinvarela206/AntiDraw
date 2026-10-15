@@ -641,6 +641,60 @@ body {
   color: var(--text-main);
 }
 
+.tree-item.dragging {
+  opacity: 0.35;
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.tree-item.drop-above {
+  border-top: 2px solid var(--accent-color) !important;
+  background-color: rgba(99, 102, 241, 0.08);
+}
+
+.tree-item.drop-below {
+  border-bottom: 2px solid var(--accent-color) !important;
+  background-color: rgba(99, 102, 241, 0.08);
+}
+
+.tree-item.drop-inside {
+  background-color: rgba(99, 102, 241, 0.22) !important;
+  outline: 1px dashed var(--accent-color);
+  outline-offset: -1px;
+}
+
+.group-collapse-btn {
+  display: inline-block;
+  font-size: 9px;
+  width: 14px;
+  height: 14px;
+  line-height: 14px;
+  text-align: center;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: transform 0.15s ease, color 0.15s ease;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.group-collapse-btn:hover {
+  color: var(--text-main);
+}
+
+.group-collapse-btn.expanded {
+  transform: rotate(90deg);
+}
+
+.group-spacer {
+  display: inline-block;
+  width: 14px;
+  flex-shrink: 0;
+}
+
+.tree-group-children {
+  display: flex;
+  flex-direction: column;
+}
+
 /* RIGHT PROPERTY INSPECTOR */
 .right-panel {
   grid-area: right;

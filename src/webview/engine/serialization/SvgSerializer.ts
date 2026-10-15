@@ -450,18 +450,30 @@ export class SvgSerializer {
     const bgStyle = hasExplicitBg ? ` style="background-color: ${backgroundColor};"` : '';
     let svg = `<svg ${rootAttrs}${bgStyle}>\n`;
 
+    const collectAllElements = (list: VectorElement[]): VectorElement[] => {
+      const res: VectorElement[] = [];
+      for (const el of list) {
+        res.push(el);
+        if (el.children && el.children.length > 0) {
+          res.push(...collectAllElements(el.children));
+        }
+      }
+      return res;
+    };
+    const allElements = collectAllElements(ctx.elements);
+
     // Detect if any vector element makes use of SVG marker terminations
-    const hasMarkers = ctx.elements.some(
+    const hasMarkers = allElements.some(
       (el) => !!(el.attributes['marker-start'] || el.attributes['marker-mid'] || el.attributes['marker-end'])
     );
-    const filterDefs = this.compileElementFilters(ctx.elements);
-    const gradientDefs = this.compileElementGradients(ctx.elements);
+    const filterDefs = this.compileElementFilters(allElements);
+    const gradientDefs = this.compileElementGradients(allElements);
 
     const hasCustomDefs = !!(ctx.customDefs && ctx.customDefs.trim().length > 0);
     if (hasMarkers || filterDefs.length > 0 || gradientDefs.length > 0 || hasCustomDefs) {
       svg += `  <defs id="antidraw-defs">\n`;
       if (hasMarkers) {
-        svg += this.compileElementMarkers(ctx.elements);
+        svg += this.compileElementMarkers(allElements);
       }
       if (filterDefs.length > 0) {
         svg += filterDefs;
@@ -494,6 +506,21 @@ export class SvgSerializer {
     ctx.elements.forEach((el) => {
       // HISTORICAL ARCHITECTURE (FIX-19): Guarantee attributes.id strictly reflects model el.id upon serialization
       el.attributes.id = el.id;
+
+      if (el.tagName === 'g') {
+        svg += `  <g${serializeCleanAttrs(el.attributes)}>\n`;
+        if (el.children && el.children.length > 0) {
+          el.children.forEach((child) => {
+            child.attributes.id = child.id;
+            if (child.vertices && child.vertices.length > 0 && child.tagName === 'path') {
+              child.attributes.d = ctx.compilePathD(child.vertices, child.isClosed);
+            }
+            svg += `    <${child.tagName}${serializeCleanAttrs(child.attributes)} />\n`;
+          });
+        }
+        svg += `  </g>\n`;
+        return;
+      }
 
       DashCornerAligner.updateFittedDashIfActive(el);
 

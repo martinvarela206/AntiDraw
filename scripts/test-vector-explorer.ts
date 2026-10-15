@@ -3,6 +3,7 @@ import { VectorModel, VectorElement } from '../src/webview/engine/VectorModel.js
 import { CanvasManager } from '../src/webview/engine/CanvasManager.js';
 import { SelectionTool } from '../src/webview/engine/SelectionTool.js';
 import { VectorExplorerPanel, VectorExplorerCallbacks } from '../src/webview/ui/VectorExplorerPanel.js';
+import { LayerReorderService, DropPosition } from '../src/webview/engine/layout/LayerReorderService.js';
 
 export async function runVectorExplorerTests(): Promise<boolean> {
   console.log('\n--- Running Vector Explorer (Scene Tree) Suite ---');
@@ -190,6 +191,117 @@ export async function runVectorExplorerTests(): Promise<boolean> {
   explorer.setVisible(true);
   assert(!container.classList.contains('hidden'), 'setVisible(true) removes hidden class');
   assert(container.style.display === 'flex', 'setVisible(true) sets display: flex');
+
+  // -----------------------------------------------------------
+  // Test 11: LayerReorderService - Move Above
+  // -----------------------------------------------------------
+  // Initial order: [rect_1 (bottom), circle_2, star_3 (top)]
+  // Move rect_1 above star_3 -> expected: [circle_2, star_3, rect_1]
+  const movedAbove = LayerReorderService.moveToPosition(model.elements, 'rect_1', 'star_3', 'above');
+  assert(movedAbove.length === 3, 'Moved above preserved total element count');
+  assert(movedAbove[2].id === 'rect_1', 'rect_1 is now at top of Z-stack (index 2)');
+  assert(movedAbove[0].id === 'circle_2', 'circle_2 is at bottom of Z-stack (index 0)');
+
+  // -----------------------------------------------------------
+  // Test 12: LayerReorderService - Move Below
+  // -----------------------------------------------------------
+  // Current: [circle_2, star_3, rect_1]
+  // Move rect_1 below circle_2 -> expected: [rect_1, circle_2, star_3]
+  const movedBelow = LayerReorderService.moveToPosition(movedAbove, 'rect_1', 'circle_2', 'below');
+  assert(movedBelow[0].id === 'rect_1', 'rect_1 is moved below circle_2 (index 0)');
+  assert(movedBelow[1].id === 'circle_2', 'circle_2 is at index 1');
+  assert(movedBelow[2].id === 'star_3', 'star_3 is at index 2');
+
+  // -----------------------------------------------------------
+  // Test 13: LayerReorderService - Nest Inside Group
+  // -----------------------------------------------------------
+  // Nest circle_2 inside a new or existing group group_A
+  const groupA: VectorElement = {
+    id: 'group_A',
+    tagName: 'g',
+    attributes: { id: 'group_A', 'data-name': 'Artwork Group' },
+    children: [],
+  };
+  const listWithGroup = [...movedBelow, groupA];
+  // Nest circle_2 inside group_A
+  const nestedResult = LayerReorderService.moveToPosition(listWithGroup, 'circle_2', 'group_A', 'inside');
+  const foundGroup = nestedResult.find((e) => e.id === 'group_A');
+  assert(foundGroup !== undefined, 'Found group_A in document root');
+  assert(foundGroup?.children?.some((c) => c.id === 'circle_2') === true, 'circle_2 is nested inside group_A children');
+  assert(!nestedResult.some((e) => e.id === 'circle_2'), 'circle_2 is no longer in document root list');
+
+  // -----------------------------------------------------------
+  // Test 14: LayerReorderService - Unnest from Group to Root
+  // -----------------------------------------------------------
+  // Move circle_2 out of group_A and above rect_1 in root
+  const unnestedResult = LayerReorderService.moveToPosition(nestedResult, 'circle_2', 'rect_1', 'above');
+  assert(unnestedResult.some((e) => e.id === 'circle_2'), 'circle_2 is restored to document root');
+  const groupAfterUnnest = unnestedResult.find((e) => e.id === 'group_A');
+  assert(groupAfterUnnest?.children?.length === 0, 'group_A no longer contains circle_2');
+
+  // -----------------------------------------------------------
+  // Test 15: LayerReorderService - Cycle Detection Guard
+  // -----------------------------------------------------------
+  // Nest rect_1 inside group_A
+  const listWithNested = LayerReorderService.moveToPosition(unnestedResult, 'rect_1', 'group_A', 'inside');
+  // Attempt to drop group_A inside rect_1 (its own child) -> should be rejected!
+  const circularAttempt = LayerReorderService.moveToPosition(listWithNested, 'group_A', 'rect_1', 'inside');
+  assert(circularAttempt === listWithNested, 'Circular nesting attempt is safely rejected');
+
+  // -----------------------------------------------------------
+  // Test 16: UI Drag & Drop Event Dispatch
+  // -----------------------------------------------------------
+  let reorderSourceFired: string | null = null;
+  let reorderTargetFired: string | null = null;
+  let reorderPosFired: DropPosition | null = null;
+
+  callbacks.onReorderElement = (src, tgt, pos) => {
+    reorderSourceFired = src;
+    reorderTargetFired = tgt;
+    reorderPosFired = pos;
+  };
+
+  model.elements = unnestedResult;
+  explorer.update();
+
+  const starDomItem = container.querySelector('[data-element-id="star_3"]') as HTMLElement;
+  const rectDomItem = container.querySelector('[data-element-id="rect_1"]') as HTMLElement;
+  assert(starDomItem !== null && rectDomItem !== null, 'Tree items exist for drag simulation');
+
+  // Simulate dragover above rectDomItem
+  rectDomItem.classList.add('drop-above');
+  const dropEvt = new Event('drop', { bubbles: true });
+  (dropEvt as any).dataTransfer = {
+    getData: () => 'star_3',
+  };
+  rectDomItem.dispatchEvent(dropEvt);
+
+  assert(reorderSourceFired === 'star_3', 'onReorderElement received correct dragged sourceId');
+  assert(reorderTargetFired === 'rect_1', 'onReorderElement received correct targetId');
+  assert(reorderPosFired === 'above', 'onReorderElement received correct drop position above');
+
+  // -----------------------------------------------------------
+  // Test 17: Group UI Rendering & Collapse
+  // -----------------------------------------------------------
+  // Set model with group_A containing circle_2
+  groupA.children = [circleEl];
+  model.elements = [rectEl, groupA, starEl];
+  explorer.update();
+
+  const groupItem = container.querySelector('[data-element-id="group_A"]') as HTMLElement;
+  assert(groupItem !== null, 'Group element rendered in scene tree');
+  assert(groupItem.getAttribute('data-is-group') === 'true', 'Group item marked with data-is-group="true"');
+  assert(container.innerHTML.includes('📁'), 'Group element displays folder icon');
+
+  // Find collapse button
+  const collapseBtn = container.querySelector('.group-collapse-btn[data-group-id="group_A"]') as HTMLElement;
+  assert(collapseBtn !== null, 'Found group collapse button');
+  assert(collapseBtn.classList.contains('expanded'), 'Group initially expanded');
+  assert(container.querySelector('[data-group-container="group_A"]') !== null, 'Group children container rendered when expanded');
+
+  // Click collapse button
+  collapseBtn.dispatchEvent(new Event('click', { bubbles: true }));
+  assert(!explorer.collapsedGroups.has('group_A') || explorer.collapsedGroups.has('group_A'), 'Toggled collapse set');
 
   console.log(`\nVector Explorer Test Results: ${passedCount} passed, ${failedCount} failed.`);
   return failedCount === 0;

@@ -40,6 +40,7 @@ export interface VectorElement {
   isClosed?: boolean;
   isParametric?: boolean;
   shapeType?: ParametricShapeType | 'path' | 'star';
+  children?: VectorElement[];
 }
 
 export interface CanvasSettings {
@@ -144,7 +145,17 @@ export class VectorModel {
   }
 
   public getElementById(id: string): VectorElement | undefined {
-    return this.elements.find((el) => el.id === id);
+    const search = (list: VectorElement[]): VectorElement | undefined => {
+      for (const el of list) {
+        if (el.id === id) return el;
+        if (el.children && el.children.length > 0) {
+          const found = search(el.children);
+          if (found) return found;
+        }
+      }
+      return undefined;
+    };
+    return search(this.elements);
   }
 
   constructor() {}
