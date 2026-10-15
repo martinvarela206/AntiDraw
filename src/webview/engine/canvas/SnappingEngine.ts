@@ -4,6 +4,7 @@ import { GridConfig } from './GridManager.js';
 import { RulerConfig } from '../CanvasManager.js';
 import { EdgeSnappingService } from './EdgeSnappingService.js';
 import { IntersectionSnappingService } from './IntersectionSnappingService.js';
+import { ContextualVectorGridService } from '../scene/ContextualVectorGridService.js';
 
 export type SnapKind = 'none' | 'node' | 'edge' | 'intersection' | 'guide' | 'grid' | 'viewbox';
 
@@ -115,6 +116,19 @@ export class SnappingEngine {
         ySnapped = true;
         detectedKind = 'node';
         targetPt = { x: bestVertex.x, y: bestVertex.y };
+      }
+    }
+
+    // 1.5. Contextual Vector Grid Discrete Snapping (Pre-computed Nodes, Centroids & Intersections)
+    if (!xSnapped || !ySnapped) {
+      const gridSnap = ContextualVectorGridService.querySnap(pt, threshold);
+      if (gridSnap) {
+        snappedX = gridSnap.point.x;
+        snappedY = gridSnap.point.y;
+        xSnapped = true;
+        ySnapped = true;
+        detectedKind = gridSnap.point.kind === 'node' ? 'node' : 'intersection';
+        targetPt = { x: gridSnap.point.x, y: gridSnap.point.y };
       }
     }
 

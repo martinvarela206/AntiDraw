@@ -8,6 +8,8 @@ import { registerAllDomainCommands } from '../../commands/index.js';
 import { ExportModal } from '../../ui/ExportModal.js';
 import { SceneLayerService } from '../scene/SceneLayerService.js';
 import { ContextElementService } from '../scene/ContextElementService.js';
+import { ContextualVectorGridService } from '../scene/ContextualVectorGridService.js';
+import { ContextualGridModal } from '../../ui/ContextualGridModal.js';
 import { VectorElement } from '../VectorModel.js';
 
 export function registerSystemCommands(registry: CommandRegistry): void {
@@ -436,6 +438,74 @@ export function registerSystemCommands(registry: CommandRegistry): void {
       for (const el of selected) {
         ContextElementService.convertToOrdinaryVector(el);
       }
+      ctx.layoutMgr?.vectorExplorerPanel?.update();
+      ctx.render?.();
+      ctx.syncToHost?.();
+      return { success: true, value: { count: selected.length } };
+    },
+  });
+
+  registry.register({
+    id: 'vector.convertToContextualGrid',
+    label: 'Convertir a Grilla Vectorial Contextual',
+    category: 'object',
+    isEnabled: (ctx: CommandContext) => (ctx.selectionTool?.selectedElementIds?.size || 0) > 0,
+    execute: (ctx: CommandContext) => {
+      if (!ctx.model || !ctx.selectionTool) return { success: false, error: 'Contexto no disponible' };
+      const selected = ctx.model.elements.filter((el: VectorElement) => ctx.selectionTool.isSelected(el.id));
+      if (selected.length === 0) return { success: false, error: 'Ningún elemento seleccionado' };
+
+      ctx.pushUndo?.();
+      for (const el of selected) {
+        ContextualVectorGridService.convertToContextualGrid(el);
+      }
+
+      // Pre-compute and profile discrete snap points
+      const cacheResult = ContextualVectorGridService.precomputeSnapPoints(selected);
+
+      // If dense grid triggers FPS risk, present the safeguard modal
+      if (cacheResult.fpsRisk && typeof document !== 'undefined') {
+        ContextualGridModal.show({
+          totalPoints: cacheResult.points.length,
+          computationTimeMs: cacheResult.computationTimeMs,
+          onContinueVisualOnly: () => {
+            ContextualVectorGridService.enableVisualOnlyReference();
+            ctx.render?.();
+          },
+          onUndo: () => {
+            for (const el of selected) {
+              ContextualVectorGridService.convertToOrdinaryVector(el);
+            }
+            ContextualVectorGridService.clearCache();
+            ctx.layoutMgr?.vectorExplorerPanel?.update();
+            ctx.render?.();
+            ctx.syncToHost?.();
+          },
+        });
+      }
+
+      ctx.layoutMgr?.vectorExplorerPanel?.update();
+      ctx.render?.();
+      ctx.syncToHost?.();
+      return { success: true, value: cacheResult };
+    },
+  });
+
+  registry.register({
+    id: 'vector.unconvertContextualGrid',
+    label: 'Desconvertir Grilla a Vectores Ordinarios',
+    category: 'object',
+    isEnabled: (ctx: CommandContext) => (ctx.selectionTool?.selectedElementIds?.size || 0) > 0,
+    execute: (ctx: CommandContext) => {
+      if (!ctx.model || !ctx.selectionTool) return { success: false, error: 'Contexto no disponible' };
+      const selected = ctx.model.elements.filter((el: VectorElement) => ctx.selectionTool.isSelected(el.id));
+      if (selected.length === 0) return { success: false, error: 'Ningún elemento seleccionado' };
+
+      ctx.pushUndo?.();
+      for (const el of selected) {
+        ContextualVectorGridService.convertToOrdinaryVector(el);
+      }
+      ContextualVectorGridService.clearCache();
       ctx.layoutMgr?.vectorExplorerPanel?.update();
       ctx.render?.();
       ctx.syncToHost?.();

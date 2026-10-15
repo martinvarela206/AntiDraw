@@ -8,6 +8,7 @@ import { ClipboardService } from '../services/ClipboardService.js';
 import { CommandRegistry } from '../engine/commands/CommandRegistry.js';
 import { ExportModal } from '../ui/ExportModal.js';
 import { ContextElementService } from '../engine/scene/ContextElementService.js';
+import { ContextualVectorGridService } from '../engine/scene/ContextualVectorGridService.js';
 
 export interface ContextMenuControllerContext {
   contextMenu: ContextMenu;
@@ -285,6 +286,21 @@ export class ContextMenuController {
             ]
           : []),
         { id: 'separator-context', label: '', action: () => {} },
+        ...(selectedEls.some((el) => ContextualVectorGridService.isContextualGrid(el))
+          ? [
+              {
+                id: 'unconvert-contextual-grid',
+                label: 'Desconvertir Grilla a Vectores Ordinarios',
+                action: () => cmdRegistry.execute('vector.unconvertContextualGrid'),
+              },
+            ]
+          : [
+              {
+                id: 'convert-to-contextual-grid',
+                label: 'Convertir a Grilla Vectorial Contextual',
+                action: () => cmdRegistry.execute('vector.convertToContextualGrid'),
+              },
+            ]),
         ...(selectedEls.some((el) => ContextElementService.isContextElement(el))
           ? [
               {
