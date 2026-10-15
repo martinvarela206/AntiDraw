@@ -14,7 +14,7 @@ import { GroupHierarchyService } from '../engine/selection/GroupHierarchyService
 
 export interface SelectToolCallbacks {
   onSelectionChanged?: () => void;
-  onGuideSelected?: (guide: GuideLine) => void;
+  onGuideSelected?: (guide: GuideLine | GuideLine[]) => void;
   onClearPanelMode?: () => void;
   setCursor?: (cursor: string) => void;
   syncMetadataToHost?: () => void;
@@ -81,7 +81,7 @@ export class SelectToolHandler implements IToolHandler {
     this.wasAlreadySelectedOnDown = false;
 
     // 1. Check Guide Line interactions (controls, rotation arrows, pivot, line body)
-    const guideRes = this.guideInteraction.onPointerDown(this.ctx, pt, this.callbacks);
+    const guideRes = this.guideInteraction.onPointerDown(this.ctx, pt, this.callbacks, e.shiftKey);
     if (guideRes.handled) {
       this.activeHandle = guideRes.activeHandle || null;
       return true;

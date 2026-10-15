@@ -46,8 +46,42 @@ export interface GuideGeometry {
 export class GuideManager {
   public guides: GuideLine[] = [];
   public showGuides: boolean = true;
-  public selectedGuideId: string | null = null;
+  public selectedGuideIds: Set<string> = new Set();
   public activeGuideTransformId: string | null = null;
+
+  public get selectedGuideId(): string | null {
+    return this.selectedGuideIds.values().next().value || null;
+  }
+
+  public set selectedGuideId(val: string | null) {
+    this.selectedGuideIds.clear();
+    if (val) this.selectedGuideIds.add(val);
+  }
+
+  public isGuideSelected(id: string): boolean {
+    return this.selectedGuideIds.has(id);
+  }
+
+  public selectGuide(id: string, additive: boolean = false): void {
+    if (!additive) this.selectedGuideIds.clear();
+    this.selectedGuideIds.add(id);
+  }
+
+  public toggleSelectGuide(id: string): void {
+    if (this.selectedGuideIds.has(id)) {
+      this.selectedGuideIds.delete(id);
+    } else {
+      this.selectedGuideIds.add(id);
+    }
+  }
+
+  public clearSelectedGuides(): void {
+    this.selectedGuideIds.clear();
+  }
+
+  public getSelectedGuides(): GuideLine[] {
+    return this.guides.filter((g) => this.selectedGuideIds.has(g.id));
+  }
 
   constructor(initialGuides: GuideLine[] = []) {
     this.guides = initialGuides;
@@ -88,7 +122,7 @@ export class GuideManager {
    */
   public removeGuide(id: string): void {
     this.guides = this.guides.filter((g) => g.id !== id);
-    if (this.selectedGuideId === id) this.selectedGuideId = null;
+    this.selectedGuideIds.delete(id);
     if (this.activeGuideTransformId === id) this.activeGuideTransformId = null;
   }
 

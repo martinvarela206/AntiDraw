@@ -155,7 +155,7 @@ export class OverlayRenderer {
     if (ctx.canvasMgr.showGuides) {
       ctx.canvasMgr.guides.forEach((g) => {
         if (g.visible === false) return;
-        const isSelected = g.id === ctx.canvasMgr.selectedGuideId;
+        const isSelected = ctx.canvasMgr.isGuideSelected(g.id);
         const mode = g.mode || 'move';
         const isRotateMode = isSelected && mode === 'rotate';
 

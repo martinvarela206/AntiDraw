@@ -80,6 +80,7 @@ export class PropertyPanel {
   public guides: GuideLine[] = [];
   private activeRulerConfig: RulerConfig | null = null;
   private activeGuide: GuideLine | null = null;
+  public selectedGuides: GuideLine[] = [];
   public shapeConfig: ShapeToolConfig = {
     aspectRatioW: 4,
     aspectRatioH: 3,
@@ -138,7 +139,8 @@ export class PropertyPanel {
     gridAlignmentMode: GridAlignmentMode = 'origin',
     grids: GridConfig[] = [],
     guides: GuideLine[] = [],
-    selectedNodeCount: number = 1
+    selectedNodeCount: number = 1,
+    selectedGuides: GuideLine[] = []
   ): void {
     this.activeVertex = selectedVertex;
     this.selectedNodeCount = selectedNodeCount;
@@ -146,6 +148,7 @@ export class PropertyPanel {
     this.penNodeType = penNodeType;
     this.penVertexCount = penVertexCount;
     this.activeGuide = selectedGuide;
+    this.selectedGuides = selectedGuides.length > 0 ? selectedGuides : (selectedGuide ? [selectedGuide] : []);
     this.polylineVertexCount = polylineVertexCount;
     this.gridAlignmentMode = gridAlignmentMode;
     if (grids.length > 0 || this.grids.length === 0) this.grids = grids;
@@ -164,7 +167,8 @@ export class PropertyPanel {
         this.activeRulerConfig = null;
       }
       this.activeGuide = null;
-    } else if (selectedGuide) {
+      this.selectedGuides = [];
+    } else if (selectedGuide || this.selectedGuides.length > 0) {
       this.currentPanelMode = 'guide';
       this.activeRulerConfig = null;
     }
@@ -177,6 +181,7 @@ export class PropertyPanel {
     this.currentPanelMode = null;
     this.activeVertex = null;
     this.activeGuide = null;
+    this.selectedGuides = [];
     this.activeRulerConfig = null;
   }
 
@@ -196,11 +201,13 @@ export class PropertyPanel {
     this.renderQuickHelp(true);
   }
 
-  public showGuideSettings(guide: GuideLine): void {
+  public showGuideSettings(guideOrGuides: GuideLine | GuideLine[]): void {
+    const list = Array.isArray(guideOrGuides) ? guideOrGuides : [guideOrGuides];
     this.currentPanelMode = 'guide';
-    this.activeGuide = guide;
+    this.activeGuide = list[0] || null;
+    this.selectedGuides = list;
     this.ensureContainers();
-    this.renderGuideProperties(guide);
+    this.renderGuideProperties(list);
     this.renderQuickHelp(true);
   }
 
@@ -268,12 +275,13 @@ export class PropertyPanel {
       // Stroke Tool Active without elements selected
       this.currentPanelMode = 'stroke';
       this.renderStrokeEmptyState();
-    } else if (this.activeGuide) {
-      // 2. Guide Line Selection
+    } else if (this.activeGuide || this.selectedGuides.length > 0) {
+      // 2. Guide Line Selection (single or multi-guide)
       this.currentPanelMode = 'guide';
       this.activeRulerConfig = null;
       isGuideOrRuler = true;
-      this.renderGuideProperties(this.activeGuide);
+      const guidesToRender = this.selectedGuides.length > 0 ? this.selectedGuides : (this.activeGuide ? [this.activeGuide] : []);
+      this.renderGuideProperties(guidesToRender);
     } else if (this.currentPanelMode === 'ruler' && this.activeRulerConfig) {
       // 3. Ruler Corner Active
       isGuideOrRuler = true;
@@ -318,7 +326,7 @@ export class PropertyPanel {
   }
 
   // Render Guide Line Properties
-  private renderGuideProperties(guide: GuideLine): void {
+  private renderGuideProperties(guide: GuideLine | GuideLine[]): void {
     this.ensureContainers();
     RulerGuideInspector.renderGuideSettings(guide, this.inspectorContainer, this.callbacks);
   }

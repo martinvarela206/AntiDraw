@@ -79,7 +79,8 @@ export class GuideInteraction {
   public onPointerDown(
     ctx: ToolContext,
     pt: Point,
-    callbacks: SelectToolCallbacks
+    callbacks: SelectToolCallbacks,
+    isAdditive: boolean = false
   ): { handled: boolean; activeHandle?: GuideHandleType } {
     this.guideDragStartPt = { ...pt };
     this.guideHasMoved = false;
@@ -123,8 +124,8 @@ export class GuideInteraction {
 
         // Check click on the active guide line body
         const hitActive = ctx.canvasMgr.hitTestGuide(pt, ctx.model.canvas.width, ctx.model.canvas.height, 8);
-        if (hitActive && hitActive.id === activeG.id) {
-          this.guideInitialState = { ...activeG };
+        if (hitActive && ctx.canvasMgr.isGuideSelected(hitActive.id)) {
+          this.guideInitialState = { ...hitActive };
           ctx.render();
           return { handled: true, activeHandle: 'guide-move' };
         }
@@ -134,14 +135,19 @@ export class GuideInteraction {
     // 2. Check clicking on any other Guide Line to select it (starts in move mode)
     const hitGuide = ctx.canvasMgr.hitTestGuide(pt, ctx.model.canvas.width, ctx.model.canvas.height, 8);
     if (hitGuide) {
-      ctx.selectionTool.deselectAll();
-      ctx.canvasMgr.selectedGuideId = hitGuide.id;
+      if (isAdditive) {
+        ctx.canvasMgr.toggleSelectGuide(hitGuide.id);
+      } else {
+        ctx.selectionTool.deselectAll();
+        ctx.canvasMgr.selectGuide(hitGuide.id, false);
+      }
       if (!hitGuide.mode) {
         hitGuide.mode = 'move';
       }
       ctx.canvasMgr.activeGuideTransformId = hitGuide.mode === 'rotate' ? hitGuide.id : null;
       this.guideInitialState = { ...hitGuide };
-      callbacks.onGuideSelected?.(hitGuide);
+      const allSelected = ctx.canvasMgr.getSelectedGuides();
+      callbacks.onGuideSelected?.(allSelected.length > 0 ? (allSelected.length === 1 ? allSelected[0] : allSelected) : hitGuide);
 
       const geom = ctx.canvasMgr.getGuideGeometry(hitGuide, ctx.model.canvas.width, ctx.model.canvas.height);
       const centerPt = geom.pivot;
@@ -159,7 +165,7 @@ export class GuideInteraction {
 
     // 3. Clicked somewhere else: clear active guide selection
     if (ctx.canvasMgr.selectedGuideId) {
-      ctx.canvasMgr.selectedGuideId = null;
+      ctx.canvasMgr.clearSelectedGuides();
       ctx.canvasMgr.activeGuideTransformId = null;
     }
 

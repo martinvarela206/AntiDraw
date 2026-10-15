@@ -359,100 +359,233 @@ export class RulerGuideInspector {
   }
 
   public static renderGuideSettings(
-    guide: GuideLine,
+    guidesInput: GuideLine | GuideLine[],
     container: HTMLElement,
     callbacks: PropertyPanelCallbacks
   ): void {
+    const guides = Array.isArray(guidesInput) ? guidesInput : [guidesInput];
+    if (guides.length === 0) return;
+
+    const singleGuide = guides.length === 1 ? guides[0] : null;
+    const verticalGuides = guides.filter((g) => g.orientation === 'vertical');
+    const horizontalGuides = guides.filter((g) => g.orientation === 'horizontal');
+    const angledGuides = guides.filter((g) => g.orientation === 'angled');
+
+    const hasVertical = verticalGuides.length > 0;
+    const hasHorizontal = horizontalGuides.length > 0;
+    const hasAngled = angledGuides.length > 0;
+
+    const primaryV = verticalGuides[0];
+    const primaryH = horizontalGuides[0];
+    const valX = primaryV ? Math.round(primaryV.position * 100) / 100 : 0;
+    const valY = primaryH ? Math.round(primaryH.position * 100) / 100 : 0;
+    const valAngle = singleGuide ? Math.round(singleGuide.angle || 0) : Math.round((angledGuides[0]?.angle) || 0);
+    const valPivotX = singleGuide ? Math.round(singleGuide.pivotX || 0) : Math.round((guides[0]?.pivotX) || 0);
+    const valPivotY = singleGuide ? Math.round(singleGuide.pivotY || 0) : Math.round((guides[0]?.pivotY) || 0);
+    const currentColor = singleGuide ? (singleGuide.color || '#00f0ff') : (guides[0].color || '#00f0ff');
+    const allLocked = guides.every((g) => g.locked);
+
+    let title = 'Guía de Regla';
+    if (singleGuide) {
+      title = singleGuide.orientation === 'vertical' ? 'Guía Vertical' : singleGuide.orientation === 'horizontal' ? 'Guía Horizontal' : 'Guía Inclinada';
+    } else {
+      title = `Guías Seleccionadas (${guides.length})`;
+    }
+
+    let typeDesc = '';
+    if (singleGuide) {
+      typeDesc = singleGuide.orientation;
+    } else {
+      const parts: string[] = [];
+      if (hasVertical) parts.push(`${verticalGuides.length}V`);
+      if (hasHorizontal) parts.push(`${horizontalGuides.length}H`);
+      if (hasAngled) parts.push(`${angledGuides.length}∠`);
+      typeDesc = parts.join(', ');
+    }
+
     container.innerHTML = `
       <div class="panel-section">
-        <div class="panel-title">Guide Line Settings</div>
+        <div class="panel-title">${title}</div>
         <div class="prop-row">
-          <span class="prop-label">Type</span>
-          <span style="font-weight:600; color:var(--text-main); text-transform:capitalize;">${guide.orientation}</span>
+          <span class="prop-label">Tipo</span>
+          <span style="font-weight:600; color:var(--text-main); text-transform:capitalize;">${typeDesc}</span>
         </div>
-        <div class="prop-row">
-          <span class="prop-label">Angle (°)</span>
-          <input type="number" class="prop-input" id="guide-angle" value="${Math.round(guide.angle || 0)}" step="1" />
-        </div>
-        <div class="prop-row">
-          <span class="prop-label">Pivot X</span>
-          <input type="number" class="prop-input" id="guide-pivot-x" value="${Math.round(guide.pivotX || 0)}" />
-        </div>
-        <div class="prop-row">
-          <span class="prop-label">Pivot Y</span>
-          <input type="number" class="prop-input" id="guide-pivot-y" value="${Math.round(guide.pivotY || 0)}" />
-        </div>
+
+        ${hasVertical ? `
+          <div class="prop-row">
+            <span class="prop-label">X</span>
+            <input type="number" step="any" class="prop-input" id="guide-pos-x" value="${valX}" />
+            ${verticalGuides.length > 1 ? `<span style="font-size:10px; color:var(--text-muted); margin-left:4px;">(Bloque ${verticalGuides.length})</span>` : ''}
+          </div>
+        ` : ''}
+
+        ${hasHorizontal ? `
+          <div class="prop-row">
+            <span class="prop-label">Y</span>
+            <input type="number" step="any" class="prop-input" id="guide-pos-y" value="${valY}" />
+            ${horizontalGuides.length > 1 ? `<span style="font-size:10px; color:var(--text-muted); margin-left:4px;">(Bloque ${horizontalGuides.length})</span>` : ''}
+          </div>
+        ` : ''}
+
+        ${(hasAngled || singleGuide) ? `
+          <div class="prop-row">
+            <span class="prop-label">Ángulo (°)</span>
+            <input type="number" class="prop-input" id="guide-angle" value="${valAngle}" step="1" />
+          </div>
+          <div class="prop-row">
+            <span class="prop-label">Pivote X</span>
+            <input type="number" class="prop-input" id="guide-pivot-x" value="${valPivotX}" />
+            <span class="prop-label" style="width:20px; text-align:right;">Y</span>
+            <input type="number" class="prop-input" id="guide-pivot-y" value="${valPivotY}" />
+          </div>
+        ` : ''}
       </div>
 
       <div class="panel-section">
-        <div class="panel-title">Guide Color</div>
+        <div class="panel-title">Color de Guía</div>
         <div class="prop-row">
           <span class="prop-label">Color</span>
           <div class="color-picker-row">
-            <input type="color" class="color-swatch" id="guide-color" value="${guide.color || '#00f0ff'}" />
-            <input type="text" class="prop-input" id="guide-color-hex" value="${guide.color || '#00f0ff'}" />
+            <input type="color" class="color-swatch" id="guide-color" value="${currentColor}" />
+            <input type="text" class="prop-input" id="guide-color-hex" value="${currentColor}" />
           </div>
         </div>
       </div>
 
       <div class="panel-section">
-        <div class="panel-title">Guide Actions</div>
+        <div class="panel-title">Acciones de Guía</div>
         <div class="prop-row" style="flex-direction:column; gap:6px;">
+          <button class="prop-input" id="btn-lock-guides" style="cursor:pointer; background:var(--bg-panel-hover); text-align:center; font-weight:500;">
+            ${allLocked ? '🔓 Desbloquear Guía(s)' : '🔒 Bloquear Guía(s)'}
+          </button>
           <button class="prop-input" id="btn-delete-guide" style="cursor:pointer; background:#ef4444; color:#fff; text-align:center; font-weight:600;">
-            🗑 Delete Guide (Supr)
+            🗑 Eliminar ${guides.length > 1 ? `Guías (${guides.length})` : 'Guía (Supr)'}
           </button>
         </div>
       </div>
     `;
 
+    const posXInput = container.querySelector<HTMLInputElement>('#guide-pos-x');
+    const posYInput = container.querySelector<HTMLInputElement>('#guide-pos-y');
     const angleInput = container.querySelector<HTMLInputElement>('#guide-angle');
     const pivotXInput = container.querySelector<HTMLInputElement>('#guide-pivot-x');
     const pivotYInput = container.querySelector<HTMLInputElement>('#guide-pivot-y');
     const colorInput = container.querySelector<HTMLInputElement>('#guide-color');
     const colorHexInput = container.querySelector<HTMLInputElement>('#guide-color-hex');
+    const lockBtn = container.querySelector<HTMLButtonElement>('#btn-lock-guides');
     const deleteBtn = container.querySelector<HTMLButtonElement>('#btn-delete-guide');
+
+    if (posXInput) {
+      posXInput.addEventListener('change', () => {
+        const newX = parseFloat(posXInput.value);
+        if (isNaN(newX)) return;
+        const deltaX = newX - valX;
+        callbacks.onPushUndo?.();
+        for (const g of verticalGuides) {
+          g.position += deltaX;
+          g.pivotX = (g.pivotX ?? g.position) + deltaX;
+          callbacks.onUpdateGuide?.(g);
+        }
+        callbacks.onRenderOverlay?.();
+      });
+    }
+
+    if (posYInput) {
+      posYInput.addEventListener('change', () => {
+        const newY = parseFloat(posYInput.value);
+        if (isNaN(newY)) return;
+        const deltaY = newY - valY;
+        callbacks.onPushUndo?.();
+        for (const g of horizontalGuides) {
+          g.position += deltaY;
+          g.pivotY = (g.pivotY ?? g.position) + deltaY;
+          callbacks.onUpdateGuide?.(g);
+        }
+        callbacks.onRenderOverlay?.();
+      });
+    }
 
     if (angleInput) {
       angleInput.addEventListener('change', () => {
-        guide.angle = parseFloat(angleInput.value) || 0;
-        guide.orientation = 'angled';
-        if (callbacks.onUpdateGuide) callbacks.onUpdateGuide(guide);
+        const newAngle = parseFloat(angleInput.value) || 0;
+        callbacks.onPushUndo?.();
+        const targets = singleGuide ? [singleGuide] : angledGuides;
+        for (const g of targets) {
+          g.angle = newAngle;
+          g.orientation = 'angled';
+          callbacks.onUpdateGuide?.(g);
+        }
+        callbacks.onRenderOverlay?.();
       });
     }
 
     if (pivotXInput) {
       pivotXInput.addEventListener('change', () => {
-        guide.pivotX = parseFloat(pivotXInput.value) || 0;
-        if (callbacks.onUpdateGuide) callbacks.onUpdateGuide(guide);
+        const newPivotX = parseFloat(pivotXInput.value) || 0;
+        callbacks.onPushUndo?.();
+        for (const g of guides) {
+          g.pivotX = newPivotX;
+          callbacks.onUpdateGuide?.(g);
+        }
+        callbacks.onRenderOverlay?.();
       });
     }
 
     if (pivotYInput) {
       pivotYInput.addEventListener('change', () => {
-        guide.pivotY = parseFloat(pivotYInput.value) || 0;
-        if (callbacks.onUpdateGuide) callbacks.onUpdateGuide(guide);
+        const newPivotY = parseFloat(pivotYInput.value) || 0;
+        callbacks.onPushUndo?.();
+        for (const g of guides) {
+          g.pivotY = newPivotY;
+          callbacks.onUpdateGuide?.(g);
+        }
+        callbacks.onRenderOverlay?.();
       });
     }
 
     if (colorInput) {
       colorInput.addEventListener('input', () => {
-        guide.color = colorInput.value;
-        if (colorHexInput) colorHexInput.value = colorInput.value;
-        if (callbacks.onUpdateGuide) callbacks.onUpdateGuide(guide);
+        const newColor = colorInput.value;
+        if (colorHexInput) colorHexInput.value = newColor;
+        for (const g of guides) {
+          g.color = newColor;
+          callbacks.onUpdateGuide?.(g);
+        }
+        callbacks.onRenderOverlay?.();
       });
     }
 
     if (colorHexInput) {
       colorHexInput.addEventListener('change', () => {
-        guide.color = colorHexInput.value;
-        if (colorInput) colorInput.value = colorHexInput.value;
-        if (callbacks.onUpdateGuide) callbacks.onUpdateGuide(guide);
+        const newColor = colorHexInput.value;
+        if (colorInput) colorInput.value = newColor;
+        for (const g of guides) {
+          g.color = newColor;
+          callbacks.onUpdateGuide?.(g);
+        }
+        callbacks.onRenderOverlay?.();
+      });
+    }
+
+    if (lockBtn) {
+      lockBtn.addEventListener('click', () => {
+        const nextLock = !allLocked;
+        callbacks.onPushUndo?.();
+        for (const g of guides) {
+          g.locked = nextLock;
+          callbacks.onUpdateGuide?.(g);
+        }
+        callbacks.onRenderOverlay?.();
+        RulerGuideInspector.renderGuideSettings(guides, container, callbacks);
       });
     }
 
     if (deleteBtn) {
       deleteBtn.addEventListener('click', () => {
-        if (callbacks.onDeleteGuide) callbacks.onDeleteGuide(guide.id);
+        callbacks.onPushUndo?.();
+        for (const g of guides) {
+          if (callbacks.onDeleteGuide) callbacks.onDeleteGuide(g.id);
+        }
       });
     }
   }

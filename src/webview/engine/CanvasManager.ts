@@ -82,6 +82,30 @@ export class CanvasManager {
     this.guideManager.selectedGuideId = val;
   }
 
+  public get selectedGuideIds(): Set<string> {
+    return this.guideManager.selectedGuideIds;
+  }
+
+  public isGuideSelected(id: string): boolean {
+    return this.guideManager.isGuideSelected(id);
+  }
+
+  public selectGuide(id: string, additive: boolean = false): void {
+    this.guideManager.selectGuide(id, additive);
+  }
+
+  public toggleSelectGuide(id: string): void {
+    this.guideManager.toggleSelectGuide(id);
+  }
+
+  public clearSelectedGuides(): void {
+    this.guideManager.clearSelectedGuides();
+  }
+
+  public getSelectedGuides(): GuideLine[] {
+    return this.guideManager.getSelectedGuides();
+  }
+
   public get activeGuideTransformId(): string | null {
     return this.guideManager.activeGuideTransformId;
   }
