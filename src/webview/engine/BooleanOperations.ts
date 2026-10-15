@@ -11,6 +11,8 @@ import {
   BooleanPreflightResult,
   BooleanOperationType,
 } from './boolean/BooleanPreflightService.js';
+import { SmartFillEngine, SmartFillOptions, EnclosedRegion } from './boolean/SmartFillEngine.js';
+import { Point } from './VectorModel.js';
 
 export {
   ElementAligner,
@@ -27,6 +29,9 @@ export {
   BooleanPreflightService,
   BooleanPreflightResult,
   BooleanOperationType,
+  SmartFillEngine,
+  SmartFillOptions,
+  EnclosedRegion,
 };
 
 /**
@@ -149,5 +154,27 @@ export class BooleanOperations {
    */
   public static outlineStrokeElements(element: VectorElement, model: VectorModel): VectorElement[] {
     return StrokeOutlineGenerator.outlineStrokeElements(element, model);
+  }
+
+  /**
+   * Detects the minimal closed region delimited by vector intersections enclosing point and creates a filled vector.
+   */
+  public static smartFill(
+    point: Point,
+    elements: VectorElement[],
+    model: VectorModel,
+    options?: SmartFillOptions
+  ): VectorElement | null {
+    return SmartFillEngine.fillRegionAtPoint(point, elements, model, options);
+  }
+
+  /**
+   * Detects all closed regions formed by vector contours in elements.
+   */
+  public static detectClosedRegions(
+    elements: VectorElement[],
+    model: VectorModel
+  ): EnclosedRegion[] {
+    return SmartFillEngine.detectAllRegions(elements, model);
   }
 }

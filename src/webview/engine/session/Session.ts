@@ -6,6 +6,7 @@ import { ShapeToolHandler } from '../../tools/ShapeToolHandler.js';
 import { PolylineToolHandler } from '../../tools/PolylineToolHandler.js';
 import { PenToolHandler } from '../../tools/PenToolHandler.js';
 import { NodeToolHandler } from '../../tools/NodeToolHandler.js';
+import { SmartFillToolHandler } from '../../tools/SmartFillToolHandler.js';
 import { DocumentState } from '../../core/model/DocumentState.js';
 
 export interface ActiveInteraction {
@@ -61,6 +62,7 @@ export class Session {
   public readonly polylineHandler: PolylineToolHandler;
   public readonly penHandler: PenToolHandler;
   public readonly nodeHandler: NodeToolHandler;
+  public readonly smartFillHandler?: SmartFillToolHandler;
   private readonly handlers: IToolHandler[];
 
   private callbacks: SessionCallbacks;
@@ -72,6 +74,7 @@ export class Session {
       polyline: PolylineToolHandler;
       pen: PenToolHandler;
       node: NodeToolHandler;
+      smartFill?: SmartFillToolHandler;
     },
     callbacks: SessionCallbacks
   ) {
@@ -80,6 +83,7 @@ export class Session {
     this.polylineHandler = handlers.polyline;
     this.penHandler = handlers.pen;
     this.nodeHandler = handlers.node;
+    this.smartFillHandler = handlers.smartFill;
     this.handlers = [
       this.selectHandler,
       this.shapeHandler,
@@ -87,6 +91,9 @@ export class Session {
       this.penHandler,
       this.nodeHandler,
     ];
+    if (this.smartFillHandler) {
+      this.handlers.push(this.smartFillHandler);
+    }
     this.callbacks = callbacks;
   }
 
@@ -112,6 +119,8 @@ export class Session {
       case 'polygon':
       case 'star':
         return this.shapeHandler;
+      case 'smartFill':
+        return this.smartFillHandler || null;
       default:
         return null;
     }
@@ -133,6 +142,9 @@ export class Session {
     }
     if (tool !== 'node') {
       this.nodeHandler.deactivate();
+    }
+    if (tool !== 'smartFill') {
+      this.smartFillHandler?.deactivate();
     }
 
     this.activeTool = tool;
@@ -229,6 +241,16 @@ export class Session {
       }
     } catch (e) {
       console.error('[Session] Error during polylineHandler.cancel():', e);
+    }
+
+    try {
+      if (this.activeTool === 'smartFill' && this.smartFillHandler?.cancel()) {
+        this.activeHandle = null;
+        this.isDragging = false;
+        handled = true;
+      }
+    } catch (e) {
+      console.error('[Session] Error during smartFillHandler.cancel():', e);
     }
 
     // 2. Guide creation drag

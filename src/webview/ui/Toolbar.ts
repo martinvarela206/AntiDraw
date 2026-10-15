@@ -56,9 +56,9 @@ export class Toolbar {
     title: 'Corte y Partición (Tijeras C, Cuchilla, Borrador Shift+E)',
     activeChildId: 'scissors',
     tools: [
-      { id: 'scissors', title: 'Scissors Tool (C)', icon: ToolIcons.scissors, shortcut: 'C' },
-      { id: 'knife', title: 'Knife Tool', icon: ToolIcons.knife },
-      { id: 'eraser', title: 'Eraser Tool (Shift+E)', icon: ToolIcons.eraser, shortcut: 'Shift+E' },
+      { id: 'scissors', title: 'Scissors Tool (C)', icon: ToolIcons.scissorsTool, shortcut: 'C' },
+      { id: 'knife', title: 'Knife Tool', icon: ToolIcons.knifeTool },
+      { id: 'eraser', title: 'Eraser Tool (Shift+E)', icon: ToolIcons.eraserTool, shortcut: 'Shift+E' },
     ],
   };
 
@@ -68,8 +68,8 @@ export class Toolbar {
     title: 'Construcción y Composición (Relleno Inteligente, Constructor de Formas)',
     activeChildId: 'smartFill',
     tools: [
-      { id: 'smartFill', title: 'Smart Fill Tool', icon: ToolIcons.smartFill },
-      { id: 'shapeBuilder', title: 'Shape Builder Tool', icon: ToolIcons.shapeBuilder },
+      { id: 'smartFill', title: 'Smart Fill Tool', icon: ToolIcons.smartFillTool },
+      { id: 'shapeBuilder', title: 'Shape Builder Tool', icon: ToolIcons.shapeBuilderTool },
     ],
   };
 
