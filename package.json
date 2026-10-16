@@ -3,7 +3,54 @@
   "displayName": "AntiDraw - SVG Vector Editor",
   "description": "Integrated vector graphics editor for SVG files inspired by CorelDraw and Figma.",
   "version": "0.85.87",
-  "publisher": "antigravity",
+  "icon": "icon.png",
+  "publisher": "martinvarela206",
+  "author": {
+    "name": "Martin Varela",
+    "email": "martinvarela206@gmail.com",
+    "url": "https://github.com/martinvarela206"
+  },
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/martinvarela206/AntiDraw.git"
+  },
+  "homepage": "https://github.com/martinvarela206/AntiDraw#readme",
+  "bugs": {
+    "url": "https://github.com/martinvarela206/AntiDraw/issues"
+  },
+  "funding": "https://ko-fi.com/martinvarela206",
+  "pricing": "Free",
+  "galleryBanner": {
+    "color": "#1e1e2e",
+    "theme": "dark"
+  },
+  "keywords": [
+    "svg",
+    "vector",
+    "editor",
+    "figma",
+    "coreldraw",
+    "illustrator",
+    "inkscape",
+    "draw",
+    "bezier",
+    "canvas",
+    "design",
+    "graphic-design"
+  ],
+  "badges": [
+    {
+      "url": "https://img.shields.io/badge/License-Source--Available-blue.svg",
+      "href": "https://github.com/martinvarela206/AntiDraw/blob/main/LICENSE",
+      "description": "PolyForm Noncommercial License"
+    },
+    {
+      "url": "https://img.shields.io/badge/Ko--fi-Support-FF5E5B.svg",
+      "href": "https://ko-fi.com/martinvarela206",
+      "description": "Support on Ko-fi"
+    }
+  ],
   "packageManager": "pnpm@11.20.0",
   "engines": {
     "vscode": "^1.80.0"
@@ -44,7 +91,7 @@
     "compile": "tsc -p . --noEmit",
     "test": "node scripts/run-tests.js",
     "bench": "node scripts/run-benchmarks.js",
-    "package": "pnpm run build && vsce package --no-dependencies --allow-missing-repository"
+    "package": "pnpm run build && vsce package --no-dependencies"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

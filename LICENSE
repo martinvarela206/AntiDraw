@@ -1,17 +1,76 @@
-MIT License
+PolyForm Noncommercial License 1.0.0
+https://polyformproject.org/licenses/noncommercial/1.0.0/
 
-Copyright (c) 2026 AntiDraw
+Copyright (c) 2026 Martin Varela <martinvarela206@gmail.com>
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+================================================================================
+PLAIN-LANGUAGE SUMMARY / RESUMEN EN LENGUAJE CLARO (NON-BINDING / NO VINCULANTE)
+================================================================================
+Español:
+1. USO GRATUITO: Puedes usar, probar, estudiar y modificar AntiDraw libremente
+   para fines personales, formativos, educativos y de desarrollo sin fines comerciales directos.
+2. ATRIBUCIÓN OBLIGATORIA: En cualquier copia o bifurcación (fork) debes mantener
+   intactos los avisos de derechos de autor y créditos de autoría originales de Martin Varela.
+3. RESTRICCIÓN COMERCIAL: Queda terminantemente prohibido revender, reempaquetar
+   o distribuir este software (o derivados) como un producto comercial pago, así como
+   incorporarlo en servicios comerciales privativos sin autorización previa por escrito del autor.
+4. DONACIONES: Si este software te resulta útil para tu trabajo diario y deseas apoyar
+   su mantenimiento y evolución, puedes realizar una contribución voluntaria al autor.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+English:
+1. FREE USE: You may freely use, study, copy, and modify AntiDraw for personal,
+   educational, research, and non-commercial development purposes.
+2. MANDATORY ATTRIBUTION: All copies and forks must clearly retain the original
+   copyright and author attribution notices of Martin Varela.
+3. NO COMMERCIAL EXPLOITATION: You may not sell, relicense, repackage, or commercialize
+   this software or its derivatives as a paid offering without explicit written consent from the author.
+4. SUPPORT: Voluntary contributions and sponsorships are welcomed to support continued development.
 
+================================================================================
+LEGAL TERMS (BINDING)
+================================================================================
+
+1. Purpose
+This license allows you to use the software for noncommercial purposes, while the
+licensor retains all copyright, trademark, and patent rights not explicitly granted.
+
+2. Agreement
+In order to receive this license, you must agree to its rules. The rules of this
+license are terms of your agreement with the licensor and conditions of your license
+under the licensor's intellectual property rights.
+
+3. Grant
+Subject to the terms and conditions of this license, the licensor grants you a
+worldwide, non-exclusive, royalty-free, non-sublicensable license under its
+intellectual property rights to reproduce, distribute, prepare derivative works of,
+and perform and display the software, but only for Noncommercial Purposes.
+
+4. Noncommercial Purposes
+A purpose is a Noncommercial Purpose only if:
+(a) it does not primarily aim for or direct towards commercial advantage or monetary
+    compensation;
+(b) you do not sell, rent, lease, distribute, or provide paid hosting or services
+    around the software; and
+(c) you do not charge fees or seek commercial profit from providing access to or use
+    of the software.
+
+5. Attribution and Notices
+You must retain all copyright, patent, trademark, and attribution notices that are
+present in the software in all copies and substantial portions that you distribute,
+including forks or derivative works.
+
+6. Modifications and Forks
+If you distribute any modifications, derivatives, or forks of the software:
+(a) You must conspicuously indicate that the work has been modified;
+(b) You must license the modifications under terms consistent with and no less
+    restrictive than this license; and
+(c) You must prominently credit Martin Varela as the original creator of AntiDraw.
+
+7. No Other Rights
+Any use of the software outside the scope of Noncommercial Purposes requires a
+separate written commercial license from the licensor.
+
+8. Disclaimer of Warranties
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE

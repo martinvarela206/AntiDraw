@@ -28,3 +28,6 @@ Thumbs.db
 sample_test.json
 sample_test.svg
 
+# Private documentation repository (tracked in separate private repo)
+Docs/
+
