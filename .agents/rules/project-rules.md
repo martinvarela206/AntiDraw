@@ -18,7 +18,7 @@
 - **Prototipos y Getters:** No utilizar spreads superficiales (`{ ...this }`, `Object.assign({}, instance)`) para contextos con getters (`get grids()`, `get guides()`), pues produce valores `undefined` silenciosos.
 - **Desacoplamiento:** Servicios algorítmicos (snapping, geometría, hit-test) no deben condicionarse a flags visuales.
 - **Precedencia de Eventos:** Asegurar que nuevos listeners no anulen interacciones base (arrastre de canvas, selección de nodos).
-- **Documentación:** Mantener sincronizado `Docs/Descripción de las herramientas.md`. Para tareas múltiples y TODO.md, seguir el skill global `task-atomic-workflow`.
+- **Documentación:** Mantener sincronizado `Docs/Descripción de las herramientas.md`. El directorio `Docs/` es un repositorio Git independiente (`AntiDraw-Docs`); cada modificación en la documentación o en `Docs/TODO.md` debe recibir su propio commit atómico en dicho sub-repositorio siguiendo el skill global `task-atomic-workflow`.
 
 ## 5. Prohibición de Límites Arbitrarios de Líneas de Código (Anti-Sobreingeniería)
 - **Prohibido el Conteo y Restricciones Numéricas de Líneas:** Queda terminantemente PROHIBIDO imponer límites artificiales (ej. `< 350 líneas`), ejecutar comandos de conteo de líneas o fraccionar archivos/clases cohesionadas por motivos de tamaño.
