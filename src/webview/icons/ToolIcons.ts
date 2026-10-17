@@ -39,6 +39,7 @@ import intersectSvg from '../assets/icons/intersect.svg';
 import knifeToolSvg from '../assets/icons/knife_tool.svg';
 import layersSvg from '../assets/icons/layers.svg';
 import lineToolSvg from '../assets/icons/line_tool.svg';
+import lockGuidesSvg from '../assets/icons/lock_guides.svg';
 import nodeAsymmetricSvg from '../assets/icons/node_asymmetric.svg';
 import nodeSharpSvg from '../assets/icons/node_sharp.svg';
 import nodeSmoothSvg from '../assets/icons/node_smooth.svg';
@@ -70,6 +71,7 @@ import strokeToolSvg from '../assets/icons/stroke_tool.svg';
 import subtractSvg from '../assets/icons/subtract.svg';
 import undoSvg from '../assets/icons/undo.svg';
 import unionSvg from '../assets/icons/union.svg';
+import unlockGuidesSvg from '../assets/icons/unlock_guides.svg';
 import zoomToolSvg from '../assets/icons/zoom_tool.svg';
 
 export const ToolIcons = {
@@ -100,6 +102,7 @@ export const ToolIcons = {
   knifeTool: knifeToolSvg,
   layers: layersSvg,
   lineTool: lineToolSvg,
+  lockGuides: lockGuidesSvg,
   nodeAsymmetric: nodeAsymmetricSvg,
   nodeSharp: nodeSharpSvg,
   nodeSmooth: nodeSmoothSvg,
@@ -131,6 +134,7 @@ export const ToolIcons = {
   subtract: subtractSvg,
   undo: undoSvg,
   union: unionSvg,
+  unlockGuides: unlockGuidesSvg,
   zoomTool: zoomToolSvg,
   select: selectToolSvg,
   stroke: strokeToolSvg,

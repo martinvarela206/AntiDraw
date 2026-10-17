@@ -38,6 +38,7 @@ import IntersectSvg from '../../assets/icons/intersect.svg';
 import KnifeToolSvg from '../../assets/icons/knife_tool.svg';
 import LayersSvg from '../../assets/icons/layers.svg';
 import LineToolSvg from '../../assets/icons/line_tool.svg';
+import LockGuidesSvg from '../../assets/icons/lock_guides.svg';
 import NodeAsymmetricSvg from '../../assets/icons/node_asymmetric.svg';
 import NodeSharpSvg from '../../assets/icons/node_sharp.svg';
 import NodeSmoothSvg from '../../assets/icons/node_smooth.svg';
@@ -69,6 +70,7 @@ import StrokeToolSvg from '../../assets/icons/stroke_tool.svg';
 import SubtractSvg from '../../assets/icons/subtract.svg';
 import UndoSvg from '../../assets/icons/undo.svg';
 import UnionSvg from '../../assets/icons/union.svg';
+import UnlockGuidesSvg from '../../assets/icons/unlock_guides.svg';
 import ZoomToolSvg from '../../assets/icons/zoom_tool.svg';
 
 export const ICONS = {
@@ -99,6 +101,7 @@ export const ICONS = {
   knifeTool: KnifeToolSvg,
   layers: LayersSvg,
   lineTool: LineToolSvg,
+  lockGuides: LockGuidesSvg,
   nodeAsymmetric: NodeAsymmetricSvg,
   nodeSharp: NodeSharpSvg,
   nodeSmooth: NodeSmoothSvg,
@@ -130,6 +133,7 @@ export const ICONS = {
   subtract: SubtractSvg,
   undo: UndoSvg,
   union: UnionSvg,
+  unlockGuides: UnlockGuidesSvg,
   zoomTool: ZoomToolSvg,
   select: SelectToolSvg,
   stroke: StrokeToolSvg,
