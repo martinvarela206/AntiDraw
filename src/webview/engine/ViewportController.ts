@@ -244,12 +244,21 @@ export class ViewportController {
       });
     }
 
-    // Window resize handler to update rulers and viewport-bounded overlay/grid renderers
-    window.addEventListener('resize', () => {
+    // Viewport resize handler (window resize + ResizeObserver on canvasScrollArea)
+    const handleViewportResize = () => {
       this.onResizeRulers?.(this.model.canvas.width, this.model.canvas.height);
       this.syncRulerScroll();
       this.onRenderOverlay?.();
-    });
+    };
+
+    window.addEventListener('resize', handleViewportResize);
+
+    if (typeof ResizeObserver !== 'undefined' && this.canvasScrollArea) {
+      const ro = new ResizeObserver(() => {
+        handleViewportResize();
+      });
+      ro.observe(this.canvasScrollArea);
+    }
   }
 
   /**

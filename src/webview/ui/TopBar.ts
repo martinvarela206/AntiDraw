@@ -82,12 +82,18 @@ export class TopBar {
 
       <div class="top-bar-divider"></div>
 
-      <!-- Grid, Guides & Snapping -->
+      <!-- Display & Visibility (Rulers, Grids, Guides) -->
       <div class="top-bar-group">
         <button class="btn-icon ${this.canvasMgr.showRulers ? 'active' : ''}" id="btn-toggle-rulers" title="${t('topbar.toggleRulers')}">${ToolIcons.rulersVisibility}</button>
         <button class="btn-icon ${this.canvasMgr.showGrid ? 'active' : ''}" id="btn-toggle-grid" title="${t('topbar.toggleGrid')}">${ToolIcons.gridVisibility}</button>
         <button class="btn-icon ${this.canvasMgr.showGuides ? 'active' : ''}" id="btn-toggle-guides" title="${t('topbar.toggleGuides')}">${ToolIcons.guidesVisibility}</button>
         <button class="btn-icon ${this.canvasMgr.lockGuides ? 'active' : ''}" id="btn-lock-guides" title="${this.canvasMgr.lockGuides ? t('topbar.unlockGuides') : t('topbar.lockGuides')}">${this.canvasMgr.lockGuides ? ToolIcons.lock : ToolIcons.unlock}</button>
+      </div>
+
+      <div class="top-bar-divider"></div>
+
+      <!-- Snapping Targets -->
+      <div class="top-bar-group">
         <button class="btn-icon ${this.canvasMgr.snapToPixelGrid ? 'active' : ''}" id="btn-snap-pixel-grid" title="${t('topbar.snapPixel')}">${ToolIcons.snapPixel}</button>
         <button class="btn-icon ${this.canvasMgr.snapToGrid ? 'active' : ''}" id="btn-snap-grid" title="${t('topbar.snapGrid')}">${ToolIcons.snapGrid}</button>
         <button class="btn-icon ${this.canvasMgr.snapToGuides ? 'active' : ''}" id="btn-snap-guide" title="${t('topbar.snapGuide')}">${ToolIcons.snapGuide}</button>
