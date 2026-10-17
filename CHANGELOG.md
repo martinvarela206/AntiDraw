@@ -3,6 +3,16 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.87.1] - 2026-10-17
+
+### 🛠️ Fixed
+- **Property Panel Default Fallback Elimination**: Fixed an issue where the Canvas & ViewBox properties were unintentionally rendered when the Selection Tool was active without any selected elements.
+- **Explicit Status Bar Activation for Canvas & ViewBox**: Canvas & ViewBox inspector properties now appear *if and only if* explicitly triggered via the `#btn-canvas-props` status bar button.
+- **Contextual Empty Selection State**: Introduced a bilingual placeholder state (`No Selection` / `Sin Selección`) with clean iconographic guidance when no objects are selected on the canvas.
+- **Active Status Indicator & Dismissal**: Added dynamic active highlighting (`.active`) to the `#btn-canvas-props` status button and automatic dismissal back to empty state upon selecting elements/nodes or pressing <kbd>Escape</kbd>.
+
+---
+
 ## [0.87.0] - 2026-10-17
 
 ### 🌐 Added

@@ -14,7 +14,7 @@
   <a href="https://open-vsx.org/extension/martinvarela206/antidraw"><img src="https://img.shields.io/badge/Open--VSX-Registry-purple?style=flat-square" alt="Open VSX Registry"></a>
   <a href="https://github.com/martinvarela206/AntiDraw"><img src="https://img.shields.io/badge/GitHub-Repository-181717?style=flat-square&logo=github" alt="GitHub Repository"></a>
   <a href="https://github.com/martinvarela206/AntiDraw/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-Source--Available-blue?style=flat-square" alt="Source-Available License"></a>
-  <a href="https://github.com/martinvarela206/AntiDraw"><img src="https://img.shields.io/badge/Status-Beta%20v0.87-orange?style=flat-square" alt="Status"></a>
+  <a href="https://github.com/martinvarela206/AntiDraw"><img src="https://img.shields.io/badge/Status-Beta%20v0.87.1-orange?style=flat-square" alt="Status"></a>
 </p>
 
 <p align="center">
@@ -38,7 +38,7 @@ Whether you discovered AntiDraw through GitHub, VS Code Marketplace, or Open VSX
 ---
 
 > [!NOTE]
-> **Project Status: Public Beta (v0.87)**  
+> **Project Status: Public Beta (v0.87.1)**  
 > AntiDraw is under active, continuous development. While vector editing, Bézier curves, snapping, and boolean topology are fully functional and stable, you may encounter occasional edge cases.  
 > Found a bug or have a feature request? Please [open an issue on GitHub](https://github.com/martinvarela206/AntiDraw/issues) — your feedback directly shapes upcoming releases!
 
@@ -62,6 +62,7 @@ Frontend developers, UI engineers, and technical designers constantly face a pai
 
 ### 📐 1. Canvas & Interactive Precision Rulers
 * **Infinite Canvas**: Smooth high-framerate pan, zoom, and transform controls.
+* **On-Demand Canvas & ViewBox Inspector**: Accessible directly via the status bar (`Lienzo` / `Canvas`) to configure presets (Icon 16-128, A4, 1080p, 1440p), bounds, and artboard background fill without cluttering the selection inspector.
 * **Dynamic Rulers & Units**: Top and Left rulers with real-time cursor tracking, configurable in `px`, `mm`, `cm`, and `in`.
 * **Interactive Smart Guides**:
   * Drag directly from horizontal or vertical rulers to place guides.

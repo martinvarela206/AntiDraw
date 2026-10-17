@@ -68,6 +68,7 @@ import { QuickHelpInspector } from './inspectors/QuickHelpInspector.js';
 import { BlendEngine } from '../engine/blend/BlendEngine.js';
 import { BlendInspector } from './inspectors/BlendInspector.js';
 import { I18nService } from '../i18n/index.js';
+import { ToolIcons } from '../icons/ToolIcons.js';
 
 export class PropertyPanel {
   private container: HTMLElement;
@@ -168,7 +169,7 @@ export class PropertyPanel {
     // If elements or guides are selected, dismiss ruler mode immediately so vector properties
     // are never blocked or hidden by stale ruler state.
     if (hasSelectedElements) {
-      if (this.currentPanelMode === 'ruler') {
+      if (this.currentPanelMode === 'ruler' || this.currentPanelMode === 'canvas') {
         this.currentPanelMode = null;
         this.activeRulerConfig = null;
       }
@@ -189,6 +190,29 @@ export class PropertyPanel {
     this.activeGuide = null;
     this.selectedGuides = [];
     this.activeRulerConfig = null;
+    this.updateCanvasStatusButton(false);
+  }
+
+  public updateCanvasStatusButton(active: boolean): void {
+    const btn = document.getElementById('btn-canvas-props');
+    if (btn) {
+      if (active) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    }
+  }
+
+  public showCanvasProperties(): void {
+    this.currentPanelMode = 'canvas';
+    this.activeVertex = null;
+    this.activeGuide = null;
+    this.selectedGuides = [];
+    this.activeRulerConfig = null;
+    this.ensureContainers();
+    this.renderCanvasProperties();
+    this.renderQuickHelp(false);
   }
 
   public showRulerSettings(
@@ -202,6 +226,7 @@ export class PropertyPanel {
     this.gridAlignmentMode = gridAlignmentMode;
     if (grids.length > 0) this.grids = grids;
     if (guides.length > 0) this.guides = guides;
+    this.updateCanvasStatusButton(false);
     this.ensureContainers();
     this.renderRulerProperties(config);
     this.renderQuickHelp(true);
@@ -212,6 +237,7 @@ export class PropertyPanel {
     this.currentPanelMode = 'guide';
     this.activeGuide = list[0] || null;
     this.selectedGuides = list;
+    this.updateCanvasStatusButton(false);
     this.ensureContainers();
     this.renderGuideProperties(list);
     this.renderQuickHelp(true);
@@ -251,6 +277,7 @@ export class PropertyPanel {
 
     // 1. HIGHEST PRIORITY: Active Vector Element Selection
     if (selectedEls.length > 0) {
+      this.updateCanvasStatusButton(false);
       this.activeGuide = null;
       this.activeRulerConfig = null;
 
@@ -278,10 +305,12 @@ export class PropertyPanel {
         this.renderMultiElementProperties(selectedEls);
       }
     } else if (this.activeTool === 'stroke') {
+      this.updateCanvasStatusButton(false);
       // Stroke Tool Active without elements selected
       this.currentPanelMode = 'stroke';
       this.renderStrokeEmptyState();
     } else if (this.activeGuide || this.selectedGuides.length > 0) {
+      this.updateCanvasStatusButton(false);
       // 2. Guide Line Selection (single or multi-guide)
       this.currentPanelMode = 'guide';
       this.activeRulerConfig = null;
@@ -289,24 +318,31 @@ export class PropertyPanel {
       const guidesToRender = this.selectedGuides.length > 0 ? this.selectedGuides : (this.activeGuide ? [this.activeGuide] : []);
       this.renderGuideProperties(guidesToRender);
     } else if (this.currentPanelMode === 'ruler' && this.activeRulerConfig) {
+      this.updateCanvasStatusButton(false);
       // 3. Ruler Corner Active
       isGuideOrRuler = true;
       this.renderRulerProperties(this.activeRulerConfig);
     } else if (this.activeTool === 'polyline' && this.polylineVertexCount > 0) {
+      this.updateCanvasStatusButton(false);
       // 4. In-Progress Interactive Path Creation
       this.currentPanelMode = 'polyline';
       this.renderPolylineProperties();
     } else if (this.activeTool === 'pen' && this.penVertexCount > 0) {
+      this.updateCanvasStatusButton(false);
       this.currentPanelMode = 'pen';
       this.renderPenProperties();
     } else if (['rect', 'circle', 'ellipse', 'line', 'polygon', 'star'].includes(this.activeTool)) {
+      this.updateCanvasStatusButton(false);
       // 5. Active Shape Tool Creation Settings (No vectors selected)
       this.currentPanelMode = 'shape';
       this.renderShapeToolProperties();
     } else {
-      // 6. Default Base State: Canvas & ViewBox Properties
-      this.currentPanelMode = 'canvas';
-      this.renderCanvasProperties();
+      // 6. Base State: Canvas Properties ONLY IF explicitly activated
+      if (this.currentPanelMode === 'canvas') {
+        this.renderCanvasProperties();
+      } else {
+        this.renderEmptySelectionState();
+      }
     }
 
     this.renderQuickHelp(isGuideOrRuler);
@@ -493,6 +529,9 @@ export class PropertyPanel {
 
   // Render Canvas & ViewBox Properties
   private renderCanvasProperties(): void {
+    this.ensureContainers();
+    this.currentPanelMode = 'canvas';
+    this.updateCanvasStatusButton(true);
     CanvasInspector.render(
       this.inspectorContainer,
       this.model,
@@ -502,6 +541,26 @@ export class PropertyPanel {
         this.renderCanvasProperties();
       }
     );
+  }
+
+  // Render Empty Selection State (Selection tool active without elements selected)
+  private renderEmptySelectionState(): void {
+    this.ensureContainers();
+    this.currentPanelMode = null;
+    this.updateCanvasStatusButton(false);
+    this.inspectorContainer.innerHTML = `
+      <div class="panel-section" style="text-align: center; padding: 28px 16px;">
+        <div style="width: 36px; height: 36px; margin: 0 auto 12px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--bg-surface); color: var(--text-muted); opacity: 0.8;">
+          ${ToolIcons.select}
+        </div>
+        <div style="font-size: 13px; font-weight: 600; color: var(--text-color); margin-bottom: 6px;">
+          ${I18nService.t('inspector.noSelectionTitle')}
+        </div>
+        <div style="font-size: 11px; color: var(--text-muted); line-height: 1.5; max-width: 210px; margin: 0 auto;">
+          ${I18nService.t('inspector.noSelectionHint')}
+        </div>
+      </div>
+    `;
   }
 
   // Render Single Element Properties

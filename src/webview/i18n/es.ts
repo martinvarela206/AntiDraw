@@ -133,6 +133,9 @@ export const es: Translations = {
   },
 
   inspector: {
+    noSelectionTitle: 'Sin Selección',
+    noSelectionHint: 'Selecciona un objeto en el lienzo para inspeccionar sus propiedades, o haz clic en "Lienzo" en la barra de estado para configurar el lienzo y viewBox.',
+
     // Mode & Transform
     mode: 'Modo',
     modeMove: 'Mover',

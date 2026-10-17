@@ -140,6 +140,10 @@ export interface Translations {
 
   // Inspector Fields & Buttons
   inspector: {
+    // No Selection State
+    noSelectionTitle: string;
+    noSelectionHint: string;
+
     // Mode & Transform
     mode: string;
     modeMove: string;

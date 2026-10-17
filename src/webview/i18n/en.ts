@@ -133,6 +133,9 @@ export const en: Translations = {
   },
 
   inspector: {
+    noSelectionTitle: 'No Selection',
+    noSelectionHint: 'Select an object on the canvas to inspect its properties, or click "Canvas" in the status bar to configure canvas & viewBox bounds.',
+
     // Mode & Transform
     mode: 'Mode',
     modeMove: 'Move',

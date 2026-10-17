@@ -318,6 +318,7 @@ export class KeyboardShortcutController {
           this.ctx.toolbar.setTool('select');
         }
         this.ctx.propertyPanel.resetPanelMode();
+        this.ctx.propertyPanel.update();
         this.ctx.render();
       }
       return;

@@ -254,9 +254,16 @@ export class AppLayoutManager {
     const btnCanvasProps = document.getElementById('btn-canvas-props');
     if (btnCanvasProps) {
       btnCanvasProps.addEventListener('click', () => {
-        this.config.selectionTool.deselectAll();
-        this.propertyPanel.resetPanelMode();
-        this.toolbar.setTool('select');
+        if (this.propertyPanel.currentPanelMode === 'canvas') {
+          this.propertyPanel.resetPanelMode();
+          this.propertyPanel.update();
+        } else {
+          this.config.selectionTool.deselectAll();
+          this.config.canvasMgr.selectedGuideId = null;
+          this.config.canvasMgr.activeGuideTransformId = null;
+          this.toolbar.setTool('select');
+          this.propertyPanel.showCanvasProperties();
+        }
       });
     }
 
