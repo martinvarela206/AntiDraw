@@ -2,6 +2,7 @@ import { VectorElement } from '../../engine/VectorModel.js';
 import { AppearanceStackManager, StrokeLayer } from '../../engine/appearance/AppearanceStackManager.js';
 import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
 import { ToolIcons } from '../../icons/ToolIcons.js';
+import { I18nService } from '../../i18n/index.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Modular Multi-Stroke Layer Controls (StrokeLayersControls)
@@ -23,28 +24,28 @@ export class StrokeLayersControls {
       <div class="panel-section" style="margin-top:8px; border-top:1px solid rgba(255,255,255,0.06); padding-top:8px;">
         <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
           <div style="display:flex; align-items:center; gap:6px;">
-            <span>Capas de Trazo (Multi-Stroke)</span>
+            <span>${I18nService.t('inspector.strokeLayersTitle')}</span>
             <span class="badge" style="font-size:10px; color:#94a3b8; font-weight:normal;">${layers.length}</span>
           </div>
-          <button type="button" class="prop-input" id="btn-add-stroke-layer" style="cursor:pointer; width:auto; padding:1px 6px; font-size:10.5px; color:#10b981; font-weight:600;" title="Añadir una capa de trazo secundaria superpuesta a la figura">+ Capa</button>
+          <button type="button" class="prop-input" id="btn-add-stroke-layer" style="cursor:pointer; width:auto; padding:1px 6px; font-size:10.5px; color:#10b981; font-weight:600;" title="${I18nService.t('inspector.addLayer')}">${I18nService.t('inspector.addLayer')}</button>
         </div>
 
         ${layers.length === 0 ? `
           <div style="font-size:10.5px; color:var(--text-muted); line-height:1.4; padding:4px 0;">
-            Añade capas secundarias para crear efectos de borde doble, carreteras o líneas concéntricas sin duplicar el vector.
+            ${I18nService.t('inspector.emptyLayersHint')}
           </div>
         ` : `
           <div style="display:flex; flex-direction:column; gap:6px; margin-top:4px;">
             ${layers.map((l, idx) => `
               <div class="stroke-layer-item" data-layer-id="${l.id}" style="padding:6px; background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:4px; display:flex; flex-direction:column; gap:4px;">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                  <span style="font-size:10.5px; font-weight:600; color:var(--text-main);">Capa ${idx + 1} (${l.position === 'below' ? 'Debajo' : 'Encima'})</span>
+                  <span style="font-size:10.5px; font-weight:600; color:var(--text-main);">${I18nService.t('inspector.layerLabel', { idx: idx + 1, pos: l.position === 'below' ? I18nService.t('inspector.layerBelow') : I18nService.t('inspector.layerAbove') })}</span>
                   <div style="display:flex; gap:4px; align-items:center;">
-                    <select class="prop-input select-layer-pos" data-layer-id="${l.id}" style="font-size:9.5px; padding:1px 4px; height:20px; cursor:pointer;" title="Orden de apilamiento: Debajo del trazo principal o Encima">
-                      <option value="below" ${l.position === 'below' ? 'selected' : ''}>Debajo</option>
-                      <option value="above" ${l.position === 'above' ? 'selected' : ''}>Encima</option>
+                    <select class="prop-input select-layer-pos" data-layer-id="${l.id}" style="font-size:9.5px; padding:1px 4px; height:20px; cursor:pointer;">
+                      <option value="below" ${l.position === 'below' ? 'selected' : ''}>${I18nService.t('inspector.layerBelow')}</option>
+                      <option value="above" ${l.position === 'above' ? 'selected' : ''}>${I18nService.t('inspector.layerAbove')}</option>
                     </select>
-                    <button type="button" class="btn-remove-stroke-layer" data-layer-id="${l.id}" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:11px; padding:0 3px; display:inline-flex; align-items:center;" title="Eliminar capa de trazo">${ToolIcons.close}</button>
+                    <button type="button" class="btn-remove-stroke-layer" data-layer-id="${l.id}" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:11px; padding:0 3px; display:inline-flex; align-items:center;" title="${I18nService.t('inspector.deleteLayerTooltip')}">${ToolIcons.close}</button>
                   </div>
                 </div>
 

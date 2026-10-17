@@ -1,5 +1,6 @@
 import { Point } from '../../engine/VectorModel.js';
 import { BoundingBox } from '../../engine/geometry/BoundingBoxCalculator.js';
+import { I18nService } from '../../i18n/index.js';
 
 export type SelectionHudMode = 'move' | 'scale' | 'rotate';
 
@@ -136,22 +137,22 @@ export class SelectionMiniHud {
         ${!isMove && !isScale ? `<line x1="-34" y1="-8" x2="-34" y2="8" stroke="#334155" stroke-width="1" />` : ''}
         ${!isScale && !isRotate ? `<line x1="34" y1="-8" x2="34" y2="8" stroke="#334155" stroke-width="1" />` : ''}
 
-        <!-- Button 1: Move (✥ Mover) -->
+        <!-- Button 1: Move (✥ Move) -->
         <g class="mini-hud-btn mini-hud-move">
-          <title>Modo Mover: Mover elementos y encajar vértices magnéticamente (W)</title>
-          <text x="-68" y="4" text-anchor="middle" fill="${moveTextColor}" font-size="11" font-weight="${moveFontWeight}" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">✥ Mover</text>
+          <title>${I18nService.t('miniHud.moveTitle')}</title>
+          <text x="-68" y="4" text-anchor="middle" fill="${moveTextColor}" font-size="11" font-weight="${moveFontWeight}" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">✥ ${I18nService.t('miniHud.move')}</text>
         </g>
 
-        <!-- Button 2: Scale (⤢ Escalar) -->
+        <!-- Button 2: Scale (⤢ Scale) -->
         <g class="mini-hud-btn mini-hud-scale">
-          <title>Modo Escalar: Redimensionar con 8 tiradores perimetrales (R)</title>
-          <text x="0" y="4" text-anchor="middle" fill="${scaleTextColor}" font-size="11" font-weight="${scaleFontWeight}" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">⤢ Escalar</text>
+          <title>${I18nService.t('miniHud.scaleTitle')}</title>
+          <text x="0" y="4" text-anchor="middle" fill="${scaleTextColor}" font-size="11" font-weight="${scaleFontWeight}" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">⤢ ${I18nService.t('miniHud.scale')}</text>
         </g>
 
-        <!-- Button 3: Rotate (⟳ Rotar) -->
+        <!-- Button 3: Rotate (⟳ Rotate) -->
         <g class="mini-hud-btn mini-hud-rotate">
-          <title>Modo Rotar: Tiradores circulares de giro y pivote libre (E)</title>
-          <text x="68" y="4" text-anchor="middle" fill="${rotateTextColor}" font-size="11" font-weight="${rotateFontWeight}" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">⟳ Rotar</text>
+          <title>${I18nService.t('miniHud.rotateTitle')}</title>
+          <text x="68" y="4" text-anchor="middle" fill="${rotateTextColor}" font-size="11" font-weight="${rotateFontWeight}" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">⟳ ${I18nService.t('miniHud.rotate')}</text>
         </g>
       </g>
     `;

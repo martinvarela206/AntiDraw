@@ -1,6 +1,7 @@
 import { VectorElement, VectorModel } from '../../engine/VectorModel.js';
 import { BlendEngine, BlendConfig } from '../../engine/blend/BlendEngine.js';
 import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
+import { I18nService } from '../../i18n/index.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Dedicated Blend Tool Inspector (BlendInspector - MDWiki 8.8)
@@ -35,13 +36,13 @@ export class BlendInspector {
     return `
       <div class="panel-section">
         <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
-          <span>Fusión Paramétrica (Blend)</span>
-          <span class="badge" style="font-size:10px; background:rgba(99,102,241,0.2); color:#818cf8; font-weight:600; padding:1px 6px; border-radius:4px;">En vivo</span>
+          <span>${I18nService.t('inspector.parametricBlend')}</span>
+          <span class="badge" style="font-size:10px; background:rgba(99,102,241,0.2); color:#818cf8; font-weight:600; padding:1px 6px; border-radius:4px;">${I18nService.t('inspector.live')}</span>
         </div>
 
         <!-- Pasos Intermedios -->
         <div class="prop-row" style="margin-top:6px;">
-          <span class="prop-label">Pasos</span>
+          <span class="prop-label">${I18nService.t('inspector.steps')}</span>
           <div style="display:flex; align-items:center; gap:6px; flex:1;">
             <input type="range" id="el-blend-steps-slider" min="1" max="40" step="1" value="${cfg.steps}" style="flex:1; cursor:pointer;" />
             <input type="number" class="prop-input" id="el-blend-steps-input" min="1" max="50" step="1" value="${cfg.steps}" style="width:45px; text-align:right;" />
@@ -50,25 +51,25 @@ export class BlendInspector {
 
         <!-- Calibración Manual de Nodo Inicial (Nodo 0) -->
         <div class="prop-row" style="align-items:flex-start; margin-top:8px;">
-          <span class="prop-label" style="margin-top:4px;">Nodo 0</span>
+          <span class="prop-label" style="margin-top:4px;">${I18nService.t('inspector.startNode0')}</span>
           <div style="display:flex; flex-direction:column; gap:6px; flex:1;">
             <!-- Figura A -->
             <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-subtle, rgba(0,0,0,0.15)); padding:4px 6px; border-radius:4px;">
-              <span style="font-size:10.5px; color:var(--text-muted);">Figura A:</span>
+              <span style="font-size:10.5px; color:var(--text-muted);">${I18nService.t('inspector.figureA')}:</span>
               <div style="display:flex; align-items:center; gap:3px;">
-                <button type="button" class="prop-input" id="btn-blend-prev-a" style="cursor:pointer; width:22px; padding:1px; text-align:center;" title="Rotar nodo 0 de figura A hacia atrás">◀</button>
+                <button type="button" class="prop-input" id="btn-blend-prev-a" style="cursor:pointer; width:22px; padding:1px; text-align:center;">◀</button>
                 <input type="number" class="prop-input" id="el-blend-start-a" min="0" max="99" value="${cfg.startNodeAIndex}" style="width:36px; text-align:center; padding:1px;" />
-                <button type="button" class="prop-input" id="btn-blend-next-a" style="cursor:pointer; width:22px; padding:1px; text-align:center;" title="Rotar nodo 0 de figura A hacia adelante">▶</button>
+                <button type="button" class="prop-input" id="btn-blend-next-a" style="cursor:pointer; width:22px; padding:1px; text-align:center;">▶</button>
               </div>
             </div>
 
             <!-- Figura B -->
             <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-subtle, rgba(0,0,0,0.15)); padding:4px 6px; border-radius:4px;">
-              <span style="font-size:10.5px; color:var(--text-muted);">Figura B:</span>
+              <span style="font-size:10.5px; color:var(--text-muted);">${I18nService.t('inspector.figureB')}:</span>
               <div style="display:flex; align-items:center; gap:3px;">
-                <button type="button" class="prop-input" id="btn-blend-prev-b" style="cursor:pointer; width:22px; padding:1px; text-align:center;" title="Rotar nodo 0 de figura B hacia atrás">◀</button>
+                <button type="button" class="prop-input" id="btn-blend-prev-b" style="cursor:pointer; width:22px; padding:1px; text-align:center;">◀</button>
                 <input type="number" class="prop-input" id="el-blend-start-b" min="0" max="99" value="${cfg.startNodeBIndex}" style="width:36px; text-align:center; padding:1px;" />
-                <button type="button" class="prop-input" id="btn-blend-next-b" style="cursor:pointer; width:22px; padding:1px; text-align:center;" title="Rotar nodo 0 de figura B hacia adelante">▶</button>
+                <button type="button" class="prop-input" id="btn-blend-next-b" style="cursor:pointer; width:22px; padding:1px; text-align:center;">▶</button>
               </div>
             </div>
           </div>
@@ -76,19 +77,19 @@ export class BlendInspector {
 
         <!-- Conmutador de Sentido de Recorrido (Anti-Twisting) -->
         <div class="prop-row" style="margin-top:8px;">
-          <span class="prop-label">Torsión</span>
-          <button type="button" class="prop-input" id="btn-blend-toggle-twist" style="flex:1; cursor:pointer; font-weight:600; padding:4px 6px; text-align:center; display:flex; align-items:center; justify-content:center; gap:4px; ${isReversedB ? 'background:rgba(239,68,68,0.2); color:#f87171; border-color:#ef4444;' : 'background:rgba(16,185,129,0.15); color:#34d399;'}" title="Invertir el sentido de recorrido de la figura B para corregir el retorcimiento en espiral (twisting)">
-            <span>${isReversedB ? '↺ Sentido Invertido (Desenredado)' : '↻ Sentido Directo (Invertir)'}</span>
+          <span class="prop-label">${I18nService.t('inspector.twisting')}</span>
+          <button type="button" class="prop-input" id="btn-blend-toggle-twist" style="flex:1; cursor:pointer; font-weight:600; padding:4px 6px; text-align:center; display:flex; align-items:center; justify-content:center; gap:4px; ${isReversedB ? 'background:rgba(239,68,68,0.2); color:#f87171; border-color:#ef4444;' : 'background:rgba(16,185,129,0.15); color:#34d399;'}">
+            <span>${isReversedB ? I18nService.t('inspector.reversedTwist') : I18nService.t('inspector.directTwist')}</span>
           </button>
         </div>
 
         <!-- Acciones de Fusión -->
         <div class="prop-row" style="margin-top:10px; display:flex; gap:4px;">
-          <button type="button" class="prop-input" id="btn-blend-expand" style="flex:1; cursor:pointer; font-weight:600; padding:5px; background:var(--bg-active); color:var(--text-main);" title="Convertir los pasos intermedios en vectores independientes ordinarios">
-            Expandir Fusión
+          <button type="button" class="prop-input" id="btn-blend-expand" style="flex:1; cursor:pointer; font-weight:600; padding:5px; background:var(--bg-active); color:var(--text-main);">
+            ${I18nService.t('inspector.expandBlend')}
           </button>
-          <button type="button" class="prop-input" id="btn-blend-release" style="cursor:pointer; padding:5px 8px; color:#ef4444;" title="Deshacer la fusión y recuperar las figuras originales A y B">
-            Soltar
+          <button type="button" class="prop-input" id="btn-blend-release" style="cursor:pointer; padding:5px 8px; color:#ef4444;">
+            ${I18nService.t('inspector.releaseBlend')}
           </button>
         </div>
       </div>

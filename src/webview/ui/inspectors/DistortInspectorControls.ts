@@ -1,5 +1,6 @@
 import { SelectionTool } from '../../engine/SelectionTool.js';
 import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
+import { I18nService } from '../../i18n/index.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Modular Distort & Homography Inspector Component
@@ -44,16 +45,16 @@ export class DistortInspectorControls {
     return `
     <div style="border-top:1px solid var(--border-color); padding-top:6px; margin-top:6px;">
       <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
-        <span>Deformación Libre</span>
-        <span style="font-size:10px; opacity:0.7;">Homografía 2D</span>
+        <span>${I18nService.t('inspector.freeDistort')}</span>
+        <span style="font-size:10px; opacity:0.7;">${I18nService.t('inspector.homography2D')}</span>
       </div>
       <div class="prop-row" style="margin-top:4px;">
-        <span class="prop-label" style="font-size:11px;">Esquina</span>
+        <span class="prop-label" style="font-size:11px;">${I18nService.t('inspector.corner')}</span>
         <div style="display:flex; gap:3px; flex:1;">
-          <button class="prop-input ${idPrefix}btn-distort-corner" data-corner="nw" style="flex:1; padding:2px; font-size:10px; ${isCornerSelected('nw') ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Esquina Noroeste (Superior Izquierda) - Shift+clic para multiselección">NO</button>
-          <button class="prop-input ${idPrefix}btn-distort-corner" data-corner="ne" style="flex:1; padding:2px; font-size:10px; ${isCornerSelected('ne') ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Esquina Noreste (Superior Derecha) - Shift+clic para multiselección">NE</button>
-          <button class="prop-input ${idPrefix}btn-distort-corner" data-corner="se" style="flex:1; padding:2px; font-size:10px; ${isCornerSelected('se') ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Esquina Sureste (Inferior Derecha) - Shift+clic para multiselección">SE</button>
-          <button class="prop-input ${idPrefix}btn-distort-corner" data-corner="sw" style="flex:1; padding:2px; font-size:10px; ${isCornerSelected('sw') ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Esquina Suroeste (Inferior Izquierda) - Shift+clic para multiselección">SO</button>
+          <button class="prop-input ${idPrefix}btn-distort-corner" data-corner="nw" style="flex:1; padding:2px; font-size:10px; ${isCornerSelected('nw') ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="NW / NO">NW</button>
+          <button class="prop-input ${idPrefix}btn-distort-corner" data-corner="ne" style="flex:1; padding:2px; font-size:10px; ${isCornerSelected('ne') ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="NE">NE</button>
+          <button class="prop-input ${idPrefix}btn-distort-corner" data-corner="se" style="flex:1; padding:2px; font-size:10px; ${isCornerSelected('se') ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="SE">SE</button>
+          <button class="prop-input ${idPrefix}btn-distort-corner" data-corner="sw" style="flex:1; padding:2px; font-size:10px; ${isCornerSelected('sw') ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="SW / SO">SW</button>
         </div>
       </div>
       <div class="prop-row">
@@ -63,28 +64,28 @@ export class DistortInspectorControls {
         <input type="number" step="any" class="prop-input" id="${idPrefix}distort-corner-y" value="${cY}" />
       </div>
       <div class="prop-row" style="margin-top:4px; gap:4px;">
-        <button class="prop-input" id="${idPrefix}btn-reset-active-corner" style="flex:1; padding:4px; cursor:pointer; font-size:11px;" title="Restaurar la posición original ortogonal de la esquina seleccionada">⟲ Esquina</button>
-        <button class="prop-input" id="${idPrefix}btn-reset-all-corners" style="flex:1; padding:4px; cursor:pointer; font-size:11px;" title="Restaurar todas las esquinas a la forma ortogonal original">⟲ Todas</button>
+        <button class="prop-input" id="${idPrefix}btn-reset-active-corner" style="flex:1; padding:4px; cursor:pointer; font-size:11px;">${I18nService.t('inspector.resetCorner')}</button>
+        <button class="prop-input" id="${idPrefix}btn-reset-all-corners" style="flex:1; padding:4px; cursor:pointer; font-size:11px;">${I18nService.t('inspector.resetAll')}</button>
       </div>
       <div class="prop-row" style="margin-top:6px; border-top:1px dashed var(--border-color); padding-top:4px;">
-        <span class="prop-label" style="font-size:11px;">Cizalla</span>
-        <button class="prop-input" id="${idPrefix}btn-reset-skew" style="flex:1; padding:2px 4px; cursor:pointer; font-size:11px;" title="Restaurar inclinación / cizallamiento a su estado original">⟲ Restaurar Cizalla</button>
+        <span class="prop-label" style="font-size:11px;">${I18nService.t('inspector.skew')}</span>
+        <button class="prop-input" id="${idPrefix}btn-reset-skew" style="flex:1; padding:2px 4px; cursor:pointer; font-size:11px;">${I18nService.t('inspector.resetSkew')}</button>
       </div>
       <div class="prop-row" style="margin-top:6px; border-top:1px dashed var(--border-color); padding-top:4px; display:flex; justify-content:space-between; align-items:center;">
-        <span style="font-size:11px; font-weight:600;">Distorsión en Arco (Warp Arc)</span>
-        <button class="prop-input" id="${idPrefix}btn-reset-warp" style="padding:2px 6px; cursor:pointer; font-size:10px;" title="Restaurar curvatura de arco original">⟲ Restaurar</button>
+        <span style="font-size:11px; font-weight:600;">${I18nService.t('inspector.warpArc')}</span>
+        <button class="prop-input" id="${idPrefix}btn-reset-warp" style="padding:2px 6px; cursor:pointer; font-size:10px;">${I18nService.t('inspector.resetCorner')}</button>
       </div>
       <div class="prop-row" style="margin-top:4px;">
-        <span class="prop-label" style="font-size:11px;">Curvatura</span>
+        <span class="prop-label" style="font-size:11px;">${I18nService.t('inspector.curvature')}</span>
         <input type="range" min="-100" max="100" value="0" class="prop-slider" id="${idPrefix}warp-bend-slider" style="flex:1;" />
         <input type="number" min="-100" max="100" value="0" class="prop-input" id="${idPrefix}warp-bend-input" style="width:45px; text-align:right;" />
         <span style="font-size:10px; opacity:0.7;">%</span>
       </div>
       <div class="prop-row" style="margin-top:4px;">
-        <span class="prop-label" style="font-size:11px;">Eje</span>
+        <span class="prop-label" style="font-size:11px;">${I18nService.t('inspector.axis')}</span>
         <select class="prop-input" id="${idPrefix}warp-direction" style="flex:1;">
-          <option value="horizontal">Horizontal (Arco)</option>
-          <option value="vertical">Vertical</option>
+          <option value="horizontal">${I18nService.t('inspector.horizontal')}</option>
+          <option value="vertical">${I18nService.t('inspector.vertical')}</option>
         </select>
       </div>
     </div>`;

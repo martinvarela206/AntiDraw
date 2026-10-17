@@ -1,5 +1,6 @@
 import { VectorElement, VectorModel } from '../../engine/VectorModel.js';
 import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
+import { I18nService } from '../../i18n/index.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Dedicated Line, Polyline & Polygon Inspector (LineInspector)
@@ -33,40 +34,40 @@ export class LineInspector {
       <!-- Line Geometry Controls (FEAT-04) -->
       <div class="panel-section">
         <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
-          <span>Línea Recta (&lt;line&gt;)</span>
+          <span>${I18nService.t('inspector.straightLine')} (&lt;line&gt;)</span>
           <span style="font-size:10px; color:var(--accent-color); font-weight:600; text-transform:none;">
             ${lineLength}px (${lineAngle}°)
           </span>
         </div>
         <div class="prop-row" style="gap: 6px;">
-          <span class="prop-label" style="width: 46px;" title="Punto inicial (x1, y1)">Inicio</span>
+          <span class="prop-label" style="width: 46px;" title="${I18nService.t('inspector.startPointTitle')}">${I18nService.t('inspector.startPoint')}</span>
           <div class="prop-coord-group">
-            <div class="prop-coord-box" title="Coordenada X1 de inicio">
+            <div class="prop-coord-box" title="${I18nService.t('inspector.startCoordXTitle')}">
               <span class="prop-coord-sublabel">X1</span>
               <input type="number" class="prop-coord-input" id="line-x1" value="${Math.round(lineX1)}" />
             </div>
-            <div class="prop-coord-box" title="Coordenada Y1 de inicio">
+            <div class="prop-coord-box" title="${I18nService.t('inspector.startCoordYTitle')}">
               <span class="prop-coord-sublabel">Y1</span>
               <input type="number" class="prop-coord-input" id="line-y1" value="${Math.round(lineY1)}" />
             </div>
           </div>
         </div>
         <div class="prop-row" style="gap: 6px; margin-top: 6px;">
-          <span class="prop-label" style="width: 46px;" title="Punto final (x2, y2)">Fin</span>
+          <span class="prop-label" style="width: 46px;" title="${I18nService.t('inspector.endPointTitle')}">${I18nService.t('inspector.endPoint')}</span>
           <div class="prop-coord-group">
-            <div class="prop-coord-box" title="Coordenada X2 de final">
+            <div class="prop-coord-box" title="${I18nService.t('inspector.endCoordXTitle')}">
               <span class="prop-coord-sublabel">X2</span>
               <input type="number" class="prop-coord-input" id="line-x2" value="${Math.round(lineX2)}" />
             </div>
-            <div class="prop-coord-box" title="Coordenada Y2 de final">
+            <div class="prop-coord-box" title="${I18nService.t('inspector.endCoordYTitle')}">
               <span class="prop-coord-sublabel">Y2</span>
               <input type="number" class="prop-coord-input" id="line-y2" value="${Math.round(lineY2)}" />
             </div>
           </div>
         </div>
         <div class="prop-row" style="gap: 6px; margin-top: 6px;">
-          <button class="prop-input" id="btn-line-reverse" style="flex: 1; cursor: pointer; height: 24px; font-size: 10px; text-align: center;" title="Invertir extremos (intercambiar X1/Y1 con X2/Y2)">⇄ Invertir Puntos</button>
-          <button class="prop-input" id="btn-line-to-path" style="flex: 1; cursor: pointer; height: 24px; font-size: 10px; text-align: center;" title="Convertir a curva Bézier independiente (Ctrl+Q)">Convertir a Curvas</button>
+          <button class="prop-input" id="btn-line-reverse" style="flex: 1; cursor: pointer; height: 24px; font-size: 10px; text-align: center;" title="${I18nService.t('inspector.reversePointsTitle')}">⇄ ${I18nService.t('inspector.reversePoints')}</button>
+          <button class="prop-input" id="btn-line-to-path" style="flex: 1; cursor: pointer; height: 24px; font-size: 10px; text-align: center;" title="${I18nService.t('inspector.convertToCurves')} (Ctrl+Q)">${I18nService.t('inspector.convertToCurves')}</button>
         </div>
       </div>
       `;
@@ -77,19 +78,19 @@ export class LineInspector {
       <!-- Polyline / Polygon Geometry Controls (FEAT-04) -->
       <div class="panel-section">
         <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
-          <span>${isPolygon ? 'Polígono (&lt;polygon&gt;)' : 'Polilínea (&lt;polyline&gt;)'}</span>
+          <span>${isPolygon ? `${I18nService.t('toolbar.polygon')} (&lt;polygon&gt;)` : `${I18nService.t('toolbar.polyline')} (&lt;polyline&gt;)`}</span>
           <span style="font-size:10px; color:var(--accent-color); font-weight:600; text-transform:none;">
-            ${el.vertices ? el.vertices.length : 0} vértices
+            ${el.vertices ? el.vertices.length : 0} ${I18nService.t('inspector.vertices')}
           </span>
         </div>
         <div class="prop-row" style="margin-top: 4px;">
-          <span class="prop-label">Puntos</span>
+          <span class="prop-label">${I18nService.t('inspector.pointsLabel')}</span>
           <span style="font-size:11px; color:var(--text-muted); flex:1; font-family:monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${el.attributes.points || ''}">
-            ${el.attributes.points || '0 puntos'}
+            ${el.attributes.points || I18nService.t('inspector.pointsZero')}
           </span>
         </div>
         <div class="prop-row" style="gap: 6px; margin-top: 6px;">
-          <button class="prop-input" id="btn-poly-to-path" style="flex: 1; cursor: pointer; height: 24px; font-size: 10px; text-align: center;" title="Convertir a trazado con curvas Bézier libres (Ctrl+Q)">Convertir a Curvas</button>
+          <button class="prop-input" id="btn-poly-to-path" style="flex: 1; cursor: pointer; height: 24px; font-size: 10px; text-align: center;" title="${I18nService.t('inspector.convertToCurves')} (Ctrl+Q)">${I18nService.t('inspector.convertToCurves')}</button>
         </div>
       </div>
       `;

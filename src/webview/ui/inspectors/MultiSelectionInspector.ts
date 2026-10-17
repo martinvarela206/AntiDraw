@@ -95,51 +95,51 @@ export class MultiSelectionInspector {
 
       <div class="panel-section">
         <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
-          <span>Batch Fill</span>
+          <span>${I18nService.t('inspector.batchFill')}</span>
           <div style="display:flex; gap:4px; align-items:center;">
-            <button class="prop-input" id="btn-batch-add-fill" style="cursor:pointer; width:auto; padding:1px 6px; font-size:11px; color:#10b981; font-weight:600;" title="Añadir relleno a todos los elementos seleccionados">+ Añadir</button>
-            <button class="prop-input" id="btn-batch-remove-fill" style="cursor:pointer; width:auto; padding:1px 6px; font-size:11px; color:#ef4444;" title="Quitar relleno de todos los elementos seleccionados (fill='none')">− Quitar</button>
+            <button class="prop-input" id="btn-batch-add-fill" style="cursor:pointer; width:auto; padding:1px 6px; font-size:11px; color:#10b981; font-weight:600;" title="${I18nService.t('inspector.addFill')}">+ ${I18nService.t('common.add')}</button>
+            <button class="prop-input" id="btn-batch-remove-fill" style="cursor:pointer; width:auto; padding:1px 6px; font-size:11px; color:#ef4444;" title="${I18nService.t('inspector.removeFill')}">− ${I18nService.t('common.delete')}</button>
           </div>
         </div>
         <div class="prop-row">
-          <span class="prop-label">Color</span>
+          <span class="prop-label">${I18nService.t('common.color')}</span>
           <div class="color-picker-row" style="display:flex; gap:4px; align-items:center;">
             <input type="color" class="color-swatch" id="batch-fill-color" value="#4f46e5" />
-            <input type="text" class="prop-input" id="batch-fill-hex" value="#4f46e5" placeholder="#hex o currentColor" style="flex:1;" />
-            <button class="prop-input" id="btn-batch-fill-currentcolor" style="cursor:pointer; width:auto; padding:2px 6px; font-size:10px; font-weight:600; color:#94a3b8;" title="Aplicar currentColor como relleno a todos los elementos seleccionados">currentColor</button>
+            <input type="text" class="prop-input" id="batch-fill-hex" value="#4f46e5" placeholder="#hex / currentColor" style="flex:1;" />
+            <button class="prop-input" id="btn-batch-fill-currentcolor" style="cursor:pointer; width:auto; padding:2px 6px; font-size:10px; font-weight:600; color:#94a3b8;">currentColor</button>
           </div>
         </div>
       </div>
 
       <div class="panel-section">
         <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
-          <span>Batch Stroke</span>
+          <span>${I18nService.t('inspector.batchStroke')}</span>
           <div style="display:flex; gap:4px; align-items:center;">
-            <button class="prop-input" id="btn-batch-add-stroke" style="cursor:pointer; width:auto; padding:1px 6px; font-size:11px; color:#10b981; font-weight:600;" title="Añadir trazo de 1px a todos los elementos seleccionados">+ Añadir</button>
-            <button class="prop-input" id="btn-batch-remove-stroke" style="cursor:pointer; width:auto; padding:1px 6px; font-size:11px; color:#ef4444;" title="Quitar trazo de todos los elementos seleccionados (stroke='none')">− Quitar</button>
+            <button class="prop-input" id="btn-batch-add-stroke" style="cursor:pointer; width:auto; padding:1px 6px; font-size:11px; color:#10b981; font-weight:600;" title="${I18nService.t('inspector.addStroke')}">+ ${I18nService.t('common.add')}</button>
+            <button class="prop-input" id="btn-batch-remove-stroke" style="cursor:pointer; width:auto; padding:1px 6px; font-size:11px; color:#ef4444;" title="${I18nService.t('inspector.removeStroke')}">− ${I18nService.t('common.delete')}</button>
           </div>
         </div>
         <div class="prop-row">
-          <span class="prop-label">Color</span>
+          <span class="prop-label">${I18nService.t('common.color')}</span>
           <div class="color-picker-row" style="display:flex; gap:4px; align-items:center;">
             <input type="color" class="color-swatch" id="batch-stroke-color" value="#000000" />
-            <input type="text" class="prop-input" id="batch-stroke-hex" value="#000000" placeholder="#hex o currentColor" style="flex:1;" />
-            <button class="prop-input" id="btn-batch-stroke-currentcolor" style="cursor:pointer; width:auto; padding:2px 6px; font-size:10px; font-weight:600; color:#94a3b8;" title="Aplicar currentColor como borde a todos los elementos seleccionados">currentColor</button>
+            <input type="text" class="prop-input" id="batch-stroke-hex" value="#000000" placeholder="#hex / currentColor" style="flex:1;" />
+            <button class="prop-input" id="btn-batch-stroke-currentcolor" style="cursor:pointer; width:auto; padding:2px 6px; font-size:10px; font-weight:600; color:#94a3b8;">currentColor</button>
           </div>
         </div>
         <div class="prop-row">
-          <span class="prop-label">Width</span>
+          <span class="prop-label">${I18nService.t('inspector.strokeWidth')}</span>
           <input type="number" class="prop-input" id="batch-stroke-width" value="1" min="0" step="0.5" />
         </div>
         <div class="prop-row">
-          <span class="prop-label">Join</span>
+          <span class="prop-label">${I18nService.t('inspector.strokeJoin')}</span>
           <div style="display:flex; gap:4px; flex:1; align-items:center;">
             <select class="prop-input" id="batch-stroke-join" style="cursor:pointer; flex:1;">
               <option value="miter">Miter</option>
               <option value="round">Round</option>
               <option value="bevel">Bevel</option>
             </select>
-            <div id="container-batch-stroke-miterlimit" style="display:flex; align-items:center; gap:2px; width:65px;" title="Ángulo mínimo de inglete en grados (°): esquinas más agudas que este valor se cortan a bisel">
+            <div id="container-batch-stroke-miterlimit" style="display:flex; align-items:center; gap:2px; width:65px;" title="${I18nService.t('inspector.strokeMiter')}">
               <input type="number" class="prop-input" id="batch-stroke-miter-angle" value="29" min="1" max="170" step="1" style="width:45px; padding:2px 4px; text-align:right;" />
               <span style="font-size:11px; color:var(--text-muted); font-weight:600;">°</span>
             </div>
@@ -163,8 +163,8 @@ export class MultiSelectionInspector {
         <div class="panel-section">
           <div class="panel-title">${I18nService.t('panels.blend')}</div>
           <div class="prop-row">
-            <button class="prop-input" id="btn-prop-blend-create" style="flex:1; cursor:pointer; font-weight:600; padding:6px; display:inline-flex; align-items:center; justify-content:center; gap:6px; background:linear-gradient(135deg, rgba(99,102,241,0.2), rgba(168,85,247,0.2)); color:var(--text-main); border:1px solid rgba(99,102,241,0.4);" title="Crear una fusión paramétrica viva de K pasos entre las 2 figuras seleccionadas">
-              ${ToolIcons.blend} Crear Fusión (Blend)
+            <button class="prop-input" id="btn-prop-blend-create" style="flex:1; cursor:pointer; font-weight:600; padding:6px; display:inline-flex; align-items:center; justify-content:center; gap:6px; background:linear-gradient(135deg, rgba(99,102,241,0.2), rgba(168,85,247,0.2)); color:var(--text-main); border:1px solid rgba(99,102,241,0.4);" title="${I18nService.t('inspector.createBlend')}">
+              ${ToolIcons.blend} ${I18nService.t('inspector.createBlend')}
             </button>
           </div>
         </div>

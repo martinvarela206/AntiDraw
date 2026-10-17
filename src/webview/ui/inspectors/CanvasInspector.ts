@@ -185,11 +185,11 @@ export class CanvasInspector {
       <div class="panel-section">
         <div class="panel-title">${I18nService.t('inspector.gridAlignment')}</div>
         <div class="prop-row" style="display:flex; gap:6px;">
-          <button class="prop-input ${gridAlignmentMode === 'origin' ? 'active' : ''}" id="btn-canvas-grid-align-origin" style="cursor:pointer; text-align:center; flex:1; padding:6px 4px; font-size:11px;" title="Modo A: Línea o cruce de grilla coincidente con (0, 0)">
-            ┼ Línea en (0, 0)
+          <button class="prop-input ${gridAlignmentMode === 'origin' ? 'active' : ''}" id="btn-canvas-grid-align-origin" style="cursor:pointer; text-align:center; flex:1; padding:6px 4px; font-size:11px;" title="${I18nService.t('statusbar.gridAlignOriginTooltip')}">
+            ${I18nService.t('inspector.gridAlignOriginCanvas')}
           </button>
-          <button class="prop-input ${gridAlignmentMode === 'cell-center' ? 'active' : ''}" id="btn-canvas-grid-align-center" style="cursor:pointer; text-align:center; flex:1; padding:6px 4px; font-size:11px;" title="Modo B: Snap al centro de cada celda de la grilla (sin desplazar la cuadrícula)">
-            ◫ Celda en (0, 0)
+          <button class="prop-input ${gridAlignmentMode === 'cell-center' ? 'active' : ''}" id="btn-canvas-grid-align-center" style="cursor:pointer; text-align:center; flex:1; padding:6px 4px; font-size:11px;" title="${I18nService.t('statusbar.gridAlignCenterTooltip')}">
+            ${I18nService.t('inspector.gridAlignCenterCanvas')}
           </button>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import { ToolIcons } from '../../icons/ToolIcons.js';
+import { I18nService } from '../../i18n/index.js';
 
 export interface ShortcutItem {
   keys: string[];
@@ -28,14 +29,14 @@ export interface ToolHelpConfig {
  *    Responsibility Principle (SRP). Updates reactively whenever the active tool changes,
  *    without causing reflows or re-renders of active input fields in companion inspectors.
  *
- * 3. State Preservation:
- *    Maintains collapse/expand accordion preference in memory so operators with smaller displays
- *    can toggle the section without losing layout state across selection changes.
+ * 3. State Preservation & Universal Localization (i18n):
+ *    Maintains collapse/expand accordion preference in memory and renders full bilingual
+ *    cheatsheets in both Spanish and English depending on active application locale.
  */
 export class QuickHelpInspector {
   private static isCollapsed: boolean = false;
 
-  private static readonly TOOL_HELP_MAP: Record<string, ToolHelpConfig> = {
+  private static readonly TOOL_HELP_MAP_ES: Record<string, ToolHelpConfig> = {
     select: {
       title: 'Herramienta Selección',
       toolId: 'select',
@@ -55,7 +56,7 @@ export class QuickHelpInspector {
         { keys: ['Arrastre en vacío'], description: 'Selección por área mediante caja elástica (Marquee)' },
         { keys: ['Shift', 'Marquee'], description: 'Selección por área acumulativa / aditiva' },
         { keys: ['Alt', 'Marquee'], description: 'Modo intersección: selecciona objetos que toquen el marco' },
-        { keys: ['Doble clic'], description: 'Conmuta a la herramienta Edición de Nodos (N)' },
+        { keys: ['Doble clic'], description: 'Conmuta a la herramienta Edición de Nodos (A)' },
         { keys: ['Tirador esquina'], description: 'Escala libremente el elemento o grupo seleccionado' },
         { keys: ['Shift', 'Escala'], description: 'Escala proporcional manteniendo relación de aspecto' },
         { keys: ['Alt', 'Escala'], description: 'Escala simétricamente expandiendo desde el centro/pivote' },
@@ -66,7 +67,6 @@ export class QuickHelpInspector {
         { keys: ['Alt', 'Arrastre tirador'], description: 'Escala simétrica concéntrica desde el centro' },
         { keys: ['Shift', 'Arrastre rotar'], description: 'Fuerza el ángulo de rotación a múltiplos de 15°' },
         { keys: ['Clic pausado'], description: 'Cicla modos: Escala → Rotación → Deformación libre (Perspectiva)' },
-        { keys: ['Doble clic'], description: 'Entra directamente al modo de edición de nodos' },
         { keys: ['Ctrl+C / Ctrl+V'], description: 'Copia y pega con desplazamiento automático de 15px' },
         { keys: ['Ctrl+D'], description: 'Duplica instantáneamente los elementos seleccionados' },
         { keys: ['Doble clic icono (V)'], description: 'Abre el diálogo de transformación numérica (posición X/Y y desplazamiento)' },
@@ -233,12 +233,211 @@ export class QuickHelpInspector {
     },
   };
 
+  private static readonly TOOL_HELP_MAP_EN: Record<string, ToolHelpConfig> = {
+    select: {
+      title: 'Selection Tool',
+      toolId: 'select',
+      icon: ToolIcons.selectTool,
+      shortcuts: [
+        { keys: ['W'], description: 'Move Mode: Hides scale handles and activates snap to vertices and center' },
+        { keys: ['R'], description: 'Scale Mode: Activates classic 8 perimeter resizing handles' },
+        { keys: ['E'], description: 'Rotate Mode: Activates circular rotation, skew handles and free pivot' },
+        { keys: ['D'], description: 'Free Distort / Perspective: Toggles 3x3 homography quad handles' },
+        { keys: ['Button ▱'], description: 'Dedicated button in inspector to toggle Free Distortion' },
+        { keys: ['Mini-HUD'], description: 'Floating pill above Bounding Box for 1-click mode toggle: Move, Scale, Rotate' },
+        { keys: ['Click'], description: 'Selects element under cursor or deselects on empty space' },
+        { keys: ['Shift', 'Click'], description: 'Adds or removes element from multiple selection' },
+        { keys: ['Drag'], description: 'Moves selected elements on canvas' },
+        { keys: ['Ctrl', 'Drag'], description: 'Constrains movement to orthogonal axes (horizontal or vertical)' },
+        { keys: ['Alt', 'Drag'], description: 'Duplicates selected elements creating a clone' },
+        { keys: ['Empty Drag'], description: 'Area selection via marquee elastic box' },
+        { keys: ['Shift', 'Marquee'], description: 'Additive cumulative area selection' },
+        { keys: ['Alt', 'Marquee'], description: 'Touch/intersection mode: selects objects intersecting frame' },
+        { keys: ['Double click'], description: 'Switches to Node Editing Tool (A)' },
+        { keys: ['Corner handle'], description: 'Free scale selected element or group' },
+        { keys: ['Shift', 'Scale'], description: 'Proportional scale maintaining aspect ratio' },
+        { keys: ['Alt', 'Scale'], description: 'Symmetric scale expanding from center/pivot' },
+        { keys: ['Drag'], description: 'Translates selected elements with snap to nodes, edges and guides' },
+        { keys: ['Shift', 'Drag'], description: 'Constrains displacement to horizontal or vertical axis' },
+        { keys: ['Alt', 'Empty Drag'], description: 'Touch/crossing selection marquee (touch-select)' },
+        { keys: ['Shift', 'Drag Handle'], description: 'Proportional scale preserving aspect ratio' },
+        { keys: ['Alt', 'Drag Handle'], description: 'Concentric symmetric scale from center' },
+        { keys: ['Shift', 'Drag Rotate'], description: 'Constrains rotation angle to 15° multiples' },
+        { keys: ['Paused click'], description: 'Cycles modes: Scale → Rotate → Free Distort (Perspective)' },
+        { keys: ['Ctrl+C / Ctrl+V'], description: 'Copy and paste with 15px auto-offset' },
+        { keys: ['Ctrl+D'], description: 'Duplicates selected elements instantly' },
+        { keys: ['Double click icon (V)'], description: 'Opens numeric transformation dialog (X/Y position and displacement)' },
+        { keys: ['Del / Backspace'], description: 'Deletes selected elements' },
+      ],
+    },
+    node: {
+      title: 'Node Editing',
+      toolId: 'node',
+      icon: ToolIcons.nodeTool,
+      shortcuts: [
+        { keys: ['Click on node'], description: 'Selects vertex and displays Bézier handles' },
+        { keys: ['Shift / Ctrl', 'Click'], description: 'Additive selection of multiple vertices' },
+        { keys: ['Drag node'], description: 'Moves vertex with snap to grids, guides and nodes' },
+        { keys: ['Shift', 'Drag handle'], description: 'Constrains handle angle to 45° steps' },
+        { keys: ['Ctrl', 'Drag to end'], description: 'Welds and closes contour upon joining opposite ends' },
+        { keys: ['Alt', 'Empty Drag'], description: 'Area node selection in touch/intersection mode' },
+        { keys: ['Double click on segment'], description: 'Inserts a new vertex at exact curve position' },
+        { keys: ['Double click on node'], description: 'Toggles node type (asymmetric ↔ smooth ↔ symmetric)' },
+        { keys: ['Ctrl', 'J'], description: 'Joins and welds coincident selected vertices removing zero-length segments' },
+        { keys: ['W / R / E'], description: 'Toggles micro-Bounding Box between Move, Scale and Rotate (N ≥ 2)' },
+        { keys: ['Del / Backspace'], description: 'Deletes selected nodes preserving stroke' },
+      ],
+    },
+    pen: {
+      title: 'Bézier Pen',
+      toolId: 'pen',
+      icon: ToolIcons.penTool,
+      shortcuts: [
+        { keys: ['Click'], description: 'Adds a straight vertex (sharp cusp node without handles)' },
+        { keys: ['Click + Drag'], description: 'Extracts tangential handles to create smooth curves' },
+        { keys: ['Alt', 'Drag handle'], description: 'Breaks node tangency (asymmetric handle)' },
+        { keys: ['Click on start'], description: 'Closes contour completing the path' },
+        { keys: ['Enter / Double click'], description: 'Finishes path leaving it open' },
+        { keys: ['Escape'], description: 'Cancels active drawing path' },
+      ],
+    },
+    polyline: {
+      title: 'Polyline',
+      toolId: 'polyline',
+      icon: ToolIcons.polylineTool,
+      shortcuts: [
+        { keys: ['Click'], description: 'Adds a new vertex with pure straight segment' },
+        { keys: ['Click on start'], description: 'Closes polyline transforming it into polygon' },
+        { keys: ['Enter / Double click'], description: 'Finishes open polygonal path' },
+        { keys: ['Escape'], description: 'Cancels current drawing' },
+      ],
+    },
+    line: {
+      title: 'Straight Line',
+      toolId: 'line',
+      icon: ToolIcons.lineTool,
+      shortcuts: [
+        { keys: ['Click + Drag'], description: 'Draws a native <line> straight segment' },
+        { keys: ['Shift', 'Drag'], description: 'Constrains angle to 45° multiples (horizontal/vertical/diagonal)' },
+        { keys: ['Space while dragging'], description: 'Repositions entire line on screen without altering length' },
+      ],
+    },
+    rect: {
+      title: 'Rectangle',
+      toolId: 'rect',
+      icon: ToolIcons.rectTool,
+      shortcuts: [
+        { keys: ['Click + Drag'], description: 'Draws a free rectangle from opposite corner' },
+        { keys: ['Shift', 'Drag'], description: 'Locks 1:1 aspect ratio (perfect square)' },
+        { keys: ['Alt', 'Drag'], description: 'Projects symmetrically expanding from geometric center' },
+        { keys: ['Space while dragging'], description: 'Repositions shape on screen without losing its size' },
+      ],
+    },
+    circle: {
+      title: 'Circle',
+      toolId: 'circle',
+      icon: ToolIcons.circleTool,
+      shortcuts: [
+        { keys: ['Click + Drag'], description: 'Draws a native <circle> (1:1 intrinsic)' },
+        { keys: ['Alt', 'Drag'], description: 'Expands circle concentrically from center' },
+        { keys: ['Space while dragging'], description: 'Repositions circle on screen without altering radius' },
+      ],
+    },
+    ellipse: {
+      title: 'Ellipse',
+      toolId: 'ellipse',
+      icon: ToolIcons.ellipseTool,
+      shortcuts: [
+        { keys: ['Click + Drag'], description: 'Draws a free parametric ellipse from opposite corner' },
+        { keys: ['Shift', 'Drag'], description: 'Locks 1:1 aspect ratio (perfect circle)' },
+        { keys: ['Alt', 'Drag'], description: 'Projects symmetrically expanding from geometric center' },
+        { keys: ['Space while dragging'], description: 'Repositions ellipse on screen without losing its size' },
+      ],
+    },
+    polygon: {
+      title: 'Regular Polygon',
+      toolId: 'polygon',
+      icon: ToolIcons.polygonTool,
+      shortcuts: [
+        { keys: ['Click + Drag'], description: 'Draws a regular polygon with configured side count' },
+        { keys: ['Alt', 'Drag'], description: 'Projects polygon expanding from center' },
+        { keys: ['Space while dragging'], description: 'Repositions polygon on screen without altering size' },
+      ],
+    },
+    star: {
+      title: 'Parametric Star',
+      toolId: 'star',
+      icon: ToolIcons.starTool,
+      shortcuts: [
+        { keys: ['Click + Drag'], description: 'Draws star with configured points and inner radius' },
+        { keys: ['Alt', 'Drag'], description: 'Projects star expanding from center' },
+        { keys: ['Space while dragging'], description: 'Repositions star on screen without altering size' },
+      ],
+    },
+    stroke: {
+      title: 'Stroke Tool',
+      toolId: 'stroke',
+      icon: ToolIcons.strokeTool,
+      shortcuts: [
+        { keys: ['Click on vector'], description: 'Inspects and edits width, line caps, joins and dashes' },
+        { keys: ['Click on empty space'], description: 'Deselects inspected vector' },
+      ],
+    },
+    addVertex: {
+      title: 'Add Vertex',
+      toolId: 'addVertex',
+      icon: ToolIcons.addVertexTool,
+      shortcuts: [
+        { keys: ['Click on path'], description: 'Inserts new node maintaining exact analytical curvature' },
+      ],
+    },
+    canvas: {
+      title: 'Canvas & ViewBox',
+      toolId: 'canvas',
+      icon: ToolIcons.canvasTool,
+      shortcuts: [
+        { keys: ['Drag borders'], description: 'Interactively resizes drawing ViewBox' },
+        { keys: ['Shift', 'Drag'], description: 'Resizes maintaining aspect ratio' },
+        { keys: ['Alt', 'Drag'], description: 'Resizes symmetrically from center' },
+      ],
+    },
+    zoom: {
+      title: 'Zoom & Pan',
+      toolId: 'zoom',
+      icon: ToolIcons.zoomTool,
+      shortcuts: [
+        { keys: ['Click'], description: 'Increases zoom level centered on cursor' },
+        { keys: ['Alt', 'Click'], description: 'Decreases zoom level' },
+        { keys: ['Drag'], description: 'Window zoom to marquee area' },
+        { keys: ['Space', 'Drag'], description: 'Free pan across workspace (also middle mouse button)' },
+        { keys: ['Ctrl', 'Mouse Wheel'], description: 'Continuous zoom in or out' },
+        { keys: ['Shift', 'Mouse Wheel'], description: 'Horizontal canvas scrolling' },
+        { keys: ['Double click icon (Z)'], description: 'Auto-fit zoom to workspace (Fit to Screen)' },
+      ],
+    },
+    ruler: {
+      title: 'Rulers & Guides',
+      toolId: 'ruler',
+      icon: ToolIcons.rulersVisibility,
+      shortcuts: [
+        { keys: ['Drag from ruler'], description: 'Creates new horizontal or vertical metric guide' },
+        { keys: ['Ctrl / Shift', 'Drag'], description: 'Constrains guide rotation to 15° steps' },
+        { keys: ['Double click corner'], description: 'Resets origin (0,0) to ViewBox corner' },
+        { keys: ['Drag corner'], description: 'Sets custom coordinate origin (0,0)' },
+        { keys: ['Double click guide'], description: 'Opens inspector to configure position and angle' },
+        { keys: ['Del / Backspace'], description: 'Deletes selected guide line' },
+      ],
+    },
+  };
+
   /**
    * Renderiza el componente de ayuda rápida en el contenedor especificado.
    */
   public static render(container: HTMLElement, activeTool: string, isGuideOrRuler: boolean = false): void {
-    const key = isGuideOrRuler ? 'ruler' : (this.TOOL_HELP_MAP[activeTool] ? activeTool : 'select');
-    const config = this.TOOL_HELP_MAP[key] || this.TOOL_HELP_MAP.select;
+    const lang = I18nService.getLanguage();
+    const map = lang === 'en' ? this.TOOL_HELP_MAP_EN : this.TOOL_HELP_MAP_ES;
+    const key = isGuideOrRuler ? 'ruler' : (map[activeTool] ? activeTool : 'select');
+    const config = map[key] || map.select;
 
     const rowsHtml = config.shortcuts
       .map((item) => {
@@ -257,13 +456,14 @@ export class QuickHelpInspector {
 
     const chevronRotation = this.isCollapsed ? 'style="transform: rotate(-90deg);"' : '';
     const contentDisplay = this.isCollapsed ? 'style="display: none;"' : '';
+    const headerPrefix = lang === 'en' ? 'Quick Help: ' : 'Ayuda Rápida: ';
 
     container.innerHTML = `
       <div class="panel-section quick-help-section">
         <div class="panel-title quick-help-header" id="btn-toggle-quick-help" style="cursor: pointer; display: flex; align-items: center; justify-content: space-between; margin-bottom: 0; user-select: none;">
           <div style="display: flex; align-items: center; gap: 6px;">
             <span class="quick-help-tool-icon">${config.icon}</span>
-            <span>Ayuda Rápida: ${config.title}</span>
+            <span>${headerPrefix}${config.title}</span>
           </div>
           <svg class="quick-help-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" ${chevronRotation}>
             <polyline points="6 9 12 15 18 9"></polyline>
@@ -287,4 +487,9 @@ export class QuickHelpInspector {
       });
     }
   }
+
+  public static get TOOL_HELP_MAP(): Record<string, ToolHelpConfig> {
+    return QuickHelpInspector.TOOL_HELP_MAP_ES;
+  }
 }
+

@@ -180,14 +180,14 @@ export class StrokeInspector {
             ${isSketch ? `
               <div id="container-sketch-params" style="display:flex; flex-direction:column; gap:3px; background:var(--bg-subtle, rgba(0,0,0,0.15)); padding:5px 6px; border-radius:4px; margin-top:2px; border:1px solid rgba(255,255,255,0.06);">
                 <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px;">
-                  <span style="color:var(--text-muted);">Amplitud:</span>
+                  <span style="color:var(--text-muted);">${I18nService.t('inspector.amplitude')}:</span>
                   <div style="display:flex; align-items:center; gap:3px;">
                     <input type="range" id="el-sketch-amplitude" min="0.1" max="0.95" step="0.05" value="${sketchAmp}" style="width:70px; cursor:pointer;" />
                     <span id="label-sketch-amp" style="width:24px; text-align:right; font-variant-numeric:tabular-nums; font-size:9.5px;">${Math.round(sketchAmp * 100)}%</span>
                   </div>
                 </div>
                 <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px;">
-                  <span style="color:var(--text-muted);">Rugosidad:</span>
+                  <span style="color:var(--text-muted);">${I18nService.t('inspector.roughness')}:</span>
                   <div style="display:flex; align-items:center; gap:3px;">
                     <input type="range" id="el-sketch-roughness" min="0" max="0.8" step="0.05" value="${sketchRough}" style="width:70px; cursor:pointer;" />
                     <span id="label-sketch-rough" style="width:24px; text-align:right; font-variant-numeric:tabular-nums; font-size:9.5px;">${Math.round(sketchRough * 100)}%</span>
@@ -214,8 +214,8 @@ export class StrokeInspector {
         })}
         ${StrokeLayersControls.renderHtml(el)}
         <div class="prop-row" style="margin-top: 8px;">
-          <button class="prop-input" id="btn-stroke-to-path" style="cursor:pointer; background:var(--bg-active); text-align:center; font-weight:600; color:var(--text-main); padding:6px;" title="Convertir geométricamente el trazo en un contorno cerrado independiente con relleno (Outline Stroke)">
-            ⤹ Convertir Trazo a Vector
+          <button class="prop-input" id="btn-stroke-to-path" style="cursor:pointer; background:var(--bg-active); text-align:center; font-weight:600; color:var(--text-main); padding:6px;" title="${I18nService.t('inspector.strokeToPath')}">
+            ⤹ ${I18nService.t('inspector.strokeToPathAction')}
           </button>
         </div>
         </div>

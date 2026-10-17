@@ -72,7 +72,7 @@ export class AppLayoutManager {
       <div class="left-toolbar" id="left-toolbar"></div>
       <div class="vector-explorer-panel hidden" id="vector-explorer-panel" style="display:none;"></div>
       <div class="canvas-container" id="canvas-container">
-        <div class="ruler-corner" id="ruler-corner" title="Drag to set (0,0) Origin | Click for Ruler Settings | Double-click to Reset Origin">
+        <div class="ruler-corner" id="ruler-corner" title="${I18nService.t('statusbar.rulerCornerTooltip')}">
           ${ToolIcons.rulerCorner}
         </div>
         <div class="ruler-top-container" id="ruler-top-container">
@@ -96,12 +96,12 @@ export class AppLayoutManager {
         <div class="status-right">
           <button class="status-btn" id="btn-canvas-props" title="${I18nService.t('statusbar.canvasPropsTooltip')}">${ToolIcons.canvasTool} <span id="status-canvas-text">${I18nService.t('toolbar.canvas')}</span></button>
           <div class="status-grid-align-group" style="display:inline-flex; gap:2px;">
-            <button class="status-btn" id="status-grid-align-origin" title="Modo A: Línea o cruce de grilla coincidente con (0, 0)">┼ Línea (0,0)</button>
-            <button class="status-btn" id="status-grid-align-center" title="Modo B: Snap al centro de cada celda de la grilla">◫ Celda (0,0)</button>
+            <button class="status-btn" id="status-grid-align-origin" title="${I18nService.t('statusbar.gridAlignOriginTooltip')}">${I18nService.t('statusbar.gridAlignOrigin')}</button>
+            <button class="status-btn" id="status-grid-align-center" title="${I18nService.t('statusbar.gridAlignCenterTooltip')}">${I18nService.t('statusbar.gridAlignCenter')}</button>
           </div>
           <button class="status-btn" id="btn-recenter-viewbox" title="${I18nService.t('statusbar.recenterViewBox')}">${ToolIcons.target} <span id="status-recenter-text">${I18nService.t('statusbar.recenterViewBox')}</span></button>
           <span id="status-info">${I18nService.t('common.ready')}</span>
-          <button class="status-zoom-btn" id="status-zoom" title="Click to reset zoom to 100%">100%</button>
+          <button class="status-zoom-btn" id="status-zoom" title="${I18nService.t('statusbar.zoomResetTooltip')}">100%</button>
           <button class="status-btn" id="btn-lang-toggle" title="${I18nService.t('statusbar.languageToggleTooltip')}" style="font-weight:700; padding:2px 8px; letter-spacing:0.5px; min-width:32px; text-align:center;">${I18nService.getLanguage().toUpperCase()}</button>
         </div>
       </div>
@@ -279,6 +279,20 @@ export class AppLayoutManager {
       if (statusRecenterText) statusRecenterText.textContent = I18nService.t('statusbar.recenterViewBox');
       const btnRecenter = document.getElementById('btn-recenter-viewbox');
       if (btnRecenter) btnRecenter.title = I18nService.t('statusbar.recenterViewBox');
+      const btnGridAlignOrigin = document.getElementById('status-grid-align-origin');
+      if (btnGridAlignOrigin) {
+        btnGridAlignOrigin.textContent = I18nService.t('statusbar.gridAlignOrigin');
+        btnGridAlignOrigin.title = I18nService.t('statusbar.gridAlignOriginTooltip');
+      }
+      const btnGridAlignCenter = document.getElementById('status-grid-align-center');
+      if (btnGridAlignCenter) {
+        btnGridAlignCenter.textContent = I18nService.t('statusbar.gridAlignCenter');
+        btnGridAlignCenter.title = I18nService.t('statusbar.gridAlignCenterTooltip');
+      }
+      const rulerCorner = document.getElementById('ruler-corner');
+      if (rulerCorner) rulerCorner.title = I18nService.t('statusbar.rulerCornerTooltip');
+      const statusZoom = document.getElementById('status-zoom');
+      if (statusZoom) statusZoom.title = I18nService.t('statusbar.zoomResetTooltip');
       const statusInfo = document.getElementById('status-info');
       if (statusInfo && (statusInfo.innerText === 'Ready' || statusInfo.innerText === 'Listo')) {
         statusInfo.innerText = I18nService.t('common.ready');

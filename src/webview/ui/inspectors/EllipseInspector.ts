@@ -1,6 +1,7 @@
 import { VectorElement, VectorModel } from '../../engine/VectorModel.js';
 import { SelectionTool, BoundingBox } from '../../engine/SelectionTool.js';
 import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
+import { I18nService } from '../../i18n/index.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Dedicated Ellipse, Pie & Arc Inspector (EllipseInspector)
@@ -43,86 +44,86 @@ export class EllipseInspector {
     const ellipseInnerPct = Math.round(ellipseInnerRatio * 100);
 
     const badgeText = ellipseInnerRatio > 0
-      ? (ellipseType === 'pie' ? 'Rosca parcial' : 'Rosca')
-      : (ellipseType === 'pie' ? 'Sector' : ellipseType === 'arc' ? 'Arco' : isCircle ? 'Círculo' : 'Elipse');
+      ? (ellipseType === 'pie' ? I18nService.t('inspector.partialDonut') : I18nService.t('inspector.donut'))
+      : (ellipseType === 'pie' ? I18nService.t('inspector.pie') : ellipseType === 'arc' ? I18nService.t('inspector.arc') : isCircle ? I18nService.t('toolbar.circle') : I18nService.t('toolbar.ellipse'));
 
     return `
       <!-- Ellipse / Circle Geometry Controls (FIX-19, FEAT-02 & FEAT-10) -->
       <div class="panel-section">
         <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
-          <span>Elipse / Círculo</span>
+          <span>${I18nService.t('toolbar.ellipse')} / ${I18nService.t('toolbar.circle')}</span>
           <span style="font-size:10px; color:var(--accent-color); font-weight:600; text-transform:none;">
             ${badgeText}
           </span>
         </div>
         <div class="prop-row" style="gap: 6px;">
-          <span class="prop-label" style="width: 46px;" title="Coordenadas del centro de la elipse">Centro</span>
+          <span class="prop-label" style="width: 46px;" title="${I18nService.t('inspector.center')}">${I18nService.t('inspector.center')}</span>
           <div class="prop-coord-group">
-            <div class="prop-coord-box" title="Coordenada X del centro de la elipse">
+            <div class="prop-coord-box" title="X">
               <span class="prop-coord-sublabel">X</span>
               <input type="number" class="prop-coord-input" id="ellipse-cx" value="${Math.round(ellipseCx)}" />
             </div>
-            <div class="prop-coord-box" title="Coordenada Y del centro de la elipse">
+            <div class="prop-coord-box" title="Y">
               <span class="prop-coord-sublabel">Y</span>
               <input type="number" class="prop-coord-input" id="ellipse-cy" value="${Math.round(ellipseCy)}" />
             </div>
           </div>
         </div>
         <div class="prop-row" style="gap: 6px;">
-          <span class="prop-label" style="width: 46px;" title="Radios horizontal y vertical">Radios</span>
+          <span class="prop-label" style="width: 46px;" title="${I18nService.t('inspector.radii')}">${I18nService.t('inspector.radii')}</span>
           <div class="prop-coord-group">
-            <div class="prop-coord-box" title="Radio horizontal (rx)">
+            <div class="prop-coord-box" title="Rx">
               <span class="prop-coord-sublabel">Rx</span>
               <input type="number" class="prop-coord-input" id="ellipse-rx" value="${Math.round(ellipseRx)}" min="1" />
             </div>
-            <div class="prop-coord-box" title="Radio vertical (ry)">
+            <div class="prop-coord-box" title="Ry">
               <span class="prop-coord-sublabel">Ry</span>
               <input type="number" class="prop-coord-input" id="ellipse-ry" value="${Math.round(ellipseRy)}" min="1" />
             </div>
           </div>
-          <button class="prop-input" id="btn-ellipse-make-circle" style="width: auto; padding: 2px 6px; height: 26px; cursor: pointer; flex-shrink: 0;" title="Convertir a círculo perfecto 1:1">1:1</button>
+          <button class="prop-input" id="btn-ellipse-make-circle" style="width: auto; padding: 2px 6px; height: 26px; cursor: pointer; flex-shrink: 0;" title="1:1">1:1</button>
         </div>
         <div class="prop-row" style="gap: 4px; margin-top: 6px;">
-          <span class="prop-label" style="width: 46px;" title="Tipo de primitiva: elipse completa, sector cerrado de tarta o arco perimetral abierto">Modo</span>
+          <span class="prop-label" style="width: 46px;" title="${I18nService.t('inspector.mode')}">${I18nService.t('inspector.mode')}</span>
           <div style="display:flex; gap:3px; flex:1;">
-            <button class="prop-input" id="btn-ellipse-mode-full" style="flex:1; cursor:pointer; font-size:10px; font-weight:600; ${ellipseType === 'ellipse' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Elipse / Círculo completo (360°)">Elipse</button>
-            <button class="prop-input" id="btn-ellipse-mode-pie" style="flex:1; cursor:pointer; font-size:10px; font-weight:600; ${ellipseType === 'pie' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Sector o porción de tarta cerrada con centro y radios (Pie)">Tarta</button>
-            <button class="prop-input" id="btn-ellipse-mode-arc" style="flex:1; cursor:pointer; font-size:10px; font-weight:600; ${ellipseType === 'arc' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Arco perimetral abierto sin relleno (Arc)">Arco</button>
+            <button class="prop-input" id="btn-ellipse-mode-full" style="flex:1; cursor:pointer; font-size:10px; font-weight:600; ${ellipseType === 'ellipse' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="${I18nService.t('toolbar.ellipse')}">${I18nService.t('toolbar.ellipse')}</button>
+            <button class="prop-input" id="btn-ellipse-mode-pie" style="flex:1; cursor:pointer; font-size:10px; font-weight:600; ${ellipseType === 'pie' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="${I18nService.t('inspector.pie')}">${I18nService.t('inspector.pie')}</button>
+            <button class="prop-input" id="btn-ellipse-mode-arc" style="flex:1; cursor:pointer; font-size:10px; font-weight:600; ${ellipseType === 'arc' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="${I18nService.t('inspector.arc')}">${I18nService.t('inspector.arc')}</button>
           </div>
         </div>
         <div id="ellipse-angles-container" style="${ellipseType === 'ellipse' ? 'display:none;' : 'display:flex;'} flex-direction:column; gap:6px; margin-top:6px;">
           <div class="prop-row" style="gap: 6px;">
-            <span class="prop-label" style="width: 46px;" title="Ángulos inicial y final de corte">Ángulo</span>
+            <span class="prop-label" style="width: 46px;" title="${I18nService.t('common.angle')}">${I18nService.t('common.angle')}</span>
             <div class="prop-coord-group">
-              <div class="prop-coord-box" title="Ángulo inicial en grados (°)">
-                <span class="prop-coord-sublabel">Ini</span>
+              <div class="prop-coord-box" title="${I18nService.t('inspector.startAngle')}">
+                <span class="prop-coord-sublabel">${I18nService.t('inspector.startAngleAbbr')}</span>
                 <input type="number" class="prop-coord-input" id="ellipse-start-angle" value="${ellipseStartAngle}" min="0" max="360" step="5" />
                 <span class="prop-coord-sublabel">°</span>
               </div>
-              <div class="prop-coord-box" title="Ángulo final en grados (°)">
-                <span class="prop-coord-sublabel">Fin</span>
+              <div class="prop-coord-box" title="${I18nService.t('inspector.endAngle')}">
+                <span class="prop-coord-sublabel">${I18nService.t('inspector.endAngleAbbr')}</span>
                 <input type="number" class="prop-coord-input" id="ellipse-end-angle" value="${ellipseEndAngle}" min="0" max="360" step="5" />
                 <span class="prop-coord-sublabel">°</span>
               </div>
             </div>
-            <button class="prop-input" id="btn-ellipse-invert-angles" style="width: 26px; height: 26px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;" title="Invertir sector angular">⇄</button>
+            <button class="prop-input" id="btn-ellipse-invert-angles" style="width: 26px; height: 26px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;" title="⇄">⇄</button>
           </div>
         </div>
         <!-- Donut / Ring Inner Ratio (FEAT-10) -->
         <div class="prop-row" style="gap: 6px; margin-top: 6px;">
-          <span class="prop-label" style="width: 46px;" title="Radio interno para crear rosca/anillo o sector anular (0% a 95%)">Hueco</span>
+          <span class="prop-label" style="width: 46px;" title="${I18nService.t('inspector.holeRatio')}">${I18nService.t('inspector.holeRatio')}</span>
           <div style="display:flex; align-items:center; gap:6px; flex:1;">
-            <input type="range" id="ellipse-inner-ratio-slider" min="0" max="95" value="${ellipseInnerPct}" style="flex:1; cursor:pointer;" title="Deslizador de hueco interior" />
+            <input type="range" id="ellipse-inner-ratio-slider" min="0" max="95" value="${ellipseInnerPct}" style="flex:1; cursor:pointer;" />
             <div class="prop-coord-box" style="width:52px; flex-shrink:0;">
               <input type="number" class="prop-coord-input" id="ellipse-inner-ratio-num" value="${ellipseInnerPct}" min="0" max="95" step="5" />
               <span class="prop-coord-sublabel">%</span>
             </div>
-            <button class="prop-input" id="btn-ellipse-inner-reset" style="width: 26px; height: 26px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;" title="Restablecer a círculo/sector sólido (0% hueco)">●</button>
+            <button class="prop-input" id="btn-ellipse-inner-reset" style="width: 26px; height: 26px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;" title="0%">●</button>
           </div>
         </div>
         <div class="prop-row" style="gap: 6px; margin-top: 6px;">
-          <button class="prop-input" id="btn-ellipse-swap-radii" style="flex: 1; cursor: pointer; height: 24px; font-size: 10px; text-align: center;" title="Intercambiar radio horizontal y vertical (Rotar 90°)">⇄ Rotar 90°</button>
-          <button class="prop-input" id="btn-ellipse-to-path" style="flex: 1; cursor: pointer; height: 24px; font-size: 10px; text-align: center;" title="Convertir a curvas Bézier independientes">Convertir a Curvas</button>
+          <button class="prop-input" id="btn-ellipse-swap-radii" style="flex: 1; cursor: pointer; height: 24px; font-size: 10px; text-align: center;" title="⇄ ${I18nService.t('inspector.rotate90')}">⇄ ${I18nService.t('inspector.rotate90')}</button>
+          <button class="prop-input" id="btn-ellipse-to-path" style="flex: 1; cursor: pointer; height: 24px; font-size: 10px; text-align: center;" title="${I18nService.t('inspector.convertToCurves')} (Ctrl+Q)">${I18nService.t('inspector.convertToCurves')}</button>
         </div>
       </div>
     `;

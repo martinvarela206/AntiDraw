@@ -1,6 +1,7 @@
 import { VectorElement, VectorModel, RectCorners } from '../../engine/VectorModel.js';
 import { SelectionTool, BoundingBox } from '../../engine/SelectionTool.js';
 import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
+import { I18nService } from '../../i18n/index.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Dedicated Rectangle & Advanced Corner Inspector (RectInspector)
@@ -29,31 +30,31 @@ export class RectInspector {
       <!-- Rectangle Geometry & Advanced Corner Radii Controls (FEAT-03) -->
       <div class="panel-section">
         <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
-          <span>Rectángulo</span>
+          <span>${I18nService.t('toolbar.rect')}</span>
           <span style="font-size:10px; color:var(--accent-color); font-weight:600; text-transform:none;">
-            ${rectCorners.mode === 'uniform' ? '⬭ Uniforme' : '◳ Individual'}
+            ${rectCorners.mode === 'uniform' ? '⬭ ' + I18nService.t('inspector.cornersUnified') : '◳ ' + I18nService.t('inspector.cornersIndependent')}
           </span>
         </div>
 
         <div class="prop-row" style="gap: 4px; margin-top: 4px;">
-          <span class="prop-label" style="width: 46px;" title="Modo de curvatura de esquinas">Modo</span>
+          <span class="prop-label" style="width: 46px;" title="${I18nService.t('inspector.cornerModeTooltip')}">${I18nService.t('inspector.mode')}</span>
           <div style="display:flex; gap:3px; flex:1;">
-            <button class="prop-input" id="btn-rect-mode-uniform" style="flex:1; cursor:pointer; font-size:10px; font-weight:600; ${rectCorners.mode === 'uniform' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Todas las esquinas comparten el mismo radio">Uniforme</button>
-            <button class="prop-input" id="btn-rect-mode-independent" style="flex:1; cursor:pointer; font-size:10px; font-weight:600; ${rectCorners.mode === 'independent' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Configurar radios individuales por esquina (TL, TR, BR, BL)">Individual</button>
+            <button class="prop-input" id="btn-rect-mode-uniform" style="flex:1; cursor:pointer; font-size:10px; font-weight:600; ${rectCorners.mode === 'uniform' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="${I18nService.t('inspector.cornersUnified')}">${I18nService.t('inspector.cornersUnified')}</button>
+            <button class="prop-input" id="btn-rect-mode-independent" style="flex:1; cursor:pointer; font-size:10px; font-weight:600; ${rectCorners.mode === 'independent' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="${I18nService.t('inspector.cornersIndependent')}">${I18nService.t('inspector.cornersIndependent')}</button>
           </div>
         </div>
 
         <div class="prop-row" style="gap: 4px; margin-top: 4px;">
-          <span class="prop-label" style="width: 46px;" title="Unidad de medida: píxeles (px) o porcentaje (%)">Unidad</span>
+          <span class="prop-label" style="width: 46px;" title="${I18nService.t('inspector.unitTooltip')}">${I18nService.t('inspector.unit')}</span>
           <div style="display:flex; gap:3px; flex:1;">
-            <button class="prop-input" id="btn-rect-unit-px" style="flex:1; cursor:pointer; font-size:10px; font-weight:600; ${rectCorners.unit === 'px' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Radio en píxeles absolutos (px)">px</button>
-            <button class="prop-input" id="btn-rect-unit-pct" style="flex:1; cursor:pointer; font-size:10px; font-weight:600; ${rectCorners.unit === '%' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="Radio en porcentaje (%)">%</button>
+            <button class="prop-input" id="btn-rect-unit-px" style="flex:1; cursor:pointer; font-size:10px; font-weight:600; ${rectCorners.unit === 'px' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="px">px</button>
+            <button class="prop-input" id="btn-rect-unit-pct" style="flex:1; cursor:pointer; font-size:10px; font-weight:600; ${rectCorners.unit === '%' ? 'background:var(--accent-color); color:#ffffff;' : ''}" title="%">%</button>
           </div>
         </div>
 
         <div id="rect-uniform-container" style="${rectCorners.mode === 'uniform' ? 'display:flex;' : 'display:none;'} flex-direction:column; gap:6px; margin-top:6px;">
           <div class="prop-row" style="gap: 6px;">
-            <span class="prop-label" style="width: 46px;" title="Radio de curvatura para todas las esquinas">Radio</span>
+            <span class="prop-label" style="width: 46px;" title="${I18nService.t('inspector.radiusTooltip')}">${I18nService.t('common.radius')}</span>
             <div class="prop-coord-box" style="flex:1;">
               <span class="prop-coord-sublabel">R</span>
               <input type="number" class="prop-coord-input" id="rect-uniform-radius" value="${rectCorners.tl}" min="0" max="${rectCorners.unit === '%' ? 50 : Math.round(Math.min(w, h) / 2)}" step="1" />
@@ -61,24 +62,24 @@ export class RectInspector {
             </div>
           </div>
           <div class="prop-row" style="gap: 3px;">
-            <button class="prop-input" id="btn-rect-preset-0" style="flex:1; cursor:pointer; font-size:9px; height:22px; padding:0;" title="Esquinas rectas (0)">0</button>
-            <button class="prop-input" id="btn-rect-preset-5" style="flex:1; cursor:pointer; font-size:9px; height:22px; padding:0;" title="Radio 5">5</button>
-            <button class="prop-input" id="btn-rect-preset-10" style="flex:1; cursor:pointer; font-size:9px; height:22px; padding:0;" title="Radio 10">10</button>
-            <button class="prop-input" id="btn-rect-preset-20" style="flex:1; cursor:pointer; font-size:9px; height:22px; padding:0;" title="Radio 20">20</button>
-            <button class="prop-input" id="btn-rect-preset-pill" style="flex:1.4; cursor:pointer; font-size:9px; height:22px; padding:0;" title="Redondeo máximo (Píldora)">Píldora</button>
+            <button class="prop-input" id="btn-rect-preset-0" style="flex:1; cursor:pointer; font-size:9px; height:22px; padding:0;" title="0">0</button>
+            <button class="prop-input" id="btn-rect-preset-5" style="flex:1; cursor:pointer; font-size:9px; height:22px; padding:0;" title="5">5</button>
+            <button class="prop-input" id="btn-rect-preset-10" style="flex:1; cursor:pointer; font-size:9px; height:22px; padding:0;" title="10">10</button>
+            <button class="prop-input" id="btn-rect-preset-20" style="flex:1; cursor:pointer; font-size:9px; height:22px; padding:0;" title="20">20</button>
+            <button class="prop-input" id="btn-rect-preset-pill" style="flex:1.4; cursor:pointer; font-size:9px; height:22px; padding:0;" title="${I18nService.t('inspector.pill')}">${I18nService.t('inspector.pill')}</button>
           </div>
         </div>
 
         <div id="rect-independent-container" style="${rectCorners.mode === 'independent' ? 'display:flex;' : 'display:none;'} flex-direction:column; gap:6px; margin-top:6px;">
           <div class="prop-row" style="gap: 6px;">
-            <span class="prop-label" style="width: 46px;" title="Esquinas superiores: Izquierda (TL) y Derecha (TR)">Arriba</span>
+            <span class="prop-label" style="width: 46px;" title="${I18nService.t('inspector.topCorners')}">${I18nService.t('inspector.topCorners')}</span>
             <div class="prop-coord-group">
-              <div class="prop-coord-box" title="Esquina Superior Izquierda (Top-Left)">
+              <div class="prop-coord-box" title="Top-Left (TL)">
                 <span class="prop-coord-sublabel">TL</span>
                 <input type="number" class="prop-coord-input" id="rect-corner-tl" value="${rectCorners.tl}" min="0" step="1" />
                 <span class="prop-coord-sublabel">${rectCorners.unit}</span>
               </div>
-              <div class="prop-coord-box" title="Esquina Superior Derecha (Top-Right)">
+              <div class="prop-coord-box" title="Top-Right (TR)">
                 <span class="prop-coord-sublabel">TR</span>
                 <input type="number" class="prop-coord-input" id="rect-corner-tr" value="${rectCorners.tr}" min="0" step="1" />
                 <span class="prop-coord-sublabel">${rectCorners.unit}</span>
@@ -86,14 +87,14 @@ export class RectInspector {
             </div>
           </div>
           <div class="prop-row" style="gap: 6px;">
-            <span class="prop-label" style="width: 46px;" title="Esquinas inferiores: Izquierda (BL) y Derecha (BR)">Abajo</span>
+            <span class="prop-label" style="width: 46px;" title="${I18nService.t('inspector.bottomCorners')}">${I18nService.t('inspector.bottomCorners')}</span>
             <div class="prop-coord-group">
-              <div class="prop-coord-box" title="Esquina Inferior Izquierda (Bottom-Left)">
+              <div class="prop-coord-box" title="Bottom-Left (BL)">
                 <span class="prop-coord-sublabel">BL</span>
                 <input type="number" class="prop-coord-input" id="rect-corner-bl" value="${rectCorners.bl}" min="0" step="1" />
                 <span class="prop-coord-sublabel">${rectCorners.unit}</span>
               </div>
-              <div class="prop-coord-box" title="Esquina Inferior Derecha (Bottom-Right)">
+              <div class="prop-coord-box" title="Bottom-Right (BR)">
                 <span class="prop-coord-sublabel">BR</span>
                 <input type="number" class="prop-coord-input" id="rect-corner-br" value="${rectCorners.br}" min="0" step="1" />
                 <span class="prop-coord-sublabel">${rectCorners.unit}</span>
@@ -101,14 +102,14 @@ export class RectInspector {
             </div>
           </div>
           <div class="prop-row" style="gap: 4px;">
-            <button class="prop-input" id="btn-rect-unify-corners" style="flex:1.2; cursor:pointer; font-size:9px; height:22px; padding:0; font-weight:600;" title="Unificar todas las esquinas al valor de TL y revertir a <rect> W3C puro">⬭ Unificar Esquinas</button>
-            <button class="prop-input" id="btn-rect-sync-tl" style="flex:1; cursor:pointer; font-size:9px; height:22px; padding:0;" title="Copiar el valor de TL a todas las esquinas">Copiar TL</button>
-            <button class="prop-input" id="btn-rect-invert-corners" style="flex:1; cursor:pointer; font-size:9px; height:22px; padding:0;" title="Intercambiar / Alternar radios de esquinas opuestas">⇄ Alternar</button>
+            <button class="prop-input" id="btn-rect-unify-corners" style="flex:1.2; cursor:pointer; font-size:9px; height:22px; padding:0; font-weight:600;" title="${I18nService.t('inspector.unifyCorners')}">⬭ ${I18nService.t('inspector.unifyCorners')}</button>
+            <button class="prop-input" id="btn-rect-sync-tl" style="flex:1; cursor:pointer; font-size:9px; height:22px; padding:0;" title="${I18nService.t('inspector.copyTL')}">${I18nService.t('inspector.copyTL')}</button>
+            <button class="prop-input" id="btn-rect-invert-corners" style="flex:1; cursor:pointer; font-size:9px; height:22px; padding:0;" title="${I18nService.t('inspector.invertCorners')}">⇄ ${I18nService.t('inspector.invertCorners')}</button>
           </div>
         </div>
 
         <div class="prop-row" style="gap: 6px; margin-top: 6px;">
-          <button class="prop-input" id="btn-rect-to-path" style="flex: 1; cursor: pointer; height: 24px; font-size: 10px; text-align: center;" title="Convertir a curvas Bézier independientes (Ctrl+Q)">Convertir a Curvas</button>
+          <button class="prop-input" id="btn-rect-to-path" style="flex: 1; cursor: pointer; height: 24px; font-size: 10px; text-align: center;" title="${I18nService.t('inspector.convertToCurves')} (Ctrl+Q)">${I18nService.t('inspector.convertToCurves')}</button>
         </div>
       </div>
     `;

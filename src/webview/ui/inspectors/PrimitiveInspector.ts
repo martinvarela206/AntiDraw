@@ -6,6 +6,7 @@ import { EllipseInspector } from './EllipseInspector.js';
 import { LineInspector } from './LineInspector.js';
 import { ShapeDefaultsInspector } from './ShapeDefaultsInspector.js';
 import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
+import { I18nService } from '../../i18n/index.js';
 
 /**
  * PrimitiveInspector
@@ -78,66 +79,66 @@ export class PrimitiveInspector {
       const isRegularPolygon = Math.abs(starInnerRatio - regularRatio) < 0.01;
       const isOuterStar = starInnerRatio > regularRatio + 0.01;
       const starBadgeText = isRegularPolygon
-        ? `Polígono regular (${starPoints} lados)`
+        ? I18nService.t('inspector.regularPolygonLados', { sides: starPoints })
         : isOuterStar
-        ? `Estrella externa (${starPoints} puntas)`
-        : `Estrella interna (${starPoints} puntas)`;
+        ? I18nService.t('inspector.outerStar', { points: starPoints })
+        : I18nService.t('inspector.innerStar', { points: starPoints });
 
       html += `
       <!-- Star & Regular Polygon Geometry Controls (FEAT-07 & FEAT-UnifiedStar) -->
       <div class="panel-section">
         <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
-          <span>Polígono / Estrella</span>
+          <span>${I18nService.t('toolbar.polygon')} / ${I18nService.t('toolbar.star')}</span>
           <span style="font-size:10px; color:var(--accent-color); font-weight:600; text-transform:none;">
             ${starBadgeText}
           </span>
         </div>
         <div class="prop-row" style="gap: 6px;">
-          <span class="prop-label" style="width: 46px;" title="Coordenadas del centro de la figura">Centro</span>
+          <span class="prop-label" style="width: 46px;" title="${I18nService.t('inspector.center')}">${I18nService.t('inspector.center')}</span>
           <div class="prop-coord-group">
-            <div class="prop-coord-box" title="Coordenada X del centro">
+            <div class="prop-coord-box" title="X">
               <span class="prop-coord-sublabel">X</span>
               <input type="number" class="prop-coord-input" id="star-cx" value="${Math.round(starCx)}" />
             </div>
-            <div class="prop-coord-box" title="Coordenada Y del centro">
+            <div class="prop-coord-box" title="Y">
               <span class="prop-coord-sublabel">Y</span>
               <input type="number" class="prop-coord-input" id="star-cy" value="${Math.round(starCy)}" />
             </div>
           </div>
         </div>
         <div class="prop-row" style="gap: 6px;">
-          <span class="prop-label" style="width: 46px;" title="Radios exterior horizontal y vertical">Radios</span>
+          <span class="prop-label" style="width: 46px;" title="${I18nService.t('inspector.radii')}">${I18nService.t('inspector.radii')}</span>
           <div class="prop-coord-group">
-            <div class="prop-coord-box" title="Radio exterior horizontal (rx)">
+            <div class="prop-coord-box" title="Rx">
               <span class="prop-coord-sublabel">Rx</span>
               <input type="number" class="prop-coord-input" id="star-rx" value="${Math.round(starRx)}" min="1" />
             </div>
-            <div class="prop-coord-box" title="Radio exterior vertical (ry)">
+            <div class="prop-coord-box" title="Ry">
               <span class="prop-coord-sublabel">Ry</span>
               <input type="number" class="prop-coord-input" id="star-ry" value="${Math.round(starRy)}" min="1" />
             </div>
           </div>
         </div>
         <div class="prop-row" style="gap: 4px;">
-          <button class="prop-input" id="btn-star-make-uniform" style="flex:1; cursor:pointer; font-size:9px; height:22px; padding:0;" title="Hacer radios Rx y Ry iguales (1:1 Regular)">1:1 Regular</button>
-          <button class="prop-input" id="btn-star-reset-regular" style="flex:1.4; cursor:pointer; font-size:9px; height:22px; padding:0; background:var(--accent-color); color:#ffffff; font-weight:600;" title="Revertir a polígono regular perfecto (${Math.round(regularRatio * 100)}%)">A Polígono Regular</button>
+          <button class="prop-input" id="btn-star-make-uniform" style="flex:1; cursor:pointer; font-size:9px; height:22px; padding:0;" title="1:1 Regular">1:1 Regular</button>
+          <button class="prop-input" id="btn-star-reset-regular" style="flex:1.4; cursor:pointer; font-size:9px; height:22px; padding:0; background:var(--accent-color); color:#ffffff; font-weight:600;" title="${I18nService.t('inspector.toRegularPolygon')}">${I18nService.t('inspector.toRegularPolygon')}</button>
         </div>
 
         <div class="prop-row" style="gap: 6px; margin-top: 4px;">
-          <span class="prop-label" style="width: 46px;" title="Número de lados o puntas (3 a 64)">Lados</span>
+          <span class="prop-label" style="width: 46px;" title="${I18nService.t('inspector.sides')}">${I18nService.t('inspector.sides')}</span>
           <input type="number" class="prop-coord-input" id="star-points" value="${starPoints}" min="3" max="64" step="1" style="flex: 1;" />
         </div>
         <div class="prop-row" style="gap: 4px;">
-          <button class="prop-input" id="btn-star-preset-3" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="Triángulo regular (3)">3</button>
-          <button class="prop-input" id="btn-star-preset-4" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="Cuadrado / 4 puntas (4)">4</button>
-          <button class="prop-input" id="btn-star-preset-5" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="Pentágono / 5 puntas (5)">5</button>
-          <button class="prop-input" id="btn-star-preset-6" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="Hexágono / 6 puntas (6)">6</button>
-          <button class="prop-input" id="btn-star-preset-8" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="Octógono / 8 puntas (8)">8</button>
-          <button class="prop-input" id="btn-star-preset-12" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="Dodecágono / 12 puntas (12)">12</button>
+          <button class="prop-input" id="btn-star-preset-3" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="3">3</button>
+          <button class="prop-input" id="btn-star-preset-4" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="4">4</button>
+          <button class="prop-input" id="btn-star-preset-5" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="5">5</button>
+          <button class="prop-input" id="btn-star-preset-6" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="6">6</button>
+          <button class="prop-input" id="btn-star-preset-8" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="8">8</button>
+          <button class="prop-input" id="btn-star-preset-12" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="12">12</button>
         </div>
 
         <div class="prop-row" style="gap: 6px; margin-top: 6px;">
-          <span class="prop-label" style="width: 46px;" title="Profundidad de arista / Radio interior (5% a 200%)">Arista</span>
+          <span class="prop-label" style="width: 46px;" title="${I18nService.t('inspector.depthEdge')}">${I18nService.t('inspector.depthEdge')}</span>
           <div style="flex: 1; display: flex; align-items: center; gap: 4px;">
             <input type="range" id="star-inner-ratio-slider" min="5" max="200" step="1" value="${starInnerPct}" style="flex: 1; accent-color: var(--accent-color); cursor: pointer;" />
             <input type="number" class="prop-coord-input" id="star-inner-ratio-num" value="${starInnerPct}" min="5" max="200" step="1" style="width: 42px; text-align: center;" />
@@ -145,14 +146,14 @@ export class PrimitiveInspector {
           </div>
         </div>
         <div class="prop-row" style="gap: 4px;">
-          <button class="prop-input" id="btn-star-ratio-25" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="Puntas muy afiladas hacia adentro (25%)">25% Aguda</button>
-          <button class="prop-input" id="btn-star-ratio-50" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="Estrella media equilibrada (50%)">50% Media</button>
-          <button class="prop-input" id="btn-star-ratio-regular" style="flex:1.2; cursor:pointer; font-size:9px; height:20px; padding:0;" title="Polígono regular alineado (${Math.round(regularRatio * 100)}%)">⬡ ${Math.round(regularRatio * 100)}% Regular</button>
-          <button class="prop-input" id="btn-star-ratio-130" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="Estrella extendida hacia afuera (130%)">130% Externa</button>
+          <button class="prop-input" id="btn-star-ratio-25" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="25%">25% ${I18nService.t('inspector.sharp')}</button>
+          <button class="prop-input" id="btn-star-ratio-50" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="50%">50% ${I18nService.t('inspector.medium')}</button>
+          <button class="prop-input" id="btn-star-ratio-regular" style="flex:1.2; cursor:pointer; font-size:9px; height:20px; padding:0;" title="${Math.round(regularRatio * 100)}%">⬡ ${Math.round(regularRatio * 100)}% Regular</button>
+          <button class="prop-input" id="btn-star-ratio-130" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="130%">130% ${I18nService.t('inspector.outer')}</button>
         </div>
 
         <div class="prop-row" style="gap: 6px; margin-top: 6px;">
-          <button class="prop-input" id="btn-star-to-path" style="flex: 1; cursor: pointer; height: 24px; font-size: 10px; text-align: center;" title="Convertir a curvas Bézier independientes (Ctrl+Q)">Convertir a Curvas</button>
+          <button class="prop-input" id="btn-star-to-path" style="flex: 1; cursor: pointer; height: 24px; font-size: 10px; text-align: center;" title="${I18nService.t('inspector.convertToCurves')} (Ctrl+Q)">${I18nService.t('inspector.convertToCurves')}</button>
         </div>
       </div>
       `;

@@ -2,6 +2,7 @@ import { VectorElement, VectorModel } from '../../engine/VectorModel.js';
 import { GlobalSwatch, GlobalSwatchManager } from '../../engine/color/GlobalSwatchManager.js';
 import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
 import { ToolIcons } from '../../icons/ToolIcons.js';
+import { I18nService } from '../../i18n/index.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Modular Swatch Palette Inspector (SwatchPaletteInspector)
@@ -37,21 +38,21 @@ export class SwatchPaletteInspector {
       <div class="panel-section" id="section-swatches" style="margin-top: 8px;">
         <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
           <div style="display:flex; align-items:center; gap:6px;">
-            <span>Muestras Globales (Swatches)</span>
+            <span>${I18nService.t('inspector.globalSwatches')}</span>
             <span class="badge" style="font-size:10px; color:#94a3b8; font-weight:normal;">${swatches.length}</span>
           </div>
           <div style="display:flex; gap:4px; align-items:center;">
-            <button class="prop-input" id="btn-swatch-extract" style="cursor:pointer; width:auto; padding:1px 6px; font-size:10px; display:inline-flex; align-items:center; gap:3px;" title="Escanear y extraer automáticamente todos los colores utilizados en el documento a muestras globales">${ToolIcons.lightning} Extraer</button>
-            <button class="prop-input" id="btn-swatch-add" style="cursor:pointer; width:auto; padding:1px 6px; font-size:10px; color:#10b981; font-weight:600;" title="Añadir nueva muestra global a la paleta">+ Nueva</button>
+            <button class="prop-input" id="btn-swatch-extract" style="cursor:pointer; width:auto; padding:1px 6px; font-size:10px; display:inline-flex; align-items:center; gap:3px;" title="${I18nService.t('inspector.extractTooltip')}">${ToolIcons.lightning} ${I18nService.t('inspector.extract')}</button>
+            <button class="prop-input" id="btn-swatch-add" style="cursor:pointer; width:auto; padding:1px 6px; font-size:10px; color:#10b981; font-weight:600;" title="${I18nService.t('inspector.newSwatchTooltip')}">${I18nService.t('inspector.newSwatch')}</button>
           </div>
         </div>
 
         ${el ? `
         <div class="prop-row" style="margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
-          <span class="prop-label">Asignar a</span>
+          <span class="prop-label">${I18nService.t('inspector.assignTo')}</span>
           <div style="display:flex; gap:4px; flex:1;">
-            <button class="prop-input ${currentChannel === 'fill' ? 'active' : ''}" id="btn-swatch-target-fill" style="flex:1; cursor:pointer; font-size:11px; font-weight:${currentChannel === 'fill' ? '600' : 'normal'}; ${currentChannel === 'fill' ? 'background:var(--accent-color); color:#fff;' : ''}">Relleno</button>
-            <button class="prop-input ${currentChannel === 'stroke' ? 'active' : ''}" id="btn-swatch-target-stroke" style="flex:1; cursor:pointer; font-size:11px; font-weight:${currentChannel === 'stroke' ? '600' : 'normal'}; ${currentChannel === 'stroke' ? 'background:var(--accent-color); color:#fff;' : ''}">Trazo</button>
+            <button class="prop-input ${currentChannel === 'fill' ? 'active' : ''}" id="btn-swatch-target-fill" style="flex:1; cursor:pointer; font-size:11px; font-weight:${currentChannel === 'fill' ? '600' : 'normal'}; ${currentChannel === 'fill' ? 'background:var(--accent-color); color:#fff;' : ''}">${I18nService.t('inspector.fill')}</button>
+            <button class="prop-input ${currentChannel === 'stroke' ? 'active' : ''}" id="btn-swatch-target-stroke" style="flex:1; cursor:pointer; font-size:11px; font-weight:${currentChannel === 'stroke' ? '600' : 'normal'}; ${currentChannel === 'stroke' ? 'background:var(--accent-color); color:#fff;' : ''}">${I18nService.t('inspector.strokeLabel')}</button>
           </div>
         </div>
         ` : ''}
@@ -61,7 +62,7 @@ export class SwatchPaletteInspector {
           ${swatches.map((s) => {
             const isBound = s.id === boundSwatchId;
             return `
-              <div class="swatch-chip" data-swatch-id="${s.id}" style="position:relative; width:28px; height:28px; border-radius:6px; background:${s.color}; cursor:pointer; border:${isBound ? '2px solid #38bdf8' : '1px solid rgba(255,255,255,0.15)'}; box-shadow:${isBound ? '0 0 8px rgba(56,189,248,0.5)' : 'none'}; transition:transform 0.1s ease;" title="${s.name} (${s.color})&#10;Click: Asignar&#10;Doble click: Editar color">
+              <div class="swatch-chip" data-swatch-id="${s.id}" style="position:relative; width:28px; height:28px; border-radius:6px; background:${s.color}; cursor:pointer; border:${isBound ? '2px solid #38bdf8' : '1px solid rgba(255,255,255,0.15)'}; box-shadow:${isBound ? '0 0 8px rgba(56,189,248,0.5)' : 'none'}; transition:transform 0.1s ease;" title="${s.name} (${s.color})">
                 ${isBound ? '<div style="position:absolute; top:2px; right:2px; width:6px; height:6px; border-radius:50%; background:#38bdf8;"></div>' : ''}
               </div>
             `;
@@ -71,36 +72,36 @@ export class SwatchPaletteInspector {
         ${el && boundSwatchId ? `
         <!-- Tint Selector -->
         <div class="prop-row" style="margin-top:8px; display:flex; align-items:center; gap:6px;">
-          <span class="prop-label" style="font-size:11px;">Matiz (Tint)</span>
+          <span class="prop-label" style="font-size:11px;">${I18nService.t('inspector.tint')}</span>
           <div style="display:flex; gap:3px; flex:1;">
             ${[100, 80, 60, 40, 20].map((t) => `
               <button type="button" class="prop-input btn-tint-pill ${currentTint === t ? 'active' : ''}" data-tint="${t}" style="flex:1; cursor:pointer; font-size:10px; padding:2px 0; text-align:center; ${currentTint === t ? 'background:var(--accent-color); color:#fff; font-weight:600;' : ''}">${t}%</button>
             `).join('')}
           </div>
-          <button type="button" class="prop-input" id="btn-swatch-unlink" style="width:auto; cursor:pointer; font-size:10px; color:#ef4444; padding:2px 6px;" title="Desvincular de la muestra global manteniendo el color hexadecimal actual">Desvincular</button>
+          <button type="button" class="prop-input" id="btn-swatch-unlink" style="width:auto; cursor:pointer; font-size:10px; color:#ef4444; padding:2px 6px;" title="${I18nService.t('inspector.unlinkTooltip')}">${I18nService.t('inspector.unlink')}</button>
         </div>
         ` : ''}
 
         <!-- Inline Swatch Editor Popover Container -->
         <div id="swatch-editor-container" style="display:none; margin-top:8px; padding:8px; background:rgba(255,255,255,0.04); border:1px solid var(--border-color); border-radius:6px;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-            <span style="font-size:11px; font-weight:600;" id="swatch-editor-title">Editar Muestra Global</span>
+            <span style="font-size:11px; font-weight:600;" id="swatch-editor-title">${I18nService.t('inspector.editSwatchTitle')}</span>
             <button type="button" id="btn-close-swatch-editor" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:12px; display:inline-flex; align-items:center;">${ToolIcons.close}</button>
           </div>
           <div class="prop-row">
-            <span class="prop-label">Nombre</span>
+            <span class="prop-label">${I18nService.t('common.name')}</span>
             <input type="text" class="prop-input" id="swatch-edit-name" style="flex:1;" />
           </div>
           <div class="prop-row">
-            <span class="prop-label">Color</span>
+            <span class="prop-label">${I18nService.t('common.color')}</span>
             <div style="display:flex; gap:4px; flex:1; align-items:center;">
               <input type="color" class="color-swatch" id="swatch-edit-color" />
               <input type="text" class="prop-input" id="swatch-edit-hex" style="flex:1;" />
             </div>
           </div>
           <div style="display:flex; justify-content:space-between; margin-top:6px;">
-            <button type="button" class="prop-input" id="btn-delete-swatch" style="cursor:pointer; color:#ef4444; width:auto; padding:2px 8px; font-size:10.5px;">Eliminar</button>
-            <button type="button" class="prop-input" id="btn-save-swatch" style="cursor:pointer; background:var(--accent-color); color:#fff; font-weight:600; width:auto; padding:2px 10px; font-size:10.5px;">Guardar</button>
+            <button type="button" class="prop-input" id="btn-delete-swatch" style="cursor:pointer; color:#ef4444; width:auto; padding:2px 8px; font-size:10.5px;">${I18nService.t('inspector.deleteSwatch')}</button>
+            <button type="button" class="prop-input" id="btn-save-swatch" style="cursor:pointer; background:var(--accent-color); color:#fff; font-weight:600; width:auto; padding:2px 10px; font-size:10.5px;">${I18nService.t('inspector.saveSwatch')}</button>
           </div>
         </div>
       </div>

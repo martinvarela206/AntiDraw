@@ -79,11 +79,11 @@ export class RulerGuideInspector {
       <div class="panel-section">
         <div class="panel-title">${I18nService.t('inspector.gridAlignment')}</div>
         <div class="prop-row" style="display:flex; gap:6px;">
-          <button class="prop-input ${gridAlignmentMode === 'origin' ? 'active' : ''}" id="btn-grid-align-origin" style="cursor:pointer; text-align:center; flex:1; padding:6px 4px; font-size:11px;" title="Modo A: Línea o cruce de grilla coincidente con (0, 0)">
-            ┼ Línea en (0, 0)
+          <button class="prop-input ${gridAlignmentMode === 'origin' ? 'active' : ''}" id="btn-grid-align-origin" style="cursor:pointer; text-align:center; flex:1; padding:6px 4px; font-size:11px;" title="${I18nService.t('statusbar.gridAlignOriginTooltip')}">
+            ${I18nService.t('inspector.gridAlignOriginCanvas')}
           </button>
-          <button class="prop-input ${gridAlignmentMode === 'cell-center' ? 'active' : ''}" id="btn-grid-align-center" style="cursor:pointer; text-align:center; flex:1; padding:6px 4px; font-size:11px;" title="Modo B: Snap al centro de cada celda de la grilla (sin desplazar la cuadrícula)">
-            ◫ Celda en (0, 0)
+          <button class="prop-input ${gridAlignmentMode === 'cell-center' ? 'active' : ''}" id="btn-grid-align-center" style="cursor:pointer; text-align:center; flex:1; padding:6px 4px; font-size:11px;" title="${I18nService.t('statusbar.gridAlignCenterTooltip')}">
+            ${I18nService.t('inspector.gridAlignCenterCanvas')}
           </button>
         </div>
       </div>
@@ -96,43 +96,43 @@ export class RulerGuideInspector {
             <div class="grid-item-card" style="background:var(--bg-dark); border:1px solid var(--border-color); border-radius:4px; padding:6px 8px; display:flex; flex-direction:column; gap:6px;">
               <div style="display:flex; align-items:center; justify-content:space-between;">
                 <span style="font-weight:600; font-size:11px; text-transform:capitalize; color:var(--text-main);">
-                  ${g.type === 'isometric' ? 'Isométrica' : g.type === 'axonometric' ? 'Axonométrica (45°)' : 'Ortogonal'}
+                  ${g.type === 'isometric' ? I18nService.t('inspector.gridIsometric') : g.type === 'axonometric' ? I18nService.t('inspector.gridAxonometric') : I18nService.t('inspector.gridOrthogonal')}
                 </span>
                 <div style="display:flex; gap:4px; align-items:center;">
-                  <button class="btn-icon" id="btn-grid-vis-${g.id}" title="${g.visible ? 'Ocultar Grilla' : 'Mostrar Grilla'}" style="width:20px; height:20px; font-size:11px;">
+                  <button class="btn-icon" id="btn-grid-vis-${g.id}" style="width:20px; height:20px; font-size:11px;">
                     ${g.visible ? ToolIcons.eye : ToolIcons.eyeOff}
                   </button>
-                  <button class="btn-icon" id="btn-grid-up-${g.id}" title="Subir orden Z" ${idx === 0 ? 'disabled style="opacity:0.3;"' : ''} style="width:20px; height:20px; font-size:9px;">
+                  <button class="btn-icon" id="btn-grid-up-${g.id}" ${idx === 0 ? 'disabled style="opacity:0.3;"' : ''} style="width:20px; height:20px; font-size:9px;">
                     ▲
                   </button>
-                  <button class="btn-icon" id="btn-grid-down-${g.id}" title="Bajar orden Z" ${idx === grids.length - 1 ? 'disabled style="opacity:0.3;"' : ''} style="width:20px; height:20px; font-size:9px;">
+                  <button class="btn-icon" id="btn-grid-down-${g.id}" ${idx === grids.length - 1 ? 'disabled style="opacity:0.3;"' : ''} style="width:20px; height:20px; font-size:9px;">
                     ▼
                   </button>
                   ${grids.length > 1 ? `
-                    <button class="btn-icon" id="btn-grid-del-${g.id}" title="Eliminar Grilla" style="width:20px; height:20px; font-size:11px; color:#ef4444;">
+                    <button class="btn-icon" id="btn-grid-del-${g.id}" style="width:20px; height:20px; font-size:11px; color:#ef4444;">
                       ${ToolIcons.trash}
                     </button>
                   ` : ''}
                 </div>
               </div>
               <div style="display:flex; align-items:center; gap:8px;">
-                <span class="prop-label" style="width:50px;">Paso (px)</span>
+                <span class="prop-label" style="width:50px;">${I18nService.t('inspector.stepPx')}</span>
                 <input type="number" class="prop-input" id="grid-spacing-${g.id}" value="${g.spacing}" min="1" step="1" style="flex:1; height:22px;" />
-                <input type="color" class="color-swatch" id="grid-color-${g.id}" value="${g.color?.startsWith('#') ? g.color : '#4f566b'}" style="width:22px; height:22px;" title="Color de trazo de grilla" />
+                <input type="color" class="color-swatch" id="grid-color-${g.id}" value="${g.color?.startsWith('#') ? g.color : '#4f566b'}" style="width:22px; height:22px;" />
               </div>
             </div>
           `).join('')}
         </div>
 
         <div style="display:flex; gap:4px; margin-top:8px;">
-          <button class="prop-input" id="btn-add-grid-ortho" style="cursor:pointer; text-align:center; font-size:10px; padding:4px 2px; flex:1;" title="Añadir Grilla Ortogonal">
-            + Ortogonal
+          <button class="prop-input" id="btn-add-grid-ortho" style="cursor:pointer; text-align:center; font-size:10px; padding:4px 2px; flex:1;">
+            + ${I18nService.t('inspector.gridOrthogonal')}
           </button>
-          <button class="prop-input" id="btn-add-grid-iso" style="cursor:pointer; text-align:center; font-size:10px; padding:4px 2px; flex:1;" title="Añadir Grilla Isométrica">
-            + Isométrica
+          <button class="prop-input" id="btn-add-grid-iso" style="cursor:pointer; text-align:center; font-size:10px; padding:4px 2px; flex:1;">
+            + ${I18nService.t('inspector.gridIsometric')}
           </button>
-          <button class="prop-input" id="btn-add-grid-axono" style="cursor:pointer; text-align:center; font-size:10px; padding:4px 2px; flex:1;" title="Añadir Grilla Axonométrica">
-            + Axonométrica
+          <button class="prop-input" id="btn-add-grid-axono" style="cursor:pointer; text-align:center; font-size:10px; padding:4px 2px; flex:1;">
+            + ${I18nService.t('inspector.gridAxonometric')}
           </button>
         </div>
       </div>
@@ -144,26 +144,26 @@ export class RulerGuideInspector {
         </div>
         ${guides.length === 0 ? `
           <div style="font-size:11px; color:var(--text-muted); padding:4px 0;">
-            No hay guías activas. Arrastra desde las reglas métricas para crear una.
+            ${I18nService.t('inspector.noActiveGuides')}
           </div>
         ` : `
           <div style="display:flex; flex-direction:column; gap:4px; max-height:160px; overflow-y:auto; margin-top:4px;">
             ${guides.map((g) => `
               <div style="background:var(--bg-dark); border:1px solid var(--border-color); border-radius:4px; padding:4px 8px; display:flex; align-items:center; justify-content:space-between;">
-                <div style="display:flex; align-items:center; gap:6px; cursor:pointer;" id="guide-item-select-${g.id}" title="Seleccionar guía en el lienzo">
+                <div style="display:flex; align-items:center; gap:6px; cursor:pointer;" id="guide-item-select-${g.id}">
                   <span style="display:inline-block; width:10px; height:10px; border-radius:2px; background:${g.color || '#00f0ff'};"></span>
                   <span style="font-size:11px; font-weight:500; color:var(--text-main);">
                     ${g.orientation === 'horizontal' ? `H: ${Math.round(g.position)}px` : g.orientation === 'vertical' ? `V: ${Math.round(g.position)}px` : `∠ ${Math.round(g.angle)}°`}
                   </span>
                 </div>
                 <div style="display:flex; gap:4px; align-items:center;">
-                  <button class="btn-icon" id="btn-guide-vis-${g.id}" title="${g.visible !== false ? 'Ocultar Guía' : 'Mostrar Guía'}" style="width:20px; height:20px; font-size:11px;">
+                  <button class="btn-icon" id="btn-guide-vis-${g.id}" style="width:20px; height:20px; font-size:11px;">
                     ${g.visible !== false ? ToolIcons.eye : ToolIcons.eyeOff}
                   </button>
-                  <button class="btn-icon" id="btn-guide-lock-${g.id}" title="${g.locked ? 'Desbloquear Guía' : 'Bloquear Guía'}" style="width:20px; height:20px; font-size:11px;">
+                  <button class="btn-icon" id="btn-guide-lock-${g.id}" style="width:20px; height:20px; font-size:11px;">
                     ${g.locked ? ToolIcons.lock : ToolIcons.unlock}
                   </button>
-                  <button class="btn-icon" id="btn-guide-del-${g.id}" title="Eliminar Guía" style="width:20px; height:20px; font-size:11px; color:#ef4444;">
+                  <button class="btn-icon" id="btn-guide-del-${g.id}" style="width:20px; height:20px; font-size:11px; color:#ef4444;">
                     ${ToolIcons.trash}
                   </button>
                 </div>
@@ -181,11 +181,7 @@ export class RulerGuideInspector {
       <div class="panel-section">
         <div class="panel-title">${I18nService.t('inspector.guideInstructions')}</div>
         <div style="font-size:11px; color:var(--text-muted); line-height:1.5;">
-          • <b>Drag from top ruler</b>: Create horizontal guide<br/>
-          • <b>Drag from left ruler</b>: Create vertical guide<br/>
-          • <b>Click guide</b>: Select guide<br/>
-          • <b>Drag guide to ruler or Supr</b>: Delete guide<br/>
-          • <b>Double-click guide</b>: Edit angle &amp; pivot node
+          ${I18nService.t('inspector.guideInstructionsBody')}
         </div>
       </div>
     `;

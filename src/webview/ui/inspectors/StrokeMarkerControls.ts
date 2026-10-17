@@ -1,6 +1,7 @@
 import { VectorElement, VectorModel } from '../../engine/VectorModel.js';
 import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
 import { ToolIcons } from '../../icons/ToolIcons.js';
+import { I18nService } from '../../i18n/index.js';
 
 export interface StrokeMarkerProps {
   markerStart: string;
@@ -64,10 +65,10 @@ export class StrokeMarkerControls {
       return `
         <div class="prop-row" style="flex-direction:column; align-items:stretch; background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:4px; padding:6px 8px; gap:6px; margin-top:4px;">
           <div style="font-size:10px; color:var(--text-muted); line-height:1.35;">
-            Las figuras SVG cerradas (&lt;${shapeTagName || 'figura'}&gt;) no admiten marcadores en el estándar SVG W3C. Para añadir flechas o terminales, convierte la figura a vector.
+            ${I18nService.t('inspector.markersRestrictedWarning', { tag: shapeTagName || 'shape' })}
           </div>
-          <button type="button" class="prop-input" id="btn-convert-for-markers" style="cursor:pointer; background:var(--accent-color); color:#fff; font-weight:600; padding:4px 8px; text-align:center; font-size:11px; display:inline-flex; align-items:center; justify-content:center; gap:6px;" title="Convertir a trazado Bézier editable para admitir flechas y marcadores">
-            ${ToolIcons.lightning} Convertir a Curvas para Flechas
+          <button type="button" class="prop-input" id="btn-convert-for-markers" style="cursor:pointer; background:var(--accent-color); color:#fff; font-weight:600; padding:4px 8px; text-align:center; font-size:11px; display:inline-flex; align-items:center; justify-content:center; gap:6px;" title="${I18nService.t('inspector.convertForMarkers')}">
+            ${ToolIcons.lightning} ${I18nService.t('inspector.convertForMarkers')}
           </button>
         </div>
       `;
@@ -76,68 +77,69 @@ export class StrokeMarkerControls {
     const isCustomMarkerColor = markerColor && markerColor !== 'context-stroke';
     const markerColorDisplay = isCustomMarkerColor ? markerColor : (stroke === 'none' || stroke === 'currentColor' ? '#000000' : stroke);
 
+    const isEs = I18nService.getLanguage() === 'es';
     const renderMarkerOptions = (current: string, isMid: boolean = false) => `
-      <option value="none" ${current === 'none' ? 'selected' : ''}>None (Ninguno)</option>
-      <optgroup label="Flechas">
-        <option value="arrow-open" ${current === 'arrow-open' ? 'selected' : ''}>Flecha Abierta (V)</option>
-        <option value="arrow-filled" ${current === 'arrow-filled' ? 'selected' : ''}>Flecha Rellena (Triángulo)</option>
-        <option value="arrow-stealth" ${current === 'arrow-stealth' ? 'selected' : ''}>Flecha Furtiva (Stealth)</option>
-        <option value="arrow-triangle-wide" ${current === 'arrow-triangle-wide' ? 'selected' : ''}>Flecha Ancha (Wide)</option>
-        <option value="arrow-concave" ${current === 'arrow-concave' ? 'selected' : ''}>Flecha Cóncava (Concave)</option>
+      <option value="none" ${current === 'none' ? 'selected' : ''}>${isEs ? 'Ninguno' : 'None'}</option>
+      <optgroup label="${isEs ? 'Flechas' : 'Arrows'}">
+        <option value="arrow-open" ${current === 'arrow-open' ? 'selected' : ''}>${isEs ? 'Flecha Abierta (V)' : 'Open Arrow (V)'}</option>
+        <option value="arrow-filled" ${current === 'arrow-filled' ? 'selected' : ''}>${isEs ? 'Flecha Rellena (Triángulo)' : 'Filled Arrow (Triangle)'}</option>
+        <option value="arrow-stealth" ${current === 'arrow-stealth' ? 'selected' : ''}>${isEs ? 'Flecha Furtiva (Stealth)' : 'Stealth Arrow'}</option>
+        <option value="arrow-triangle-wide" ${current === 'arrow-triangle-wide' ? 'selected' : ''}>${isEs ? 'Flecha Ancha (Wide)' : 'Wide Arrow'}</option>
+        <option value="arrow-concave" ${current === 'arrow-concave' ? 'selected' : ''}>${isEs ? 'Flecha Cóncava (Concave)' : 'Concave Arrow'}</option>
       </optgroup>
-      <optgroup label="Geometría">
-        <option value="circle-dot" ${current === 'circle-dot' ? 'selected' : ''}>Punto Sólido (Circle Dot)</option>
-        <option value="circle-open" ${current === 'circle-open' ? 'selected' : ''}>Círculo Hueco (Circle Open)</option>
-        <option value="diamond" ${current === 'diamond' ? 'selected' : ''}>Rombo Diamante (Diamond)</option>
-        <option value="square-block" ${current === 'square-block' ? 'selected' : ''}>Cuadrado Sólido (Square)</option>
-        <option value="square-open" ${current === 'square-open' ? 'selected' : ''}>Cuadrado Hueco (Square Open)</option>
+      <optgroup label="${isEs ? 'Geometría' : 'Geometry'}">
+        <option value="circle-dot" ${current === 'circle-dot' ? 'selected' : ''}>${isEs ? 'Punto Sólido (Dot)' : 'Solid Circle (Dot)'}</option>
+        <option value="circle-open" ${current === 'circle-open' ? 'selected' : ''}>${isEs ? 'Círculo Hueco' : 'Open Circle'}</option>
+        <option value="diamond" ${current === 'diamond' ? 'selected' : ''}>${isEs ? 'Rombo (Diamond)' : 'Diamond'}</option>
+        <option value="square-block" ${current === 'square-block' ? 'selected' : ''}>${isEs ? 'Cuadrado Sólido' : 'Solid Square'}</option>
+        <option value="square-open" ${current === 'square-open' ? 'selected' : ''}>${isEs ? 'Cuadrado Hueco' : 'Open Square'}</option>
       </optgroup>
       ${!isMid ? `
-      <optgroup label="Cotas y Remates">
-        <option value="bar-cap" ${current === 'bar-cap' ? 'selected' : ''}>Barra Remate en T</option>
-        <option value="slash" ${current === 'slash' ? 'selected' : ''}>Barra Inclinada (Slash)</option>
-        <option value="bracket" ${current === 'bracket' ? 'selected' : ''}>Corchete Delimitador (Bracket)</option>
+      <optgroup label="${isEs ? 'Cotas y Remates' : 'Caps & Terminals'}">
+        <option value="bar-cap" ${current === 'bar-cap' ? 'selected' : ''}>${isEs ? 'Barra Remate en T' : 'T-Bar Cap'}</option>
+        <option value="slash" ${current === 'slash' ? 'selected' : ''}>${isEs ? 'Barra Inclinada (Slash)' : 'Slash'}</option>
+        <option value="bracket" ${current === 'bracket' ? 'selected' : ''}>${isEs ? 'Corchete Delimitador' : 'Bracket'}</option>
       </optgroup>
       ` : ''}
     `;
 
     return `
       <div class="prop-row">
-        <span class="prop-label">Start Mkr</span>
-        <select class="prop-input" id="el-marker-start" style="cursor:pointer;" title="Marcador de inicio de trazo (marker-start)">
+        <span class="prop-label">${I18nService.t('inspector.markerStart')}</span>
+        <select class="prop-input" id="el-marker-start" style="cursor:pointer;" title="${I18nService.t('inspector.markerStart')}">
           ${renderMarkerOptions(markerStart)}
         </select>
       </div>
       <div class="prop-row">
-        <span class="prop-label">Mid Mkr</span>
-        <select class="prop-input" id="el-marker-mid" style="cursor:pointer;" title="Marcador en vértices intermedios (marker-mid)">
+        <span class="prop-label">${I18nService.t('inspector.markerMid')}</span>
+        <select class="prop-input" id="el-marker-mid" style="cursor:pointer;" title="${I18nService.t('inspector.markerMid')}">
           ${renderMarkerOptions(markerMid, true)}
         </select>
       </div>
       <div class="prop-row">
-        <span class="prop-label">End Mkr</span>
-        <select class="prop-input" id="el-marker-end" style="cursor:pointer;" title="Marcador de final de trazo (marker-end)">
+        <span class="prop-label">${I18nService.t('inspector.markerEnd')}</span>
+        <select class="prop-input" id="el-marker-end" style="cursor:pointer;" title="${I18nService.t('inspector.markerEnd')}">
           ${renderMarkerOptions(markerEnd)}
         </select>
       </div>
       <div class="prop-row">
-        <span class="prop-label">Mkr Align</span>
-        <select class="prop-input" id="el-marker-align" style="cursor:pointer;" title="Alineación del marcador: Punta en nodo (Tip-on-end) ancla la punta exterior exacta en el vértice; Extender (Extend-past-end) ancla la base en el vértice y proyecta la flecha hacia afuera">
-          <option value="tip" ${markerAlign === 'tip' ? 'selected' : ''}>Punta en nodo (Tip)</option>
-          <option value="extend" ${markerAlign === 'extend' ? 'selected' : ''}>Extender fuera (Extend)</option>
+        <span class="prop-label">${I18nService.t('inspector.markerAlign')}</span>
+        <select class="prop-input" id="el-marker-align" style="cursor:pointer;">
+          <option value="tip" ${markerAlign === 'tip' ? 'selected' : ''}>${I18nService.t('inspector.markerTip')}</option>
+          <option value="extend" ${markerAlign === 'extend' ? 'selected' : ''}>${I18nService.t('inspector.markerExtend')}</option>
         </select>
       </div>
       <div class="prop-row">
-        <span class="prop-label">Offset</span>
-        <input type="number" class="prop-input" id="el-marker-offset" value="${markerOffset}" step="0.5" title="Desfase paramétrico del marcador respecto al nodo: valores positivos desplazan el marcador hacia afuera del trazo para evitar que el remate del trazo sobresalga" />
+        <span class="prop-label">${I18nService.t('inspector.markerOffset')}</span>
+        <input type="number" class="prop-input" id="el-marker-offset" value="${markerOffset}" step="0.5" />
       </div>
       <div class="prop-row">
-        <span class="prop-label">Mkr Size</span>
+        <span class="prop-label">${I18nService.t('inspector.markerSize')}</span>
         <div style="display:flex; gap:4px; flex:1; align-items:center;">
-          <input type="number" class="prop-input" id="el-marker-size" value="${markerSize}" min="0.5" step="0.5" style="width:55px;" title="Dimensionamiento del marcador (escala)" />
-          <select class="prop-input" id="el-marker-units" style="cursor:pointer; flex:1;" title="Unidades de escala del marcador: Relativo escala con el grosor del trazo (strokeWidth); Absoluto mantiene dimensiones fijas en píxeles (userSpaceOnUse)">
-            <option value="strokeWidth" ${markerUnits === 'strokeWidth' ? 'selected' : ''}>Relativo (trazo)</option>
-            <option value="userSpaceOnUse" ${markerUnits === 'userSpaceOnUse' ? 'selected' : ''}>Absoluto (px)</option>
+          <input type="number" class="prop-input" id="el-marker-size" value="${markerSize}" min="0.5" step="0.5" style="width:55px;" />
+          <select class="prop-input" id="el-marker-units" style="cursor:pointer; flex:1;">
+            <option value="strokeWidth" ${markerUnits === 'strokeWidth' ? 'selected' : ''}>${I18nService.t('inspector.markerRelative')}</option>
+            <option value="userSpaceOnUse" ${markerUnits === 'userSpaceOnUse' ? 'selected' : ''}>${I18nService.t('inspector.markerAbsolute')}</option>
           </select>
         </div>
       </div>

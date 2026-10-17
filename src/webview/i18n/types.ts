@@ -97,6 +97,23 @@ export interface Translations {
     languageToggleTooltip: string;
     recoveredFromError: string;
     recenterViewBox: string;
+    gridAlignOrigin: string;
+    gridAlignOriginTooltip: string;
+    gridAlignCenter: string;
+    gridAlignCenterTooltip: string;
+    zoomResetTooltip: string;
+    rulerCornerTooltip: string;
+    currentTool: string;
+  };
+
+  // Mini HUD (Floating pill)
+  miniHud: {
+    move: string;
+    scale: string;
+    rotate: string;
+    moveTitle: string;
+    scaleTitle: string;
+    rotateTitle: string;
   };
 
   // Panels & Inspectors
@@ -171,6 +188,7 @@ export interface Translations {
     strokeDash: string;
     strokeMarkers: string;
     strokeToPath: string;
+    strokeToPathAction: string;
     profile: string;
     profileUniform: string;
     profileTapered: string;
@@ -182,38 +200,113 @@ export interface Translations {
     dashLong: string;
     dashAlignCorners: string;
     reseedVariation: string;
+    amplitude: string;
+    roughness: string;
+    strokeLayers: string;
+    addLayer: string;
+
+    // Markers
+    markersRestrictedWarning: string;
+    convertForMarkers: string;
+    markerStart: string;
+    markerMid: string;
+    markerEnd: string;
+    markerAlign: string;
+    markerTip: string;
+    markerExtend: string;
+    markerOffset: string;
+    markerSize: string;
+    markerRelative: string;
+    markerAbsolute: string;
+    markerAuto: string;
 
     // Effects
     dropShadow: string;
     innerShadow: string;
     blur: string;
 
-    // MultiSelection
+    // MultiSelection & Batch
     multiSelectionTitle: string;
     selectedCount: string;
     totalNodes: string;
     transformGroup: string;
+    batch: string;
+    batchFill: string;
+    batchStroke: string;
 
-    // Primitives
+    // Primitives & Geometry
     corners: string;
     cornersUnified: string;
     cornersIndependent: string;
+    unit: string;
+    unitTooltip: string;
+    cornerModeTooltip: string;
+    radiusTooltip: string;
+    pill: string;
+    topCorners: string;
+    bottomCorners: string;
+    unifyCorners: string;
+    copyTL: string;
+    invertCorners: string;
+    center: string;
+    radii: string;
+    pie: string;
+    arc: string;
+    donut: string;
+    partialDonut: string;
+    startAngle: string;
+    endAngle: string;
+    startAngleAbbr: string;
+    endAngleAbbr: string;
+    holeRatio: string;
+    rotate90: string;
     sides: string;
     points: string;
     innerRadius: string;
     regularPolygon: string;
+    regularPolygonLados: string;
     starShape: string;
+    outerStar: string;
+    innerStar: string;
+    toRegularPolygon: string;
+    depthEdge: string;
+    sharp: string;
+    medium: string;
+    outer: string;
     ellipseSector: string;
     ellipseArc: string;
     donutHole: string;
 
-    // Pathfinder
+    // Line & Polyline
+    straightLine: string;
+    startPoint: string;
+    startPointTitle: string;
+    startCoordXTitle: string;
+    startCoordYTitle: string;
+    endPoint: string;
+    endPointTitle: string;
+    endCoordXTitle: string;
+    endCoordYTitle: string;
+    reversePoints: string;
+    reversePointsTitle: string;
+    vertices: string;
+    pointsLabel: string;
+    pointsZero: string;
+
+    // Pathfinder & Booleans
     union: string;
     subtract: string;
     intersect: string;
     exclude: string;
     combine: string;
     fragment: string;
+    booleanOpsTitle: string;
+    boolUnionTooltip: string;
+    boolSubtractTooltip: string;
+    boolIntersectTooltip: string;
+    boolExcludeTooltip: string;
+    boolCombineTooltip: string;
+    boolFragmentTooltip: string;
 
     // Nodes
     nodeSharp: string;
@@ -241,16 +334,96 @@ export interface Translations {
     rulerOrigin: string;
     rulerScale: string;
     gridAlignment: string;
+    gridAlignOriginCanvas: string;
+    gridAlignCenterCanvas: string;
     activeGrids: string;
     guideInstructions: string;
+    guideInstructionsBody: string;
     guideColor: string;
     guideActions: string;
     clearAllGuides: string;
+    guide: string;
+    guideVertical: string;
+    guideHorizontal: string;
+    guideAngled: string;
+    guidesSelected: string;
+    noActiveGuides: string;
+    stepPx: string;
+
+    // Swatches
+    globalSwatches: string;
+    extract: string;
+    extractTooltip: string;
+    newSwatch: string;
+    newSwatchTooltip: string;
+    assignTo: string;
+    tint: string;
+    unlink: string;
+    unlinkTooltip: string;
+    editSwatchTitle: string;
+    deleteSwatch: string;
+    saveSwatch: string;
+
+    // Stroke Layers
+    strokeLayersTitle: string;
+    emptyLayersHint: string;
+    layerLabel: string;
+    layerBelow: string;
+    layerAbove: string;
+    deleteLayerTooltip: string;
+
+    // Blend
+    parametricBlend: string;
+    createBlend: string;
+    live: string;
+    steps: string;
+    startNode0: string;
+    figureA: string;
+    figureB: string;
+    twisting: string;
+    reversedTwist: string;
+    directTwist: string;
+    expandBlend: string;
+    releaseBlend: string;
+
+    // Free Distort & Homography
+    freeDistort: string;
+    homography2D: string;
+    corner: string;
+    resetCorner: string;
+    resetAll: string;
+    skew: string;
+    resetSkew: string;
+    warpArc: string;
+    curvature: string;
+    axis: string;
+    horizontal: string;
+    vertical: string;
 
     // Modals
     denseGridWarningTitle: string;
     denseGridWarningBody: string;
     continueVisualOnly: string;
     undoConversion: string;
+  };
+
+  // Quick Help
+  quickHelp: {
+    header: string;
+  };
+
+  // Vector Explorer
+  explorer: {
+    title: string;
+    closeTitle: string;
+    branchContext: string;
+    branchDocument: string;
+    gridsSubgroup: string;
+    guidesSubgroup: string;
+    artboardSubgroup: string;
+    noGuidesHint: string;
+    emptyCanvasHint: string;
+    guideBadge: string;
+    recenterViewBox: string;
   };
 }

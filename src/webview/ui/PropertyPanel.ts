@@ -67,6 +67,7 @@ import { StrokeInspector, StrokeInspectorProps } from './inspectors/StrokeInspec
 import { QuickHelpInspector } from './inspectors/QuickHelpInspector.js';
 import { BlendEngine } from '../engine/blend/BlendEngine.js';
 import { BlendInspector } from './inspectors/BlendInspector.js';
+import { I18nService } from '../i18n/index.js';
 
 export class PropertyPanel {
   private container: HTMLElement;
@@ -338,57 +339,53 @@ export class PropertyPanel {
 
   // Render Pen Tool options & next-node-type configuration
   private renderPenProperties(): void {
+    const isEs = I18nService.getLanguage() === 'es';
     this.inspectorContainer.innerHTML = `
       <div class="panel-section">
-        <div class="panel-title">Bézier Curve Tool (P)</div>
+        <div class="panel-title">${isEs ? 'Herramienta Pluma Bézier (P)' : 'Bézier Curve Tool (P)'}</div>
         <div class="prop-row">
-          <span class="prop-label">Path Nodes</span>
-          <span style="font-weight:600; color:var(--text-main);">${this.penVertexCount} vertices</span>
+          <span class="prop-label">${I18nService.t('common.nodes')}</span>
+          <span style="font-weight:600; color:var(--text-main);">${this.penVertexCount} ${isEs ? 'vértices' : 'vertices'}</span>
         </div>
       </div>
 
       <div class="panel-section">
-        <div class="panel-title">Next Node Type</div>
+        <div class="panel-title">${isEs ? 'Tipo de Nodo Siguiente' : 'Next Node Type'}</div>
         <div class="prop-row" style="justify-content: flex-start; gap: 8px;">
-          <button class="btn-icon ${this.penNodeType === 'sharp' ? 'active' : ''}" id="btn-pen-sharp" title="Sin tiradores (Sharp / Recto)">
+          <button class="btn-icon ${this.penNodeType === 'sharp' ? 'active' : ''}" id="btn-pen-sharp" title="${I18nService.t('inspector.nodeSharp')}">
             ${ToolIcons.nodeSharp}
           </button>
-          <button class="btn-icon ${this.penNodeType === 'asymmetric' ? 'active' : ''}" id="btn-pen-asym" title="Asymmetric Node (Independent Handles)">
+          <button class="btn-icon ${this.penNodeType === 'asymmetric' ? 'active' : ''}" id="btn-pen-asym" title="${I18nService.t('inspector.nodeAsymmetric')}">
             ${ToolIcons.nodeAsymmetric}
           </button>
-          <button class="btn-icon ${this.penNodeType === 'smooth' ? 'active' : ''}" id="btn-pen-smooth" title="Uniform / Smooth Node (Curved)">
+          <button class="btn-icon ${this.penNodeType === 'smooth' ? 'active' : ''}" id="btn-pen-smooth" title="${I18nService.t('inspector.nodeSmooth')}">
             ${ToolIcons.nodeSmooth}
           </button>
-          <button class="btn-icon ${this.penNodeType === 'symmetric' ? 'active' : ''}" id="btn-pen-sym" title="Symmetric Node (Equal Length Handles)">
+          <button class="btn-icon ${this.penNodeType === 'symmetric' ? 'active' : ''}" id="btn-pen-sym" title="${I18nService.t('inspector.nodeSymmetric')}">
             ${ToolIcons.nodeSymmetric}
           </button>
         </div>
         <div style="font-size:11px; color:var(--text-muted); margin-top:8px; line-height:1.4;">
-          Selected mode will apply to new nodes drawn.
+          ${isEs ? 'El modo seleccionado se aplicará a los nuevos nodos trazados.' : 'Selected mode will apply to new nodes drawn.'}
         </div>
       </div>
 
       <div class="panel-section">
-        <div class="panel-title">Path Actions</div>
+        <div class="panel-title">${isEs ? 'Acciones de Trazado' : 'Path Actions'}</div>
         <div class="prop-row" style="flex-direction:column; gap:6px;">
           <button class="prop-input" id="btn-finish-path" style="cursor:pointer; background:var(--accent-color); color:#fff; text-align:center; font-weight:600; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
-            ${ToolIcons.check} Finish Path (Enter)
+            ${ToolIcons.check} ${isEs ? 'Finalizar Trazado (Enter)' : 'Finish Path (Enter)'}
           </button>
           <button class="prop-input" id="btn-close-path" style="cursor:pointer; background:var(--bg-panel-hover); text-align:center;">
-            ⟳ Close &amp; Finish Loop
+            ⟳ ${isEs ? 'Cerrar y Finalizar Bucle' : 'Close & Finish Loop'}
           </button>
         </div>
       </div>
 
       <div class="panel-section">
-        <div class="panel-title">Shortcuts</div>
+        <div class="panel-title">${isEs ? 'Atajos de Teclado' : 'Shortcuts'}</div>
         <div style="font-size:11px; color:var(--text-muted); line-height:1.5;">
-          • <b>Click</b>: Add node<br/>
-          • <b>Drag</b>: Pull Bézier handles (Hold <b>Alt</b> to break handle)<br/>
-          • <b>Shift + Click node</b>: Delete node<br/>
-          • <b>Ctrl + Drag node</b>: Move node<br/>
-          • <b>Enter / DblClick</b>: Finish path<br/>
-          • <b>Escape</b>: Cancel drawing
+          ${isEs ? '• <b>Clic</b>: Añadir nodo<br/>• <b>Arrastrar</b>: Tiradores Bézier (mantener <b>Alt</b> para quebrar)<br/>• <b>Shift + Clic en nodo</b>: Eliminar nodo<br/>• <b>Ctrl + Arrastrar nodo</b>: Mover nodo<br/>• <b>Enter / Doble Clic</b>: Finalizar trazado<br/>• <b>Escape</b>: Cancelar trazado' : '• <b>Click</b>: Add node<br/>• <b>Drag</b>: Pull Bézier handles (Hold <b>Alt</b> to break handle)<br/>• <b>Shift + Click node</b>: Delete node<br/>• <b>Ctrl + Drag node</b>: Move node<br/>• <b>Enter / DblClick</b>: Finish path<br/>• <b>Escape</b>: Cancel drawing'}
         </div>
       </div>
     `;
@@ -423,38 +420,35 @@ export class PropertyPanel {
 
   // Render Polyline Tool Properties & Actions
   private renderPolylineProperties(): void {
+    const isEs = I18nService.getLanguage() === 'es';
     const hasEnoughVerts = this.polylineVertexCount >= 2;
     const canClose = this.polylineVertexCount >= 3;
 
     this.inspectorContainer.innerHTML = `
       <div class="panel-section">
-        <div class="panel-title">Polyline Tool (Y)</div>
+        <div class="panel-title">${isEs ? 'Herramienta Polilínea (Y)' : 'Polyline Tool (Y)'}</div>
         <div class="prop-row">
-          <span class="prop-label">Vertices</span>
+          <span class="prop-label">${isEs ? 'Vértices' : 'Vertices'}</span>
           <span style="font-weight:600; color:var(--text-main);">${this.polylineVertexCount} pts</span>
         </div>
       </div>
 
       <div class="panel-section">
-        <div class="panel-title">Path Actions</div>
+        <div class="panel-title">${isEs ? 'Acciones de Trazado' : 'Path Actions'}</div>
         <div class="prop-row" style="flex-direction:column; gap:8px; align-items:stretch;">
           <button class="prop-input" id="btn-finish-polyline" ${!hasEnoughVerts ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : 'style="cursor:pointer; background:var(--bg-active); text-align:center;"'}>
-            Finalizar Trazo Abierto (Enter / DblClick)
+            ${isEs ? 'Finalizar Trazo Abierto (Enter / Doble Clic)' : 'Finish Open Path (Enter / DblClick)'}
           </button>
           <button class="prop-input" id="btn-close-polyline" ${!canClose ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : 'style="cursor:pointer; background:var(--accent); color:#ffffff; text-align:center;"'}>
-            Cerrar Polígono (Z / Clic en Inicio)
+            ${isEs ? 'Cerrar Polígono (Z / Clic en Inicio)' : 'Close Polygon (Z / Click on Start)'}
           </button>
         </div>
       </div>
 
       <div class="panel-section">
-        <div class="panel-title">Drawing Instructions</div>
+        <div class="panel-title">${isEs ? 'Instrucciones de Trazado' : 'Drawing Instructions'}</div>
         <div style="font-size:11px; color:var(--text-muted); line-height:1.6;">
-          • <b>Clic</b>: Colocar vértice recto puro (L)<br/>
-          • <b>Clic en inicio</b>: Cerrar figura (Z)<br/>
-          • <b>Enter / Doble Clic</b>: Finalizar trazo abierto<br/>
-          • <b>Escape</b>: Cancelar trazado en curso<br/>
-          • <b>Snap Activo</b>: Imantado a Grilla, Guías y Nodos
+          ${isEs ? '• <b>Clic</b>: Colocar vértice recto puro (L)<br/>• <b>Clic en inicio</b>: Cerrar figura (Z)<br/>• <b>Enter / Doble Clic</b>: Finalizar trazo abierto<br/>• <b>Escape</b>: Cancelar trazado en curso<br/>• <b>Snap Activo</b>: Imantado a Grilla, Guías y Nodos' : '• <b>Click</b>: Place straight vertex (L)<br/>• <b>Click on start</b>: Close shape (Z)<br/>• <b>Enter / Double Click</b>: Finish open path<br/>• <b>Escape</b>: Cancel current drawing<br/>• <b>Active Snapping</b>: Snaps to Grid, Guides, and Nodes'}
         </div>
       </div>
     `;
@@ -610,14 +604,14 @@ export class PropertyPanel {
       ${EffectsInspector.renderHtml(ds, is)}
 
       <div class="panel-section">
-        <div class="panel-title">Boolean Operations (Formas)</div>
+        <div class="panel-title">${I18nService.t('panels.pathfinder')}</div>
         <div class="prop-row" style="justify-content: flex-start; gap: 6px; flex-wrap: wrap;">
-          <button class="btn-icon" id="btn-prop-bool-union-single" title="Weld / Union (Soldar formas)">${ToolIcons.union}</button>
-          <button class="btn-icon" id="btn-prop-bool-subtract-single" title="Trim / Minus (1° corta al último)">${ToolIcons.subtract}</button>
-          <button class="btn-icon" id="btn-prop-bool-intersect-single" title="Intersect (Intersección)">${ToolIcons.intersect}</button>
-          <button class="btn-icon" id="btn-prop-bool-exclude-single" title="Exclusion / XOR (Exclusión)">${ToolIcons.exclude}</button>
-          <button class="btn-icon" id="btn-prop-bool-combine-single" title="Boundary / Combine (Unir conservando originales)">${ToolIcons.combine}</button>
-          <button class="btn-icon" id="btn-prop-bool-fragment-single" title="Divide / Fragment (Intersección y exclusión a la vez)">${ToolIcons.fragment}</button>
+          <button class="btn-icon" id="btn-prop-bool-union-single" title="${I18nService.t('inspector.union')}">${ToolIcons.union}</button>
+          <button class="btn-icon" id="btn-prop-bool-subtract-single" title="${I18nService.t('inspector.subtract')}">${ToolIcons.subtract}</button>
+          <button class="btn-icon" id="btn-prop-bool-intersect-single" title="${I18nService.t('inspector.intersect')}">${ToolIcons.intersect}</button>
+          <button class="btn-icon" id="btn-prop-bool-exclude-single" title="${I18nService.t('inspector.exclude')}">${ToolIcons.exclude}</button>
+          <button class="btn-icon" id="btn-prop-bool-combine-single" title="${I18nService.t('inspector.combine')}">${ToolIcons.combine}</button>
+          <button class="btn-icon" id="btn-prop-bool-fragment-single" title="${I18nService.t('inspector.fragment')}">${ToolIcons.fragment}</button>
         </div>
       </div>
     `;

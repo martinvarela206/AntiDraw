@@ -52,7 +52,7 @@ export class NodeInspector {
         `}
       </div>
       <div class="panel-section">
-        <div class="panel-title">${I18nService.t('inspector.nodeType')} ${isMulti ? '(Lote)' : ''}</div>
+        <div class="panel-title">${I18nService.t('inspector.nodeType')} ${isMulti ? `(${I18nService.t('inspector.batch')})` : ''}</div>
         ${isParametric ? `
         <div style="margin-bottom: 8px; padding: 6px 8px; background: rgba(59, 130, 246, 0.08); border: 1px dashed rgba(59, 130, 246, 0.3); border-radius: 4px;">
           <button class="prop-input" id="btn-convert-to-curves-node" style="cursor:pointer; background:var(--accent-color, #3b82f6); color:#fff; border:none; border-radius:4px; padding:5px 8px; font-weight:600; font-size:11px; display:flex; align-items:center; justify-content:center; gap:6px; width:100%;" title="${I18nService.t('inspector.convertToCurves')}">

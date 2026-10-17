@@ -3,6 +3,7 @@ import { CanvasManager, GuideLine } from '../engine/CanvasManager.js';
 import { SelectionTool } from '../engine/SelectionTool.js';
 import { ToolIcons } from '../icons/ToolIcons.js';
 import { DropPosition } from '../engine/layout/LayerReorderService.js';
+import { I18nService } from '../i18n/index.js';
 
 export interface VectorExplorerCallbacks {
   onSelectElement: (id: string, multiSelect?: boolean) => void;
@@ -85,10 +86,10 @@ export class VectorExplorerPanel {
       <div class="explorer-header">
         <div class="explorer-title-group">
           <span class="explorer-icon">${ToolIcons.layers}</span>
-          <span class="explorer-title">Explorador de Vectores</span>
+          <span class="explorer-title">${I18nService.t('explorer.title')}</span>
           <span class="explorer-badge">${elements.length}</span>
         </div>
-        <button class="btn-icon-subtle" id="btn-close-explorer" title="Cerrar panel">${ToolIcons.close}</button>
+        <button class="btn-icon-subtle" id="btn-close-explorer" title="${I18nService.t('explorer.closeTitle')}">${ToolIcons.close}</button>
       </div>
 
       <div class="explorer-body">
@@ -96,19 +97,19 @@ export class VectorExplorerPanel {
         <div class="explorer-branch" id="branch-context">
           <div class="branch-header" id="header-context">
             <span class="branch-arrow ${this.isContextBranchOpen ? 'expanded' : ''}">▸</span>
-            <span class="branch-title">Rama 1: Contexto</span>
+            <span class="branch-title">${I18nService.t('explorer.branchContext')}</span>
             <span class="branch-count">(${grids.length + guides.length + 1})</span>
           </div>
 
           <div class="branch-content ${this.isContextBranchOpen ? 'open' : 'closed'}" id="content-context">
             <!-- Grillas -->
             <div class="tree-subgroup">
-              <div class="tree-subgroup-title">Grillas (${grids.length})</div>
+              <div class="tree-subgroup-title">${I18nService.t('explorer.gridsSubgroup')} (${grids.length})</div>
               ${grids.map((grid) => `
                 <div class="tree-item context-item" data-grid-id="${grid.id}">
                   <span class="tree-item-icon">⊞</span>
                   <span class="tree-item-label">${grid.type} (${grid.spacing}px)</span>
-                  <button class="tree-action-btn btn-toggle-grid-vis" data-grid-id="${grid.id}" title="Alternar visibilidad de grilla">
+                  <button class="tree-action-btn btn-toggle-grid-vis" data-grid-id="${grid.id}">
                     ${grid.visible ? ToolIcons.eye : ToolIcons.eyeOff}
                   </button>
                 </div>
@@ -117,15 +118,15 @@ export class VectorExplorerPanel {
 
             <!-- Guías -->
             <div class="tree-subgroup">
-              <div class="tree-subgroup-title">Guías de Regla (${guides.length})</div>
-              ${guides.length === 0 ? '<div class="tree-empty-hint">Sin guías activas</div>' : ''}
+              <div class="tree-subgroup-title">${I18nService.t('explorer.guidesSubgroup')} (${guides.length})</div>
+              ${guides.length === 0 ? `<div class="tree-empty-hint">${I18nService.t('explorer.noGuidesHint')}</div>` : ''}
               ${guides.map((guide) => `
                 <div class="tree-item context-item" data-guide-id="${guide.id}">
                   <span class="tree-item-icon">${ToolIcons.rulersVisibility}</span>
                   <span class="tree-item-label">
                     ${guide.orientation === 'horizontal' ? `H: ${Math.round(guide.position)}px` : guide.orientation === 'vertical' ? `V: ${Math.round(guide.position)}px` : `∠ ${Math.round(guide.angle || 0)}°`}
                   </span>
-                  <button class="tree-action-btn btn-toggle-guide-vis" data-guide-id="${guide.id}" title="Alternar visibilidad">
+                  <button class="tree-action-btn btn-toggle-guide-vis" data-guide-id="${guide.id}">
                     ${guide.visible !== false ? ToolIcons.eye : ToolIcons.eyeOff}
                   </button>
                 </div>
@@ -134,11 +135,11 @@ export class VectorExplorerPanel {
 
             <!-- Artboard / ViewBox -->
             <div class="tree-subgroup">
-              <div class="tree-subgroup-title">Artboard / ViewBox</div>
+              <div class="tree-subgroup-title">${I18nService.t('explorer.artboardSubgroup')}</div>
               <div class="tree-item context-item" id="item-viewbox">
                 <span class="tree-item-icon">⊡</span>
                 <span class="tree-item-label">${viewBox}</span>
-                <button class="tree-action-btn" id="btn-recenter-vb" title="Recentrar ViewBox">${ToolIcons.target}</button>
+                <button class="tree-action-btn" id="btn-recenter-vb" title="${I18nService.t('explorer.recenterViewBox')}">${ToolIcons.target}</button>
               </div>
             </div>
           </div>
@@ -148,12 +149,12 @@ export class VectorExplorerPanel {
         <div class="explorer-branch" id="branch-document">
           <div class="branch-header" id="header-document">
             <span class="branch-arrow ${this.isDocumentBranchOpen ? 'expanded' : ''}">▸</span>
-            <span class="branch-title">Rama 2: Objetos SVG</span>
+            <span class="branch-title">${I18nService.t('explorer.branchDocument')}</span>
             <span class="branch-count">(${elements.length})</span>
           </div>
 
           <div class="branch-content ${this.isDocumentBranchOpen ? 'open' : 'closed'}" id="content-document">
-            ${elements.length === 0 ? '<div class="tree-empty-hint">Lienzo vacío</div>' : ''}
+            ${elements.length === 0 ? `<div class="tree-empty-hint">${I18nService.t('explorer.emptyCanvasHint')}</div>` : ''}
             <div class="tree-element-list" id="tree-element-list">
               ${this.renderElementTree(elements)}
             </div>
