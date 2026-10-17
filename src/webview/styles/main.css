@@ -1019,6 +1019,13 @@ button.prop-input.active {
   gap: 4px;
 }
 
+.status-btn svg {
+  width: 13px;
+  height: 13px;
+  display: block;
+  flex-shrink: 0;
+}
+
 .status-zoom-btn:hover,
 .status-btn:hover,
 .status-btn.active {

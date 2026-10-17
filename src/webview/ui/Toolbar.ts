@@ -187,7 +187,6 @@ export class Toolbar {
 
       // 5. Utilidades y Espacio de Trabajo
       { type: 'tool', id: 'addVertex', title: 'Add Vertex Tool (+)', icon: ToolIcons.addVertexTool },
-      { type: 'tool', id: 'canvas', title: 'Canvas Tool', icon: ToolIcons.canvasTool },
       { type: 'tool', id: 'zoom', title: 'Zoom/Pan Tool (Z)', icon: ToolIcons.zoomTool },
     ];
   }

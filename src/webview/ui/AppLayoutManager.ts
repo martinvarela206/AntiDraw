@@ -93,6 +93,7 @@ export class AppLayoutManager {
           <span id="status-coords">X: 0, Y: 0</span>
         </div>
         <div class="status-right">
+          <button class="status-btn" id="btn-canvas-props" title="Canvas & ViewBox Settings">${ToolIcons.canvasTool} Canvas</button>
           <div class="status-grid-align-group" style="display:inline-flex; gap:2px;">
             <button class="status-btn" id="status-grid-align-origin" title="Modo A: Línea o cruce de grilla coincidente con (0, 0)">┼ Línea (0,0)</button>
             <button class="status-btn" id="status-grid-align-center" title="Modo B: Snap al centro de cada celda de la grilla">◫ Celda (0,0)</button>
@@ -246,5 +247,15 @@ export class AppLayoutManager {
         },
       }
     );
+
+    // Canvas settings trigger in Status Bar
+    const btnCanvasProps = document.getElementById('btn-canvas-props');
+    if (btnCanvasProps) {
+      btnCanvasProps.addEventListener('click', () => {
+        this.config.selectionTool.deselectAll();
+        this.propertyPanel.resetPanelMode();
+        this.toolbar.setTool('select');
+      });
+    }
   }
 }
