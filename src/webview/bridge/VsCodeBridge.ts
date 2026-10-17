@@ -51,6 +51,7 @@ export interface CompanionMetadata {
 export interface LoadSvgPayload {
   text: string;
   metadata?: CompanionMetadata | null;
+  locale?: string;
 }
 
 declare function acquireVsCodeApi(): {
@@ -83,16 +84,17 @@ export class VsCodeBridge {
       if (!msg || typeof msg !== 'object') return;
 
       if (msg.type === 'loadSvg') {
+        const payload: LoadSvgPayload = {
+          text: msg.text || '',
+          metadata: msg.metadata || null,
+          locale: msg.locale,
+        };
+
         if (this.isUpdatingFromWebview) {
           // Suppress echo: document update originated within this webview session
           this.isUpdatingFromWebview = false;
           return;
         }
-
-        const payload: LoadSvgPayload = {
-          text: msg.text || '',
-          metadata: msg.metadata || null,
-        };
 
         for (const cb of this.loadSvgCallbacks) {
           cb(payload);

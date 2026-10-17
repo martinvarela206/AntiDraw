@@ -2,6 +2,7 @@ import { VectorElement, VectorModel, GradientConfig, GradientStop } from '../../
 import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
 import { bindInspectorMouseDown } from './CanvasInspector.js';
 import { ToolIcons } from '../../icons/ToolIcons.js';
+import { I18nService } from '../../i18n/index.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Bi-directional Conversion Between SVG Miter Limit and Degrees
@@ -72,34 +73,34 @@ export class AppearanceInspector {
       <div class="panel-section">
         <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
           <div style="display:flex; align-items:center; gap:6px;">
-            <span>Fill (Relleno)</span>
-            ${!isClosed ? '<span style="font-size:10px; color:#94a3b8; font-weight:normal; text-transform:none;">(Abierto)</span>' : ''}
+            <span>${I18nService.t('inspector.fill')}</span>
+            ${!isClosed ? `<span style="font-size:10px; color:#94a3b8; font-weight:normal; text-transform:none;">(${I18nService.t('common.open')})</span>` : ''}
           </div>
           <div style="display:flex; gap:4px; align-items:center;">
             ${hasFill ? `
-              <button class="prop-input" id="btn-remove-fill" style="cursor:pointer; width:auto; padding:1px 6px; font-size:11px; color:#ef4444;" title="Quitar relleno (establecer fill='none')">− Quitar</button>
+              <button class="prop-input" id="btn-remove-fill" style="cursor:pointer; width:auto; padding:1px 6px; font-size:11px; color:#ef4444;" title="${I18nService.t('inspector.removeFill')}">${I18nService.t('inspector.removeFill')}</button>
             ` : `
-              <button class="prop-input" id="btn-add-fill" style="cursor:pointer; width:auto; padding:1px 6px; font-size:11px; color:#10b981; font-weight:600;" title="Añadir relleno sólido">+ Añadir</button>
+              <button class="prop-input" id="btn-add-fill" style="cursor:pointer; width:auto; padding:1px 6px; font-size:11px; color:#10b981; font-weight:600;" title="${I18nService.t('inspector.addFill')}">${I18nService.t('inspector.addFill')}</button>
             `}
           </div>
         </div>
 
         <div class="prop-row">
-          <span class="prop-label">Type</span>
+          <span class="prop-label">${I18nService.t('common.type')}</span>
           <select class="prop-input" id="el-fill-type" style="cursor:pointer;">
-            <option value="none" ${!hasFill ? 'selected' : ''}>None (Sin relleno)</option>
-            <option value="solid" ${hasFill && fillType === 'solid' ? 'selected' : ''}>Solid Color</option>
-            <option value="linear" ${hasFill && fillType === 'linear' ? 'selected' : ''}>Linear Gradient</option>
-            <option value="radial" ${hasFill && fillType === 'radial' ? 'selected' : ''}>Radial Gradient</option>
+            <option value="none" ${!hasFill ? 'selected' : ''}>${I18nService.t('inspector.fillTypeNone')}</option>
+            <option value="solid" ${hasFill && fillType === 'solid' ? 'selected' : ''}>${I18nService.t('inspector.fillTypeSolid')}</option>
+            <option value="linear" ${hasFill && fillType === 'linear' ? 'selected' : ''}>${I18nService.t('inspector.fillTypeLinear')}</option>
+            <option value="radial" ${hasFill && fillType === 'radial' ? 'selected' : ''}>${I18nService.t('inspector.fillTypeRadial')}</option>
           </select>
         </div>
 
         ${!hasFill ? `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px; padding:6px 8px; background:rgba(255,255,255,0.02); border:1px dashed var(--border-color); border-radius:4px;">
-          <span style="font-size:11px; color:#94a3b8;">Sin relleno (fill="none")</span>
+          <span style="font-size:11px; color:#94a3b8;">${I18nService.t('inspector.noFill')}</span>
           <div style="display:flex; gap:4px;">
-            ${!isClosed ? `<button class="prop-input" id="btn-prop-close-path" style="cursor:pointer; background:#3b82f6; color:#fff; font-weight:600; padding:2px 6px; font-size:10px;" title="Cerrar trazado formalmente uniendo extremos libres con Z">Cerrar (Z)</button>` : ''}
-            <button class="prop-input" id="btn-add-fill-body" style="cursor:pointer; background:var(--accent-color); color:#fff; font-weight:600; padding:2px 6px; font-size:10px;" title="Añadir color de relleno sólido">+ Añadir Relleno</button>
+            ${!isClosed ? `<button class="prop-input" id="btn-prop-close-path" style="cursor:pointer; background:#3b82f6; color:#fff; font-weight:600; padding:2px 6px; font-size:10px;" title="Z">Z</button>` : ''}
+            <button class="prop-input" id="btn-add-fill-body" style="cursor:pointer; background:var(--accent-color); color:#fff; font-weight:600; padding:2px 6px; font-size:10px;" title="${I18nService.t('inspector.addFill')}">${I18nService.t('inspector.addFill')}</button>
           </div>
         </div>
         ` : ''}

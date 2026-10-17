@@ -1,5 +1,6 @@
 import { VectorElement, DropShadowConfig, InnerShadowConfig } from '../../engine/VectorModel.js';
 import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
+import { I18nService } from '../../i18n/index.js';
 
 /**
  * EffectsInspector
@@ -16,13 +17,13 @@ export class EffectsInspector {
   ): string {
     return `
       <div class="panel-section">
-        <div class="panel-title">Effects (Sombras)</div>
+        <div class="panel-title">${I18nService.t('panels.effects')}</div>
         
         <!-- Sombra Paralela (Drop Shadow) -->
         <div class="prop-row" style="margin-bottom: 6px;">
           <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px; font-weight: 600; color: var(--text-main);">
             <input type="checkbox" id="shadow-drop-enable" ${ds.enabled ? 'checked' : ''} />
-            Sombra Paralela (Drop Shadow)
+            ${I18nService.t('inspector.dropShadow')}
           </label>
         </div>
         <div id="shadow-drop-controls" style="${ds.enabled ? '' : 'display: none;'} margin-bottom: 12px; padding-left: 6px; border-left: 2px solid var(--border-subtle);">
@@ -33,13 +34,13 @@ export class EffectsInspector {
             <input type="number" class="prop-input" id="shadow-drop-dy" value="${ds.dy}" step="1" />
           </div>
           <div class="prop-row">
-            <span class="prop-label">Blur</span>
+            <span class="prop-label">${I18nService.t('inspector.blur')}</span>
             <input type="number" class="prop-input" id="shadow-drop-blur" value="${ds.blur}" min="0" step="1" />
             <span class="prop-label" style="width:40px; text-align:right;">Opac%</span>
             <input type="number" class="prop-input" id="shadow-drop-opacity" value="${Math.round(ds.opacity * 100)}" min="0" max="100" step="5" />
           </div>
           <div class="prop-row">
-            <span class="prop-label">Color</span>
+            <span class="prop-label">${I18nService.t('common.color')}</span>
             <div class="color-picker-row">
               <input type="color" class="color-swatch" id="shadow-drop-color" value="${ds.color || '#000000'}" />
               <input type="text" class="prop-input" id="shadow-drop-color-hex" value="${ds.color || '#000000'}" />
@@ -51,7 +52,7 @@ export class EffectsInspector {
         <div class="prop-row" style="margin-bottom: 6px;">
           <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px; font-weight: 600; color: var(--text-main);">
             <input type="checkbox" id="shadow-inner-enable" ${is.enabled ? 'checked' : ''} />
-            Sombra Interna (Inner Shadow)
+            ${I18nService.t('inspector.innerShadow')}
           </label>
         </div>
         <div id="shadow-inner-controls" style="${is.enabled ? '' : 'display: none;'} padding-left: 6px; border-left: 2px solid var(--border-subtle);">
@@ -62,13 +63,13 @@ export class EffectsInspector {
             <input type="number" class="prop-input" id="shadow-inner-dy" value="${is.dy}" step="1" />
           </div>
           <div class="prop-row">
-            <span class="prop-label">Blur</span>
+            <span class="prop-label">${I18nService.t('inspector.blur')}</span>
             <input type="number" class="prop-input" id="shadow-inner-blur" value="${is.blur}" min="0" step="1" />
             <span class="prop-label" style="width:40px; text-align:right;">Opac%</span>
             <input type="number" class="prop-input" id="shadow-inner-opacity" value="${Math.round(is.opacity * 100)}" min="0" max="100" step="5" />
           </div>
           <div class="prop-row">
-            <span class="prop-label">Color</span>
+            <span class="prop-label">${I18nService.t('common.color')}</span>
             <div class="color-picker-row">
               <input type="color" class="color-swatch" id="shadow-inner-color" value="${is.color || '#000000'}" />
               <input type="text" class="prop-input" id="shadow-inner-color-hex" value="${is.color || '#000000'}" />

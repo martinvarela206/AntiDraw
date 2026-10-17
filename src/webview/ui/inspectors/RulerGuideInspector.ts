@@ -3,6 +3,7 @@ import { RulerConfig, GuideLine, GridConfig, GridAlignmentMode } from '../../eng
 import { VectorModel } from '../../engine/VectorModel.js';
 import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
 import { bindInspectorMouseDown } from './CanvasInspector.js';
+import { I18nService } from '../../i18n/index.js';
 
 /**
  * RulerGuideInspector
@@ -29,7 +30,7 @@ export class RulerGuideInspector {
 
     container.innerHTML = `
       <div class="panel-section">
-        <div class="panel-title">Ruler Origin (Zero Point)</div>
+        <div class="panel-title">${I18nService.t('inspector.rulerOrigin')}</div>
         <div class="prop-row">
           <span class="prop-label">Origin X</span>
           <input type="number" class="prop-input" id="ruler-origin-x" value="${config.originX || 0}" />
@@ -55,7 +56,7 @@ export class RulerGuideInspector {
       </div>
 
       <div class="panel-section">
-        <div class="panel-title">Ruler &amp; Grid Scale</div>
+        <div class="panel-title">${I18nService.t('inspector.rulerScale')}</div>
         <div class="prop-row">
           <span class="prop-label">Units</span>
           <select class="prop-input" id="ruler-unit" style="cursor:pointer;">
@@ -76,7 +77,7 @@ export class RulerGuideInspector {
       </div>
 
       <div class="panel-section">
-        <div class="panel-title">Grid-Ruler Alignment</div>
+        <div class="panel-title">${I18nService.t('inspector.gridAlignment')}</div>
         <div class="prop-row" style="display:flex; gap:6px;">
           <button class="prop-input ${gridAlignmentMode === 'origin' ? 'active' : ''}" id="btn-grid-align-origin" style="cursor:pointer; text-align:center; flex:1; padding:6px 4px; font-size:11px;" title="Modo A: Línea o cruce de grilla coincidente con (0, 0)">
             ┼ Línea en (0, 0)
@@ -89,7 +90,7 @@ export class RulerGuideInspector {
 
       <!-- EXPLORADOR DE GRILLAS -->
       <div class="panel-section">
-        <div class="panel-title">Grillas Activas (${grids.length})</div>
+        <div class="panel-title">${I18nService.t('inspector.activeGrids', { count: grids.length })}</div>
         <div style="display:flex; flex-direction:column; gap:6px; margin-top:4px;">
           ${grids.map((g, idx) => `
             <div class="grid-item-card" style="background:var(--bg-dark); border:1px solid var(--border-color); border-radius:4px; padding:6px 8px; display:flex; flex-direction:column; gap:6px;">
@@ -139,7 +140,7 @@ export class RulerGuideInspector {
       <!-- EXPLORADOR DE LÍNEAS DE GUÍA -->
       <div class="panel-section">
         <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
-          <span>Líneas de Guía (${guides.length})</span>
+          <span>${I18nService.t('panels.rulerGuides')} (${guides.length})</span>
         </div>
         ${guides.length === 0 ? `
           <div style="font-size:11px; color:var(--text-muted); padding:4px 0;">
@@ -171,14 +172,14 @@ export class RulerGuideInspector {
           </div>
           <div style="margin-top:8px;">
             <button class="prop-input" id="btn-clear-guides" style="cursor:pointer; background:#ef4444; color:#fff; text-align:center; font-weight:600; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
-              ${ToolIcons.trash} Limpiar Todas las Guías
+              ${ToolIcons.trash} ${I18nService.t('inspector.clearAllGuides')}
             </button>
           </div>
         `}
       </div>
 
       <div class="panel-section">
-        <div class="panel-title">Guide Instructions</div>
+        <div class="panel-title">${I18nService.t('inspector.guideInstructions')}</div>
         <div style="font-size:11px; color:var(--text-muted); line-height:1.5;">
           • <b>Drag from top ruler</b>: Create horizontal guide<br/>
           • <b>Drag from left ruler</b>: Create vertical guide<br/>
@@ -442,9 +443,9 @@ export class RulerGuideInspector {
       </div>
 
       <div class="panel-section">
-        <div class="panel-title">Color de Guía</div>
+        <div class="panel-title">${I18nService.t('inspector.guideColor')}</div>
         <div class="prop-row">
-          <span class="prop-label">Color</span>
+          <span class="prop-label">${I18nService.t('common.color')}</span>
           <div class="color-picker-row">
             <input type="color" class="color-swatch" id="guide-color" value="${currentColor}" />
             <input type="text" class="prop-input" id="guide-color-hex" value="${currentColor}" />
@@ -453,16 +454,16 @@ export class RulerGuideInspector {
       </div>
 
       <div class="panel-section">
-        <div class="panel-title">Acciones de Guía</div>
+        <div class="panel-title">${I18nService.t('inspector.guideActions')}</div>
         <div class="prop-row" style="flex-direction:column; gap:6px;">
           <button class="prop-input" id="btn-convert-guide-to-vector" style="cursor:pointer; background:var(--accent-primary, #007acc); color:#fff; text-align:center; font-weight:600; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
-            Convertir a Vector Ordinario
+            ${I18nService.t('inspector.convertToVector')}
           </button>
           <button class="prop-input" id="btn-lock-guides" style="cursor:pointer; background:var(--bg-panel-hover); text-align:center; font-weight:500; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
-            ${allLocked ? ToolIcons.unlock : ToolIcons.lock} ${allLocked ? 'Desbloquear Guía(s)' : 'Bloquear Guía(s)'}
+            ${allLocked ? ToolIcons.unlock : ToolIcons.lock} ${allLocked ? I18nService.t('inspector.unlockGuidesAction') : I18nService.t('inspector.lockGuidesAction')}
           </button>
           <button class="prop-input" id="btn-delete-guide" style="cursor:pointer; background:#ef4444; color:#fff; text-align:center; font-weight:600; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
-            ${ToolIcons.trash} Eliminar ${guides.length > 1 ? `Guías (${guides.length})` : 'Guía (Supr)'}
+            ${ToolIcons.trash} ${guides.length > 1 ? I18nService.t('inspector.deleteGuides', { count: guides.length }) : I18nService.t('inspector.deleteGuide')}
           </button>
         </div>
       </div>

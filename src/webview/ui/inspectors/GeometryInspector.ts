@@ -3,6 +3,7 @@ import { SelectionTool, BoundingBox } from '../../engine/SelectionTool.js';
 import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
 import { DistortInspectorControls } from './DistortInspectorControls.js';
 import { ToolIcons } from '../../icons/ToolIcons.js';
+import { I18nService } from '../../i18n/index.js';
 
 /**
  * GeometryInspector
@@ -31,26 +32,26 @@ export class GeometryInspector {
 
     return `
       <div class="panel-section">
-        <div class="panel-title">Transform</div>
+        <div class="panel-title">${I18nService.t('panels.transform')}</div>
         <div class="prop-row">
-          <span class="prop-label">Modo</span>
+          <span class="prop-label">${I18nService.t('inspector.mode')}</span>
           <div style="display:flex; gap:4px; flex:1;">
-            <button class="prop-input" id="btn-mode-move" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'move' ? 'background:#10b981; color:#ffffff;' : ''}" title="Modo Mover (W): Mover elementos y anclar vértices">Mover</button>
-            <button class="prop-input" id="btn-mode-scale" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'scale' ? 'background:#6366f1; color:#ffffff;' : ''}" title="Modo Escalar (R): Redimensionar con 8 tiradores">Escalar</button>
-            <button class="prop-input" id="btn-mode-rotate" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'rotate' ? 'background:#8b5cf6; color:#ffffff;' : ''}" title="Modo Rotar (E): Girar elementos interactivamente">Rotar</button>
+            <button class="prop-input" id="btn-mode-move" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'move' ? 'background:#10b981; color:#ffffff;' : ''}" title="${I18nService.t('inspector.modeMove')} (W)">${I18nService.t('inspector.modeMove')}</button>
+            <button class="prop-input" id="btn-mode-scale" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'scale' ? 'background:#6366f1; color:#ffffff;' : ''}" title="${I18nService.t('inspector.modeScale')} (R)">${I18nService.t('inspector.modeScale')}</button>
+            <button class="prop-input" id="btn-mode-rotate" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'rotate' ? 'background:#8b5cf6; color:#ffffff;' : ''}" title="${I18nService.t('inspector.modeRotate')} (E)">${I18nService.t('inspector.modeRotate')}</button>
           </div>
         </div>
         <div class="prop-row" style="margin-top:2px;">
-          <span class="prop-label" style="font-size:11px;">Avanzado</span>
+          <span class="prop-label" style="font-size:11px;">${I18nService.t('inspector.advanced')}</span>
           <div style="display:flex; gap:6px; flex:1;">
-            <button class="prop-input" id="btn-mode-distort" style="flex:1; cursor:pointer; font-weight:600; padding:3px 6px; font-size:11px; display:flex; align-items:center; justify-content:center; gap:4px; ${selectionTool.selectionMode === 'distort' ? 'background:#f59e0b; color:#0f172a; border-color:#d97706;' : 'background:transparent; border:1px solid var(--border-color);'}" title="Deformación Libre y Perspectiva Proyectiva (D): Deformación homográfica 3x3">${selectionTool.selectionMode === 'distort' ? '▰ Deformación Libre (Activa)' : '▱ Deformación Libre (D)'}</button>
+            <button class="prop-input" id="btn-mode-distort" style="flex:1; cursor:pointer; font-weight:600; padding:3px 6px; font-size:11px; display:flex; align-items:center; justify-content:center; gap:4px; ${selectionTool.selectionMode === 'distort' ? 'background:#f59e0b; color:#0f172a; border-color:#d97706;' : 'background:transparent; border:1px solid var(--border-color);'}" title="${I18nService.t('inspector.modeDistort')} (D)">${selectionTool.selectionMode === 'distort' ? '▰ ' + I18nService.t('inspector.modeDistortActive') : '▱ ' + I18nService.t('inspector.modeDistort')}</button>
           </div>
         </div>
         <div class="prop-row" style="margin-top:2px;">
-          <span class="prop-label" style="font-size:11px;">Escalar</span>
+          <span class="prop-label" style="font-size:11px;">${I18nService.t('inspector.modeScale')}</span>
           <div style="display:flex; gap:6px; flex:1; align-items:center;">
-            <button class="prop-input" id="btn-lock-scale-stroke" style="flex:1; padding:2px 4px; display:flex; justify-content:center; align-items:center; gap:4px; cursor:pointer; font-size:11px; ${selectionTool.scaleStroke ? 'background:var(--accent-color); color:#ffffff;' : 'background:transparent;'} border:1px solid var(--border-color);" title="Escalar grosor de trazo proporcionalmente al redimensionar (candado cerrado = escala, abierto = fijo)">${selectionTool.scaleStroke ? ToolIcons.lock : ToolIcons.unlock} Trazo</button>
-            <button class="prop-input" id="btn-lock-scale-corners" style="flex:1; padding:2px 4px; display:flex; justify-content:center; align-items:center; gap:4px; cursor:pointer; font-size:11px; ${selectionTool.scaleCorners ? 'background:var(--accent-color); color:#ffffff;' : 'background:transparent;'} border:1px solid var(--border-color);" title="Escalar radios de esquinas paramétricas proporcionalmente al redimensionar (candado cerrado = escala, abierto = fijo)">${selectionTool.scaleCorners ? ToolIcons.lock : ToolIcons.unlock} Esquinas</button>
+            <button class="prop-input" id="btn-lock-scale-stroke" style="flex:1; padding:2px 4px; display:flex; justify-content:center; align-items:center; gap:4px; cursor:pointer; font-size:11px; ${selectionTool.scaleStroke ? 'background:var(--accent-color); color:#ffffff;' : 'background:transparent;'} border:1px solid var(--border-color);" title="${I18nService.t('inspector.scaleStroke')}">${selectionTool.scaleStroke ? ToolIcons.lock : ToolIcons.unlock} ${I18nService.t('inspector.scaleStroke')}</button>
+            <button class="prop-input" id="btn-lock-scale-corners" style="flex:1; padding:2px 4px; display:flex; justify-content:center; align-items:center; gap:4px; cursor:pointer; font-size:11px; ${selectionTool.scaleCorners ? 'background:var(--accent-color); color:#ffffff;' : 'background:transparent;'} border:1px solid var(--border-color);" title="${I18nService.t('inspector.scaleCorners')}">${selectionTool.scaleCorners ? ToolIcons.lock : ToolIcons.unlock} ${I18nService.t('inspector.scaleCorners')}</button>
           </div>
         </div>
         <div class="prop-row">
@@ -62,16 +63,16 @@ export class GeometryInspector {
         <div class="prop-row">
           <span class="prop-label">W</span>
           <input type="number" step="any" class="prop-input" id="el-w" value="${w}" />
-          <button class="prop-input" id="btn-lock-aspect" style="width:30px; padding:2px; display:flex; justify-content:center; align-items:center; cursor:pointer; font-size:14px; background:${selectionTool.isAspectRatioLocked ? 'var(--accent-color)' : 'transparent'}; border:1px solid var(--border-color);" title="Bloquear proporción (W/H)">${selectionTool.isAspectRatioLocked ? ToolIcons.lock : ToolIcons.unlock}</button>
+          <button class="prop-input" id="btn-lock-aspect" style="width:30px; padding:2px; display:flex; justify-content:center; align-items:center; cursor:pointer; font-size:14px; background:${selectionTool.isAspectRatioLocked ? 'var(--accent-color)' : 'transparent'}; border:1px solid var(--border-color);" title="${I18nService.t('inspector.lockAspect')}">${selectionTool.isAspectRatioLocked ? ToolIcons.lock : ToolIcons.unlock}</button>
           <span class="prop-label" style="width:20px; text-align:right;">H</span>
           <input type="number" step="any" class="prop-input" id="el-h" value="${h}" />
         </div>
         <div class="prop-row">
           <span class="prop-label">Pivot</span>
-          <input type="number" class="prop-input" id="el-pivot-x" value="${Math.round(pivot.x)}" title="Coordenada X del pivote de rotación" />
+          <input type="number" class="prop-input" id="el-pivot-x" value="${Math.round(pivot.x)}" />
           <span class="prop-label" style="width:20px; text-align:right;">Y</span>
-          <input type="number" class="prop-input" id="el-pivot-y" value="${Math.round(pivot.y)}" title="Coordenada Y del pivote de rotación" />
-          <button class="prop-input" id="btn-reset-pivot" style="width:auto; padding:2px 8px; cursor:pointer;" title="Restablecer pivote al centro del elemento">⟲</button>
+          <input type="number" class="prop-input" id="el-pivot-y" value="${Math.round(pivot.y)}" />
+          <button class="prop-input" id="btn-reset-pivot" style="width:auto; padding:2px 8px; cursor:pointer;" title="${I18nService.t('inspector.resetPivot')}">⟲</button>
         </div>
         ${(() => {
           const opacityAttr = el.attributes['opacity'];
@@ -79,34 +80,34 @@ export class GeometryInspector {
           const opacityPct = Math.round(Math.max(0, Math.min(1, isNaN(opacityVal) ? 1 : opacityVal)) * 100);
           return `
           <div class="prop-row">
-            <span class="prop-label">Opacity</span>
-            <input type="range" class="prop-input" id="el-opacity-slider" min="0" max="100" step="1" value="${opacityPct}" style="flex:1; cursor:pointer; margin:0 4px;" title="Opacidad del elemento seleccionado (0% a 100%)" />
+            <span class="prop-label">${I18nService.t('inspector.opacity')}</span>
+            <input type="range" class="prop-input" id="el-opacity-slider" min="0" max="100" step="1" value="${opacityPct}" style="flex:1; cursor:pointer; margin:0 4px;" title="${I18nService.t('inspector.opacity')}" />
             <div style="display:flex; align-items:center; gap:2px; width:54px;">
-              <input type="number" class="prop-input" id="el-opacity" min="0" max="100" step="1" value="${opacityPct}" style="width:36px; padding:2px 4px; text-align:right;" title="Porcentaje de opacidad (0 - 100)" />
+              <input type="number" class="prop-input" id="el-opacity" min="0" max="100" step="1" value="${opacityPct}" style="width:36px; padding:2px 4px; text-align:right;" title="${I18nService.t('inspector.opacity')}" />
               <span style="font-size:11px; color:var(--text-muted); font-weight:600;">%</span>
             </div>
           </div>`;
         })()}
         ${DistortInspectorControls.renderHtml(selectionTool, x, y, w, h)}
         <div class="prop-row">
-          <span class="prop-label">Nodes</span>
-          <span style="font-weight:600; color:var(--text-main); font-size:12px;">${el.vertices ? el.vertices.length : 0} nodes (${isClosed ? 'closed' : 'open'})</span>
+          <span class="prop-label">${I18nService.t('panels.nodes')}</span>
+          <span style="font-weight:600; color:var(--text-main); font-size:12px;">${el.vertices ? el.vertices.length : 0} ${I18nService.t('common.nodes')} (${isClosed ? I18nService.t('common.closed') : I18nService.t('common.open')})</span>
         </div>
         ${model.isParametricElement(el) ? `
         <div class="prop-row" style="margin-top: 6px;">
-          <button class="prop-input" id="btn-convert-to-path" style="flex:1; cursor:pointer; background:#312e81; color:#c7d2fe; border:1px solid #6366f1; font-weight:600; padding:6px; display:flex; align-items:center; justify-content:center; gap:6px;" title="Convertir primitiva paramétrica a curvas libres editables con herramienta de Nodos (Ctrl+Q)">
+          <button class="prop-input" id="btn-convert-to-path" style="flex:1; cursor:pointer; background:#312e81; color:#c7d2fe; border:1px solid #6366f1; font-weight:600; padding:6px; display:flex; align-items:center; justify-content:center; gap:6px;" title="${I18nService.t('inspector.convertToCurves')}">
             <span style="font-size:13px;">⤹</span>
-            <span>Convertir a Curvas (Ctrl+Q)</span>
+            <span>${I18nService.t('inspector.convertToCurves')}</span>
           </button>
         </div>` : (detectedPrimitive ? `
         <div class="prop-row" style="margin-top: 6px; flex-direction: column; gap: 4px; background: rgba(16, 185, 129, 0.08); border: 1px dashed #10b981; border-radius: 4px; padding: 6px;">
           <div style="font-size: 10px; color: #10b981; font-weight: 600; display: flex; align-items: center; justify-content: space-between;">
-            <span style="display:inline-flex; align-items:center; gap:4px;">${ToolIcons.lightning} Primitiva detectada</span>
+            <span style="display:inline-flex; align-items:center; gap:4px;">${ToolIcons.lightning} ${I18nService.t('inspector.primitiveDetected')}</span>
             <span style="text-transform: uppercase; font-family: monospace;">&lt;${detectedPrimitive.primitive}${detectedPrimitive.attributes?.['data-ellipse-type'] ? ` (${detectedPrimitive.attributes['data-ellipse-type']})` : ''}&gt;</span>
           </div>
-          <button class="prop-input" id="btn-simplify-to-primitive" style="cursor:pointer; background:#065f46; color:#a7f3d0; border:1px solid #10b981; font-weight:600; padding:5px; display:flex; align-items:center; justify-content:center; gap:6px; font-size:11px;" title="Simplificar trazado &lt;path&gt; a forma geométrica SVG canónica &lt;${detectedPrimitive.primitive}&gt;">
+          <button class="prop-input" id="btn-simplify-to-primitive" style="cursor:pointer; background:#065f46; color:#a7f3d0; border:1px solid #10b981; font-weight:600; padding:5px; display:flex; align-items:center; justify-content:center; gap:6px; font-size:11px;" title="${I18nService.t('inspector.simplifyTo')} &lt;${detectedPrimitive.primitive}&gt;">
             <span>${ToolIcons.lightning}</span>
-            <span>Simplificar a &lt;${detectedPrimitive.primitive}${detectedPrimitive.attributes?.['data-ellipse-type'] ? ` (${detectedPrimitive.attributes['data-ellipse-type']})` : ''}&gt;</span>
+            <span>${I18nService.t('inspector.simplifyTo')} &lt;${detectedPrimitive.primitive}${detectedPrimitive.attributes?.['data-ellipse-type'] ? ` (${detectedPrimitive.attributes['data-ellipse-type']})` : ''}&gt;</span>
           </button>
         </div>` : '')}
       </div>

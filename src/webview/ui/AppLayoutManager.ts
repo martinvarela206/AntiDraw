@@ -9,6 +9,7 @@ import { PropertyPanel, PropertyPanelCallbacks } from './PropertyPanel.js';
 import { VectorExplorerPanel, VectorExplorerCallbacks } from './VectorExplorerPanel.js';
 import { DropPosition } from '../engine/layout/LayerReorderService.js';
 import { ToolIcons } from '../icons/ToolIcons.js';
+import { I18nService } from '../i18n/I18nService.js';
 
 export interface AppLayoutConfig {
   canvasMgr: CanvasManager;
@@ -93,14 +94,15 @@ export class AppLayoutManager {
           <span id="status-coords">X: 0, Y: 0</span>
         </div>
         <div class="status-right">
-          <button class="status-btn" id="btn-canvas-props" title="Canvas & ViewBox Settings">${ToolIcons.canvasTool} Canvas</button>
+          <button class="status-btn" id="btn-canvas-props" title="${I18nService.t('statusbar.canvasPropsTooltip')}">${ToolIcons.canvasTool} <span id="status-canvas-text">${I18nService.t('toolbar.canvas')}</span></button>
           <div class="status-grid-align-group" style="display:inline-flex; gap:2px;">
             <button class="status-btn" id="status-grid-align-origin" title="Modo A: Línea o cruce de grilla coincidente con (0, 0)">┼ Línea (0,0)</button>
             <button class="status-btn" id="status-grid-align-center" title="Modo B: Snap al centro de cada celda de la grilla">◫ Celda (0,0)</button>
           </div>
-          <button class="status-btn" id="btn-recenter-viewbox" title="Recenter ViewBox / Camera (Artboard)">${ToolIcons.target} Recenter ViewBox</button>
-          <span id="status-info">Ready</span>
+          <button class="status-btn" id="btn-recenter-viewbox" title="${I18nService.t('statusbar.recenterViewBox')}">${ToolIcons.target} <span id="status-recenter-text">${I18nService.t('statusbar.recenterViewBox')}</span></button>
+          <span id="status-info">${I18nService.t('common.ready')}</span>
           <button class="status-zoom-btn" id="status-zoom" title="Click to reset zoom to 100%">100%</button>
+          <button class="status-btn" id="btn-lang-toggle" title="${I18nService.t('statusbar.languageToggleTooltip')}" style="font-weight:700; padding:2px 8px; letter-spacing:0.5px; min-width:32px; text-align:center;">${I18nService.getLanguage().toUpperCase()}</button>
         </div>
       </div>
     `;
@@ -257,5 +259,33 @@ export class AppLayoutManager {
         this.toolbar.setTool('select');
       });
     }
+
+    // Language toggle in Status Bar
+    const btnLangToggle = document.getElementById('btn-lang-toggle');
+    if (btnLangToggle) {
+      btnLangToggle.addEventListener('click', () => {
+        const nextLang = I18nService.toggleLanguage();
+        btnLangToggle.textContent = nextLang.toUpperCase();
+      });
+    }
+
+    I18nService.onLanguageChange((lang) => {
+      if (btnLangToggle) btnLangToggle.textContent = lang.toUpperCase();
+      const statusCanvasText = document.getElementById('status-canvas-text');
+      if (statusCanvasText) statusCanvasText.textContent = I18nService.t('toolbar.canvas');
+      const btnCanvas = document.getElementById('btn-canvas-props');
+      if (btnCanvas) btnCanvas.title = I18nService.t('statusbar.canvasPropsTooltip');
+      const statusRecenterText = document.getElementById('status-recenter-text');
+      if (statusRecenterText) statusRecenterText.textContent = I18nService.t('statusbar.recenterViewBox');
+      const btnRecenter = document.getElementById('btn-recenter-viewbox');
+      if (btnRecenter) btnRecenter.title = I18nService.t('statusbar.recenterViewBox');
+      const statusInfo = document.getElementById('status-info');
+      if (statusInfo && (statusInfo.innerText === 'Ready' || statusInfo.innerText === 'Listo')) {
+        statusInfo.innerText = I18nService.t('common.ready');
+      }
+      this.propertyPanel.update();
+      this.topBar.update();
+      this.toolbar.render();
+    });
   }
 }

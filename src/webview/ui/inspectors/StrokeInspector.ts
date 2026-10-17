@@ -7,6 +7,7 @@ import { StrokeLayersControls } from './StrokeLayersControls.js';
 import { DashCornerAligner } from '../../engine/geometry/DashCornerAligner.js';
 import { SpineCurveService } from '../../engine/stroke/SpineCurveService.js';
 import { ToolIcons } from '../../icons/ToolIcons.js';
+import { I18nService } from '../../i18n/index.js';
 
 export interface StrokeInspectorProps {
   stroke: string;
@@ -96,58 +97,58 @@ export class StrokeInspector {
       <div class="panel-section">
         <div class="panel-title" style="display:flex; justify-content:space-between; align-items:center;">
           <div style="display:flex; align-items:center; gap:6px;">
-            <span>Stroke (Trazo)</span>
-            ${!hasStroke ? '<span class="badge" style="font-size:10px; color:#94a3b8; font-weight:normal; text-transform:none;">(Sin trazo)</span>' : ''}
+            <span>${I18nService.t('inspector.strokeLabel')}</span>
+            ${!hasStroke ? `<span class="badge" style="font-size:10px; color:#94a3b8; font-weight:normal; text-transform:none;">(${I18nService.t('inspector.noStroke')})</span>` : ''}
           </div>
           <div style="display:flex; gap:4px; align-items:center;">
             ${hasStroke ? `
-              <button class="prop-input" id="btn-remove-stroke" style="cursor:pointer; width:auto; padding:1px 6px; font-size:11px; color:#ef4444;" title="Quitar trazo (establecer stroke='none')">− Quitar</button>
+              <button class="prop-input" id="btn-remove-stroke" style="cursor:pointer; width:auto; padding:1px 6px; font-size:11px; color:#ef4444;" title="${I18nService.t('inspector.removeStroke')}">${I18nService.t('inspector.removeStroke')}</button>
             ` : `
-              <button class="prop-input" id="btn-add-stroke" style="cursor:pointer; width:auto; padding:1px 6px; font-size:11px; color:#10b981; font-weight:600;" title="Añadir trazo de 1px">+ Añadir</button>
+              <button class="prop-input" id="btn-add-stroke" style="cursor:pointer; width:auto; padding:1px 6px; font-size:11px; color:#10b981; font-weight:600;" title="${I18nService.t('inspector.addStroke')}">${I18nService.t('inspector.addStroke')}</button>
             `}
           </div>
         </div>
 
         ${!hasStroke ? `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px; padding:6px 8px; background:rgba(255,255,255,0.02); border:1px dashed var(--border-color); border-radius:4px;">
-          <span style="font-size:11px; color:#94a3b8;">Sin borde (stroke="none")</span>
-          <button class="prop-input" id="btn-add-stroke-body" style="cursor:pointer; background:var(--accent-color); color:#fff; font-weight:600; padding:2px 8px; font-size:11px;" title="Añadir trazo de 1px">+ Añadir Borde</button>
+          <span style="font-size:11px; color:#94a3b8;">${I18nService.t('inspector.noStroke')}</span>
+          <button class="prop-input" id="btn-add-stroke-body" style="cursor:pointer; background:var(--accent-color); color:#fff; font-weight:600; padding:2px 8px; font-size:11px;" title="${I18nService.t('inspector.addStroke')}">${I18nService.t('inspector.addStroke')}</button>
         </div>
         ` : `
         <div id="stroke-active-controls">
           <div class="prop-row">
-            <span class="prop-label">Color</span>
+            <span class="prop-label">${I18nService.t('common.color')}</span>
             <div class="color-picker-row" style="display:flex; gap:4px; align-items:center;">
-              <input type="color" class="color-swatch" id="el-stroke-color" value="${isCurrentColor ? '#000000' : (stroke === 'none' ? '#000000' : stroke)}" ${isCurrentColor ? 'disabled title="Color dinámico (currentColor)"' : ''} />
+              <input type="color" class="color-swatch" id="el-stroke-color" value="${isCurrentColor ? '#000000' : (stroke === 'none' ? '#000000' : stroke)}" ${isCurrentColor ? 'disabled title="currentColor"' : ''} />
               <input type="text" class="prop-input" id="el-stroke-hex" value="${stroke === 'none' ? '#000000' : stroke}" placeholder="#hex o currentColor" style="flex:1;" />
-              <button class="prop-input ${isCurrentColor ? 'active' : ''}" id="btn-stroke-currentcolor" style="cursor:pointer; width:auto; padding:2px 6px; font-size:10px; font-weight:600; ${isCurrentColor ? 'background:#3b82f6; color:#fff;' : 'color:#94a3b8;'}" title="Conmutar currentColor (hereda dinámicamente el color de texto del contexto)">currentColor</button>
+              <button class="prop-input ${isCurrentColor ? 'active' : ''}" id="btn-stroke-currentcolor" style="cursor:pointer; width:auto; padding:2px 6px; font-size:10px; font-weight:600; ${isCurrentColor ? 'background:#3b82f6; color:#fff;' : 'color:#94a3b8;'}" title="currentColor">currentColor</button>
             </div>
           </div>
         <div class="prop-row">
-          <span class="prop-label">Width</span>
+          <span class="prop-label">${I18nService.t('inspector.strokeWidth')}</span>
           <input type="number" class="prop-input" id="el-stroke-width" value="${strokeWidth}" min="0" step="0.5" />
         </div>
         <div class="prop-row" style="align-items:flex-start;">
-          <span class="prop-label" style="margin-top:4px;">Dashes</span>
+          <span class="prop-label" style="margin-top:4px;">${I18nService.t('inspector.strokeDash')}</span>
           <div style="display:flex; flex-direction:column; gap:4px; flex:1;">
             <div style="display:flex; gap:4px; align-items:center;">
               <input type="text" class="prop-input" id="el-stroke-dash" value="${strokeDash}" placeholder="e.g. 8 4 o 0 8" style="flex:1;" />
-              <label style="display:flex; align-items:center; gap:3px; font-size:10px; cursor:pointer; color:var(--text-muted); white-space:nowrap;" title="Ajustar guiones a esquinas (Plan::fitted): calcula y escala micro-intervalos para centrar perfectamente un guión o punto en cada esquina">
+              <label style="display:flex; align-items:center; gap:3px; font-size:10px; cursor:pointer; color:var(--text-muted); white-space:nowrap;">
                 <input type="checkbox" id="el-stroke-dash-align-corners" ${dashAlignCorners ? 'checked' : ''} style="cursor:pointer;" />
-                <span>Esquinas</span>
+                <span>${I18nService.t('inspector.dashAlignCorners')}</span>
               </label>
             </div>
             <div style="display:flex; gap:3px; flex-wrap:wrap;">
-              <button type="button" class="prop-input" id="btn-dash-solid" style="cursor:pointer; width:auto; padding:1px 5px; font-size:9.5px;" title="Trazo continuo sin guiones">Sólido</button>
-              <button type="button" class="prop-input" id="btn-dash-dashed" style="cursor:pointer; width:auto; padding:1px 5px; font-size:9.5px;" title="Guiones estándar (8 4) adaptados a esquinas">Guiones</button>
-              <button type="button" class="prop-input" id="btn-dash-dots" style="cursor:pointer; width:auto; padding:1px 5px; font-size:9.5px;" title="Discos circulares perfectos (0 8) centrados en cada vértice">Puntos</button>
-              <button type="button" class="prop-input" id="btn-dash-dense-dots" style="cursor:pointer; width:auto; padding:1px 5px; font-size:9.5px;" title="Puntos finos densos (0 5)">Puntos finos</button>
-              <button type="button" class="prop-input" id="btn-dash-long" style="cursor:pointer; width:auto; padding:1px 5px; font-size:9.5px;" title="Rayas largas (16 6)">Rayas</button>
+              <button type="button" class="prop-input" id="btn-dash-solid" style="cursor:pointer; width:auto; padding:1px 5px; font-size:9.5px;">${I18nService.t('inspector.dashSolid')}</button>
+              <button type="button" class="prop-input" id="btn-dash-dashed" style="cursor:pointer; width:auto; padding:1px 5px; font-size:9.5px;">${I18nService.t('inspector.dashDashed')}</button>
+              <button type="button" class="prop-input" id="btn-dash-dots" style="cursor:pointer; width:auto; padding:1px 5px; font-size:9.5px;">${I18nService.t('inspector.dashDots')}</button>
+              <button type="button" class="prop-input" id="btn-dash-dense-dots" style="cursor:pointer; width:auto; padding:1px 5px; font-size:9.5px;">${I18nService.t('inspector.dashDenseDots')}</button>
+              <button type="button" class="prop-input" id="btn-dash-long" style="cursor:pointer; width:auto; padding:1px 5px; font-size:9.5px;">${I18nService.t('inspector.dashLong')}</button>
             </div>
           </div>
         </div>
         <div class="prop-row">
-          <span class="prop-label">Cap</span>
+          <span class="prop-label">${I18nService.t('inspector.strokeCap')}</span>
           <select class="prop-input" id="el-stroke-cap" style="cursor:pointer;">
             <option value="butt" ${strokeLinecap === 'butt' ? 'selected' : ''}>Butt</option>
             <option value="round" ${strokeLinecap === 'round' ? 'selected' : ''}>Round</option>
@@ -155,26 +156,26 @@ export class StrokeInspector {
           </select>
         </div>
         <div class="prop-row">
-          <span class="prop-label">Join</span>
+          <span class="prop-label">${I18nService.t('inspector.strokeJoin')}</span>
           <div style="display:flex; gap:4px; flex:1; align-items:center;">
             <select class="prop-input" id="el-stroke-join" style="cursor:pointer; flex:1;">
               <option value="miter" ${strokeLinejoin === 'miter' ? 'selected' : ''}>Miter</option>
               <option value="round" ${strokeLinejoin === 'round' ? 'selected' : ''}>Round</option>
               <option value="bevel" ${strokeLinejoin === 'bevel' ? 'selected' : ''}>Bevel</option>
             </select>
-            <div id="container-stroke-miterlimit" style="${strokeLinejoin === 'miter' ? 'display:flex;' : 'display:none;'} align-items:center; gap:2px; width:65px;" title="Ángulo mínimo de inglete en grados (°): esquinas más agudas que este valor se cortan a bisel. Valores menores permiten puntas más afiladas.">
+            <div id="container-stroke-miterlimit" style="${strokeLinejoin === 'miter' ? 'display:flex;' : 'display:none;'} align-items:center; gap:2px; width:65px;">
               <input type="number" class="prop-input" id="el-stroke-miter-angle" value="${miterAngleDeg}" min="1" max="170" step="1" style="width:45px; padding:2px 4px; text-align:right;" />
               <span style="font-size:11px; color:var(--text-muted); font-weight:600;">°</span>
             </div>
           </div>
         </div>
         <div class="prop-row" style="align-items:flex-start;">
-          <span class="prop-label" style="margin-top:4px;">Perfil</span>
+          <span class="prop-label" style="margin-top:4px;">${I18nService.t('inspector.profile')}</span>
           <div style="display:flex; flex-direction:column; gap:4px; flex:1;">
             <div style="display:flex; gap:3px; flex-wrap:wrap;">
-              <button type="button" class="prop-input ${profileMode === 'uniform' ? 'active' : ''}" id="btn-profile-uniform" style="cursor:pointer; width:auto; padding:2px 6px; font-size:10px; font-weight:600;" title="Trazo con grosor uniforme clásico">Uniforme</button>
-              <button type="button" class="prop-input ${profileMode === 'variable' ? 'active' : ''}" id="btn-profile-tapered" style="cursor:pointer; width:auto; padding:2px 6px; font-size:10px; font-weight:600;" title="Trazo ahusado (puntas afiladas, centro grueso)">Ahusado</button>
-              <button type="button" class="prop-input ${isSketch ? 'active' : ''}" id="btn-profile-sketch" style="cursor:pointer; width:auto; padding:2px 6px; font-size:10px; font-weight:600; color:var(--accent, #00f0ff);" title="Modulación aleatoria / orgánica sobre w(t) estilo tinta de boceto">Boceto (Tinta)</button>
+              <button type="button" class="prop-input ${profileMode === 'uniform' ? 'active' : ''}" id="btn-profile-uniform" style="cursor:pointer; width:auto; padding:2px 6px; font-size:10px; font-weight:600;">${I18nService.t('inspector.profileUniform')}</button>
+              <button type="button" class="prop-input ${profileMode === 'variable' ? 'active' : ''}" id="btn-profile-tapered" style="cursor:pointer; width:auto; padding:2px 6px; font-size:10px; font-weight:600;">${I18nService.t('inspector.profileTapered')}</button>
+              <button type="button" class="prop-input ${isSketch ? 'active' : ''}" id="btn-profile-sketch" style="cursor:pointer; width:auto; padding:2px 6px; font-size:10px; font-weight:600; color:var(--accent, #00f0ff);">${I18nService.t('inspector.profileSketch')}</button>
             </div>
             ${isSketch ? `
               <div id="container-sketch-params" style="display:flex; flex-direction:column; gap:3px; background:var(--bg-subtle, rgba(0,0,0,0.15)); padding:5px 6px; border-radius:4px; margin-top:2px; border:1px solid rgba(255,255,255,0.06);">
@@ -192,7 +193,7 @@ export class StrokeInspector {
                     <span id="label-sketch-rough" style="width:24px; text-align:right; font-variant-numeric:tabular-nums; font-size:9.5px;">${Math.round(sketchRough * 100)}%</span>
                   </div>
                 </div>
-                <button type="button" class="prop-input" id="btn-sketch-reseed" style="cursor:pointer; font-size:9.5px; padding:2px 4px; margin-top:2px; text-align:center; display:inline-flex; align-items:center; justify-content:center; gap:4px;" title="Re-generar semilla de modulación orgánica">${ToolIcons.dice} Re-sembrar variación</button>
+                <button type="button" class="prop-input" id="btn-sketch-reseed" style="cursor:pointer; font-size:9.5px; padding:2px 4px; margin-top:2px; text-align:center; display:inline-flex; align-items:center; justify-content:center; gap:4px;" title="${I18nService.t('inspector.reseedVariation')}">${ToolIcons.dice} ${I18nService.t('inspector.reseedVariation')}</button>
               </div>
             ` : ''}
           </div>

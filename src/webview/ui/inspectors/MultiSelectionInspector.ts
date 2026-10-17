@@ -6,6 +6,7 @@ import { bindInspectorMouseDown } from './CanvasInspector.js';
 import { degreesToMiterLimit } from './AppearanceInspector.js';
 import { DistortInspectorControls } from './DistortInspectorControls.js';
 import { BlendEngine } from '../../engine/blend/BlendEngine.js';
+import { I18nService } from '../../i18n/index.js';
 
 /**
  * MultiSelectionInspector
@@ -40,38 +41,38 @@ export class MultiSelectionInspector {
 
     container.innerHTML = `
       <div class="panel-section">
-        <div class="panel-title">Multiple Selection</div>
+        <div class="panel-title">${I18nService.t('inspector.multiSelectionTitle')}</div>
         <div class="prop-row">
-          <span class="prop-label">Selected</span>
-          <span style="font-weight:600; color:var(--text-main);">${elements.length} vectors</span>
+          <span class="prop-label">${I18nService.t('common.selected')}</span>
+          <span style="font-weight:600; color:var(--text-main);">${I18nService.t('inspector.selectedCount', { count: elements.length })}</span>
         </div>
         <div class="prop-row">
-          <span class="prop-label">Total Nodes</span>
-          <span style="font-weight:600; color:var(--text-main);">${elements.reduce((acc, curr) => acc + (curr.vertices ? curr.vertices.length : 0), 0)} nodes</span>
+          <span class="prop-label">${I18nService.t('common.nodes')}</span>
+          <span style="font-weight:600; color:var(--text-main);">${I18nService.t('inspector.totalNodes', { count: elements.reduce((acc, curr) => acc + (curr.vertices ? curr.vertices.length : 0), 0) })}</span>
         </div>
       </div>
 
       <div class="panel-section">
-        <div class="panel-title">Transform (Group)</div>
+        <div class="panel-title">${I18nService.t('inspector.transformGroup')}</div>
         <div class="prop-row">
-          <span class="prop-label">Modo</span>
+          <span class="prop-label">${I18nService.t('inspector.mode')}</span>
           <div style="display:flex; gap:4px; flex:1;">
-            <button class="prop-input" id="btn-multi-mode-move" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'move' ? 'background:#10b981; color:#ffffff;' : ''}" title="Modo Mover (W): Mover elementos y anclar vértices">Mover</button>
-            <button class="prop-input" id="btn-multi-mode-scale" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'scale' ? 'background:#6366f1; color:#ffffff;' : ''}" title="Modo Escalar (R): Redimensionar con 8 tiradores">Escalar</button>
-            <button class="prop-input" id="btn-multi-mode-rotate" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'rotate' ? 'background:#8b5cf6; color:#ffffff;' : ''}" title="Modo Rotación (E): Muestra tiradores de giro y pivote libre">Rotar</button>
+            <button class="prop-input" id="btn-multi-mode-move" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'move' ? 'background:#10b981; color:#ffffff;' : ''}" title="${I18nService.t('inspector.modeMove')} (W)">${I18nService.t('inspector.modeMove')}</button>
+            <button class="prop-input" id="btn-multi-mode-scale" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'scale' ? 'background:#6366f1; color:#ffffff;' : ''}" title="${I18nService.t('inspector.modeScale')} (R)">${I18nService.t('inspector.modeScale')}</button>
+            <button class="prop-input" id="btn-multi-mode-rotate" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'rotate' ? 'background:#8b5cf6; color:#ffffff;' : ''}" title="${I18nService.t('inspector.modeRotate')} (E)">${I18nService.t('inspector.modeRotate')}</button>
           </div>
         </div>
         <div class="prop-row" style="margin-top:2px;">
-          <span class="prop-label" style="font-size:11px;">Avanzado</span>
+          <span class="prop-label" style="font-size:11px;">${I18nService.t('inspector.advanced')}</span>
           <div style="display:flex; gap:6px; flex:1;">
-            <button class="prop-input" id="btn-multi-mode-distort" style="flex:1; cursor:pointer; font-weight:600; padding:3px 6px; font-size:11px; display:flex; align-items:center; justify-content:center; gap:4px; ${selectionTool.selectionMode === 'distort' ? 'background:#f59e0b; color:#0f172a; border-color:#d97706;' : 'background:transparent; border:1px solid var(--border-color);'}" title="Deformación Libre y Perspectiva Proyectiva grupal (D)">${selectionTool.selectionMode === 'distort' ? '▰ Deformación Libre (Activa)' : '▱ Deformación Libre (D)'}</button>
+            <button class="prop-input" id="btn-multi-mode-distort" style="flex:1; cursor:pointer; font-weight:600; padding:3px 6px; font-size:11px; display:flex; align-items:center; justify-content:center; gap:4px; ${selectionTool.selectionMode === 'distort' ? 'background:#f59e0b; color:#0f172a; border-color:#d97706;' : 'background:transparent; border:1px solid var(--border-color);'}" title="${I18nService.t('inspector.modeDistort')} (D)">${selectionTool.selectionMode === 'distort' ? '▰ ' + I18nService.t('inspector.modeDistortActive') : '▱ ' + I18nService.t('inspector.modeDistort')}</button>
           </div>
         </div>
         <div class="prop-row" style="margin-top:2px;">
-          <span class="prop-label" style="font-size:11px;">Escalar</span>
+          <span class="prop-label" style="font-size:11px;">${I18nService.t('inspector.modeScale')}</span>
           <div style="display:flex; gap:6px; flex:1; align-items:center;">
-            <button class="prop-input" id="btn-multi-lock-scale-stroke" style="flex:1; padding:2px 4px; display:flex; justify-content:center; align-items:center; gap:4px; cursor:pointer; font-size:11px; ${selectionTool.scaleStroke ? 'background:var(--accent-color); color:#ffffff;' : 'background:transparent;'} border:1px solid var(--border-color);" title="Escalar grosor de trazo proporcionalmente al redimensionar (candado cerrado = escala, abierto = fijo)">${selectionTool.scaleStroke ? ToolIcons.lock : ToolIcons.unlock} Trazo</button>
-            <button class="prop-input" id="btn-multi-lock-scale-corners" style="flex:1; padding:2px 4px; display:flex; justify-content:center; align-items:center; gap:4px; cursor:pointer; font-size:11px; ${selectionTool.scaleCorners ? 'background:var(--accent-color); color:#ffffff;' : 'background:transparent;'} border:1px solid var(--border-color);" title="Escalar radios de esquinas paramétricas proporcionalmente al redimensionar (candado cerrado = escala, abierto = fijo)">${selectionTool.scaleCorners ? ToolIcons.lock : ToolIcons.unlock} Esquinas</button>
+            <button class="prop-input" id="btn-multi-lock-scale-stroke" style="flex:1; padding:2px 4px; display:flex; justify-content:center; align-items:center; gap:4px; cursor:pointer; font-size:11px; ${selectionTool.scaleStroke ? 'background:var(--accent-color); color:#ffffff;' : 'background:transparent;'} border:1px solid var(--border-color);" title="${I18nService.t('inspector.scaleStroke')}">${selectionTool.scaleStroke ? ToolIcons.lock : ToolIcons.unlock} ${I18nService.t('inspector.scaleStroke')}</button>
+            <button class="prop-input" id="btn-multi-lock-scale-corners" style="flex:1; padding:2px 4px; display:flex; justify-content:center; align-items:center; gap:4px; cursor:pointer; font-size:11px; ${selectionTool.scaleCorners ? 'background:var(--accent-color); color:#ffffff;' : 'background:transparent;'} border:1px solid var(--border-color);" title="${I18nService.t('inspector.scaleCorners')}">${selectionTool.scaleCorners ? ToolIcons.lock : ToolIcons.unlock} ${I18nService.t('inspector.scaleCorners')}</button>
           </div>
         </div>
         <div class="prop-row">
@@ -147,20 +148,20 @@ export class MultiSelectionInspector {
       </div>
 
       <div class="panel-section">
-        <div class="panel-title">Boolean Operations (Formas)</div>
+        <div class="panel-title">${I18nService.t('panels.pathfinder')}</div>
         <div class="prop-row" style="justify-content: flex-start; gap: 6px; flex-wrap: wrap;">
-          <button class="btn-icon" id="btn-prop-bool-union" title="Weld / Union (Soldar formas)">${ToolIcons.union}</button>
-          <button class="btn-icon" id="btn-prop-bool-subtract" title="Trim / Minus (1° corta al último, conserva cortador)">${ToolIcons.subtract}</button>
-          <button class="btn-icon" id="btn-prop-bool-intersect" title="Intersect (Intersección)">${ToolIcons.intersect}</button>
-          <button class="btn-icon" id="btn-prop-bool-exclude" title="Exclusion / XOR (Exclusión)">${ToolIcons.exclude}</button>
-          <button class="btn-icon" id="btn-prop-bool-combine" title="Boundary / Combine (Unir conservando originales)">${ToolIcons.combine}</button>
-          <button class="btn-icon" id="btn-prop-bool-fragment" title="Divide / Fragment (Intersección y exclusión a la vez)">${ToolIcons.fragment}</button>
+          <button class="btn-icon" id="btn-prop-bool-union" title="${I18nService.t('inspector.union')}">${ToolIcons.union}</button>
+          <button class="btn-icon" id="btn-prop-bool-subtract" title="${I18nService.t('inspector.subtract')}">${ToolIcons.subtract}</button>
+          <button class="btn-icon" id="btn-prop-bool-intersect" title="${I18nService.t('inspector.intersect')}">${ToolIcons.intersect}</button>
+          <button class="btn-icon" id="btn-prop-bool-exclude" title="${I18nService.t('inspector.exclude')}">${ToolIcons.exclude}</button>
+          <button class="btn-icon" id="btn-prop-bool-combine" title="${I18nService.t('inspector.combine')}">${ToolIcons.combine}</button>
+          <button class="btn-icon" id="btn-prop-bool-fragment" title="${I18nService.t('inspector.fragment')}">${ToolIcons.fragment}</button>
         </div>
       </div>
 
       ${elements.length === 2 ? `
         <div class="panel-section">
-          <div class="panel-title">Fusión Paramétrica (Blend)</div>
+          <div class="panel-title">${I18nService.t('panels.blend')}</div>
           <div class="prop-row">
             <button class="prop-input" id="btn-prop-blend-create" style="flex:1; cursor:pointer; font-weight:600; padding:6px; display:inline-flex; align-items:center; justify-content:center; gap:6px; background:linear-gradient(135deg, rgba(99,102,241,0.2), rgba(168,85,247,0.2)); color:var(--text-main); border:1px solid rgba(99,102,241,0.4);" title="Crear una fusión paramétrica viva de K pasos entre las 2 figuras seleccionadas">
               ${ToolIcons.blend} Crear Fusión (Blend)

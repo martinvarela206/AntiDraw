@@ -1,5 +1,6 @@
 import { ToolIcons } from '../icons/ToolIcons.js';
 import { ToolType } from '../tools/ToolType.js';
+import { I18nService } from '../i18n/I18nService.js';
 
 export type { ToolType };
 
@@ -86,6 +87,10 @@ export class Toolbar {
     this.onToolDoubleClickCallback = onToolDoubleClick;
     this.setupGlobalListeners();
     this.render();
+
+    I18nService.onLanguageChange(() => {
+      this.render();
+    });
   }
 
   private setupGlobalListeners(): void {
@@ -162,25 +167,36 @@ export class Toolbar {
   }
 
   private getToolbarItems(): (ToolbarItem | { type: 'divider' })[] {
+    const t = (k: string) => I18nService.t(k);
+
+    this.drawerCut.title = t('toolbar.drawerCutTooltip');
+    this.drawerCut.tools[0].title = t('toolbar.scissors');
+    this.drawerCut.tools[1].title = t('toolbar.knife');
+    this.drawerCut.tools[2].title = t('toolbar.eraser');
+
+    this.drawerConstruct.title = t('toolbar.drawerConstructTooltip');
+    this.drawerConstruct.tools[0].title = t('toolbar.smartFill');
+    this.drawerConstruct.tools[1].title = t('toolbar.shapeBuilder');
+
     return [
       // 1. Selección y Manipulación
-      { type: 'tool', id: 'select', title: 'Selection Tool (V)', icon: ToolIcons.selectTool },
-      { type: 'tool', id: 'stroke', title: 'Stroke Tool (T)', icon: ToolIcons.strokeTool },
-      { type: 'tool', id: 'node', title: 'Node Edit Tool (N)', icon: ToolIcons.nodeTool },
+      { type: 'tool', id: 'select', title: t('toolbar.select'), icon: ToolIcons.selectTool },
+      { type: 'tool', id: 'stroke', title: t('panels.stroke'), icon: ToolIcons.strokeTool },
+      { type: 'tool', id: 'node', title: t('toolbar.node'), icon: ToolIcons.nodeTool },
       { type: 'divider' },
 
       // 2. Curvas y Trazado
-      { type: 'tool', id: 'pen', title: 'Bézier Curve Tool (P)', icon: ToolIcons.penTool },
-      { type: 'tool', id: 'line', title: 'Line Tool (L)', icon: ToolIcons.lineTool },
-      { type: 'tool', id: 'polyline', title: 'Polyline Tool (Y)', icon: ToolIcons.polylineTool },
+      { type: 'tool', id: 'pen', title: t('toolbar.pen'), icon: ToolIcons.penTool },
+      { type: 'tool', id: 'line', title: t('toolbar.line'), icon: ToolIcons.lineTool },
+      { type: 'tool', id: 'polyline', title: t('toolbar.polyline'), icon: ToolIcons.polylineTool },
       { type: 'divider' },
 
       // 3. Primitivas Paramétricas
-      { type: 'tool', id: 'rect', title: 'Rectangle Tool (R)', icon: ToolIcons.rectTool },
-      { type: 'tool', id: 'circle', title: 'Circle Tool (O)', icon: ToolIcons.circleTool },
-      { type: 'tool', id: 'ellipse', title: 'Ellipse Tool (E)', icon: ToolIcons.ellipseTool },
-      { type: 'tool', id: 'polygon', title: 'Polygon Tool (G)', icon: ToolIcons.polygonTool },
-      { type: 'tool', id: 'star', title: 'Star Tool (S)', icon: ToolIcons.starTool },
+      { type: 'tool', id: 'rect', title: t('toolbar.rect'), icon: ToolIcons.rectTool },
+      { type: 'tool', id: 'circle', title: t('toolbar.circle'), icon: ToolIcons.circleTool },
+      { type: 'tool', id: 'ellipse', title: t('toolbar.ellipse'), icon: ToolIcons.ellipseTool },
+      { type: 'tool', id: 'polygon', title: t('toolbar.polygon'), icon: ToolIcons.polygonTool },
+      { type: 'tool', id: 'star', title: t('toolbar.star'), icon: ToolIcons.starTool },
       { type: 'divider' },
 
       // 4. Operaciones de Topología (Sub-cajones Hermanos A y B)
@@ -189,8 +205,8 @@ export class Toolbar {
       { type: 'divider' },
 
       // 5. Utilidades y Espacio de Trabajo
-      { type: 'tool', id: 'addVertex', title: 'Add Vertex Tool (+)', icon: ToolIcons.addVertexTool },
-      { type: 'tool', id: 'zoom', title: 'Zoom/Pan Tool (Z)', icon: ToolIcons.zoomTool },
+      { type: 'tool', id: 'addVertex', title: t('toolbar.addVertex'), icon: ToolIcons.addVertexTool },
+      { type: 'tool', id: 'zoom', title: t('toolbar.zoom'), icon: ToolIcons.zoomTool },
     ];
   }
 
@@ -248,7 +264,7 @@ export class Toolbar {
         mainBtn.setAttribute('data-active', isDrawerActive ? 'true' : 'false');
         mainBtn.setAttribute('aria-pressed', isDrawerActive ? 'true' : 'false');
         mainBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-        mainBtn.title = `${currentChild.title} [Clic largo o botón derecho para alternar grupo]`;
+        mainBtn.title = `${currentChild.title} ${I18nService.t('toolbar.drawerCutTooltip')}`;
         mainBtn.innerHTML = `${currentChild.icon}<span class="drawer-indicator"></span>`;
 
         // Long press trigger for drawer flyout

@@ -73,6 +73,7 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
           type: 'loadSvg',
           text: document.getText(),
           metadata: metadata || null,
+          locale: vscode.env.language,
         });
       }
     };
@@ -159,8 +160,11 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
 
     const nonce = getNonce();
 
+    const userLocale = vscode.env.language || 'en';
+    const langAttr = userLocale.toLowerCase().startsWith('es') ? 'es' : 'en';
+
     return /* html */ `<!DOCTYPE html>
-<html lang="en">
+<html lang="${langAttr}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -168,7 +172,7 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
   <title>AntiDraw SVG Vector Editor</title>
   <link rel="stylesheet" href="${styleUri}">
 </head>
-<body>
+<body data-vscode-language="${userLocale}">
   <div id="app"></div>
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>

@@ -1,5 +1,6 @@
 import { ToolIcons } from '../icons/ToolIcons.js';
 import { CanvasManager } from '../engine/CanvasManager.js';
+import { I18nService } from '../i18n/I18nService.js';
 
 export interface TopBarCallbacks {
   onUndo?: () => void;
@@ -26,6 +27,10 @@ export class TopBar {
     this.canvasMgr = canvasMgr;
     this.callbacks = callbacks;
     this.render();
+
+    I18nService.onLanguageChange(() => {
+      this.update();
+    });
   }
 
   public update(): void {
@@ -33,61 +38,63 @@ export class TopBar {
   }
 
   private render(): void {
+    const t = (k: string) => I18nService.t(k);
+
     this.container.innerHTML = `
       <!-- History (Undo / Redo) -->
       <div class="top-bar-group">
-        <button class="btn-icon" id="btn-undo" title="Undo (Ctrl+Z)">${ToolIcons.undo}</button>
-        <button class="btn-icon" id="btn-redo" title="Redo (Ctrl+Y)">${ToolIcons.redo}</button>
+        <button class="btn-icon" id="btn-undo" title="${t('topbar.undo')}">${ToolIcons.undo}</button>
+        <button class="btn-icon" id="btn-redo" title="${t('topbar.redo')}">${ToolIcons.redo}</button>
       </div>
 
       <div class="top-bar-divider"></div>
 
       <!-- Alignments -->
       <div class="top-bar-group">
-        <button class="btn-icon" id="btn-align-left" title="Align Left">${ToolIcons.alignLeft}</button>
-        <button class="btn-icon" id="btn-align-center" title="Align Center">${ToolIcons.alignCenter}</button>
-        <button class="btn-icon" id="btn-align-right" title="Align Right">${ToolIcons.alignRight}</button>
-        <button class="btn-icon" id="btn-align-top" title="Align Top">${ToolIcons.alignTop}</button>
-        <button class="btn-icon" id="btn-align-middle" title="Align Middle">${ToolIcons.alignMiddle}</button>
-        <button class="btn-icon" id="btn-align-bottom" title="Align Bottom">${ToolIcons.alignBottom}</button>
+        <button class="btn-icon" id="btn-align-left" title="${t('topbar.alignLeft')}">${ToolIcons.alignLeft}</button>
+        <button class="btn-icon" id="btn-align-center" title="${t('topbar.alignCenter')}">${ToolIcons.alignCenter}</button>
+        <button class="btn-icon" id="btn-align-right" title="${t('topbar.alignRight')}">${ToolIcons.alignRight}</button>
+        <button class="btn-icon" id="btn-align-top" title="${t('topbar.alignTop')}">${ToolIcons.alignTop}</button>
+        <button class="btn-icon" id="btn-align-middle" title="${t('topbar.alignMiddle')}">${ToolIcons.alignMiddle}</button>
+        <button class="btn-icon" id="btn-align-bottom" title="${t('topbar.alignBottom')}">${ToolIcons.alignBottom}</button>
       </div>
 
       <!-- Flip / Mirror -->
       <div class="top-bar-group">
-        <button class="btn-icon" id="btn-flip-h" title="Flip Horizontally (Mirror X)">${ToolIcons.flipHorizontal}</button>
-        <button class="btn-icon" id="btn-flip-v" title="Flip Vertically (Mirror Y)">${ToolIcons.flipVertical}</button>
+        <button class="btn-icon" id="btn-flip-h" title="${t('topbar.flipHorizontal')}">${ToolIcons.flipHorizontal}</button>
+        <button class="btn-icon" id="btn-flip-v" title="${t('topbar.flipVertical')}">${ToolIcons.flipVertical}</button>
       </div>
 
       <!-- Z-Ordering -->
       <div class="top-bar-group">
-        <button class="btn-icon" id="btn-z-front" title="Bring to Front">${ToolIcons.bringFront}</button>
-        <button class="btn-icon" id="btn-z-forward" title="Bring Forward">${ToolIcons.bringForward}</button>
-        <button class="btn-icon" id="btn-z-backward" title="Send Backward">${ToolIcons.sendBackward}</button>
-        <button class="btn-icon" id="btn-z-back" title="Send to Back">${ToolIcons.sendBack}</button>
+        <button class="btn-icon" id="btn-z-front" title="${t('topbar.bringFront')}">${ToolIcons.bringFront}</button>
+        <button class="btn-icon" id="btn-z-forward" title="${t('topbar.bringForward')}">${ToolIcons.bringForward}</button>
+        <button class="btn-icon" id="btn-z-backward" title="${t('topbar.sendBackward')}">${ToolIcons.sendBackward}</button>
+        <button class="btn-icon" id="btn-z-back" title="${t('topbar.sendBack')}">${ToolIcons.sendBack}</button>
       </div>
 
       <div class="top-bar-divider"></div>
 
       <!-- Vector Explorer / Scene Tree -->
       <div class="top-bar-group">
-        <button class="btn-icon ${this.canvasMgr.showVectorExplorer ? 'active' : ''}" id="btn-toggle-explorer" title="Toggle Vector Explorer (Scene Tree)">${ToolIcons.layers}</button>
+        <button class="btn-icon ${this.canvasMgr.showVectorExplorer ? 'active' : ''}" id="btn-toggle-explorer" title="${t('topbar.toggleLayers')}">${ToolIcons.layers}</button>
       </div>
 
       <div class="top-bar-divider"></div>
 
       <!-- Grid, Guides & Snapping -->
       <div class="top-bar-group">
-        <button class="btn-icon ${this.canvasMgr.showRulers ? 'active' : ''}" id="btn-toggle-rulers" title="Toggle Rulers">${ToolIcons.rulersVisibility}</button>
-        <button class="btn-icon ${this.canvasMgr.showGrid ? 'active' : ''}" id="btn-toggle-grid" title="Toggle Grid Overlay">${ToolIcons.gridVisibility}</button>
-        <button class="btn-icon ${this.canvasMgr.showGuides ? 'active' : ''}" id="btn-toggle-guides" title="Toggle Guide Lines">${ToolIcons.guidesVisibility}</button>
-        <button class="btn-icon ${this.canvasMgr.lockGuides ? 'active' : ''}" id="btn-lock-guides" title="Bloquear Guías y Elementos Contextuales (Ctrl+Alt+;)">${this.canvasMgr.lockGuides ? ToolIcons.lock : ToolIcons.unlock}</button>
-        <button class="btn-icon ${this.canvasMgr.snapToPixelGrid ? 'active' : ''}" id="btn-snap-pixel-grid" title="Snap to Pixel Grid (Pixel-Perfect)">${ToolIcons.snapPixel}</button>
-        <button class="btn-icon ${this.canvasMgr.snapToGrid ? 'active' : ''}" id="btn-snap-grid" title="Snap to Grid (Lines &amp; Cells)">${ToolIcons.snapGrid}</button>
-        <button class="btn-icon ${this.canvasMgr.snapToGuides ? 'active' : ''}" id="btn-snap-guide" title="Snap to Guides (Infinite Guidelines &amp; Intersections)">${ToolIcons.snapGuide}</button>
-        <button class="btn-icon ${this.canvasMgr.snapToViewBox ? 'active' : ''}" id="btn-snap-view-box" title="Snap to ViewBox (Canvas Borders, Corners &amp; Center)">${ToolIcons.snapViewBox}</button>
-        <button class="btn-icon ${this.canvasMgr.snapToNodes ? 'active' : ''}" id="btn-snap-nodes" title="Snap to Vector Nodes (Structural, Handles &amp; Positional)">${ToolIcons.snapVertex}</button>
-        <button class="btn-icon ${this.canvasMgr.snapToEdges ? 'active' : ''}" id="btn-snap-edges" title="Snap to Vector Edges (Contours &amp; Paths)">${ToolIcons.snapEdge}</button>
-        <button class="btn-icon ${this.canvasMgr.snapAngular ? 'active' : ''}" id="btn-snap-angular" title="Snap Angular (Multiples of 15°)">${ToolIcons.snapAngular}</button>
+        <button class="btn-icon ${this.canvasMgr.showRulers ? 'active' : ''}" id="btn-toggle-rulers" title="${t('topbar.toggleRulers')}">${ToolIcons.rulersVisibility}</button>
+        <button class="btn-icon ${this.canvasMgr.showGrid ? 'active' : ''}" id="btn-toggle-grid" title="${t('topbar.toggleGrid')}">${ToolIcons.gridVisibility}</button>
+        <button class="btn-icon ${this.canvasMgr.showGuides ? 'active' : ''}" id="btn-toggle-guides" title="${t('topbar.toggleGuides')}">${ToolIcons.guidesVisibility}</button>
+        <button class="btn-icon ${this.canvasMgr.lockGuides ? 'active' : ''}" id="btn-lock-guides" title="${this.canvasMgr.lockGuides ? t('topbar.unlockGuides') : t('topbar.lockGuides')}">${this.canvasMgr.lockGuides ? ToolIcons.lock : ToolIcons.unlock}</button>
+        <button class="btn-icon ${this.canvasMgr.snapToPixelGrid ? 'active' : ''}" id="btn-snap-pixel-grid" title="${t('topbar.snapPixel')}">${ToolIcons.snapPixel}</button>
+        <button class="btn-icon ${this.canvasMgr.snapToGrid ? 'active' : ''}" id="btn-snap-grid" title="${t('topbar.snapGrid')}">${ToolIcons.snapGrid}</button>
+        <button class="btn-icon ${this.canvasMgr.snapToGuides ? 'active' : ''}" id="btn-snap-guide" title="${t('topbar.snapGuide')}">${ToolIcons.snapGuide}</button>
+        <button class="btn-icon ${this.canvasMgr.snapToViewBox ? 'active' : ''}" id="btn-snap-view-box" title="${t('topbar.snapViewBox')}">${ToolIcons.snapViewBox}</button>
+        <button class="btn-icon ${this.canvasMgr.snapToNodes ? 'active' : ''}" id="btn-snap-nodes" title="${t('topbar.snapNode')}">${ToolIcons.snapVertex}</button>
+        <button class="btn-icon ${this.canvasMgr.snapToEdges ? 'active' : ''}" id="btn-snap-edges" title="${t('topbar.snapEdge')}">${ToolIcons.snapEdge}</button>
+        <button class="btn-icon ${this.canvasMgr.snapAngular ? 'active' : ''}" id="btn-snap-angular" title="${t('topbar.snapAngular')}">${ToolIcons.snapAngular}</button>
       </div>
     `;
 

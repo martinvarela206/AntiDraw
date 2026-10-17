@@ -2,6 +2,7 @@ import { VectorModel } from '../../engine/VectorModel.js';
 import { GridAlignmentMode } from '../../engine/CanvasManager.js';
 import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
 import { SwatchPaletteInspector } from './SwatchPaletteInspector.js';
+import { I18nService } from '../../i18n/I18nService.js';
 
 export interface ViewBoxPreset {
   id: string;
@@ -69,20 +70,22 @@ export class CanvasInspector {
     );
     const selectedPresetId = matchedPreset ? matchedPreset.id : 'custom';
 
+    const isEs = I18nService.getLanguage() === 'es';
+
     container.innerHTML = `
       <div class="panel-section">
-        <div class="panel-title">Canvas &amp; ViewBox Size</div>
+        <div class="panel-title">${I18nService.t('panels.canvasProps')}</div>
         <div class="prop-row">
           <span class="prop-label">Preset</span>
           <select class="prop-input" id="canvas-preset" style="cursor:pointer;">
             ${VIEWBOX_PRESETS.map(
               (p) =>
-                `<option value="${p.id}" ${selectedPresetId === p.id ? 'selected' : ''}>${p.name}</option>`
+                `<option value="${p.id}" ${selectedPresetId === p.id ? 'selected' : ''}>${p.id === 'custom' ? I18nService.t('common.custom') : p.name}</option>`
             ).join('')}
           </select>
         </div>
         <div class="prop-row">
-          <span class="prop-label">Width</span>
+          <span class="prop-label">${I18nService.t('common.width')}</span>
           <input type="number" class="prop-input" id="canvas-width" value="${canvas.width}" />
           <span class="prop-label" style="width:20px; text-align:right;">H</span>
           <input type="number" class="prop-input" id="canvas-height" value="${canvas.height}" />
@@ -90,7 +93,7 @@ export class CanvasInspector {
       </div>
 
       <div class="panel-section">
-        <div class="panel-title">ViewBox &amp; Escalado</div>
+        <div class="panel-title">${I18nService.t('panels.viewboxScaling')}</div>
         <div class="prop-row">
           <span class="prop-label">X</span>
           <input type="number" class="prop-input" id="vb-minx" value="${vb.minX}" />
@@ -105,61 +108,61 @@ export class CanvasInspector {
         </div>
         <div class="prop-row">
           <span class="prop-label">Raw</span>
-          <input type="text" class="prop-input" id="canvas-viewbox" value="${canvas.viewBox}" title="Formato: minX minY width height" />
+          <input type="text" class="prop-input" id="canvas-viewbox" value="${canvas.viewBox}" title="${isEs ? 'Formato: minX minY width height' : 'Format: minX minY width height'}" />
         </div>
         <div class="prop-row">
-          <span class="prop-label" title="preserveAspectRatio: Ajuste de relación de aspecto del viewBox">Aspect</span>
+          <span class="prop-label" title="${isEs ? 'preserveAspectRatio: Ajuste de relación de aspecto del viewBox' : 'preserveAspectRatio: ViewBox aspect ratio alignment'}">Aspect</span>
           <select class="prop-input" id="canvas-preserve-aspect" style="cursor:pointer;">
-            <option value="none" ${canvas.preserveAspectRatio === 'none' ? 'selected' : ''}>none (Deformar)</option>
-            <option value="xMidYMid meet" ${!canvas.preserveAspectRatio || canvas.preserveAspectRatio === 'xMidYMid meet' ? 'selected' : ''}>xMidYMid meet (Contener centrado)</option>
-            <option value="xMinYMin meet" ${canvas.preserveAspectRatio === 'xMinYMin meet' ? 'selected' : ''}>xMinYMin meet (Contener arriba-izq)</option>
-            <option value="xMaxYMax meet" ${canvas.preserveAspectRatio === 'xMaxYMax meet' ? 'selected' : ''}>xMaxYMax meet (Contener abajo-der)</option>
-            <option value="xMidYMid slice" ${canvas.preserveAspectRatio === 'xMidYMid slice' ? 'selected' : ''}>xMidYMid slice (Cubrir centrado)</option>
-            <option value="xMinYMin slice" ${canvas.preserveAspectRatio === 'xMinYMin slice' ? 'selected' : ''}>xMinYMin slice (Cubrir arriba-izq)</option>
-            <option value="xMaxYMax slice" ${canvas.preserveAspectRatio === 'xMaxYMax slice' ? 'selected' : ''}>xMaxYMax slice (Cubrir abajo-der)</option>
+            <option value="none" ${canvas.preserveAspectRatio === 'none' ? 'selected' : ''}>none (${isEs ? 'Deformar' : 'Distort'})</option>
+            <option value="xMidYMid meet" ${!canvas.preserveAspectRatio || canvas.preserveAspectRatio === 'xMidYMid meet' ? 'selected' : ''}>xMidYMid meet (${isEs ? 'Contener centrado' : 'Contain center'})</option>
+            <option value="xMinYMin meet" ${canvas.preserveAspectRatio === 'xMinYMin meet' ? 'selected' : ''}>xMinYMin meet (${isEs ? 'Contener arriba-izq' : 'Contain top-left'})</option>
+            <option value="xMaxYMax meet" ${canvas.preserveAspectRatio === 'xMaxYMax meet' ? 'selected' : ''}>xMaxYMax meet (${isEs ? 'Contener abajo-der' : 'Contain bottom-right'})</option>
+            <option value="xMidYMid slice" ${canvas.preserveAspectRatio === 'xMidYMid slice' ? 'selected' : ''}>xMidYMid slice (${isEs ? 'Cubrir centrado' : 'Cover center'})</option>
+            <option value="xMinYMin slice" ${canvas.preserveAspectRatio === 'xMinYMin slice' ? 'selected' : ''}>xMinYMin slice (${isEs ? 'Cubrir arriba-izq' : 'Cover top-left'})</option>
+            <option value="xMaxYMax slice" ${canvas.preserveAspectRatio === 'xMaxYMax slice' ? 'selected' : ''}>xMaxYMax slice (${isEs ? 'Cubrir abajo-der' : 'Cover bottom-right'})</option>
           </select>
         </div>
       </div>
 
       <div class="panel-section">
-        <div class="panel-title">Visualización de currentColor</div>
+        <div class="panel-title">${I18nService.t('panels.currentColorView')}</div>
         <div class="prop-row">
-          <span class="prop-label" title="Color con el que se visualiza currentColor en el lienzo de AntiDraw">Color</span>
+          <span class="prop-label" title="${isEs ? 'Color con el que se visualiza currentColor en el lienzo' : 'Preview color for currentColor on the canvas'}">${I18nService.t('common.color')}</span>
           <div class="color-picker-row" style="display:flex; gap:4px; align-items:center;">
             <input type="color" class="color-swatch" id="canvas-currentcolor-color" value="${canvas.currentColor || '#000000'}" />
             <input type="text" class="prop-input" id="canvas-currentcolor-hex" value="${canvas.currentColor || '#000000'}" style="flex:1;" />
-            <button class="prop-input" id="btn-reset-canvas-currentcolor" style="width:26px; height:24px; padding:0; display:flex; align-items:center; justify-content:center; cursor:pointer;" title="Restablecer color de previsualización a negro (#000000)">⟲</button>
+            <button class="prop-input" id="btn-reset-canvas-currentcolor" style="width:26px; height:24px; padding:0; display:flex; align-items:center; justify-content:center; cursor:pointer;" title="${isEs ? 'Restablecer a negro (#000000)' : 'Reset preview color to black (#000000)'}">⟲</button>
           </div>
         </div>
       </div>
 
       <div class="panel-section">
-        <div class="panel-title">Atributos Raíz SVG (&lt;svg&gt;)</div>
+        <div class="panel-title">${I18nService.t('panels.rootSvgAttrs')}</div>
         <div class="prop-row">
-          <span class="prop-label" title="Atributo fill predeterminado del elemento raíz <svg>">Root Fill</span>
+          <span class="prop-label" title="Default fill for root <svg>">Root Fill</span>
           <input type="text" class="prop-input" id="canvas-svg-fill" value="${canvas.svgFill || ''}" placeholder="none, currentColor, #hex" />
         </div>
         <div class="prop-row">
-          <span class="prop-label" title="Atributo stroke predeterminado del elemento raíz <svg>">Root Stroke</span>
+          <span class="prop-label" title="Default stroke for root <svg>">Root Stroke</span>
           <input type="text" class="prop-input" id="canvas-svg-stroke" value="${canvas.svgStroke || ''}" placeholder="none, currentColor, #hex" />
         </div>
         <div class="prop-row">
-          <span class="prop-label" title="Atributo stroke-width predeterminado del elemento raíz <svg>">Root Width</span>
+          <span class="prop-label" title="Default stroke-width for root <svg>">Root Width</span>
           <input type="number" class="prop-input" id="canvas-svg-strokewidth" value="${canvas.svgStrokeWidth || ''}" min="0" step="0.5" placeholder="1.5" />
         </div>
         <div class="prop-row">
-          <span class="prop-label" title="Atributo stroke-linecap predeterminado del elemento raíz <svg>">Linecap</span>
+          <span class="prop-label" title="Default stroke-linecap for root <svg>">Linecap</span>
           <select class="prop-input" id="canvas-svg-linecap" style="cursor:pointer;">
-            <option value="" ${!canvas.svgStrokeLinecap ? 'selected' : ''}>Sin definir (por defecto)</option>
+            <option value="" ${!canvas.svgStrokeLinecap ? 'selected' : ''}>${isEs ? 'Sin definir (por defecto)' : 'Undefined (default)'}</option>
             <option value="butt" ${canvas.svgStrokeLinecap === 'butt' ? 'selected' : ''}>butt</option>
             <option value="round" ${canvas.svgStrokeLinecap === 'round' ? 'selected' : ''}>round</option>
             <option value="square" ${canvas.svgStrokeLinecap === 'square' ? 'selected' : ''}>square</option>
           </select>
         </div>
         <div class="prop-row">
-          <span class="prop-label" title="Atributo stroke-linejoin predeterminado del elemento raíz <svg>">Linejoin</span>
+          <span class="prop-label" title="Default stroke-linejoin for root <svg>">Linejoin</span>
           <select class="prop-input" id="canvas-svg-linejoin" style="cursor:pointer;">
-            <option value="" ${!canvas.svgStrokeLinejoin ? 'selected' : ''}>Sin definir (por defecto)</option>
+            <option value="" ${!canvas.svgStrokeLinejoin ? 'selected' : ''}>${isEs ? 'Sin definir (por defecto)' : 'Undefined (default)'}</option>
             <option value="miter" ${canvas.svgStrokeLinejoin === 'miter' ? 'selected' : ''}>miter</option>
             <option value="round" ${canvas.svgStrokeLinejoin === 'round' ? 'selected' : ''}>round</option>
             <option value="bevel" ${canvas.svgStrokeLinejoin === 'bevel' ? 'selected' : ''}>bevel</option>
@@ -168,19 +171,19 @@ export class CanvasInspector {
       </div>
 
       <div class="panel-section">
-        <div class="panel-title">Artboard Background</div>
+        <div class="panel-title">${I18nService.t('panels.artboardBackground')}</div>
         <div class="prop-row">
-          <span class="prop-label">Color</span>
+          <span class="prop-label">${I18nService.t('common.color')}</span>
           <div class="color-picker-row">
             <input type="color" class="color-swatch" id="canvas-bg-color" value="${canvas.backgroundColor && canvas.backgroundColor.startsWith('#') ? canvas.backgroundColor : '#ffffff'}" />
-            <input type="text" class="prop-input" id="canvas-bg-hex" value="${canvas.backgroundColor || 'none'}" placeholder="none o #hex" style="flex:1;" />
-            <button class="prop-input ${canvas.backgroundColor === 'none' || !canvas.backgroundColor ? 'active' : ''}" id="btn-canvas-bg-none" style="cursor:pointer; width:auto; padding:2px 6px; font-size:10px; font-weight:600;" title="Quitar color de fondo (transparente)">Sin fondo</button>
+            <input type="text" class="prop-input" id="canvas-bg-hex" value="${canvas.backgroundColor || 'none'}" placeholder="${isEs ? 'none o #hex' : 'none or #hex'}" style="flex:1;" />
+            <button class="prop-input ${canvas.backgroundColor === 'none' || !canvas.backgroundColor ? 'active' : ''}" id="btn-canvas-bg-none" style="cursor:pointer; width:auto; padding:2px 6px; font-size:10px; font-weight:600;" title="${isEs ? 'Quitar color de fondo (transparente)' : 'Remove background color (transparent)'}">${isEs ? 'Sin fondo' : 'No background'}</button>
           </div>
         </div>
       </div>
 
       <div class="panel-section">
-        <div class="panel-title">Grid-Ruler Alignment</div>
+        <div class="panel-title">${I18nService.t('inspector.gridAlignment')}</div>
         <div class="prop-row" style="display:flex; gap:6px;">
           <button class="prop-input ${gridAlignmentMode === 'origin' ? 'active' : ''}" id="btn-canvas-grid-align-origin" style="cursor:pointer; text-align:center; flex:1; padding:6px 4px; font-size:11px;" title="Modo A: Línea o cruce de grilla coincidente con (0, 0)">
             ┼ Línea en (0, 0)
