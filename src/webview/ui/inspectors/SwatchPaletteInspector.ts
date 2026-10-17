@@ -1,6 +1,7 @@
 import { VectorElement, VectorModel } from '../../engine/VectorModel.js';
 import { GlobalSwatch, GlobalSwatchManager } from '../../engine/color/GlobalSwatchManager.js';
 import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
+import { ToolIcons } from '../../icons/ToolIcons.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Modular Swatch Palette Inspector (SwatchPaletteInspector)
@@ -40,7 +41,7 @@ export class SwatchPaletteInspector {
             <span class="badge" style="font-size:10px; color:#94a3b8; font-weight:normal;">${swatches.length}</span>
           </div>
           <div style="display:flex; gap:4px; align-items:center;">
-            <button class="prop-input" id="btn-swatch-extract" style="cursor:pointer; width:auto; padding:1px 6px; font-size:10px;" title="Escanear y extraer automáticamente todos los colores utilizados en el documento a muestras globales">⚡ Extraer</button>
+            <button class="prop-input" id="btn-swatch-extract" style="cursor:pointer; width:auto; padding:1px 6px; font-size:10px; display:inline-flex; align-items:center; gap:3px;" title="Escanear y extraer automáticamente todos los colores utilizados en el documento a muestras globales">${ToolIcons.lightning} Extraer</button>
             <button class="prop-input" id="btn-swatch-add" style="cursor:pointer; width:auto; padding:1px 6px; font-size:10px; color:#10b981; font-weight:600;" title="Añadir nueva muestra global a la paleta">+ Nueva</button>
           </div>
         </div>
@@ -84,7 +85,7 @@ export class SwatchPaletteInspector {
         <div id="swatch-editor-container" style="display:none; margin-top:8px; padding:8px; background:rgba(255,255,255,0.04); border:1px solid var(--border-color); border-radius:6px;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
             <span style="font-size:11px; font-weight:600;" id="swatch-editor-title">Editar Muestra Global</span>
-            <button type="button" id="btn-close-swatch-editor" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:12px;">✕</button>
+            <button type="button" id="btn-close-swatch-editor" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:12px; display:inline-flex; align-items:center;">${ToolIcons.close}</button>
           </div>
           <div class="prop-row">
             <span class="prop-label">Nombre</span>

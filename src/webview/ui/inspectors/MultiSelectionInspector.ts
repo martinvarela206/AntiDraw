@@ -56,9 +56,9 @@ export class MultiSelectionInspector {
         <div class="prop-row">
           <span class="prop-label">Modo</span>
           <div style="display:flex; gap:4px; flex:1;">
-            <button class="prop-input" id="btn-multi-mode-move" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'move' ? 'background:#10b981; color:#ffffff;' : ''}" title="Modo Mover (W): Mover elementos y anclar vértices">✛ Mover</button>
-            <button class="prop-input" id="btn-multi-mode-scale" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'scale' ? 'background:#6366f1; color:#ffffff;' : ''}" title="Modo Escalar (R): Redimensionar con 8 tiradores">⤡ Escalar</button>
-            <button class="prop-input" id="btn-multi-mode-rotate" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'rotate' ? 'background:#8b5cf6; color:#ffffff;' : ''}" title="Modo Rotación (E): Muestra tiradores de giro y pivote libre">↻ Rotar</button>
+            <button class="prop-input" id="btn-multi-mode-move" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'move' ? 'background:#10b981; color:#ffffff;' : ''}" title="Modo Mover (W): Mover elementos y anclar vértices">Mover</button>
+            <button class="prop-input" id="btn-multi-mode-scale" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'scale' ? 'background:#6366f1; color:#ffffff;' : ''}" title="Modo Escalar (R): Redimensionar con 8 tiradores">Escalar</button>
+            <button class="prop-input" id="btn-multi-mode-rotate" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'rotate' ? 'background:#8b5cf6; color:#ffffff;' : ''}" title="Modo Rotación (E): Muestra tiradores de giro y pivote libre">Rotar</button>
           </div>
         </div>
         <div class="prop-row" style="margin-top:2px;">
@@ -70,8 +70,8 @@ export class MultiSelectionInspector {
         <div class="prop-row" style="margin-top:2px;">
           <span class="prop-label" style="font-size:11px;">Escalar</span>
           <div style="display:flex; gap:6px; flex:1; align-items:center;">
-            <button class="prop-input" id="btn-multi-lock-scale-stroke" style="flex:1; padding:2px 4px; display:flex; justify-content:center; align-items:center; gap:4px; cursor:pointer; font-size:11px; ${selectionTool.scaleStroke ? 'background:var(--accent-color); color:#ffffff;' : 'background:transparent;'} border:1px solid var(--border-color);" title="Escalar grosor de trazo proporcionalmente al redimensionar (candado cerrado = escala, abierto = fijo)">${selectionTool.scaleStroke ? '🔒' : '🔓'} Trazo</button>
-            <button class="prop-input" id="btn-multi-lock-scale-corners" style="flex:1; padding:2px 4px; display:flex; justify-content:center; align-items:center; gap:4px; cursor:pointer; font-size:11px; ${selectionTool.scaleCorners ? 'background:var(--accent-color); color:#ffffff;' : 'background:transparent;'} border:1px solid var(--border-color);" title="Escalar radios de esquinas paramétricas proporcionalmente al redimensionar (candado cerrado = escala, abierto = fijo)">${selectionTool.scaleCorners ? '🔒' : '🔓'} Esquinas</button>
+            <button class="prop-input" id="btn-multi-lock-scale-stroke" style="flex:1; padding:2px 4px; display:flex; justify-content:center; align-items:center; gap:4px; cursor:pointer; font-size:11px; ${selectionTool.scaleStroke ? 'background:var(--accent-color); color:#ffffff;' : 'background:transparent;'} border:1px solid var(--border-color);" title="Escalar grosor de trazo proporcionalmente al redimensionar (candado cerrado = escala, abierto = fijo)">${selectionTool.scaleStroke ? ToolIcons.lock : ToolIcons.unlock} Trazo</button>
+            <button class="prop-input" id="btn-multi-lock-scale-corners" style="flex:1; padding:2px 4px; display:flex; justify-content:center; align-items:center; gap:4px; cursor:pointer; font-size:11px; ${selectionTool.scaleCorners ? 'background:var(--accent-color); color:#ffffff;' : 'background:transparent;'} border:1px solid var(--border-color);" title="Escalar radios de esquinas paramétricas proporcionalmente al redimensionar (candado cerrado = escala, abierto = fijo)">${selectionTool.scaleCorners ? ToolIcons.lock : ToolIcons.unlock} Esquinas</button>
           </div>
         </div>
         <div class="prop-row">
@@ -162,8 +162,8 @@ export class MultiSelectionInspector {
         <div class="panel-section">
           <div class="panel-title">Fusión Paramétrica (Blend)</div>
           <div class="prop-row">
-            <button class="prop-input" id="btn-prop-blend-create" style="flex:1; cursor:pointer; font-weight:600; padding:6px; background:linear-gradient(135deg, rgba(99,102,241,0.2), rgba(168,85,247,0.2)); color:var(--text-main); border:1px solid rgba(99,102,241,0.4);" title="Crear una fusión paramétrica viva de K pasos entre las 2 figuras seleccionadas">
-              🧬 Crear Fusión (Blend)
+            <button class="prop-input" id="btn-prop-blend-create" style="flex:1; cursor:pointer; font-weight:600; padding:6px; display:inline-flex; align-items:center; justify-content:center; gap:6px; background:linear-gradient(135deg, rgba(99,102,241,0.2), rgba(168,85,247,0.2)); color:var(--text-main); border:1px solid rgba(99,102,241,0.4);" title="Crear una fusión paramétrica viva de K pasos entre las 2 figuras seleccionadas">
+              ${ToolIcons.blend} Crear Fusión (Blend)
             </button>
           </div>
         </div>

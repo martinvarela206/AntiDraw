@@ -95,11 +95,11 @@ export class RulerGuideInspector {
             <div class="grid-item-card" style="background:var(--bg-dark); border:1px solid var(--border-color); border-radius:4px; padding:6px 8px; display:flex; flex-direction:column; gap:6px;">
               <div style="display:flex; align-items:center; justify-content:space-between;">
                 <span style="font-weight:600; font-size:11px; text-transform:capitalize; color:var(--text-main);">
-                  ${g.type === 'isometric' ? '📐 Isométrica' : g.type === 'axonometric' ? '📐 Axonométrica (45°)' : '⊞ Ortogonal'}
+                  ${g.type === 'isometric' ? 'Isométrica' : g.type === 'axonometric' ? 'Axonométrica (45°)' : 'Ortogonal'}
                 </span>
                 <div style="display:flex; gap:4px; align-items:center;">
                   <button class="btn-icon" id="btn-grid-vis-${g.id}" title="${g.visible ? 'Ocultar Grilla' : 'Mostrar Grilla'}" style="width:20px; height:20px; font-size:11px;">
-                    ${g.visible ? '👁' : '🚫'}
+                    ${g.visible ? ToolIcons.eye : ToolIcons.eyeOff}
                   </button>
                   <button class="btn-icon" id="btn-grid-up-${g.id}" title="Subir orden Z" ${idx === 0 ? 'disabled style="opacity:0.3;"' : ''} style="width:20px; height:20px; font-size:9px;">
                     ▲
@@ -109,7 +109,7 @@ export class RulerGuideInspector {
                   </button>
                   ${grids.length > 1 ? `
                     <button class="btn-icon" id="btn-grid-del-${g.id}" title="Eliminar Grilla" style="width:20px; height:20px; font-size:11px; color:#ef4444;">
-                      🗑
+                      ${ToolIcons.trash}
                     </button>
                   ` : ''}
                 </div>
@@ -157,21 +157,21 @@ export class RulerGuideInspector {
                 </div>
                 <div style="display:flex; gap:4px; align-items:center;">
                   <button class="btn-icon" id="btn-guide-vis-${g.id}" title="${g.visible !== false ? 'Ocultar Guía' : 'Mostrar Guía'}" style="width:20px; height:20px; font-size:11px;">
-                    ${g.visible !== false ? '👁' : '🚫'}
+                    ${g.visible !== false ? ToolIcons.eye : ToolIcons.eyeOff}
                   </button>
                   <button class="btn-icon" id="btn-guide-lock-${g.id}" title="${g.locked ? 'Desbloquear Guía' : 'Bloquear Guía'}" style="width:20px; height:20px; font-size:11px;">
-                    ${g.locked ? '🔒' : '🔓'}
+                    ${g.locked ? ToolIcons.lock : ToolIcons.unlock}
                   </button>
                   <button class="btn-icon" id="btn-guide-del-${g.id}" title="Eliminar Guía" style="width:20px; height:20px; font-size:11px; color:#ef4444;">
-                    🗑
+                    ${ToolIcons.trash}
                   </button>
                 </div>
               </div>
             `).join('')}
           </div>
           <div style="margin-top:8px;">
-            <button class="prop-input" id="btn-clear-guides" style="cursor:pointer; background:#ef4444; color:#fff; text-align:center; font-weight:600;">
-              🗑 Limpiar Todas las Guías
+            <button class="prop-input" id="btn-clear-guides" style="cursor:pointer; background:#ef4444; color:#fff; text-align:center; font-weight:600; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+              ${ToolIcons.trash} Limpiar Todas las Guías
             </button>
           </div>
         `}
@@ -455,14 +455,14 @@ export class RulerGuideInspector {
       <div class="panel-section">
         <div class="panel-title">Acciones de Guía</div>
         <div class="prop-row" style="flex-direction:column; gap:6px;">
-          <button class="prop-input" id="btn-convert-guide-to-vector" style="cursor:pointer; background:var(--accent-primary, #007acc); color:#fff; text-align:center; font-weight:600;">
-            ➔ Convertir a Vector Ordinario
+          <button class="prop-input" id="btn-convert-guide-to-vector" style="cursor:pointer; background:var(--accent-primary, #007acc); color:#fff; text-align:center; font-weight:600; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+            Convertir a Vector Ordinario
           </button>
-          <button class="prop-input" id="btn-lock-guides" style="cursor:pointer; background:var(--bg-panel-hover); text-align:center; font-weight:500;">
-            ${allLocked ? '🔓 Desbloquear Guía(s)' : '🔒 Bloquear Guía(s)'}
+          <button class="prop-input" id="btn-lock-guides" style="cursor:pointer; background:var(--bg-panel-hover); text-align:center; font-weight:500; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+            ${allLocked ? ToolIcons.unlock : ToolIcons.lock} ${allLocked ? 'Desbloquear Guía(s)' : 'Bloquear Guía(s)'}
           </button>
-          <button class="prop-input" id="btn-delete-guide" style="cursor:pointer; background:#ef4444; color:#fff; text-align:center; font-weight:600;">
-            🗑 Eliminar ${guides.length > 1 ? `Guías (${guides.length})` : 'Guía (Supr)'}
+          <button class="prop-input" id="btn-delete-guide" style="cursor:pointer; background:#ef4444; color:#fff; text-align:center; font-weight:600; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+            ${ToolIcons.trash} Eliminar ${guides.length > 1 ? `Guías (${guides.length})` : 'Guía (Supr)'}
           </button>
         </div>
       </div>

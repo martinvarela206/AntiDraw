@@ -88,7 +88,7 @@ export class VectorExplorerPanel {
           <span class="explorer-title">Explorador de Vectores</span>
           <span class="explorer-badge">${elements.length}</span>
         </div>
-        <button class="btn-icon-subtle" id="btn-close-explorer" title="Cerrar panel">✕</button>
+        <button class="btn-icon-subtle" id="btn-close-explorer" title="Cerrar panel">${ToolIcons.close}</button>
       </div>
 
       <div class="explorer-body">
@@ -109,7 +109,7 @@ export class VectorExplorerPanel {
                   <span class="tree-item-icon">⊞</span>
                   <span class="tree-item-label">${grid.type} (${grid.spacing}px)</span>
                   <button class="tree-action-btn btn-toggle-grid-vis" data-grid-id="${grid.id}" title="Alternar visibilidad de grilla">
-                    ${grid.visible ? '👁' : '🚫'}
+                    ${grid.visible ? ToolIcons.eye : ToolIcons.eyeOff}
                   </button>
                 </div>
               `).join('')}
@@ -121,12 +121,12 @@ export class VectorExplorerPanel {
               ${guides.length === 0 ? '<div class="tree-empty-hint">Sin guías activas</div>' : ''}
               ${guides.map((guide) => `
                 <div class="tree-item context-item" data-guide-id="${guide.id}">
-                  <span class="tree-item-icon">📏</span>
+                  <span class="tree-item-icon">${ToolIcons.rulersVisibility}</span>
                   <span class="tree-item-label">
                     ${guide.orientation === 'horizontal' ? `H: ${Math.round(guide.position)}px` : guide.orientation === 'vertical' ? `V: ${Math.round(guide.position)}px` : `∠ ${Math.round(guide.angle || 0)}°`}
                   </span>
                   <button class="tree-action-btn btn-toggle-guide-vis" data-guide-id="${guide.id}" title="Alternar visibilidad">
-                    ${guide.visible !== false ? '👁' : '🚫'}
+                    ${guide.visible !== false ? ToolIcons.eye : ToolIcons.eyeOff}
                   </button>
                 </div>
               `).join('')}
@@ -138,7 +138,7 @@ export class VectorExplorerPanel {
               <div class="tree-item context-item" id="item-viewbox">
                 <span class="tree-item-icon">⊡</span>
                 <span class="tree-item-label">${viewBox}</span>
-                <button class="tree-action-btn" id="btn-recenter-vb" title="Recentrar ViewBox">🎯</button>
+                <button class="tree-action-btn" id="btn-recenter-vb" title="Recentrar ViewBox">${ToolIcons.target}</button>
               </div>
             </div>
           </div>
@@ -205,10 +205,10 @@ export class VectorExplorerPanel {
             <span class="tree-item-label" title="${el.id}">${name}${contextBadge}</span>
             <div class="tree-item-actions">
               <button class="tree-action-btn btn-elem-vis" data-element-id="${el.id}" title="${isHidden ? 'Mostrar elemento' : 'Ocultar elemento'}">
-                ${isHidden ? '🚫' : '👁'}
+                ${isHidden ? ToolIcons.eyeOff : ToolIcons.eye}
               </button>
               <button class="tree-action-btn btn-elem-lock" data-element-id="${el.id}" title="${isLocked ? 'Desbloquear elemento' : 'Bloquear elemento'}">
-                ${isLocked ? '🔒' : '🔓'}
+                ${isLocked ? ToolIcons.lock : ToolIcons.unlock}
               </button>
             </div>
           </div>
@@ -221,25 +221,25 @@ export class VectorExplorerPanel {
   private getShapeIcon(el: VectorElement): string {
     switch (el.shapeType || el.tagName) {
       case 'rect':
-        return '▭';
+        return ToolIcons.rectTool;
       case 'circle':
-        return '○';
+        return ToolIcons.circleTool;
       case 'ellipse':
-        return '⬭';
+        return ToolIcons.ellipseTool;
       case 'star':
-        return '★';
+        return ToolIcons.starTool;
       case 'polygon':
-        return '⬡';
+        return ToolIcons.polygonTool;
       case 'line':
-        return '╱';
+        return ToolIcons.lineTool;
       case 'polyline':
-        return '⎶';
+        return ToolIcons.polylineTool;
       case 'path':
-        return '🖋';
+        return ToolIcons.penTool;
       case 'g':
-        return '📁';
+        return ToolIcons.folder;
       default:
-        return '◆';
+        return ToolIcons.nodeTool;
     }
   }
 

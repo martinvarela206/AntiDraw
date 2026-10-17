@@ -1,6 +1,7 @@
 import { VectorElement, VectorModel, GradientConfig, GradientStop } from '../../engine/VectorModel.js';
 import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
 import { bindInspectorMouseDown } from './CanvasInspector.js';
+import { ToolIcons } from '../../icons/ToolIcons.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Bi-directional Conversion Between SVG Miter Limit and Degrees
@@ -125,7 +126,7 @@ export class AppearanceInspector {
             <div style="display: flex; gap: 4px; justify-content: space-between; align-items: center;">
               <button class="prop-input" id="btn-add-gradient-stop" style="cursor: pointer; width: auto; padding: 3px 8px; font-size: 10px; font-weight: 600;" title="Añadir parada de color">+ Parada</button>
               <button class="prop-input" id="btn-reverse-gradient" style="cursor: pointer; width: auto; padding: 3px 8px; font-size: 11px; font-weight: 600;" title="Invertir dirección del degradado">⇄ Invertir</button>
-              <button class="prop-input" id="btn-delete-gradient-stop" style="cursor: pointer; width: auto; padding: 3px 8px; font-size: 10px; color: #ef4444;" title="Eliminar parada activa" ${grad.stops.length <= 2 ? 'disabled' : ''}>🗑</button>
+              <button class="prop-input" id="btn-delete-gradient-stop" style="cursor: pointer; width: auto; padding: 3px 8px; font-size: 10px; color: #ef4444; display: inline-flex; align-items: center;" title="Eliminar parada activa" ${grad.stops.length <= 2 ? 'disabled' : ''}>${ToolIcons.trash}</button>
             </div>
           </div>
 
@@ -260,7 +261,7 @@ export class AppearanceInspector {
               <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
                 <span class="prop-label" style="width: auto; flex: 1; font-size: 11px;" title="Bloquear escala: el relleno escala con el vector. Desbloqueado: conserva dimensiones fijas en pantalla.">Escala</span>
                 <button class="prop-input" id="btn-lock-fill-scale" style="width: 28px; height: 24px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px;" title="${grad.lockScale !== false ? 'Escala bloqueada (acompaña al vector). Clic para desbloquear y mantener tamaño fijo.' : 'Escala desbloqueada (mantiene tamaño fijo en pantalla). Clic para bloquear.'}">
-                  ${grad.lockScale !== false ? '🔒' : '🔓'}
+                  ${grad.lockScale !== false ? ToolIcons.lock : ToolIcons.unlock}
                 </button>
                 <button class="prop-input" id="btn-reset-fill-scale" style="width: 28px; height: 24px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px;" title="Restablecer escala del relleno a las dimensiones del vector">
                   ⟲
@@ -271,7 +272,7 @@ export class AppearanceInspector {
               <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
                 <span class="prop-label" style="width: auto; flex: 1; font-size: 11px;" title="Bloquear posición: el relleno se traslada con el vector. Desbloqueado: permanece fijo en el lienzo.">Posición</span>
                 <button class="prop-input" id="btn-lock-fill-pos" style="width: 28px; height: 24px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px;" title="${grad.lockPosition !== false ? 'Posición bloqueada (acompaña al vector). Clic para desbloquear y fijar al lienzo.' : 'Posición desbloqueada (fijo en el lienzo). Clic para bloquear.'}">
-                  ${grad.lockPosition !== false ? '🔒' : '🔓'}
+                  ${grad.lockPosition !== false ? ToolIcons.lock : ToolIcons.unlock}
                 </button>
                 <button class="prop-input" id="btn-reset-fill-pos" style="width: 28px; height: 24px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px;" title="Recentrar posición del relleno en el centro del vector">
                   ⟲
@@ -282,7 +283,7 @@ export class AppearanceInspector {
               <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
                 <span class="prop-label" style="width: auto; flex: 1; font-size: 11px;" title="Bloquear rotación: el relleno gira con el vector. Desbloqueado: conserva orientación fija en el lienzo.">Rotación</span>
                 <button class="prop-input" id="btn-lock-fill-rot" style="width: 28px; height: 24px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px;" title="${grad.lockRotation !== false ? 'Rotación bloqueada (gira con el vector). Clic para desbloquear y fijar orientación al lienzo.' : 'Rotación desbloqueada (orientación fija en el lienzo). Clic para bloquear.'}">
-                  ${grad.lockRotation !== false ? '🔒' : '🔓'}
+                  ${grad.lockRotation !== false ? ToolIcons.lock : ToolIcons.unlock}
                 </button>
                 <button class="prop-input" id="btn-reset-fill-rot" style="width: 28px; height: 24px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px;" title="Restablecer rotación del relleno a 0° relativo al vector">
                   ⟲
@@ -765,7 +766,7 @@ export class AppearanceInspector {
       btnLockScale.addEventListener('click', () => {
         if (callbacks.onPushUndo) callbacks.onPushUndo();
         grad.lockScale = grad.lockScale !== false ? false : true;
-        btnLockScale.textContent = grad.lockScale ? '🔒' : '🔓';
+        btnLockScale.innerHTML = grad.lockScale ? ToolIcons.lock : ToolIcons.unlock;
         btnLockScale.title = grad.lockScale
           ? 'Escala bloqueada (acompaña al vector). Clic para desbloquear y mantener tamaño fijo.'
           : 'Escala desbloqueada (mantiene tamaño fijo en pantalla). Clic para bloquear.';
@@ -798,7 +799,7 @@ export class AppearanceInspector {
       btnLockPos.addEventListener('click', () => {
         if (callbacks.onPushUndo) callbacks.onPushUndo();
         grad.lockPosition = grad.lockPosition !== false ? false : true;
-        btnLockPos.textContent = grad.lockPosition ? '🔒' : '🔓';
+        btnLockPos.innerHTML = grad.lockPosition ? ToolIcons.lock : ToolIcons.unlock;
         btnLockPos.title = grad.lockPosition
           ? 'Posición bloqueada (acompaña al vector). Clic para desbloquear y fijar al lienzo.'
           : 'Posición desbloqueada (fijo en el lienzo). Clic para bloquear.';
@@ -834,7 +835,7 @@ export class AppearanceInspector {
       btnLockRot.addEventListener('click', () => {
         if (callbacks.onPushUndo) callbacks.onPushUndo();
         grad.lockRotation = grad.lockRotation !== false ? false : true;
-        btnLockRot.textContent = grad.lockRotation ? '🔒' : '🔓';
+        btnLockRot.innerHTML = grad.lockRotation ? ToolIcons.lock : ToolIcons.unlock;
         btnLockRot.title = grad.lockRotation
           ? 'Rotación bloqueada (gira con el vector). Clic para desbloquear y fijar orientación al lienzo.'
           : 'Rotación desbloqueada (orientación fija en el lienzo). Clic para bloquear.';

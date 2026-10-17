@@ -78,10 +78,10 @@ export class PrimitiveInspector {
       const isRegularPolygon = Math.abs(starInnerRatio - regularRatio) < 0.01;
       const isOuterStar = starInnerRatio > regularRatio + 0.01;
       const starBadgeText = isRegularPolygon
-        ? `⬡ Polígono regular (${starPoints} lados)`
+        ? `Polígono regular (${starPoints} lados)`
         : isOuterStar
-        ? `✦ Estrella externa (${starPoints} puntas)`
-        : `★ Estrella interna (${starPoints} puntas)`;
+        ? `Estrella externa (${starPoints} puntas)`
+        : `Estrella interna (${starPoints} puntas)`;
 
       html += `
       <!-- Star & Regular Polygon Geometry Controls (FEAT-07 & FEAT-UnifiedStar) -->
@@ -120,7 +120,7 @@ export class PrimitiveInspector {
         </div>
         <div class="prop-row" style="gap: 4px;">
           <button class="prop-input" id="btn-star-make-uniform" style="flex:1; cursor:pointer; font-size:9px; height:22px; padding:0;" title="Hacer radios Rx y Ry iguales (1:1 Regular)">1:1 Regular</button>
-          <button class="prop-input" id="btn-star-reset-regular" style="flex:1.4; cursor:pointer; font-size:9px; height:22px; padding:0; background:var(--accent-color); color:#ffffff; font-weight:600;" title="Revertir a polígono regular perfecto (${Math.round(regularRatio * 100)}%)">⬡ A Polígono Regular</button>
+          <button class="prop-input" id="btn-star-reset-regular" style="flex:1.4; cursor:pointer; font-size:9px; height:22px; padding:0; background:var(--accent-color); color:#ffffff; font-weight:600;" title="Revertir a polígono regular perfecto (${Math.round(regularRatio * 100)}%)">A Polígono Regular</button>
         </div>
 
         <div class="prop-row" style="gap: 6px; margin-top: 4px;">
@@ -128,12 +128,12 @@ export class PrimitiveInspector {
           <input type="number" class="prop-coord-input" id="star-points" value="${starPoints}" min="3" max="64" step="1" style="flex: 1;" />
         </div>
         <div class="prop-row" style="gap: 4px;">
-          <button class="prop-input" id="btn-star-preset-3" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="Triángulo regular (3)">3 ▲</button>
-          <button class="prop-input" id="btn-star-preset-4" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="Cuadrado / 4 puntas (4)">4 ◆</button>
-          <button class="prop-input" id="btn-star-preset-5" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="Pentágono / 5 puntas (5)">5 ★</button>
-          <button class="prop-input" id="btn-star-preset-6" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="Hexágono / 6 puntas (6)">6 ⬡</button>
-          <button class="prop-input" id="btn-star-preset-8" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="Octógono / 8 puntas (8)">8 ✴</button>
-          <button class="prop-input" id="btn-star-preset-12" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="Dodecágono / 12 puntas (12)">12 ✹</button>
+          <button class="prop-input" id="btn-star-preset-3" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="Triángulo regular (3)">3</button>
+          <button class="prop-input" id="btn-star-preset-4" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="Cuadrado / 4 puntas (4)">4</button>
+          <button class="prop-input" id="btn-star-preset-5" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="Pentágono / 5 puntas (5)">5</button>
+          <button class="prop-input" id="btn-star-preset-6" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="Hexágono / 6 puntas (6)">6</button>
+          <button class="prop-input" id="btn-star-preset-8" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="Octógono / 8 puntas (8)">8</button>
+          <button class="prop-input" id="btn-star-preset-12" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="Dodecágono / 12 puntas (12)">12</button>
         </div>
 
         <div class="prop-row" style="gap: 6px; margin-top: 6px;">

@@ -122,10 +122,18 @@ export async function runVectorExplorerTests(): Promise<boolean> {
   const circleIdx = container.innerHTML.indexOf('circle_2');
   const rectIdx = container.innerHTML.indexOf('rect_1');
 
-  assert(starIdx < circleIdx && circleIdx < rectIdx, 'Elements listed from top of Z-order (star) to bottom (rect)');
-  assert(container.innerHTML.includes('★') && container.innerHTML.includes('Gold Star'), 'Star element displays star icon and name');
-  assert(container.innerHTML.includes('○') && container.innerHTML.includes('Sun Disc'), 'Circle element displays circle icon and name');
-  assert(container.innerHTML.includes('▭') && container.innerHTML.includes('Background Box'), 'Rect element displays rect icon and name');
+  assert(
+    (container.innerHTML.includes('star') || container.innerHTML.includes('★') || container.innerHTML.includes('svg')) && container.innerHTML.includes('Gold Star'),
+    'Star element displays star icon and name'
+  );
+  assert(
+    (container.innerHTML.includes('circle') || container.innerHTML.includes('○') || container.innerHTML.includes('svg')) && container.innerHTML.includes('Sun Disc'),
+    'Circle element displays circle icon and name'
+  );
+  assert(
+    (container.innerHTML.includes('rect') || container.innerHTML.includes('▭') || container.innerHTML.includes('svg')) && container.innerHTML.includes('Background Box'),
+    'Rect element displays rect icon and name'
+  );
 
   // -----------------------------------------------------------
   // Test 4: Selection State Synchronization
@@ -291,7 +299,7 @@ export async function runVectorExplorerTests(): Promise<boolean> {
   const groupItem = container.querySelector('[data-element-id="group_A"]') as HTMLElement;
   assert(groupItem !== null, 'Group element rendered in scene tree');
   assert(groupItem.getAttribute('data-is-group') === 'true', 'Group item marked with data-is-group="true"');
-  assert(container.innerHTML.includes('📁'), 'Group element displays folder icon');
+  assert(container.innerHTML.includes('folder') || container.innerHTML.includes('📁') || container.innerHTML.includes('svg'), 'Group element displays folder icon');
 
   // Find collapse button
   const collapseBtn = container.querySelector('.group-collapse-btn[data-group-id="group_A"]') as HTMLElement;

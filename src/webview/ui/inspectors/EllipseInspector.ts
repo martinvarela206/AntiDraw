@@ -43,8 +43,8 @@ export class EllipseInspector {
     const ellipseInnerPct = Math.round(ellipseInnerRatio * 100);
 
     const badgeText = ellipseInnerRatio > 0
-      ? (ellipseType === 'pie' ? '◔ Rosca parcial' : '🍩 Rosca')
-      : (ellipseType === 'pie' ? '◔ Tarta' : ellipseType === 'arc' ? '◜ Arco' : isCircle ? '● Círculo' : '⬭ Elipse');
+      ? (ellipseType === 'pie' ? 'Rosca parcial' : 'Rosca')
+      : (ellipseType === 'pie' ? 'Sector' : ellipseType === 'arc' ? 'Arco' : isCircle ? 'Círculo' : 'Elipse');
 
     return `
       <!-- Ellipse / Circle Geometry Controls (FIX-19, FEAT-02 & FEAT-10) -->

@@ -2,6 +2,7 @@ import { VectorElement, VectorModel } from '../../engine/VectorModel.js';
 import { SelectionTool, BoundingBox } from '../../engine/SelectionTool.js';
 import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
 import { DistortInspectorControls } from './DistortInspectorControls.js';
+import { ToolIcons } from '../../icons/ToolIcons.js';
 
 /**
  * GeometryInspector
@@ -34,9 +35,9 @@ export class GeometryInspector {
         <div class="prop-row">
           <span class="prop-label">Modo</span>
           <div style="display:flex; gap:4px; flex:1;">
-            <button class="prop-input" id="btn-mode-move" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'move' ? 'background:#10b981; color:#ffffff;' : ''}" title="Modo Mover (W): Mover elementos y anclar vértices">✛ Mover</button>
-            <button class="prop-input" id="btn-mode-scale" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'scale' ? 'background:#6366f1; color:#ffffff;' : ''}" title="Modo Escalar (R): Redimensionar con 8 tiradores">⤡ Escalar</button>
-            <button class="prop-input" id="btn-mode-rotate" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'rotate' ? 'background:#8b5cf6; color:#ffffff;' : ''}" title="Modo Rotar (E): Girar elementos interactivamente">↻ Rotar</button>
+            <button class="prop-input" id="btn-mode-move" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'move' ? 'background:#10b981; color:#ffffff;' : ''}" title="Modo Mover (W): Mover elementos y anclar vértices">Mover</button>
+            <button class="prop-input" id="btn-mode-scale" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'scale' ? 'background:#6366f1; color:#ffffff;' : ''}" title="Modo Escalar (R): Redimensionar con 8 tiradores">Escalar</button>
+            <button class="prop-input" id="btn-mode-rotate" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'rotate' ? 'background:#8b5cf6; color:#ffffff;' : ''}" title="Modo Rotar (E): Girar elementos interactivamente">Rotar</button>
           </div>
         </div>
         <div class="prop-row" style="margin-top:2px;">
@@ -48,8 +49,8 @@ export class GeometryInspector {
         <div class="prop-row" style="margin-top:2px;">
           <span class="prop-label" style="font-size:11px;">Escalar</span>
           <div style="display:flex; gap:6px; flex:1; align-items:center;">
-            <button class="prop-input" id="btn-lock-scale-stroke" style="flex:1; padding:2px 4px; display:flex; justify-content:center; align-items:center; gap:4px; cursor:pointer; font-size:11px; ${selectionTool.scaleStroke ? 'background:var(--accent-color); color:#ffffff;' : 'background:transparent;'} border:1px solid var(--border-color);" title="Escalar grosor de trazo proporcionalmente al redimensionar (candado cerrado = escala, abierto = fijo)">${selectionTool.scaleStroke ? '🔒' : '🔓'} Trazo</button>
-            <button class="prop-input" id="btn-lock-scale-corners" style="flex:1; padding:2px 4px; display:flex; justify-content:center; align-items:center; gap:4px; cursor:pointer; font-size:11px; ${selectionTool.scaleCorners ? 'background:var(--accent-color); color:#ffffff;' : 'background:transparent;'} border:1px solid var(--border-color);" title="Escalar radios de esquinas paramétricas proporcionalmente al redimensionar (candado cerrado = escala, abierto = fijo)">${selectionTool.scaleCorners ? '🔒' : '🔓'} Esquinas</button>
+            <button class="prop-input" id="btn-lock-scale-stroke" style="flex:1; padding:2px 4px; display:flex; justify-content:center; align-items:center; gap:4px; cursor:pointer; font-size:11px; ${selectionTool.scaleStroke ? 'background:var(--accent-color); color:#ffffff;' : 'background:transparent;'} border:1px solid var(--border-color);" title="Escalar grosor de trazo proporcionalmente al redimensionar (candado cerrado = escala, abierto = fijo)">${selectionTool.scaleStroke ? ToolIcons.lock : ToolIcons.unlock} Trazo</button>
+            <button class="prop-input" id="btn-lock-scale-corners" style="flex:1; padding:2px 4px; display:flex; justify-content:center; align-items:center; gap:4px; cursor:pointer; font-size:11px; ${selectionTool.scaleCorners ? 'background:var(--accent-color); color:#ffffff;' : 'background:transparent;'} border:1px solid var(--border-color);" title="Escalar radios de esquinas paramétricas proporcionalmente al redimensionar (candado cerrado = escala, abierto = fijo)">${selectionTool.scaleCorners ? ToolIcons.lock : ToolIcons.unlock} Esquinas</button>
           </div>
         </div>
         <div class="prop-row">
@@ -61,7 +62,7 @@ export class GeometryInspector {
         <div class="prop-row">
           <span class="prop-label">W</span>
           <input type="number" step="any" class="prop-input" id="el-w" value="${w}" />
-          <button class="prop-input" id="btn-lock-aspect" style="width:30px; padding:2px; display:flex; justify-content:center; align-items:center; cursor:pointer; font-size:14px; background:${selectionTool.isAspectRatioLocked ? 'var(--accent-color)' : 'transparent'}; border:1px solid var(--border-color);" title="Bloquear proporción (W/H)">${selectionTool.isAspectRatioLocked ? '🔒' : '🔓'}</button>
+          <button class="prop-input" id="btn-lock-aspect" style="width:30px; padding:2px; display:flex; justify-content:center; align-items:center; cursor:pointer; font-size:14px; background:${selectionTool.isAspectRatioLocked ? 'var(--accent-color)' : 'transparent'}; border:1px solid var(--border-color);" title="Bloquear proporción (W/H)">${selectionTool.isAspectRatioLocked ? ToolIcons.lock : ToolIcons.unlock}</button>
           <span class="prop-label" style="width:20px; text-align:right;">H</span>
           <input type="number" step="any" class="prop-input" id="el-h" value="${h}" />
         </div>
@@ -100,11 +101,11 @@ export class GeometryInspector {
         </div>` : (detectedPrimitive ? `
         <div class="prop-row" style="margin-top: 6px; flex-direction: column; gap: 4px; background: rgba(16, 185, 129, 0.08); border: 1px dashed #10b981; border-radius: 4px; padding: 6px;">
           <div style="font-size: 10px; color: #10b981; font-weight: 600; display: flex; align-items: center; justify-content: space-between;">
-            <span>⚡ Primitiva detectada</span>
+            <span style="display:inline-flex; align-items:center; gap:4px;">${ToolIcons.lightning} Primitiva detectada</span>
             <span style="text-transform: uppercase; font-family: monospace;">&lt;${detectedPrimitive.primitive}${detectedPrimitive.attributes?.['data-ellipse-type'] ? ` (${detectedPrimitive.attributes['data-ellipse-type']})` : ''}&gt;</span>
           </div>
           <button class="prop-input" id="btn-simplify-to-primitive" style="cursor:pointer; background:#065f46; color:#a7f3d0; border:1px solid #10b981; font-weight:600; padding:5px; display:flex; align-items:center; justify-content:center; gap:6px; font-size:11px;" title="Simplificar trazado &lt;path&gt; a forma geométrica SVG canónica &lt;${detectedPrimitive.primitive}&gt;">
-            <span>⚡</span>
+            <span>${ToolIcons.lightning}</span>
             <span>Simplificar a &lt;${detectedPrimitive.primitive}${detectedPrimitive.attributes?.['data-ellipse-type'] ? ` (${detectedPrimitive.attributes['data-ellipse-type']})` : ''}&gt;</span>
           </button>
         </div>` : '')}

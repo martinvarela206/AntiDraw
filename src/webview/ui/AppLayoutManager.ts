@@ -98,7 +98,7 @@ export class AppLayoutManager {
             <button class="status-btn" id="status-grid-align-origin" title="Modo A: Línea o cruce de grilla coincidente con (0, 0)">┼ Línea (0,0)</button>
             <button class="status-btn" id="status-grid-align-center" title="Modo B: Snap al centro de cada celda de la grilla">◫ Celda (0,0)</button>
           </div>
-          <button class="status-btn" id="btn-recenter-viewbox" title="Recenter ViewBox / Camera (Artboard)">🎯 Recenter ViewBox</button>
+          <button class="status-btn" id="btn-recenter-viewbox" title="Recenter ViewBox / Camera (Artboard)">${ToolIcons.target} Recenter ViewBox</button>
           <span id="status-info">Ready</span>
           <button class="status-zoom-btn" id="status-zoom" title="Click to reset zoom to 100%">100%</button>
         </div>

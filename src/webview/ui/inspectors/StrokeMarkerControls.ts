@@ -1,5 +1,6 @@
 import { VectorElement, VectorModel } from '../../engine/VectorModel.js';
 import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
+import { ToolIcons } from '../../icons/ToolIcons.js';
 
 export interface StrokeMarkerProps {
   markerStart: string;
@@ -63,10 +64,10 @@ export class StrokeMarkerControls {
       return `
         <div class="prop-row" style="flex-direction:column; align-items:stretch; background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:4px; padding:6px 8px; gap:6px; margin-top:4px;">
           <div style="font-size:10px; color:var(--text-muted); line-height:1.35;">
-            ℹ️ Las figuras SVG cerradas (&lt;${shapeTagName || 'figura'}&gt;) no admiten marcadores en el estándar SVG W3C. Para añadir flechas o terminales, convierte la figura a vector.
+            Las figuras SVG cerradas (&lt;${shapeTagName || 'figura'}&gt;) no admiten marcadores en el estándar SVG W3C. Para añadir flechas o terminales, convierte la figura a vector.
           </div>
-          <button type="button" class="prop-input" id="btn-convert-for-markers" style="cursor:pointer; background:var(--accent-color); color:#fff; font-weight:600; padding:4px 8px; text-align:center; font-size:11px;" title="Convertir a trazado Bézier editable para admitir flechas y marcadores">
-            ⚡ Convertir a Curvas para Flechas
+          <button type="button" class="prop-input" id="btn-convert-for-markers" style="cursor:pointer; background:var(--accent-color); color:#fff; font-weight:600; padding:4px 8px; text-align:center; font-size:11px; display:inline-flex; align-items:center; justify-content:center; gap:6px;" title="Convertir a trazado Bézier editable para admitir flechas y marcadores">
+            ${ToolIcons.lightning} Convertir a Curvas para Flechas
           </button>
         </div>
       `;

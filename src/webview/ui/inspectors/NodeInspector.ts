@@ -55,7 +55,7 @@ export class NodeInspector {
         ${isParametric ? `
         <div style="margin-bottom: 8px; padding: 6px 8px; background: rgba(59, 130, 246, 0.08); border: 1px dashed rgba(59, 130, 246, 0.3); border-radius: 4px;">
           <button class="prop-input" id="btn-convert-to-curves-node" style="cursor:pointer; background:var(--accent-color, #3b82f6); color:#fff; border:none; border-radius:4px; padding:5px 8px; font-weight:600; font-size:11px; display:flex; align-items:center; justify-content:center; gap:6px; width:100%;" title="Convertir primitiva <${el.shapeType || el.tagName}> a trazado libre <path> (Ctrl+Q)">
-            <span>⚡</span>
+            <span>${ToolIcons.lightning}</span>
             <span>Convertir a Curvas de Bézier</span>
           </button>
           <div style="font-size:10px; color:var(--text-muted, #94a3b8); margin-top:4px; line-height:1.3; text-align:center;">
@@ -86,11 +86,11 @@ export class NodeInspector {
               ⟳ Auto-Cerrar Curva (Z)
             </button>
           ` : `
-            <div style="font-size:11px; color:var(--text-muted); text-align:center; padding: 3px 0;">✓ Contorno cerrado (Z)</div>
+            <div style="font-size:11px; color:var(--text-muted); text-align:center; padding: 3px 0; display:flex; align-items:center; justify-content:center; gap:6px;">${ToolIcons.check} Contorno cerrado (Z)</div>
           `}
           ${isMulti ? `
-          <button class="prop-input" id="btn-join-nodes" style="cursor:${isParametric ? 'not-allowed' : 'pointer'}; background:var(--bg-active); text-align:center; font-weight:600; color:var(--text-primary); ${isParametric ? 'opacity: 0.35; filter: grayscale(1); pointer-events: none;' : ''}" ${isParametric ? 'disabled' : ''} title="${isParametric ? 'Requiere convertir a curvas de Bézier' : 'Unir y soldar vértices coincidentes (Ctrl+J)'}">
-            ⛙ Unir Nodos (Ctrl+J)
+          <button class="prop-input" id="btn-join-nodes" style="cursor:${isParametric ? 'not-allowed' : 'pointer'}; background:var(--bg-active); text-align:center; font-weight:600; color:var(--text-primary); display:inline-flex; align-items:center; justify-content:center; gap:6px; ${isParametric ? 'opacity: 0.35; filter: grayscale(1); pointer-events: none;' : ''}" ${isParametric ? 'disabled' : ''} title="${isParametric ? 'Requiere convertir a curvas de Bézier' : 'Unir y soldar vértices coincidentes (Ctrl+J)'}">
+            ${ToolIcons.joinNodes} Unir Nodos (Ctrl+J)
           </button>
           ` : `
           <button class="prop-input" id="btn-split-node" style="cursor:${isParametric ? 'not-allowed' : 'pointer'}; background:var(--bg-active); text-align:center; ${isParametric ? 'opacity: 0.35; filter: grayscale(1); pointer-events: none;' : ''}" ${isParametric ? 'disabled' : ''} title="${isParametric ? 'Requiere convertir a curvas de Bézier' : 'Split Node into 2 Vertices'}">

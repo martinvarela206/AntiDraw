@@ -19,6 +19,7 @@ import { ContextMenu } from '../ui/ContextMenu.js';
 import { ToolSuite } from '../tools/ToolFactory.js';
 import { ToastNotification } from '../ui/ToastNotification.js';
 import { VsCodeBridge } from '../bridge/VsCodeBridge.js';
+import { ToolIcons } from '../icons/ToolIcons.js';
 
 export interface CanvasInteractionContext {
   model: VectorModel;
@@ -184,7 +185,10 @@ export class CanvasInteractionController implements CanvasViewDelegate {
       const statusInfo = document.getElementById('status-info');
       if (statusInfo) {
         const prevText = statusInfo.innerText;
-        statusInfo.innerText = `⚠️ Recuperado de error (${phase})`;
+        statusInfo.innerText = `Recuperado de error (${phase})`;
+        try {
+          statusInfo.innerHTML = `<span style="display:inline-flex; align-items:center; gap:4px;">${ToolIcons.warning} Recuperado de error (${phase})</span>`;
+        } catch (_) {}
         statusInfo.style.color = '#f59e0b';
         setTimeout(() => {
           statusInfo.innerText = prevText || 'Ready';

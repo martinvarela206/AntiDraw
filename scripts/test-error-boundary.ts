@@ -242,7 +242,7 @@ export async function runErrorBoundaryTests(): Promise<boolean> {
 
   const statusEl = document.getElementById('status-info');
   assert(
-    statusEl !== null && statusEl.innerText.includes('⚠️'),
+    statusEl !== null && (statusEl.innerText.includes('Recuperado de error') || statusEl.innerText.includes('⚠️')),
     'Status bar telemetry reflects graceful recovery notice'
   );
 

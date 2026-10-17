@@ -6,6 +6,7 @@ import { StrokeMarkerControls } from './StrokeMarkerControls.js';
 import { StrokeLayersControls } from './StrokeLayersControls.js';
 import { DashCornerAligner } from '../../engine/geometry/DashCornerAligner.js';
 import { SpineCurveService } from '../../engine/stroke/SpineCurveService.js';
+import { ToolIcons } from '../../icons/ToolIcons.js';
 
 export interface StrokeInspectorProps {
   stroke: string;
@@ -191,7 +192,7 @@ export class StrokeInspector {
                     <span id="label-sketch-rough" style="width:24px; text-align:right; font-variant-numeric:tabular-nums; font-size:9.5px;">${Math.round(sketchRough * 100)}%</span>
                   </div>
                 </div>
-                <button type="button" class="prop-input" id="btn-sketch-reseed" style="cursor:pointer; font-size:9.5px; padding:2px 4px; margin-top:2px; text-align:center;" title="Re-generar semilla de modulación orgánica">🎲 Re-sembrar variación</button>
+                <button type="button" class="prop-input" id="btn-sketch-reseed" style="cursor:pointer; font-size:9.5px; padding:2px 4px; margin-top:2px; text-align:center; display:inline-flex; align-items:center; justify-content:center; gap:4px;" title="Re-generar semilla de modulación orgánica">${ToolIcons.dice} Re-sembrar variación</button>
               </div>
             ` : ''}
           </div>

@@ -1,3 +1,5 @@
+import { ToolIcons } from '../icons/ToolIcons.js';
+
 export interface SafeguardModalOptions {
   totalPoints: number;
   computationTimeMs: number;
@@ -35,7 +37,7 @@ export class ContextualGridModal {
     titleEl.className = 'ad-modal-title';
     titleEl.innerHTML = `
       <span style="display:flex; align-items:center; gap:8px; color:#f59e0b; font-weight:600;">
-        ⚠️ Rendimiento: Grilla Vectorial Densa
+        ${ToolIcons.warning} Rendimiento: Grilla Vectorial Densa
       </span>
     `;
 
@@ -62,7 +64,7 @@ export class ContextualGridModal {
     visualBtn.style.fontWeight = '600';
     visualBtn.style.padding = '8px 12px';
     visualBtn.style.textAlign = 'center';
-    visualBtn.textContent = '👁 Continuar como referencia visual sin snap';
+    visualBtn.innerHTML = `<span style="display:inline-flex; align-items:center; justify-content:center; gap:6px;">${ToolIcons.eye} Continuar como referencia visual sin snap</span>`;
     visualBtn.onclick = () => {
       this.close();
       options.onContinueVisualOnly();
@@ -76,7 +78,7 @@ export class ContextualGridModal {
     undoBtn.style.fontWeight = '500';
     undoBtn.style.padding = '8px 12px';
     undoBtn.style.textAlign = 'center';
-    undoBtn.textContent = '↩ Deshacer conversión';
+    undoBtn.innerHTML = `<span style="display:inline-flex; align-items:center; justify-content:center; gap:6px;">${ToolIcons.undo} Deshacer conversión</span>`;
     undoBtn.onclick = () => {
       this.close();
       options.onUndo();

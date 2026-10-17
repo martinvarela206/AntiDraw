@@ -18,26 +18,36 @@ import AlignLeftSvg from '../../assets/icons/align_left.svg';
 import AlignMiddleSvg from '../../assets/icons/align_middle.svg';
 import AlignRightSvg from '../../assets/icons/align_right.svg';
 import AlignTopSvg from '../../assets/icons/align_top.svg';
+import BlendSvg from '../../assets/icons/blend.svg';
 import BringForwardSvg from '../../assets/icons/bring_forward.svg';
 import BringFrontSvg from '../../assets/icons/bring_front.svg';
 import CanvasToolSvg from '../../assets/icons/canvas_tool.svg';
+import CheckSvg from '../../assets/icons/check.svg';
 import ChevronDownSvg from '../../assets/icons/chevron_down.svg';
 import CircleToolSvg from '../../assets/icons/circle_tool.svg';
+import CloseSvg from '../../assets/icons/close.svg';
 import CombineSvg from '../../assets/icons/combine.svg';
+import DiceSvg from '../../assets/icons/dice.svg';
 import EllipseToolSvg from '../../assets/icons/ellipse_tool.svg';
 import EraserToolSvg from '../../assets/icons/eraser_tool.svg';
 import ExcludeSvg from '../../assets/icons/exclude.svg';
+import EyeSvg from '../../assets/icons/eye.svg';
+import EyeOffSvg from '../../assets/icons/eye_off.svg';
 import FlipHorizontalSvg from '../../assets/icons/flip_horizontal.svg';
 import FlipVerticalSvg from '../../assets/icons/flip_vertical.svg';
+import FolderSvg from '../../assets/icons/folder.svg';
 import FragmentSvg from '../../assets/icons/fragment.svg';
 import GridVisibilitySvg from '../../assets/icons/grid_visibility.svg';
 import GuideDoubleArrowVerticalLeftRotateSvg from '../../assets/icons/guide_double_arrow_vertical_left_rotate.svg';
 import GuideDoubleArrowVerticalRightRotateSvg from '../../assets/icons/guide_double_arrow_vertical_right_rotate.svg';
 import GuidesVisibilitySvg from '../../assets/icons/guides_visibility.svg';
 import IntersectSvg from '../../assets/icons/intersect.svg';
+import JoinNodesSvg from '../../assets/icons/join_nodes.svg';
 import KnifeToolSvg from '../../assets/icons/knife_tool.svg';
 import LayersSvg from '../../assets/icons/layers.svg';
+import LightningSvg from '../../assets/icons/lightning.svg';
 import LineToolSvg from '../../assets/icons/line_tool.svg';
+import LockSvg from '../../assets/icons/lock.svg';
 import LockGuidesSvg from '../../assets/icons/lock_guides.svg';
 import NodeAsymmetricSvg from '../../assets/icons/node_asymmetric.svg';
 import NodeSharpSvg from '../../assets/icons/node_sharp.svg';
@@ -68,9 +78,13 @@ import SplitNodeSvg from '../../assets/icons/split_node.svg';
 import StarToolSvg from '../../assets/icons/star_tool.svg';
 import StrokeToolSvg from '../../assets/icons/stroke_tool.svg';
 import SubtractSvg from '../../assets/icons/subtract.svg';
+import TargetSvg from '../../assets/icons/target.svg';
+import TrashSvg from '../../assets/icons/trash.svg';
 import UndoSvg from '../../assets/icons/undo.svg';
 import UnionSvg from '../../assets/icons/union.svg';
+import UnlockSvg from '../../assets/icons/unlock.svg';
 import UnlockGuidesSvg from '../../assets/icons/unlock_guides.svg';
+import WarningSvg from '../../assets/icons/warning.svg';
 import ZoomToolSvg from '../../assets/icons/zoom_tool.svg';
 
 export const ICONS = {
@@ -81,26 +95,36 @@ export const ICONS = {
   alignMiddle: AlignMiddleSvg,
   alignRight: AlignRightSvg,
   alignTop: AlignTopSvg,
+  blend: BlendSvg,
   bringForward: BringForwardSvg,
   bringFront: BringFrontSvg,
   canvasTool: CanvasToolSvg,
+  check: CheckSvg,
   chevronDown: ChevronDownSvg,
   circleTool: CircleToolSvg,
+  close: CloseSvg,
   combine: CombineSvg,
+  dice: DiceSvg,
   ellipseTool: EllipseToolSvg,
   eraserTool: EraserToolSvg,
   exclude: ExcludeSvg,
+  eye: EyeSvg,
+  eyeOff: EyeOffSvg,
   flipHorizontal: FlipHorizontalSvg,
   flipVertical: FlipVerticalSvg,
+  folder: FolderSvg,
   fragment: FragmentSvg,
   gridVisibility: GridVisibilitySvg,
   guideDoubleArrowVerticalLeftRotate: GuideDoubleArrowVerticalLeftRotateSvg,
   guideDoubleArrowVerticalRightRotate: GuideDoubleArrowVerticalRightRotateSvg,
   guidesVisibility: GuidesVisibilitySvg,
   intersect: IntersectSvg,
+  joinNodes: JoinNodesSvg,
   knifeTool: KnifeToolSvg,
   layers: LayersSvg,
+  lightning: LightningSvg,
   lineTool: LineToolSvg,
+  lock: LockSvg,
   lockGuides: LockGuidesSvg,
   nodeAsymmetric: NodeAsymmetricSvg,
   nodeSharp: NodeSharpSvg,
@@ -131,9 +155,13 @@ export const ICONS = {
   starTool: StarToolSvg,
   strokeTool: StrokeToolSvg,
   subtract: SubtractSvg,
+  target: TargetSvg,
+  trash: TrashSvg,
   undo: UndoSvg,
   union: UnionSvg,
+  unlock: UnlockSvg,
   unlockGuides: UnlockGuidesSvg,
+  warning: WarningSvg,
   zoomTool: ZoomToolSvg,
   select: SelectToolSvg,
   stroke: StrokeToolSvg,

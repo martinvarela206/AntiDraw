@@ -203,8 +203,17 @@ body {
   border-bottom-color: #ffffff;
 }
 
+.btn-drawer-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .tool-drawer-flyout {
-  position: fixed;
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 0;
   background-color: var(--bg-panel);
   border: 1px solid var(--border-color);
   border-radius: 8px;
@@ -214,6 +223,7 @@ body {
   gap: 4px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.08);
   z-index: 99999;
+  white-space: nowrap;
   animation: flyoutFadeIn 0.12s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -622,6 +632,19 @@ body {
   border-radius: 4px;
   line-height: 1;
   transition: background-color 0.1s ease, color 0.1s ease;
+}
+
+.tree-item-icon svg {
+  width: 14px;
+  height: 14px;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.tree-action-btn svg {
+  width: 13px;
+  height: 13px;
+  display: block;
 }
 
 .tree-action-btn:hover {

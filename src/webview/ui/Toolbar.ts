@@ -118,7 +118,7 @@ export class Toolbar {
 
     this.activeTool = tool;
     this.openDrawerId = null;
-    document.querySelectorAll('.tool-drawer-flyout').forEach((el) => el.remove());
+    document.querySelectorAll('.tool-drawer-flyout').forEach((el) => el.remove?.());
     this.render();
     this.onToolChangeCallback(tool);
   }
@@ -126,7 +126,7 @@ export class Toolbar {
   public deselectAll(): void {
     this.activeTool = '' as any;
     this.openDrawerId = null;
-    document.querySelectorAll('.tool-drawer-flyout').forEach((el) => el.remove());
+    document.querySelectorAll('.tool-drawer-flyout').forEach((el) => el.remove?.());
     this.render();
   }
 
@@ -138,7 +138,7 @@ export class Toolbar {
   public closeDrawers(): void {
     if (this.openDrawerId !== null) {
       this.openDrawerId = null;
-      document.querySelectorAll('.tool-drawer-flyout').forEach((el) => el.remove());
+      document.querySelectorAll('.tool-drawer-flyout').forEach((el) => el.remove?.());
       this.render();
     }
   }
@@ -310,7 +310,7 @@ export class Toolbar {
 
         // Render flyout if open
         if (isOpen) {
-          document.querySelectorAll('.tool-drawer-flyout').forEach((el) => el.remove());
+          document.querySelectorAll('.tool-drawer-flyout').forEach((el) => el.remove?.());
 
           const flyout = document.createElement('div');
           flyout.className = 'tool-drawer-flyout';
@@ -337,16 +337,7 @@ export class Toolbar {
             flyout.appendChild(childBtn);
           });
 
-          // Measure mainBtn to position fixed flyout outside any scroll clipping
-          setTimeout(() => {
-            const rect = mainBtn.getBoundingClientRect();
-            flyout.style.position = 'fixed';
-            flyout.style.left = `${Math.round(rect.right + 6)}px`;
-            flyout.style.top = `${Math.round(rect.top)}px`;
-            flyout.style.zIndex = '99999';
-          }, 0);
-
-          document.body.appendChild(flyout);
+          wrapper.appendChild(flyout);
         }
 
         this.container.appendChild(wrapper);

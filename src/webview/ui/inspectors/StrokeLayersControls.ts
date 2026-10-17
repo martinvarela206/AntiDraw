@@ -1,6 +1,7 @@
 import { VectorElement } from '../../engine/VectorModel.js';
 import { AppearanceStackManager, StrokeLayer } from '../../engine/appearance/AppearanceStackManager.js';
 import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
+import { ToolIcons } from '../../icons/ToolIcons.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Modular Multi-Stroke Layer Controls (StrokeLayersControls)
@@ -43,7 +44,7 @@ export class StrokeLayersControls {
                       <option value="below" ${l.position === 'below' ? 'selected' : ''}>Debajo</option>
                       <option value="above" ${l.position === 'above' ? 'selected' : ''}>Encima</option>
                     </select>
-                    <button type="button" class="btn-remove-stroke-layer" data-layer-id="${l.id}" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:11px; padding:0 3px;" title="Eliminar capa de trazo">✕</button>
+                    <button type="button" class="btn-remove-stroke-layer" data-layer-id="${l.id}" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:11px; padding:0 3px; display:inline-flex; align-items:center;" title="Eliminar capa de trazo">${ToolIcons.close}</button>
                   </div>
                 </div>
 

@@ -42,8 +42,14 @@ export async function runToolbarTopologyDrawersTests(): Promise<boolean> {
       },
       hasAttribute: (k: string) => k in attrs,
       appendChild: (child: any) => {
+        child.parentElement = el;
         el.children.push(child);
         return child;
+      },
+      remove: () => {
+        if (el.parentElement) {
+          el.parentElement.children = el.parentElement.children.filter((c: any) => c !== el);
+        }
       },
       addEventListener: (evt: string, cb: Function) => {
         if (!listeners[evt]) listeners[evt] = [];
@@ -105,6 +111,26 @@ export async function runToolbarTopologyDrawersTests(): Promise<boolean> {
   }
 
   const container = createMockElement('div');
+  (globalThis as any).document = {
+    createElement: (tag: string) => createMockElement(tag),
+    querySelectorAll: (selector: string) => container.querySelectorAll(selector),
+    querySelector: (selector: string) => container.querySelector(selector),
+  };
+  const windowListeners: Record<string, Function[]> = {};
+  (globalThis as any).window = {
+    addEventListener: (evt: string, cb: Function) => {
+      if (!windowListeners[evt]) windowListeners[evt] = [];
+      windowListeners[evt].push(cb);
+    },
+    removeEventListener: (evt: string, cb: Function) => {
+      if (windowListeners[evt]) windowListeners[evt] = windowListeners[evt].filter((l) => l !== cb);
+    },
+    dispatchEvent: (e: any) => {
+      const list = windowListeners[e.type] || [];
+      for (const fn of list) fn(e);
+      return true;
+    },
+  };
   let changedTool: ToolType | null = null;
   const toolbar = new Toolbar(
     container,
