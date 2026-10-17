@@ -144,6 +144,19 @@ export interface Translations {
     noSelectionTitle: string;
     noSelectionHint: string;
 
+    // Root SVG Attributes
+    rootFill: string;
+    rootStroke: string;
+    rootWidth: string;
+    linecap: string;
+    linejoin: string;
+    rootFillTooltip: string;
+    rootStrokeTooltip: string;
+    rootWidthTooltip: string;
+    linecapTooltip: string;
+    linejoinTooltip: string;
+    undefinedDefault: string;
+
     // Mode & Transform
     mode: string;
     modeMove: string;

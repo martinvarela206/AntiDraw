@@ -31,3 +31,8 @@
   3. **`package.json`**: Verificar coherencia total entre la versión declarada, scripts y metadatos.
   4. **Documentación Técnica en `Docs/`**: Toda modificación en herramientas, atajos, parámetros o flujos debe quedar reflejada en `Descripción de las herramientas.md`, `Catálogo de Iconos y Herramientas.md`, guías operativas y `Docs/TODO.md`, completando su propio commit atómico en el sub-repositorio `AntiDraw-Docs` antes o en simultáneo.
   5. **Empaquetado Inmediato**: Finalizado el commit de código y documentación sincronizada, ejecutar sin excepción `pnpm run package` para generar el artefacto VSIX correspondiente.
+
+## 7. Sincronización Bilingüe Obligatoria en Correcciones y Textos (i18n Espejado)
+- **Paridad Obligatoria Español-Inglés:** Cualquier adición, modificación o corrección de textos en la interfaz de usuario, cadenas de internacionalización (`src/webview/i18n/es.ts`), mensajes de error, tooltips o documentación técnica que se realice en español debe realizarse **estricta y simétricamente en inglés** (`src/webview/i18n/en.ts`), y viceversa.
+- **Prohibición de Textos Huérfanos o Asimétricos:** No se permite introducir cadenas hardcodeadas en un solo idioma ni actualizar las claves de traducción de un archivo de localización sin reflejar de inmediato su contraparte exacta con su tipado correspondiente en `types.ts`.
+- **Escape de Caracteres HTML en Textos de UI:** Al incluir referencias a etiquetas o elementos sintácticos (como `<svg>`, `<div>`, etc.) en cadenas de traducción que se renderizan mediante `innerHTML`, es obligatorio usar entidades HTML (`&lt;svg&gt;`) para evitar que el motor del navegador los interprete como elementos del DOM provocando deformaciones de layout o renderizados vacíos.

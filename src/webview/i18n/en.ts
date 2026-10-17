@@ -115,7 +115,7 @@ export const en: Translations = {
     canvasProps: 'Canvas & ViewBox Bounds',
     viewboxScaling: 'ViewBox & Scaling',
     currentColorView: 'Context Color (currentColor)',
-    rootSvgAttrs: 'Root SVG Attributes (<svg>)',
+    rootSvgAttrs: 'Root SVG Attributes (&lt;svg&gt;)',
     artboardBackground: 'Artboard Background Color',
     geometry: 'Geometry & Transform',
     transform: 'Transform',
@@ -135,6 +135,19 @@ export const en: Translations = {
   inspector: {
     noSelectionTitle: 'No Selection',
     noSelectionHint: 'Select an object on the canvas to inspect its properties, or click "Canvas" in the status bar to configure canvas & viewBox bounds.',
+
+    // Root SVG Attributes
+    rootFill: 'Root Fill',
+    rootStroke: 'Root Stroke',
+    rootWidth: 'Root Width',
+    linecap: 'Linecap',
+    linejoin: 'Linejoin',
+    rootFillTooltip: 'Default fill for root <svg>',
+    rootStrokeTooltip: 'Default stroke for root <svg>',
+    rootWidthTooltip: 'Default stroke-width for root <svg>',
+    linecapTooltip: 'Default stroke-linecap for root <svg>',
+    linejoinTooltip: 'Default stroke-linejoin for root <svg>',
+    undefinedDefault: 'Undefined (default)',
 
     // Mode & Transform
     mode: 'Mode',

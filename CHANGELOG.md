@@ -3,6 +3,18 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.87.3] - 2026-10-17
+
+### 🛠️ Fixed
+- **Property Panel Void & Truncated Header Fix**: Fixed an issue where unescaped `<svg>` characters in `panels.rootSvgAttrs` translation strings caused the browser's DOM parser to instantiate an unclosed, native 300×150px `<svg>` canvas element directly inside the Property Panel, truncating the title to `"ATRIBUTOS RAÍZ SVG ("` and pushing the properties controls down with a large empty gap.
+- **HTML Entity Escaping**: Properly escaped `<svg>` to `&lt;svg&gt;` in both English and Spanish localization dictionaries (`rootSvgAttrs`).
+- **Complete Root SVG Attribute Localization**: Localized all inner attribute labels and tooltips in `CanvasInspector` (`rootFill`, `rootStroke`, `rootWidth`, `linecap`, `linejoin`, `undefinedDefault`, and all explanatory tooltips).
+
+### 📋 Governance & Rules
+- **Rule 7 (AntiDraw) & Rule 5 (AntiDraw-Docs) Added**: Enforced mandatory bilingual synchronization—any text correction, addition, or copy update made in Spanish must strictly and symmetrically be reflected in English (and vice versa) across all localization dictionaries, tooltips, and documentation.
+
+---
+
 ## [0.87.2] - 2026-10-17
 
 ### 🛠️ Fixed

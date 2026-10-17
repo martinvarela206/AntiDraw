@@ -139,30 +139,30 @@ export class CanvasInspector {
       <div class="panel-section">
         <div class="panel-title">${I18nService.t('panels.rootSvgAttrs')}</div>
         <div class="prop-row">
-          <span class="prop-label" title="Default fill for root <svg>">Root Fill</span>
+          <span class="prop-label" title="${I18nService.t('inspector.rootFillTooltip')}">${I18nService.t('inspector.rootFill')}</span>
           <input type="text" class="prop-input" id="canvas-svg-fill" value="${canvas.svgFill || ''}" placeholder="none, currentColor, #hex" />
         </div>
         <div class="prop-row">
-          <span class="prop-label" title="Default stroke for root <svg>">Root Stroke</span>
+          <span class="prop-label" title="${I18nService.t('inspector.rootStrokeTooltip')}">${I18nService.t('inspector.rootStroke')}</span>
           <input type="text" class="prop-input" id="canvas-svg-stroke" value="${canvas.svgStroke || ''}" placeholder="none, currentColor, #hex" />
         </div>
         <div class="prop-row">
-          <span class="prop-label" title="Default stroke-width for root <svg>">Root Width</span>
+          <span class="prop-label" title="${I18nService.t('inspector.rootWidthTooltip')}">${I18nService.t('inspector.rootWidth')}</span>
           <input type="number" class="prop-input" id="canvas-svg-strokewidth" value="${canvas.svgStrokeWidth || ''}" min="0" step="0.5" placeholder="1.5" />
         </div>
         <div class="prop-row">
-          <span class="prop-label" title="Default stroke-linecap for root <svg>">Linecap</span>
+          <span class="prop-label" title="${I18nService.t('inspector.linecapTooltip')}">${I18nService.t('inspector.linecap')}</span>
           <select class="prop-input" id="canvas-svg-linecap" style="cursor:pointer;">
-            <option value="" ${!canvas.svgStrokeLinecap ? 'selected' : ''}>${isEs ? 'Sin definir (por defecto)' : 'Undefined (default)'}</option>
+            <option value="" ${!canvas.svgStrokeLinecap ? 'selected' : ''}>${I18nService.t('inspector.undefinedDefault')}</option>
             <option value="butt" ${canvas.svgStrokeLinecap === 'butt' ? 'selected' : ''}>butt</option>
             <option value="round" ${canvas.svgStrokeLinecap === 'round' ? 'selected' : ''}>round</option>
             <option value="square" ${canvas.svgStrokeLinecap === 'square' ? 'selected' : ''}>square</option>
           </select>
         </div>
         <div class="prop-row">
-          <span class="prop-label" title="Default stroke-linejoin for root <svg>">Linejoin</span>
+          <span class="prop-label" title="${I18nService.t('inspector.linejoinTooltip')}">${I18nService.t('inspector.linejoin')}</span>
           <select class="prop-input" id="canvas-svg-linejoin" style="cursor:pointer;">
-            <option value="" ${!canvas.svgStrokeLinejoin ? 'selected' : ''}>${isEs ? 'Sin definir (por defecto)' : 'Undefined (default)'}</option>
+            <option value="" ${!canvas.svgStrokeLinejoin ? 'selected' : ''}>${I18nService.t('inspector.undefinedDefault')}</option>
             <option value="miter" ${canvas.svgStrokeLinejoin === 'miter' ? 'selected' : ''}>miter</option>
             <option value="round" ${canvas.svgStrokeLinejoin === 'round' ? 'selected' : ''}>round</option>
             <option value="bevel" ${canvas.svgStrokeLinejoin === 'bevel' ? 'selected' : ''}>bevel</option>

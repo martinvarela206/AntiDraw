@@ -115,7 +115,7 @@ export const es: Translations = {
     canvasProps: 'Lienzo & Tamaño de ViewBox',
     viewboxScaling: 'ViewBox & Escalado',
     currentColorView: 'Color de Contexto (currentColor)',
-    rootSvgAttrs: 'Atributos Raíz SVG (<svg>)',
+    rootSvgAttrs: 'Atributos Raíz SVG (&lt;svg&gt;)',
     artboardBackground: 'Fondo del Lienzo (Artboard)',
     geometry: 'Geometría y Transformación',
     transform: 'Transformar',
@@ -135,6 +135,19 @@ export const es: Translations = {
   inspector: {
     noSelectionTitle: 'Sin Selección',
     noSelectionHint: 'Selecciona un objeto en el lienzo para inspeccionar sus propiedades, o haz clic en "Lienzo" en la barra de estado para configurar el lienzo y viewBox.',
+
+    // Root SVG Attributes
+    rootFill: 'Relleno Raíz',
+    rootStroke: 'Trazo Raíz',
+    rootWidth: 'Grosor Raíz',
+    linecap: 'Remate (Linecap)',
+    linejoin: 'Unión (Linejoin)',
+    rootFillTooltip: 'Relleno por defecto para el tag <svg> raíz',
+    rootStrokeTooltip: 'Trazo por defecto para el tag <svg> raíz',
+    rootWidthTooltip: 'Grosor de trazo por defecto para el tag <svg> raíz',
+    linecapTooltip: 'Remate de línea por defecto para el tag <svg> raíz',
+    linejoinTooltip: 'Unión de línea por defecto para el tag <svg> raíz',
+    undefinedDefault: 'Sin definir (por defecto)',
 
     // Mode & Transform
     mode: 'Modo',
