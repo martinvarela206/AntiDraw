@@ -100,6 +100,11 @@ Frontend developers, UI engineers, and technical designers constantly face a pai
 * **Parametric Blend Tool**: Morphological and chromatic interpolation between vectors with twist-correction inversion.
 * **Warp & Distort Engine**: Concentric circular arc deformation without polygon breakdown.
 
+### 🌐 8. Native Bilingual Architecture (i18n) & Refined UI
+* **Instant Bilingual Switching**: 1-click live toggle between English (<kbd>EN</kbd>) and Spanish (<kbd>ES</kbd>) from the status bar with zero editor reloads.
+* **Universal Coverage**: All property panels, tooltips, shortcuts cheatsheet, and floating Mini-HUD adapt instantaneously to the chosen language.
+* **100% Crisp Vector Iconography**: Slenderized `1.4px` precision stroke geometry, eliminating emojis in favor of professional technical SVG design.
+
 ---
 
 ## ⌨️ Essential Keyboard Shortcuts

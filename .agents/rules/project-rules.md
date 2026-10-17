@@ -23,3 +23,11 @@
 ## 5. Prohibición de Límites Arbitrarios de Líneas de Código (Anti-Sobreingeniería)
 - **Prohibido el Conteo y Restricciones Numéricas de Líneas:** Queda terminantemente PROHIBIDO imponer límites artificiales (ej. `< 350 líneas`), ejecutar comandos de conteo de líneas o fraccionar archivos/clases cohesionadas por motivos de tamaño.
 - **Cohesión sobre Fragmentación:** Se prioriza la cohesión funcional, la claridad y la arquitectura unificada frente a divisiones arbitrarias que dispersen el código y provoquen sobreingeniería innecesaria.
+
+## 6. Sincronización Pre-Commit Obligatoria de Documentación, README y Changelog
+- **Prohibición de Commits Huérfanos de Documentación:** Antes de ejecutar cualquier commit que incorpore nuevas características, correcciones, mejoras visuales o bumps de versión en el repositorio principal `AntiDraw`, es **ESTRICTAMENTE OBLIGATORIO** haber actualizado previamente todos los documentos relacionados del proyecto:
+  1. **`changelog.md`**: Registrar bajo el estándar *Keep a Changelog* la nueva versión, fecha y desglose exhaustivo de cambios (`Added`, `Changed`, `Fixed`, etc.).
+  2. **`readme.md`**: Actualizar la insignia de versión (ej. `v0.87.0`), las descripciones de nuevas capacidades (ej. i18n bilingüe, barras de herramientas actualizadas), enlaces a marketplaces y tablas de soporte.
+  3. **`package.json`**: Verificar coherencia total entre la versión declarada, scripts y metadatos.
+  4. **Documentación Técnica en `Docs/`**: Toda modificación en herramientas, atajos, parámetros o flujos debe quedar reflejada en `Descripción de las herramientas.md`, `Catálogo de Iconos y Herramientas.md`, guías operativas y `Docs/TODO.md`, completando su propio commit atómico en el sub-repositorio `AntiDraw-Docs` antes o en simultáneo.
+  5. **Empaquetado Inmediato**: Finalizado el commit de código y documentación sincronizada, ejecutar sin excepción `pnpm run package` para generar el artefacto VSIX correspondiente.
