@@ -94,7 +94,7 @@ export class Toolbar {
     this.outsideClickListener = (e: MouseEvent) => {
       if (!this.openDrawerId) return;
       const target = e.target as HTMLElement | null;
-      if (target && this.container.contains(target)) return;
+      if (target && (this.container.contains(target) || target.closest('.tool-drawer-flyout'))) return;
       this.closeDrawers();
     };
 
@@ -118,6 +118,7 @@ export class Toolbar {
 
     this.activeTool = tool;
     this.openDrawerId = null;
+    document.querySelectorAll('.tool-drawer-flyout').forEach((el) => el.remove());
     this.render();
     this.onToolChangeCallback(tool);
   }
@@ -125,6 +126,7 @@ export class Toolbar {
   public deselectAll(): void {
     this.activeTool = '' as any;
     this.openDrawerId = null;
+    document.querySelectorAll('.tool-drawer-flyout').forEach((el) => el.remove());
     this.render();
   }
 
@@ -136,6 +138,7 @@ export class Toolbar {
   public closeDrawers(): void {
     if (this.openDrawerId !== null) {
       this.openDrawerId = null;
+      document.querySelectorAll('.tool-drawer-flyout').forEach((el) => el.remove());
       this.render();
     }
   }
@@ -250,13 +253,18 @@ export class Toolbar {
 
         // Long press trigger for drawer flyout
         let longPressTimer: any = null;
+        let didLongPress = false;
+
         mainBtn.addEventListener('pointerdown', (e) => {
           if (e.button === 0) {
+            didLongPress = false;
             longPressTimer = setTimeout(() => {
+              didLongPress = true;
               this.openDrawer(drawer.id);
             }, 250);
           }
         });
+
         const cancelLongPress = () => {
           if (longPressTimer) {
             clearTimeout(longPressTimer);
@@ -269,6 +277,10 @@ export class Toolbar {
         // Click interaction
         mainBtn.addEventListener('click', (e) => {
           e.preventDefault();
+          if (didLongPress) {
+            didLongPress = false;
+            return;
+          }
           cancelLongPress();
           if (isDrawerActive) {
             // Already active in this drawer: toggle flyout
@@ -282,6 +294,7 @@ export class Toolbar {
         // Context menu opens flyout immediately
         mainBtn.addEventListener('contextmenu', (e) => {
           e.preventDefault();
+          e.stopPropagation();
           cancelLongPress();
           this.toggleDrawer(drawer.id);
         });
@@ -297,9 +310,12 @@ export class Toolbar {
 
         // Render flyout if open
         if (isOpen) {
+          document.querySelectorAll('.tool-drawer-flyout').forEach((el) => el.remove());
+
           const flyout = document.createElement('div');
           flyout.className = 'tool-drawer-flyout';
           flyout.setAttribute('role', 'menu');
+          flyout.setAttribute('data-flyout-for', drawer.id);
 
           drawer.tools.forEach((child) => {
             const isChildActive = this.activeTool === child.id;
@@ -314,13 +330,23 @@ export class Toolbar {
             childBtn.addEventListener('click', (e) => {
               e.preventDefault();
               e.stopPropagation();
+              drawer.activeChildId = child.id;
               this.setTool(child.id);
             });
 
             flyout.appendChild(childBtn);
           });
 
-          wrapper.appendChild(flyout);
+          // Measure mainBtn to position fixed flyout outside any scroll clipping
+          setTimeout(() => {
+            const rect = mainBtn.getBoundingClientRect();
+            flyout.style.position = 'fixed';
+            flyout.style.left = `${Math.round(rect.right + 6)}px`;
+            flyout.style.top = `${Math.round(rect.top)}px`;
+            flyout.style.zIndex = '99999';
+          }, 0);
+
+          document.body.appendChild(flyout);
         }
 
         this.container.appendChild(wrapper);
