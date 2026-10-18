@@ -110,8 +110,9 @@ export class HitTestService {
         }
       }
 
+      const isImage = el.tagName === 'image';
       const fill = el.attributes.fill || 'none';
-      const isFilled = fill !== 'none' && fill !== 'transparent' && fill !== 'rgba(0,0,0,0)';
+      const isFilled = isImage || (fill !== 'none' && fill !== 'transparent' && fill !== 'rgba(0,0,0,0)');
       const isClosed = el.isClosed !== false;
 
       // 1. Edge/Stroke Hit test
@@ -151,8 +152,9 @@ export class HitTestService {
       if (options?.lockGuides && el.attributes?.['data-contextual'] === 'true') continue;
       if (!el.vertices || el.vertices.length === 0) continue;
 
+      const isImage = el.tagName === 'image';
       const fill = el.attributes.fill || 'none';
-      const isFilled = fill !== 'none' && fill !== 'transparent' && fill !== 'rgba(0,0,0,0)';
+      const isFilled = isImage || (fill !== 'none' && fill !== 'transparent' && fill !== 'rgba(0,0,0,0)');
       const isClosed = el.isClosed !== false;
 
       const edgeHit = this.hitTestPathEdge(el.vertices, pt, effectiveTolerance, isClosed);

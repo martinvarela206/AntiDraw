@@ -21,6 +21,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **W3C SVG Image Serialization & Roundtrip**: Lossless deserialization and serialization of `<image>` and `<pattern>` nodes in `SvgSerializer` and `SvgDeserializer` adhering strictly to W3C standards.
 - **Bilingual Localization (ES / EN)**: Full symmetrical localization for all new modal options, tooltips, and image workflow notifications.
 
+### 🛠️ Fixed
+- **Omnichannel Drag & Drop Interception**: Fixed an issue where dragging an image into the AntiDraw canvas caused VS Code to open the image in a new tab with the image preview plugin. Drag events (`dragenter`, `dragover`, `dragleave`, `drop`) are now captured at window root level in the capture phase, supporting both OS file drops (`File` blobs) and VS Code Explorer sidebar drops (`text/uri-list`).
+- **Webview Relative Image Resolution & 404 Prevention**: Fixed broken image placeholder icon when saving linked relative assets (`./name.png`) by configuring `<base href>` in the webview head and providing an in-memory live asset resolver in `SvgDomRenderer`.
+- **Image Bounding Box Hit-Testing**: Fixed an issue where `<image>` elements could only be selected by clicking their perimeter edges. `<image>` elements are now recognized as solid bodies in `HitTestService`, allowing instant selection and transformation when clicking anywhere inside their bounding box.
+- **Canvas Click Flicker**: Resolved the flickering of broken image icons upon clicking anywhere on the document by eliminating 404 reload cycles during reactive canvas re-renders.
+
 ---
 
 ## [0.87.3] - 2026-10-17

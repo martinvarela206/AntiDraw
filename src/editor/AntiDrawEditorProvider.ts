@@ -36,7 +36,7 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
       ],
     };
 
-    webviewPanel.webview.html = this.getHtmlForWebview(webviewPanel.webview);
+    webviewPanel.webview.html = this.getHtmlForWebview(webviewPanel.webview, docDir);
 
     let pendingWebviewEdits = 0;
 
@@ -73,6 +73,7 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
       if (pendingWebviewEdits === 0) {
         const metadata = await readSidecarMetadata();
         const baseFileName = document.uri.path.split('/').pop() || 'untitled.svg';
+        const docDirWebviewUri = webviewPanel.webview.asWebviewUri(docDir).toString().replace(/\/+$/, '');
         webviewPanel.webview.postMessage({
           type: 'loadSvg',
           text: document.getText(),
@@ -80,6 +81,7 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
           locale: vscode.env.language,
           documentUri: document.uri.toString(),
           documentDirUri: docDir.toString(),
+          documentDirWebviewUri: docDirWebviewUri,
           fileName: baseFileName,
         });
       }
@@ -208,6 +210,46 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
           break;
         }
 
+        case 'readImageUri': {
+          try {
+            const uriStr = message.uri;
+            const targetUri = uriStr.startsWith('file:')
+              ? vscode.Uri.parse(uriStr)
+              : vscode.Uri.file(uriStr);
+            const fileData = await vscode.workspace.fs.readFile(targetUri);
+            const ext = targetUri.path.split('.').pop()?.toLowerCase() || 'png';
+            const mime =
+              ext === 'jpg' || ext === 'jpeg'
+                ? 'image/jpeg'
+                : ext === 'webp'
+                ? 'image/webp'
+                : ext === 'gif'
+                ? 'image/gif'
+                : ext === 'svg'
+                ? 'image/svg+xml'
+                : 'image/png';
+            const base64 = `data:${mime};base64,${Buffer.from(fileData).toString('base64')}`;
+            const fileName = targetUri.path.split('/').pop() || 'image.png';
+
+            webviewPanel.webview.postMessage({
+              type: 'readImageUriResponse',
+              requestId: message.requestId,
+              success: true,
+              base64,
+              fileName,
+              sizeBytes: fileData.byteLength,
+            });
+          } catch (err: any) {
+            webviewPanel.webview.postMessage({
+              type: 'readImageUriResponse',
+              requestId: message.requestId,
+              success: false,
+              error: err?.message || String(err),
+            });
+          }
+          break;
+        }
+
         case 'showInfo':
           vscode.window.showInformationMessage(message.message);
           break;
@@ -238,7 +280,7 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
     updateWebview();
   }
 
-  private getHtmlForWebview(webview: vscode.Webview): string {
+  private getHtmlForWebview(webview: vscode.Webview, docDir?: vscode.Uri): string {
     const scriptUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview.js')
     );
@@ -250,12 +292,16 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
 
     const userLocale = vscode.env.language || 'en';
     const langAttr = userLocale.toLowerCase().startsWith('es') ? 'es' : 'en';
+    const baseTag = docDir
+      ? `<base href="${webview.asWebviewUri(docDir).toString().replace(/\/+$/, '')}/">`
+      : '';
 
     return /* html */ `<!DOCTYPE html>
 <html lang="${langAttr}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  ${baseTag}
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} data: blob:; style-src 'unsafe-inline' ${webview.cspSource}; script-src 'nonce-${nonce}'; font-src ${webview.cspSource} https://fonts.gstatic.com;">
   <title>AntiDraw SVG Vector Editor</title>
   <link rel="stylesheet" href="${styleUri}">

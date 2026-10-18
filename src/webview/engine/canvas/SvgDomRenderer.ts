@@ -1,5 +1,6 @@
 import { VectorModel } from '../VectorModel.js';
 import { VectorScene } from '../../core/model/VectorScene.js';
+import { ImageIngestionService } from '../../services/ImageIngestionService.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Dedicated SVG Document DOM Renderer (SvgDomRenderer - L1)
@@ -59,6 +60,18 @@ export class SvgDomRenderer {
     tempSvg.innerHTML = model.toSvgString({ excludeContextual: false });
     const parsedSvg = tempSvg.querySelector('svg');
     if (parsedSvg) {
+      // Resolve any image tags for live DOM projection (preventing 404 broken image placeholders)
+      parsedSvg.querySelectorAll('image').forEach((imgEl) => {
+        const href = imgEl.getAttribute('href') || imgEl.getAttribute('xlink:href');
+        if (href) {
+          const resolved = ImageIngestionService.resolveLiveAssetUri(href);
+          if (resolved) {
+            imgEl.setAttribute('href', resolved);
+            imgEl.setAttributeNS('http://www.w3.org/1999/xlink', 'href', resolved);
+          }
+        }
+      });
+
       Array.from(parsedSvg.children).forEach((child) => {
         svgCanvas.appendChild(child.cloneNode(true));
       });
@@ -89,13 +102,25 @@ export class SvgDomRenderer {
     for (const el of elements) {
       const domEl = document.createElementNS(SvgDomRenderer.SVG_NS, el.tagName);
       for (const [key, value] of Object.entries(el.attributes)) {
-        domEl.setAttribute(key, value);
+        if (el.tagName === 'image' && (key === 'href' || key === 'xlink:href')) {
+          const resolved = ImageIngestionService.resolveLiveAssetUri(value);
+          domEl.setAttribute(key, resolved);
+          domEl.setAttributeNS('http://www.w3.org/1999/xlink', 'href', resolved);
+        } else {
+          domEl.setAttribute(key, value);
+        }
       }
       if (el.children && el.children.length > 0) {
         for (const child of el.children) {
           const childDom = document.createElementNS(SvgDomRenderer.SVG_NS, child.tagName);
           for (const [ck, cv] of Object.entries(child.attributes)) {
-            childDom.setAttribute(ck, cv);
+            if (child.tagName === 'image' && (ck === 'href' || ck === 'xlink:href')) {
+              const resolved = ImageIngestionService.resolveLiveAssetUri(cv);
+              childDom.setAttribute(ck, resolved);
+              childDom.setAttributeNS('http://www.w3.org/1999/xlink', 'href', resolved);
+            } else {
+              childDom.setAttribute(ck, cv);
+            }
           }
           if (child.textContent) {
             childDom.textContent = child.textContent;

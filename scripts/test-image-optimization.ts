@@ -2,6 +2,8 @@ import { ImageProcessorService } from '../src/webview/services/ImageProcessorSer
 import { VectorModel } from '../src/webview/engine/VectorModel.js';
 import { BoundingBoxCalculator } from '../src/webview/engine/geometry/BoundingBoxCalculator.js';
 import { SvgSerializer } from '../src/webview/engine/serialization/SvgSerializer.js';
+import { HitTestService } from '../src/webview/engine/selection/HitTestService.js';
+import { ImageIngestionService } from '../src/webview/services/ImageIngestionService.js';
 
 export async function runImageOptimizationTests(): Promise<boolean> {
   console.log('\n--- Running Image Optimization, Smart Ingestion & Texture Suite ---');
@@ -117,6 +119,49 @@ export async function runImageOptimizationTests(): Promise<boolean> {
     assert(reloadModel.customDefs.includes('pat_wood_texture_01'), 'Reloaded model preserves custom pattern definition in defs');
     const reloadedRect = reloadModel.elements[0];
     assert(reloadedRect.attributes.fill === 'url(#pat_wood_texture_01)', 'Reloaded rect preserves pattern fill URL');
+  }
+
+  // 5. Standalone Image Body & Interior Hit-Testing (Solid Bounding Box)
+  console.log('\n[5. Standalone Image Body & Interior Hit-Testing]');
+  {
+    const model = new VectorModel();
+    const svgInput = `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 800">
+  <image id="ref_img_01" href="./hero_artwork.png" x="100" y="100" width="400" height="300" preserveAspectRatio="none" />
+</svg>`;
+    model.loadSvgString(svgInput);
+    const imgEl = model.elements[0];
+    assert(imgEl !== undefined && imgEl.tagName === 'image', 'Parsed <image> element into model');
+
+    // Test A: Click exactly inside the center body of the image (300, 250)
+    const centerHit = HitTestService.hitTest(model.elements, { x: 300, y: 250 }, 1.0, 3.0);
+    assert(centerHit !== null, 'Hit test succeeded inside center of image');
+    assert(centerHit?.element.id === 'ref_img_01', 'Hit element matches image ID');
+    assert(centerHit?.hitOnFill === true, 'Hit detected as solid fill body');
+
+    // Test B: Click outside the image (50, 50)
+    const outsideHit = HitTestService.hitTest(model.elements, { x: 50, y: 50 }, 1.0, 3.0);
+    assert(outsideHit === null, 'Hit test correctly rejects point outside image');
+
+    // Test C: Spatial index query hit
+    model.rebuildSpatialIndex();
+    const spatialHit = HitTestService.hitTestSpatial(model.spatialIndex, { x: 300, y: 250 }, 1.0, 3.0);
+    assert(spatialHit !== null, 'Spatial index hit test succeeded inside center of image');
+    assert(spatialHit?.element.id === 'ref_img_01', 'Spatial hit element matches image ID');
+  }
+
+  // 6. Live Asset Caching & Resolution
+  console.log('\n[6. Live Asset Caching & Resolution]');
+  {
+    const relativeHref = './drawing_img_42_img.png';
+    const fakeWebviewUri = 'vscode-webview://webview-id/drawing_img_42_img.png';
+
+    ImageIngestionService.cacheLiveAsset(relativeHref, fakeWebviewUri);
+    const resolved = ImageIngestionService.resolveLiveAssetUri(relativeHref);
+    assert(resolved === fakeWebviewUri, 'Resolved live asset URI matches cached webview URI');
+
+    const cleanResolved = ImageIngestionService.resolveLiveAssetUri('drawing_img_42_img.png');
+    assert(cleanResolved === fakeWebviewUri, 'Resolved asset without ./ prefix matches cached webview URI');
   }
 
   console.log(`\nImage Optimization Tests complete: ${allPassed ? 'ALL PASSED' : 'SOME FAILED'}.\n`);

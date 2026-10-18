@@ -33,6 +33,7 @@ export interface ImageIngestionContext {
 
 export class ImageIngestionService {
   private static instance: ImageIngestionService | null = null;
+  private static liveAssetCache: Map<string, string> = new Map();
   private ctx!: ImageIngestionContext;
   private fileInputEl: HTMLInputElement | null = null;
 
@@ -47,6 +48,37 @@ export class ImageIngestionService {
 
   public static getInstance(): ImageIngestionService | null {
     return this.instance;
+  }
+
+  public static cacheLiveAsset(key: string, resolvedUri: string): void {
+    if (!key || !resolvedUri) return;
+    this.liveAssetCache.set(key, resolvedUri);
+    const clean = key.replace(/^\.\//, '');
+    this.liveAssetCache.set(clean, resolvedUri);
+    const fileName = clean.split('/').pop();
+    if (fileName) {
+      this.liveAssetCache.set(fileName, resolvedUri);
+    }
+  }
+
+  public static resolveLiveAssetUri(href: string): string {
+    if (!href) return '';
+    if (this.liveAssetCache.has(href)) {
+      return this.liveAssetCache.get(href)!;
+    }
+    const clean = href.replace(/^\.\//, '');
+    if (this.liveAssetCache.has(clean)) {
+      return this.liveAssetCache.get(clean)!;
+    }
+    const fileName = clean.split('/').pop();
+    if (fileName && this.liveAssetCache.has(fileName)) {
+      return this.liveAssetCache.get(fileName)!;
+    }
+    const docDirWebviewUri = VsCodeBridge.getInstance().getDocumentDirWebviewUri();
+    if (docDirWebviewUri && (href.startsWith('./') || !href.includes(':'))) {
+      return `${docDirWebviewUri}/${clean}`;
+    }
+    return href;
   }
 
   private setupEventListeners(): void {
@@ -73,28 +105,64 @@ export class ImageIngestionService {
     });
     document.body.appendChild(this.fileInputEl);
 
-    // 3. Global Drag & Drop on Canvas
-    window.addEventListener('dragover', (e: DragEvent) => {
-      if (e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files')) {
-        e.preventDefault();
+    // 3. Omnichannel Drag & Drop (Windows Explorer & VS Code Tree View)
+    // Capture events at window level to prevent VS Code workbench from intercepting dropped files
+    const handleDragPrevent = (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.dataTransfer) {
         e.dataTransfer.dropEffect = 'copy';
       }
-    });
+    };
+
+    window.addEventListener('dragenter', handleDragPrevent, true);
+    window.addEventListener('dragover', handleDragPrevent, true);
+    window.addEventListener('dragleave', (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+    }, true);
 
     window.addEventListener('drop', async (e: DragEvent) => {
-      if (!e.dataTransfer || !e.dataTransfer.files || e.dataTransfer.files.length === 0) return;
-      const file = e.dataTransfer.files[0];
-      if (!file.type.startsWith('image/')) return;
-
       e.preventDefault();
+      e.stopPropagation();
+
       let dropPt: { x: number; y: number } | undefined;
       if (this.ctx.screenToSvgCoord) {
         dropPt = this.ctx.screenToSvgCoord(e.clientX, e.clientY);
       }
 
-      const base64 = await ImageProcessorService.blobToBase64(file);
-      this.processIncomingImage(base64, file.name, file.size, dropPt);
-    });
+      // Channel A: Direct files dropped from OS file manager or desktop
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        const file = e.dataTransfer.files[0];
+        const isImage = file.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|svg|bmp|ico)$/i.test(file.name);
+        if (isImage) {
+          const base64 = await ImageProcessorService.blobToBase64(file);
+          await this.processIncomingImage(base64, file.name, file.size, dropPt);
+          return;
+        }
+      }
+
+      // Channel B: Dropped from VS Code file explorer sidebar (text/uri-list / text/plain)
+      if (e.dataTransfer) {
+        const uriData = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
+        if (uriData) {
+          const lines = uriData.split(/[\r\n]+/).map((l) => l.trim()).filter(Boolean);
+          for (const line of lines) {
+            if (/\.(png|jpe?g|webp|gif|svg|bmp|ico)(\?.*)?$/i.test(line)) {
+              try {
+                const res = await VsCodeBridge.getInstance().readImageFromUri(line);
+                if (res.success && res.base64) {
+                  await this.processIncomingImage(res.base64, res.fileName || 'image.png', res.sizeBytes, dropPt);
+                  return;
+                }
+              } catch (err) {
+                console.warn('[ImageIngestionService] Failed to read dropped URI:', line, err);
+              }
+            }
+          }
+        }
+      }
+    }, true);
 
     // 4. Clipboard Paste (Ctrl+V) for instant screenshots
     window.addEventListener('paste', async (e: ClipboardEvent) => {
@@ -173,11 +241,19 @@ export class ImageIngestionService {
           const saveRes = await VsCodeBridge.getInstance().saveLinkedImage(imageId, cleanExt, finalBase64);
           if (saveRes.success && saveRes.relativePath) {
             imageHref = saveRes.relativePath;
+            if (saveRes.webviewUri) {
+              ImageIngestionService.cacheLiveAsset(saveRes.relativePath, saveRes.webviewUri);
+            } else {
+              ImageIngestionService.cacheLiveAsset(saveRes.relativePath, finalBase64);
+            }
           }
         } catch (_err) {
           // Keep base64 fallback if host bridge fails or running outside VS Code
           imageHref = finalBase64;
+          ImageIngestionService.cacheLiveAsset(imageId, finalBase64);
         }
+      } else {
+        ImageIngestionService.cacheLiveAsset(imageId, finalBase64);
       }
 
       // 4. Contextual Application: Vector Background vs Standalone Canvas Element

@@ -55,6 +55,7 @@ export interface LoadSvgPayload {
   fileName?: string;
   documentUri?: string;
   documentDirUri?: string;
+  documentDirWebviewUri?: string;
 }
 
 export interface SaveLinkedImageResponse {
@@ -62,6 +63,14 @@ export interface SaveLinkedImageResponse {
   relativePath?: string;
   webviewUri?: string;
   fileName?: string;
+  error?: string;
+}
+
+export interface ReadImageUriResponse {
+  success: boolean;
+  base64?: string;
+  fileName?: string;
+  sizeBytes?: number;
   error?: string;
 }
 
@@ -85,7 +94,9 @@ export class VsCodeBridge {
   private loadSvgCallbacks: Array<(payload: LoadSvgPayload) => void> = [];
   private imageFileSelectedCallbacks: Array<(payload: ImageFileSelectedPayload) => void> = [];
   private pendingImageSaveResolvers: Map<string, (res: SaveLinkedImageResponse) => void> = new Map();
+  private pendingReadUriResolvers: Map<string, (res: ReadImageUriResponse) => void> = new Map();
   private currentFileName: string = 'drawing.svg';
+  private documentDirWebviewUri: string = '';
 
   constructor() {
     this.vscodeApi = acquireVsCodeApi();
@@ -112,6 +123,9 @@ export class VsCodeBridge {
         if (msg.fileName) {
           this.currentFileName = msg.fileName;
         }
+        if (msg.documentDirWebviewUri) {
+          this.documentDirWebviewUri = msg.documentDirWebviewUri;
+        }
         const payload: LoadSvgPayload = {
           text: msg.text || '',
           metadata: msg.metadata || null,
@@ -119,6 +133,7 @@ export class VsCodeBridge {
           fileName: msg.fileName,
           documentUri: msg.documentUri,
           documentDirUri: msg.documentDirUri,
+          documentDirWebviewUri: msg.documentDirWebviewUri,
         };
 
         if (this.isUpdatingFromWebview) {
@@ -139,6 +154,18 @@ export class VsCodeBridge {
             relativePath: msg.relativePath,
             webviewUri: msg.webviewUri,
             fileName: msg.fileName,
+            error: msg.error,
+          });
+        }
+      } else if (msg.type === 'readImageUriResponse') {
+        const resolver = this.pendingReadUriResolvers.get(msg.requestId);
+        if (resolver) {
+          this.pendingReadUriResolvers.delete(msg.requestId);
+          resolver({
+            success: !!msg.success,
+            base64: msg.base64,
+            fileName: msg.fileName,
+            sizeBytes: msg.sizeBytes,
             error: msg.error,
           });
         }
@@ -195,6 +222,30 @@ export class VsCodeBridge {
         if (this.pendingImageSaveResolvers.has(requestId)) {
           this.pendingImageSaveResolvers.delete(requestId);
           resolve({ success: false, error: 'Timeout waiting for image save in host' });
+        }
+      }, 10000);
+    });
+  }
+
+  public getDocumentDirWebviewUri(): string {
+    return this.documentDirWebviewUri;
+  }
+
+  public async readImageFromUri(uri: string): Promise<ReadImageUriResponse> {
+    const requestId = `read_uri_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+    return new Promise((resolve) => {
+      this.pendingReadUriResolvers.set(requestId, resolve);
+      this.vscodeApi.postMessage({
+        type: 'readImageUri',
+        requestId,
+        uri,
+      });
+
+      // Timeout safety
+      setTimeout(() => {
+        if (this.pendingReadUriResolvers.has(requestId)) {
+          this.pendingReadUriResolvers.delete(requestId);
+          resolve({ success: false, error: 'Timeout reading image from URI in host' });
         }
       }, 10000);
     });
