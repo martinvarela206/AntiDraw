@@ -85,9 +85,11 @@ export class NodeEditorTool {
     vertices: PathVertex[],
     pt: Point,
     radius: number = 12,
-    selectedVertexId: string | null = null
+    selectedVertexId: string | null = null,
+    handleRadius?: number
   ): { vertex: PathVertex; type: 'vertex' | 'handleIn' | 'handleOut' } | null {
     let bestHit: { vertex: PathVertex; type: 'vertex' | 'handleIn' | 'handleOut'; dist: number } | null = null;
+    const effHandleRadius = handleRadius !== undefined ? handleRadius : radius * 1.35;
 
     // 1. Check all anchor vertices
     for (const v of vertices) {
@@ -104,14 +106,14 @@ export class NodeEditorTool {
       }
     }
 
-    // 2. Check handles of all vertices with extended handles (handleLen >= 2)
+    // 2. Check handles of all vertices with extended handles (handleLen > 0.0001)
+    // Generous handle radius ensures handles sitting right on top of or near segments are always grabbed
     for (const v of vertices) {
       if (v.handleIn) {
         const dIn = Math.hypot(pt.x - v.handleIn.x, pt.y - v.handleIn.y);
         const handleLen = Math.hypot(v.handleIn.x - v.x, v.handleIn.y - v.y);
-        // Ignore collapsed handles (< 2px from anchor)
-        if (handleLen >= 2 && dIn <= radius) {
-          // Handle overrides anchor or previous hit if closer
+        if (handleLen > 0.0001 && dIn <= effHandleRadius) {
+          // Handle overrides anchor or previous hit if closer to cursor
           if (!bestHit || dIn < bestHit.dist) {
             bestHit = { vertex: v, type: 'handleIn', dist: dIn };
           }
@@ -121,8 +123,7 @@ export class NodeEditorTool {
       if (v.handleOut) {
         const dOut = Math.hypot(pt.x - v.handleOut.x, pt.y - v.handleOut.y);
         const handleLen = Math.hypot(v.handleOut.x - v.x, v.handleOut.y - v.y);
-        // Ignore collapsed handles (< 2px from anchor)
-        if (handleLen >= 2 && dOut <= radius) {
+        if (handleLen > 0.0001 && dOut <= effHandleRadius) {
           if (!bestHit || dOut < bestHit.dist) {
             bestHit = { vertex: v, type: 'handleOut', dist: dOut };
           }

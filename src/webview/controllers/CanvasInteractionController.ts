@@ -293,12 +293,12 @@ export class CanvasInteractionController implements CanvasViewDelegate {
         const z = this.ctx.canvasMgr.zoom || 1;
         const selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
         if (selectedEl && selectedEl.vertices) {
-          const hit = this.ctx.nodeEditorTool.hitTestVertices(selectedEl.vertices, pt, 12 / z, this.ctx.nodeEditorTool.selectedVertexId);
+          const hit = this.ctx.nodeEditorTool.hitTestVertices(selectedEl.vertices, pt, 12 / z, this.ctx.nodeEditorTool.selectedVertexId, 16 / z);
           if (hit) {
             canvasView?.setCursor('pointer');
             return;
           }
-          const hitSeg = this.ctx.nodeEditorTool.hitTestSegment(selectedEl.vertices, pt, 10 / z, this.ctx.model.isElementClosed(selectedEl));
+          const hitSeg = this.ctx.nodeEditorTool.hitTestSegment(selectedEl.vertices, pt, 8 / z, this.ctx.model.isElementClosed(selectedEl));
           if (hitSeg !== null) {
             canvasView?.setCursor('crosshair');
             return;

@@ -50,6 +50,23 @@ export async function runNodeEditingUxTests(): Promise<boolean> {
   assert(hitHandle?.type === 'handleOut', `Hit type is handleOut -> got ${hitHandle?.type}`);
   assert(hitHandle?.vertex.id === 'v0', `Hit handle belongs to v0 -> got ${hitHandle?.vertex.id}`);
 
+  // Test 3.1: Sub-2px Micro Handles (like in 64x64 icon coordinates) directly on segment
+  console.log('\n[3.1 Micro Handles (< 2px) on Segment Proximity]');
+  const microVerts: PathVertex[] = [
+    { id: 'm0', x: 32, y: 33, nodeType: 'sharp', command: 'M' },
+    { id: 'm1', x: 29.5, y: 35.5, nodeType: 'sharp', command: 'L' },
+  ];
+  const curvedMicro = nodeEditor.convertSegmentToCurve(microVerts, 0, false);
+  const mHandleOut = curvedMicro[0].handleOut!;
+  const microLen = Math.hypot(mHandleOut.x - curvedMicro[0].x, mHandleOut.y - curvedMicro[0].y);
+  assert(microLen < 2.0, `Micro handle length is sub-2px: ${microLen.toFixed(2)}`);
+
+  // Cursor is slightly offset (e.g. 0.3 units) near the handle on the segment chord
+  const hitMicroHandle = nodeEditor.hitTestVertices(curvedMicro, { x: mHandleOut.x + 0.1, y: mHandleOut.y + 0.1 }, 12, 'm0', 16);
+  assert(hitMicroHandle !== null, 'Hit test successfully detects micro handle (< 2px)');
+  assert(hitMicroHandle?.type === 'handleOut', 'Detected hit is handleOut');
+  assert(hitMicroHandle?.vertex.id === 'm0', 'Detected hit belongs to m0');
+
   // Test 4: Convert Segment to Line Restores Sharp
   console.log('\n[4. Convert Segment to Line Restores Linear Geometry]');
   const lineVerts = nodeEditor.convertSegmentToLine(curvedVerts, 0, true);

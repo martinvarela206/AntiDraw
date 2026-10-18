@@ -3,6 +3,16 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.93.1] - 2026-10-18
+
+### 🛠️ Fixed
+- **Detección y Prioridad de Tiradores Bézier Sub-2px y Adyacentes a Segmentos**:
+  - Se eliminó la restricción artificial `handleLen >= 2` que descartaba tiradores con longitud menor a 2 unidades de coordenadas, impidiendo seleccionar manijas en trazados de precisión o iconos con viewBox compactos (e.g. 64x64, 48x48 o 32x32).
+  - Se implementó un radio de captura generoso para tiradores Bézier (`effHandleRadius = 16 / z`) frente a una tolerancia de segmento más ajustada (`8 / z`), asegurando que al clicar sobre o cerca de un tirador posicionado directamente sobre la cuerda del segmento, la interacción seleccione y arrastre siempre el tirador sin secuestro por parte del segmento.
+  - Sincronización del cursor en hover (`CanvasInteractionController`): muestra cursor `pointer` con prioridad al sobrevolar tiradores Bézier incluso cuando coinciden exactamente con la trayectoria del segmento.
+
+---
+
 ## [0.93.0] - 2026-10-18
 
 ### 🚀 Added / 🛠️ Enhanced

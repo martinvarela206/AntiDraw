@@ -365,7 +365,8 @@ export class NodeToolHandler implements IToolHandler {
             selectedEl.vertices,
             pt,
             12 / z,
-            this.nodeEditorTool.selectedVertexId
+            this.nodeEditorTool.selectedVertexId,
+            16 / z
           )
         : null;
 
@@ -458,7 +459,7 @@ export class NodeToolHandler implements IToolHandler {
       const hitSegment = this.nodeEditorTool.hitTestSegment(
         selectedEl.vertices,
         pt,
-        10 / z,
+        8 / z,
         isClosed
       );
 
