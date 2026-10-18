@@ -8,6 +8,7 @@ import { DashCornerAligner } from '../../engine/geometry/DashCornerAligner.js';
 import { SpineCurveService } from '../../engine/stroke/SpineCurveService.js';
 import { ToolIcons } from '../../icons/ToolIcons.js';
 import { I18nService } from '../../i18n/index.js';
+import { ColorPickerPopover } from '../ColorPickerPopover.js';
 
 export interface StrokeInspectorProps {
   stroke: string;
@@ -119,7 +120,7 @@ export class StrokeInspector {
           <div class="prop-row">
             <span class="prop-label">${I18nService.t('common.color')}</span>
             <div class="color-picker-row" style="display:flex; gap:4px; align-items:center;">
-              <input type="color" class="color-swatch" id="el-stroke-color" value="${isCurrentColor ? '#000000' : (stroke === 'none' ? '#000000' : stroke)}" ${isCurrentColor ? 'disabled title="currentColor"' : ''} />
+              <button type="button" class="color-swatch" id="el-stroke-color" style="background-color: ${isCurrentColor ? '#000000' : (stroke === 'none' ? '#000000' : stroke)};" title="${I18nService.t('common.color')}" ${isCurrentColor ? 'disabled title="currentColor"' : ''}></button>
               <input type="text" class="prop-input" id="el-stroke-hex" value="${stroke === 'none' ? '#000000' : stroke}" placeholder="#hex o currentColor" style="flex:1;" />
               <button class="prop-input ${isCurrentColor ? 'active' : ''}" id="btn-stroke-currentcolor" style="cursor:pointer; width:auto; padding:2px 6px; font-size:10px; font-weight:600; ${isCurrentColor ? 'background:#3b82f6; color:#fff;' : 'color:#94a3b8;'}" title="currentColor">currentColor</button>
             </div>
@@ -265,27 +266,63 @@ export class StrokeInspector {
     if (btnAddStrokeBody) btnAddStrokeBody.addEventListener('click', onAddStrokeClicked);
 
     if (elStrokeColor) {
-      let isPickingStroke = false;
-      elStrokeColor.addEventListener('pointerdown', () => {
-        if (!isPickingStroke && callbacks.onPushUndo) {
-          callbacks.onPushUndo();
-          isPickingStroke = true;
+      elStrokeColor.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (el.attributes['stroke'] === 'currentColor') return;
+
+        const currentStroke = el.attributes['stroke'] && el.attributes['stroke'] !== 'none'
+          ? el.attributes['stroke']
+          : '#000000';
+        const currentOp = parseFloat(el.attributes['stroke-opacity'] || '1');
+
+        ColorPickerPopover.show({
+          anchor: elStrokeColor,
+          initialColor: currentStroke,
+          initialOpacity: currentOp,
+          showAlpha: true,
+          onChange: ({ hex, alpha }) => {
+            el.attributes['stroke'] = hex;
+            if (!el.attributes['stroke-width'] || parseFloat(el.attributes['stroke-width']) <= 0) {
+              el.attributes['stroke-width'] = '1';
+            }
+            if (alpha < 1) {
+              el.attributes['stroke-opacity'] = alpha.toFixed(2);
+            } else {
+              delete el.attributes['stroke-opacity'];
+            }
+            if (elStrokeHex) elStrokeHex.value = hex;
+            elStrokeColor.style.backgroundColor = hex;
+            callbacks.onUpdateElement(el);
+          },
+          onCommit: () => {
+            if (callbacks.onPushUndo) callbacks.onPushUndo();
+            callbacks.onUpdateElement(el);
+          },
+        });
+      });
+    }
+
+    if (elStrokeHex) {
+      elStrokeHex.addEventListener('input', () => {
+        const val = elStrokeHex.value.trim();
+        if (val.startsWith('#') && (val.length === 4 || val.length === 7 || val.length === 9)) {
+          el.attributes['stroke'] = val;
+          if (elStrokeColor) elStrokeColor.style.backgroundColor = val;
+          callbacks.onUpdateElement(el);
         }
       });
-      elStrokeColor.addEventListener('input', () => {
-        if (!isPickingStroke && callbacks.onPushUndo) {
-          callbacks.onPushUndo();
-          isPickingStroke = true;
+      elStrokeHex.addEventListener('change', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        const val = elStrokeHex.value.trim();
+        if (val.toLowerCase() === 'currentcolor') {
+          el.attributes['stroke'] = 'currentColor';
+        } else {
+          el.attributes['stroke'] = val.startsWith('#') || val === 'none' ? val : `#${val}`;
+          if (elStrokeColor) elStrokeColor.style.backgroundColor = el.attributes['stroke'];
         }
-        el.attributes['stroke'] = elStrokeColor.value;
-        if (!el.attributes['stroke-width'] || parseFloat(el.attributes['stroke-width']) <= 0) {
-          el.attributes['stroke-width'] = '1';
-        }
-        if (elStrokeHex) elStrokeHex.value = elStrokeColor.value;
         callbacks.onUpdateElement(el);
-      });
-      elStrokeColor.addEventListener('change', () => {
-        isPickingStroke = false;
+        onReRender();
       });
     }
 

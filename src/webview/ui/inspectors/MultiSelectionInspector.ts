@@ -7,6 +7,7 @@ import { degreesToMiterLimit } from './AppearanceInspector.js';
 import { DistortInspectorControls } from './DistortInspectorControls.js';
 import { BlendEngine } from '../../engine/blend/BlendEngine.js';
 import { I18nService } from '../../i18n/index.js';
+import { ColorPickerPopover } from '../ColorPickerPopover.js';
 
 /**
  * MultiSelectionInspector
@@ -104,7 +105,7 @@ export class MultiSelectionInspector {
         <div class="prop-row">
           <span class="prop-label">${I18nService.t('common.color')}</span>
           <div class="color-picker-row" style="display:flex; gap:4px; align-items:center;">
-            <input type="color" class="color-swatch" id="batch-fill-color" value="#4f46e5" />
+            <button type="button" class="color-swatch" id="batch-fill-color" style="background-color: #4f46e5;" title="${I18nService.t('common.color')}"></button>
             <input type="text" class="prop-input" id="batch-fill-hex" value="#4f46e5" placeholder="#hex / currentColor" style="flex:1;" />
             <button class="prop-input" id="btn-batch-fill-currentcolor" style="cursor:pointer; width:auto; padding:2px 6px; font-size:10px; font-weight:600; color:#94a3b8;">currentColor</button>
           </div>
@@ -122,7 +123,7 @@ export class MultiSelectionInspector {
         <div class="prop-row">
           <span class="prop-label">${I18nService.t('common.color')}</span>
           <div class="color-picker-row" style="display:flex; gap:4px; align-items:center;">
-            <input type="color" class="color-swatch" id="batch-stroke-color" value="#000000" />
+            <button type="button" class="color-swatch" id="batch-stroke-color" style="background-color: #000000;" title="${I18nService.t('common.color')}"></button>
             <input type="text" class="prop-input" id="batch-stroke-hex" value="#000000" placeholder="#hex / currentColor" style="flex:1;" />
             <button class="prop-input" id="btn-batch-stroke-currentcolor" style="cursor:pointer; width:auto; padding:2px 6px; font-size:10px; font-weight:600; color:#94a3b8;">currentColor</button>
           </div>
@@ -188,9 +189,9 @@ export class MultiSelectionInspector {
       });
     }
 
-    const bFillColor = container.querySelector<HTMLInputElement>('#batch-fill-color');
+    const bFillColor = container.querySelector<HTMLButtonElement>('#batch-fill-color');
     const bFillHex = container.querySelector<HTMLInputElement>('#batch-fill-hex');
-    const bStrokeColor = container.querySelector<HTMLInputElement>('#batch-stroke-color');
+    const bStrokeColor = container.querySelector<HTMLButtonElement>('#batch-stroke-color');
     const bStrokeHex = container.querySelector<HTMLInputElement>('#batch-stroke-hex');
     const bStrokeWidth = container.querySelector<HTMLInputElement>('#batch-stroke-width');
     const bStrokeJoin = container.querySelector<HTMLSelectElement>('#batch-stroke-join');
@@ -253,17 +254,41 @@ export class MultiSelectionInspector {
     }
 
     if (bFillColor) {
-      bFillColor.addEventListener('input', () => {
-        elements.forEach((el) => {
-          if (!model.isElementClosed(el) && el.vertices && el.vertices.length > 2) {
-            el.isClosed = true;
-            el.attributes.d = model.compilePathD(el.vertices, true);
+      bFillColor.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const initialColor = bFillHex?.value || '#4f46e5';
+        ColorPickerPopover.show({
+          anchorEl: bFillColor,
+          initialColor: initialColor.startsWith('#') ? initialColor : '#4f46e5',
+          showAlpha: true,
+          onChange: ({ hex }) => {
+            elements.forEach((el) => {
+              if (!model.isElementClosed(el) && el.vertices && el.vertices.length > 2) {
+                el.isClosed = true;
+                el.attributes.d = model.compilePathD(el.vertices, true);
+              }
+              el.attributes['fill'] = hex;
+              delete el.attributes['data-gradient'];
+            });
+            if (bFillHex) bFillHex.value = hex;
+            bFillColor.style.backgroundColor = hex;
+            callbacks.onUpdateElement(elements[0]);
+          },
+          onCommit: ({ hex }) => {
+            if (callbacks.onPushUndo) callbacks.onPushUndo();
+            elements.forEach((el) => {
+              if (!model.isElementClosed(el) && el.vertices && el.vertices.length > 2) {
+                el.isClosed = true;
+                el.attributes.d = model.compilePathD(el.vertices, true);
+              }
+              el.attributes['fill'] = hex;
+              delete el.attributes['data-gradient'];
+            });
+            if (bFillHex) bFillHex.value = hex;
+            bFillColor.style.backgroundColor = hex;
+            callbacks.onUpdateElement(elements[0]);
           }
-          el.attributes['fill'] = bFillColor.value;
-          delete el.attributes['data-gradient'];
         });
-        if (bFillHex) bFillHex.value = bFillColor.value;
-        callbacks.onUpdateElement(elements[0]);
       });
     }
     if (bFillHex) {
@@ -279,7 +304,9 @@ export class MultiSelectionInspector {
           el.attributes['fill'] = finalColor;
           delete el.attributes['data-gradient'];
         });
-        if (bFillColor && finalColor !== 'currentColor' && finalColor !== 'none') bFillColor.value = finalColor;
+        if (bFillColor && finalColor !== 'currentColor' && finalColor !== 'none') {
+          bFillColor.style.backgroundColor = finalColor;
+        }
         callbacks.onUpdateElement(elements[0]);
         onReRender();
       });
@@ -344,20 +371,47 @@ export class MultiSelectionInspector {
     }
 
     if (bStrokeColor) {
-      bStrokeColor.addEventListener('input', () => {
-        elements.forEach((el) => {
-          el.attributes['stroke'] = bStrokeColor.value;
-          if (!el.attributes['stroke-width'] || parseFloat(el.attributes['stroke-width']) <= 0) {
-            el.attributes['stroke-width'] = bStrokeWidth?.value || '1';
-          }
-          const svgEl = document.getElementById(el.id);
-          if (svgEl) {
-            svgEl.setAttribute('stroke', bStrokeColor.value);
-            svgEl.setAttribute('stroke-width', el.attributes['stroke-width']);
+      bStrokeColor.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const initialColor = bStrokeHex?.value || '#000000';
+        ColorPickerPopover.show({
+          anchorEl: bStrokeColor,
+          initialColor: initialColor.startsWith('#') ? initialColor : '#000000',
+          showAlpha: true,
+          onChange: ({ hex }) => {
+            elements.forEach((el) => {
+              el.attributes['stroke'] = hex;
+              if (!el.attributes['stroke-width'] || parseFloat(el.attributes['stroke-width']) <= 0) {
+                el.attributes['stroke-width'] = bStrokeWidth?.value || '1';
+              }
+              const svgEl = document.getElementById(el.id);
+              if (svgEl) {
+                svgEl.setAttribute('stroke', hex);
+                svgEl.setAttribute('stroke-width', el.attributes['stroke-width']);
+              }
+            });
+            if (bStrokeHex) bStrokeHex.value = hex;
+            bStrokeColor.style.backgroundColor = hex;
+            callbacks.onUpdateElement(elements[0]);
+          },
+          onCommit: ({ hex }) => {
+            if (callbacks.onPushUndo) callbacks.onPushUndo();
+            elements.forEach((el) => {
+              el.attributes['stroke'] = hex;
+              if (!el.attributes['stroke-width'] || parseFloat(el.attributes['stroke-width']) <= 0) {
+                el.attributes['stroke-width'] = bStrokeWidth?.value || '1';
+              }
+              const svgEl = document.getElementById(el.id);
+              if (svgEl) {
+                svgEl.setAttribute('stroke', hex);
+                svgEl.setAttribute('stroke-width', el.attributes['stroke-width']);
+              }
+            });
+            if (bStrokeHex) bStrokeHex.value = hex;
+            bStrokeColor.style.backgroundColor = hex;
+            callbacks.onUpdateElement(elements[0]);
           }
         });
-        if (bStrokeHex) bStrokeHex.value = bStrokeColor.value;
-        callbacks.onUpdateElement(elements[0]);
       });
     }
     if (bStrokeHex) {
@@ -376,7 +430,9 @@ export class MultiSelectionInspector {
             svgEl.setAttribute('stroke-width', el.attributes['stroke-width']);
           }
         });
-        if (bStrokeColor && finalStroke !== 'currentColor' && finalStroke !== 'none') bStrokeColor.value = finalStroke;
+        if (bStrokeColor && finalStroke !== 'currentColor' && finalStroke !== 'none') {
+          bStrokeColor.style.backgroundColor = finalStroke;
+        }
         callbacks.onUpdateElement(elements[0]);
         onReRender();
       });

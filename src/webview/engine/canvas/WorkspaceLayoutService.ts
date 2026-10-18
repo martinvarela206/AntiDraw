@@ -13,6 +13,7 @@ import { Session } from '../session/Session.js';
 import { PenToolHandler } from '../../tools/PenToolHandler.js';
 import { PolylineToolHandler } from '../../tools/PolylineToolHandler.js';
 import { VectorExplorerPanel } from '../../ui/VectorExplorerPanel.js';
+import { ColorPickerPopover } from '../../ui/ColorPickerPopover.js';
 
 export interface WorkspaceLayoutContext {
   model: VectorModel;
@@ -167,18 +168,20 @@ export class WorkspaceLayoutService {
     }
 
     const selNodeCount = Math.max(1, this.ctx.nodeEditorTool.selectedVertexIds?.size || 1);
-    propertyPanel?.update(
-      selectedV,
-      toolbar?.activeTool || 'select',
-      penHandler?.penNodeType || 'smooth',
-      penHandler?.vertexCount || 0,
-      selectedGuide,
-      polylineHandler?.vertexCount || 0,
-      this.ctx.canvasMgr.gridAlignmentMode,
-      this.ctx.canvasMgr.grids,
-      this.ctx.canvasMgr.guides,
-      selNodeCount
-    );
+    if (!ColorPickerPopover.isOpen()) {
+      propertyPanel?.update(
+        selectedV,
+        toolbar?.activeTool || 'select',
+        penHandler?.penNodeType || 'smooth',
+        penHandler?.vertexCount || 0,
+        selectedGuide,
+        polylineHandler?.vertexCount || 0,
+        this.ctx.canvasMgr.gridAlignmentMode,
+        this.ctx.canvasMgr.grids,
+        this.ctx.canvasMgr.guides,
+        selNodeCount
+      );
+    }
 
     this.ctx.getVectorExplorerPanel?.()?.update();
   }

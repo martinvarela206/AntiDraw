@@ -3,6 +3,7 @@ import { GridAlignmentMode } from '../../engine/CanvasManager.js';
 import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
 import { SwatchPaletteInspector } from './SwatchPaletteInspector.js';
 import { I18nService } from '../../i18n/I18nService.js';
+import { ColorPickerPopover } from '../ColorPickerPopover.js';
 
 export interface ViewBoxPreset {
   id: string;
@@ -129,7 +130,7 @@ export class CanvasInspector {
         <div class="prop-row">
           <span class="prop-label" title="${isEs ? 'Color con el que se visualiza currentColor en el lienzo' : 'Preview color for currentColor on the canvas'}">${I18nService.t('common.color')}</span>
           <div class="color-picker-row" style="display:flex; gap:4px; align-items:center;">
-            <input type="color" class="color-swatch" id="canvas-currentcolor-color" value="${canvas.currentColor || '#000000'}" />
+            <button type="button" class="color-swatch" id="canvas-currentcolor-color" style="background-color: ${canvas.currentColor || '#000000'};" title="${I18nService.t('common.color')}"></button>
             <input type="text" class="prop-input" id="canvas-currentcolor-hex" value="${canvas.currentColor || '#000000'}" style="flex:1;" />
             <button class="prop-input" id="btn-reset-canvas-currentcolor" style="width:26px; height:24px; padding:0; display:flex; align-items:center; justify-content:center; cursor:pointer;" title="${isEs ? 'Restablecer a negro (#000000)' : 'Reset preview color to black (#000000)'}">⟲</button>
           </div>
@@ -175,7 +176,7 @@ export class CanvasInspector {
         <div class="prop-row">
           <span class="prop-label">${I18nService.t('common.color')}</span>
           <div class="color-picker-row">
-            <input type="color" class="color-swatch" id="canvas-bg-color" value="${canvas.backgroundColor && canvas.backgroundColor.startsWith('#') ? canvas.backgroundColor : '#ffffff'}" />
+            <button type="button" class="color-swatch" id="canvas-bg-color" style="background-color: ${canvas.backgroundColor && canvas.backgroundColor.startsWith('#') ? canvas.backgroundColor : '#ffffff'};" title="${I18nService.t('common.color')}"></button>
             <input type="text" class="prop-input" id="canvas-bg-hex" value="${canvas.backgroundColor || 'none'}" placeholder="${isEs ? 'none o #hex' : 'none or #hex'}" style="flex:1;" />
             <button class="prop-input ${canvas.backgroundColor === 'none' || !canvas.backgroundColor ? 'active' : ''}" id="btn-canvas-bg-none" style="cursor:pointer; width:auto; padding:2px 6px; font-size:10px; font-weight:600;" title="${isEs ? 'Quitar color de fondo (transparente)' : 'Remove background color (transparent)'}">${isEs ? 'Sin fondo' : 'No background'}</button>
           </div>
@@ -206,7 +207,7 @@ export class CanvasInspector {
     const vbHeight = container.querySelector<HTMLInputElement>('#vb-height');
     const viewBoxInput = container.querySelector<HTMLInputElement>('#canvas-viewbox');
     const preserveAspectInput = container.querySelector<HTMLSelectElement>('#canvas-preserve-aspect');
-    const ccColor = container.querySelector<HTMLInputElement>('#canvas-currentcolor-color');
+    const ccColor = container.querySelector<HTMLButtonElement>('#canvas-currentcolor-color');
     const ccHex = container.querySelector<HTMLInputElement>('#canvas-currentcolor-hex');
     const btnResetCc = container.querySelector<HTMLButtonElement>('#btn-reset-canvas-currentcolor');
     const svgFillInput = container.querySelector<HTMLInputElement>('#canvas-svg-fill');
@@ -214,7 +215,7 @@ export class CanvasInspector {
     const svgStrokeWidthInput = container.querySelector<HTMLInputElement>('#canvas-svg-strokewidth');
     const svgLinecapInput = container.querySelector<HTMLSelectElement>('#canvas-svg-linecap');
     const svgLinejoinInput = container.querySelector<HTMLSelectElement>('#canvas-svg-linejoin');
-    const bgColor = container.querySelector<HTMLInputElement>('#canvas-bg-color');
+    const bgColor = container.querySelector<HTMLButtonElement>('#canvas-bg-color');
     const bgHex = container.querySelector<HTMLInputElement>('#canvas-bg-hex');
 
     const syncVbFromNumbers = () => {
@@ -335,7 +336,7 @@ export class CanvasInspector {
 
     const updateCurrentColor = (val: string) => {
       model.canvas.currentColor = val;
-      if (ccColor) ccColor.value = val.startsWith('#') ? val : '#000000';
+      if (ccColor) ccColor.style.backgroundColor = val.startsWith('#') ? val : '#000000';
       if (ccHex) ccHex.value = val;
       callbacks.syncMetadataToHost?.();
       callbacks.onUpdateCanvas();
@@ -343,7 +344,24 @@ export class CanvasInspector {
     };
 
     if (ccColor) {
-      ccColor.addEventListener('input', () => updateCurrentColor(ccColor.value));
+      ccColor.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const initial = model.canvas.currentColor || '#000000';
+        ColorPickerPopover.show({
+          anchorEl: ccColor,
+          initialColor: initial.startsWith('#') ? initial : '#000000',
+          showAlpha: false,
+          onChange: ({ hex }) => {
+            model.canvas.currentColor = hex;
+            ccColor.style.backgroundColor = hex;
+            if (ccHex) ccHex.value = hex;
+            callbacks.onUpdateCanvas();
+          },
+          onCommit: ({ hex }) => {
+            updateCurrentColor(hex);
+          }
+        });
+      });
     }
     if (ccHex) {
       ccHex.addEventListener('change', () => {
@@ -396,17 +414,33 @@ export class CanvasInspector {
     }
 
     if (bgColor) {
-      bgColor.addEventListener('input', () => {
-        model.canvas.backgroundColor = bgColor.value;
-        if (bgHex) bgHex.value = bgColor.value;
-        callbacks.onUpdateCanvas();
+      bgColor.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const initial = model.canvas.backgroundColor && model.canvas.backgroundColor.startsWith('#') ? model.canvas.backgroundColor : '#ffffff';
+        ColorPickerPopover.show({
+          anchorEl: bgColor,
+          initialColor: initial,
+          showAlpha: true,
+          onChange: ({ hex }) => {
+            model.canvas.backgroundColor = hex;
+            bgColor.style.backgroundColor = hex;
+            if (bgHex) bgHex.value = hex;
+            callbacks.onUpdateCanvas();
+          },
+          onCommit: ({ hex }) => {
+            model.canvas.backgroundColor = hex;
+            bgColor.style.backgroundColor = hex;
+            if (bgHex) bgHex.value = hex;
+            callbacks.onUpdateCanvas();
+          }
+        });
       });
     }
     if (bgHex) {
       bgHex.addEventListener('change', () => {
         const val = bgHex.value.trim();
         model.canvas.backgroundColor = val;
-        if (bgColor && val.startsWith('#')) bgColor.value = val;
+        if (bgColor && val.startsWith('#')) bgColor.style.backgroundColor = val;
         callbacks.onUpdateCanvas();
       });
     }

@@ -4,6 +4,7 @@ import { VectorModel } from '../../engine/VectorModel.js';
 import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
 import { bindInspectorMouseDown } from './CanvasInspector.js';
 import { I18nService } from '../../i18n/index.js';
+import { ColorPickerPopover } from '../ColorPickerPopover.js';
 
 /**
  * RulerGuideInspector
@@ -118,7 +119,7 @@ export class RulerGuideInspector {
               <div style="display:flex; align-items:center; gap:8px;">
                 <span class="prop-label" style="width:50px;">${I18nService.t('inspector.stepPx')}</span>
                 <input type="number" class="prop-input" id="grid-spacing-${g.id}" value="${g.spacing}" min="1" step="1" style="flex:1; height:22px;" />
-                <input type="color" class="color-swatch" id="grid-color-${g.id}" value="${g.color?.startsWith('#') ? g.color : '#4f566b'}" style="width:22px; height:22px;" />
+                <button type="button" class="color-swatch" id="grid-color-${g.id}" style="width:22px; height:22px; background-color: ${g.color?.startsWith('#') ? g.color : '#4f566b'};" title="${I18nService.t('common.color')}"></button>
               </div>
             </div>
           `).join('')}
@@ -309,11 +310,26 @@ export class RulerGuideInspector {
         });
       }
 
-      const colInput = container.querySelector<HTMLInputElement>(`#grid-color-${g.id}`);
+      const colInput = container.querySelector<HTMLButtonElement>(`#grid-color-${g.id}`);
       if (colInput) {
-        colInput.addEventListener('input', () => {
-          g.color = colInput.value;
-          if (callbacks.onUpdateGrid) callbacks.onUpdateGrid(g.id, { color: colInput.value });
+        colInput.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const initial = g.color?.startsWith('#') ? g.color : '#4f566b';
+          ColorPickerPopover.show({
+            anchorEl: colInput,
+            initialColor: initial,
+            showAlpha: false,
+            onChange: ({ hex }) => {
+              g.color = hex;
+              colInput.style.backgroundColor = hex;
+              if (callbacks.onUpdateGrid) callbacks.onUpdateGrid(g.id, { color: hex });
+            },
+            onCommit: ({ hex }) => {
+              g.color = hex;
+              colInput.style.backgroundColor = hex;
+              if (callbacks.onUpdateGrid) callbacks.onUpdateGrid(g.id, { color: hex });
+            }
+          });
         });
       }
     });
@@ -443,7 +459,7 @@ export class RulerGuideInspector {
         <div class="prop-row">
           <span class="prop-label">${I18nService.t('common.color')}</span>
           <div class="color-picker-row">
-            <input type="color" class="color-swatch" id="guide-color" value="${currentColor}" />
+            <button type="button" class="color-swatch" id="guide-color" style="background-color: ${currentColor};" title="${I18nService.t('common.color')}"></button>
             <input type="text" class="prop-input" id="guide-color-hex" value="${currentColor}" />
           </div>
         </div>
@@ -471,7 +487,7 @@ export class RulerGuideInspector {
     const angleInput = container.querySelector<HTMLInputElement>('#guide-angle');
     const pivotXInput = container.querySelector<HTMLInputElement>('#guide-pivot-x');
     const pivotYInput = container.querySelector<HTMLInputElement>('#guide-pivot-y');
-    const colorInput = container.querySelector<HTMLInputElement>('#guide-color');
+    const colorInput = container.querySelector<HTMLButtonElement>('#guide-color');
     const colorHexInput = container.querySelector<HTMLInputElement>('#guide-color-hex');
     const lockBtn = container.querySelector<HTMLButtonElement>('#btn-lock-guides');
     const deleteBtn = container.querySelector<HTMLButtonElement>('#btn-delete-guide');
@@ -545,21 +561,41 @@ export class RulerGuideInspector {
     }
 
     if (colorInput) {
-      colorInput.addEventListener('input', () => {
-        const newColor = colorInput.value;
-        if (colorHexInput) colorHexInput.value = newColor;
-        for (const g of guides) {
-          g.color = newColor;
-          callbacks.onUpdateGuide?.(g);
-        }
-        callbacks.onRenderOverlay?.();
+      colorInput.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const initial = currentColor;
+        ColorPickerPopover.show({
+          anchorEl: colorInput,
+          initialColor: initial.startsWith('#') ? initial : '#00ffff',
+          showAlpha: false,
+          onChange: ({ hex }) => {
+            if (colorHexInput) colorHexInput.value = hex;
+            colorInput.style.backgroundColor = hex;
+            for (const g of guides) {
+              g.color = hex;
+              callbacks.onUpdateGuide?.(g);
+            }
+            callbacks.onRenderOverlay?.();
+          },
+          onCommit: ({ hex }) => {
+            callbacks.onPushUndo?.();
+            if (colorHexInput) colorHexInput.value = hex;
+            colorInput.style.backgroundColor = hex;
+            for (const g of guides) {
+              g.color = hex;
+              callbacks.onUpdateGuide?.(g);
+            }
+            callbacks.onRenderOverlay?.();
+          }
+        });
       });
     }
 
     if (colorHexInput) {
       colorHexInput.addEventListener('change', () => {
-        const newColor = colorHexInput.value;
-        if (colorInput) colorInput.value = newColor;
+        const val = colorHexInput.value.trim();
+        const newColor = val.startsWith('#') ? val : `#${val}`;
+        if (colorInput) colorInput.style.backgroundColor = newColor;
         for (const g of guides) {
           g.color = newColor;
           callbacks.onUpdateGuide?.(g);

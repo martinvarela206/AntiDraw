@@ -2,6 +2,7 @@ import { VectorElement, VectorModel } from '../../engine/VectorModel.js';
 import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
 import { ToolIcons } from '../../icons/ToolIcons.js';
 import { I18nService } from '../../i18n/index.js';
+import { ColorPickerPopover } from '../ColorPickerPopover.js';
 
 export interface StrokeMarkerProps {
   markerStart: string;
@@ -153,7 +154,7 @@ export class StrokeMarkerControls {
       <div class="prop-row">
         <span class="prop-label">Mkr Color</span>
         <div class="color-picker-row">
-          <input type="color" class="color-swatch" id="el-marker-color" value="${markerColorDisplay}" />
+          <button type="button" class="color-swatch" id="el-marker-color" style="background-color: ${markerColorDisplay};" title="Color del marcador"></button>
           <input type="text" class="prop-input" id="el-marker-color-hex" value="${isCustomMarkerColor ? markerColor : 'Auto (trazo)'}" placeholder="Auto (trazo)" title="Color del marcador: escribe un código hexadecimal o usa el botón ⟲ para volver al color del trazo" />
           <button class="prop-input" id="btn-reset-marker-color" style="width:26px; height:24px; padding:0; display:flex; align-items:center; justify-content:center; cursor:pointer;" title="Restablecer color al trazo (context-stroke)">⟲</button>
         </div>
@@ -187,7 +188,7 @@ export class StrokeMarkerControls {
     const elMarkerSize = container.querySelector<HTMLInputElement>('#el-marker-size');
     const elMarkerUnits = container.querySelector<HTMLSelectElement>('#el-marker-units');
     const elMarkerLayer = container.querySelector<HTMLSelectElement>('#el-marker-layer');
-    const elMarkerColor = container.querySelector<HTMLInputElement>('#el-marker-color');
+    const elMarkerColor = container.querySelector<HTMLButtonElement>('#el-marker-color');
     const elMarkerColorHex = container.querySelector<HTMLInputElement>('#el-marker-color-hex');
     const btnResetMarkerColor = container.querySelector<HTMLButtonElement>('#btn-reset-marker-color');
 
@@ -317,18 +318,38 @@ export class StrokeMarkerControls {
       if (color === 'context-stroke') {
         delete el.attributes['data-marker-color'];
         if (elMarkerColorHex) elMarkerColorHex.value = 'Auto (trazo)';
+        if (elMarkerColor) {
+          const stroke = el.attributes['stroke'];
+          elMarkerColor.style.backgroundColor = (stroke && stroke.startsWith('#')) ? stroke : '#000000';
+        }
       } else {
         el.attributes['data-marker-color'] = color;
-        if (elMarkerColor) elMarkerColor.value = color;
+        if (elMarkerColor) elMarkerColor.style.backgroundColor = color;
         if (elMarkerColorHex) elMarkerColorHex.value = color;
       }
       refreshActiveMarkers();
     };
 
     if (elMarkerColor) {
-      elMarkerColor.addEventListener('input', () => {
-        if (callbacks.onPushUndo) callbacks.onPushUndo();
-        applyMarkerColor(elMarkerColor.value);
+      elMarkerColor.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const currentCustom = el.attributes['data-marker-color'];
+        const initial = (currentCustom && currentCustom.startsWith('#')) ? currentCustom : (el.attributes['stroke']?.startsWith('#') ? el.attributes['stroke'] : '#000000');
+        ColorPickerPopover.show({
+          anchorEl: elMarkerColor,
+          initialColor: initial,
+          showAlpha: false,
+          onChange: ({ hex }) => {
+            el.attributes['data-marker-color'] = hex;
+            elMarkerColor.style.backgroundColor = hex;
+            if (elMarkerColorHex) elMarkerColorHex.value = hex;
+            refreshActiveMarkers();
+          },
+          onCommit: ({ hex }) => {
+            if (callbacks.onPushUndo) callbacks.onPushUndo();
+            applyMarkerColor(hex);
+          }
+        });
       });
     }
 

@@ -3,6 +3,7 @@ import { AppearanceStackManager, StrokeLayer } from '../../engine/appearance/App
 import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
 import { ToolIcons } from '../../icons/ToolIcons.js';
 import { I18nService } from '../../i18n/index.js';
+import { ColorPickerPopover } from '../ColorPickerPopover.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Modular Multi-Stroke Layer Controls (StrokeLayersControls)
@@ -51,7 +52,7 @@ export class StrokeLayersControls {
 
                 <div style="display:flex; gap:4px; align-items:center;">
                   <!-- Color -->
-                  <input type="color" class="color-swatch input-layer-color" data-layer-id="${l.id}" value="${l.stroke.startsWith('#') ? l.stroke : '#000000'}" style="width:24px; height:24px;" title="Color del trazo secundario" />
+                  <button type="button" class="color-swatch input-layer-color" data-layer-id="${l.id}" style="width:24px; height:24px; background-color: ${l.stroke.startsWith('#') ? l.stroke : '#000000'};" title="Color del trazo secundario"></button>
                   <input type="text" class="prop-input input-layer-hex" data-layer-id="${l.id}" value="${l.stroke}" style="flex:1; font-size:10.5px;" />
                   <!-- Width -->
                   <div style="display:flex; align-items:center; gap:2px; width:60px;">
@@ -110,15 +111,32 @@ export class StrokeLayersControls {
       });
     });
 
-    container.querySelectorAll<HTMLInputElement>('.input-layer-color').forEach((colorInput) => {
-      colorInput.addEventListener('input', () => {
-        const layerId = colorInput.getAttribute('data-layer-id');
+    container.querySelectorAll<HTMLButtonElement>('.input-layer-color').forEach((colorBtn) => {
+      colorBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const layerId = colorBtn.getAttribute('data-layer-id');
         if (!layerId) return;
-        if (callbacks.onPushUndo) callbacks.onPushUndo();
-        AppearanceStackManager.updateStrokeLayer(el, layerId, { stroke: colorInput.value });
-        const hexInput = container.querySelector<HTMLInputElement>(`.input-layer-hex[data-layer-id="${layerId}"]`);
-        if (hexInput) hexInput.value = colorInput.value;
-        callbacks.onUpdateElement(el);
+        const initial = colorBtn.style.backgroundColor || '#000000';
+        ColorPickerPopover.show({
+          anchorEl: colorBtn,
+          initialColor: initial.startsWith('#') ? initial : '#000000',
+          showAlpha: true,
+          onChange: ({ hex }) => {
+            AppearanceStackManager.updateStrokeLayer(el, layerId, { stroke: hex });
+            colorBtn.style.backgroundColor = hex;
+            const hexInput = container.querySelector<HTMLInputElement>(`.input-layer-hex[data-layer-id="${layerId}"]`);
+            if (hexInput) hexInput.value = hex;
+            callbacks.onUpdateElement(el);
+          },
+          onCommit: ({ hex }) => {
+            if (callbacks.onPushUndo) callbacks.onPushUndo();
+            AppearanceStackManager.updateStrokeLayer(el, layerId, { stroke: hex });
+            colorBtn.style.backgroundColor = hex;
+            const hexInput = container.querySelector<HTMLInputElement>(`.input-layer-hex[data-layer-id="${layerId}"]`);
+            if (hexInput) hexInput.value = hex;
+            callbacks.onUpdateElement(el);
+          }
+        });
       });
     });
 
@@ -130,8 +148,8 @@ export class StrokeLayersControls {
         const val = hexInput.value.trim();
         const hex = val.startsWith('#') ? val : `#${val}`;
         AppearanceStackManager.updateStrokeLayer(el, layerId, { stroke: hex });
-        const colorInput = container.querySelector<HTMLInputElement>(`.input-layer-color[data-layer-id="${layerId}"]`);
-        if (colorInput) colorInput.value = hex;
+        const colorBtn = container.querySelector<HTMLButtonElement>(`.input-layer-color[data-layer-id="${layerId}"]`);
+        if (colorBtn) colorBtn.style.backgroundColor = hex;
         callbacks.onUpdateElement(el);
       });
     });

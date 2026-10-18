@@ -3,6 +3,7 @@ import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
 import { bindInspectorMouseDown } from './CanvasInspector.js';
 import { ToolIcons } from '../../icons/ToolIcons.js';
 import { I18nService } from '../../i18n/index.js';
+import { ColorPickerPopover } from '../ColorPickerPopover.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Bi-directional Conversion Between SVG Miter Limit and Degrees
@@ -110,7 +111,7 @@ export class AppearanceInspector {
           <div class="prop-row">
             <span class="prop-label">Color</span>
             <div class="color-picker-row" style="display:flex; gap:4px; align-items:center;">
-              <input type="color" class="color-swatch" id="el-fill-color" value="${isCurrentColor ? '#000000' : (fill === 'none' || fill.startsWith('url') ? '#4f46e5' : fill)}" ${isCurrentColor ? 'disabled title="Color dinámico (currentColor)"' : ''} />
+              <button type="button" class="color-swatch" id="el-fill-color" style="background-color: ${isCurrentColor ? '#000000' : (fill === 'none' || fill.startsWith('url') ? '#4f46e5' : fill)};" title="Seleccionar color de relleno" ${isCurrentColor ? 'disabled title="Color dinámico (currentColor)"' : ''}></button>
               <input type="text" class="prop-input" id="el-fill-hex" value="${fill.startsWith('url') || fill === 'none' ? '#4f46e5' : fill}" placeholder="#hex o currentColor" style="flex:1;" />
               <button class="prop-input ${isCurrentColor ? 'active' : ''}" id="btn-fill-currentcolor" style="cursor:pointer; width:auto; padding:2px 6px; font-size:10px; font-weight:600; ${isCurrentColor ? 'background:#3b82f6; color:#fff;' : 'color:#94a3b8;'}" title="Conmutar currentColor (hereda dinámicamente el color de texto del contexto)">currentColor</button>
             </div>
@@ -175,82 +176,34 @@ export class AppearanceInspector {
                   <span class="prop-coord-sublabel">Ry</span>
                   <input type="number" class="prop-coord-input" id="radial-ry" value="${Math.round((grad.ry ?? grad.rx ?? grad.r ?? 0.5) * 100)}" min="1" max="500" step="5" />
                   <span class="prop-coord-sublabel">%</span>
-        <!-- Solid Color Controls -->
-        <div id="fill-solid-controls" style="${fillType === 'solid' ? '' : 'display:none;'}">
-          <div class="prop-row">
-            <span class="prop-label">Color</span>
-            <div class="color-picker-row">
-              <input type="color" class="color-swatch" id="el-fill-color" value="${fill === 'none' ? '#000000' : fill}" />
-              <input type="text" class="prop-input" id="el-fill-hex" value="${fill}" />
-            </div>
-          </div>
-        </div>
-
-        <!-- Gradient Controls -->
-        <div id="fill-gradient-controls" style="${fillType === 'linear' || fillType === 'radial' ? '' : 'display:none;'}">
-          <!-- Gradient Bar Preview -->
-          <div style="margin: 6px 0 8px 0;">
-            <div id="gradient-bar-preview" style="height: 16px; border-radius: 3px; border: 1px solid var(--border-color); background: ${gradientCss}; cursor: pointer; position: relative;" title="Clic para añadir una parada de color">
-              ${grad.stops.map((s, idx) => `
-                <div class="grad-stop-marker" data-stop-idx="${idx}" style="position: absolute; top: -2px; bottom: -2px; left: calc(${s.offset * 100}% - 4px); width: 8px; border: 1.5px solid #fff; border-radius: 2px; background: ${s.color}; box-shadow: 0 0 2px rgba(0,0,0,0.8); cursor: pointer;" title="Parada ${idx + 1}: ${Math.round(s.offset * 100)}%"></div>
-              `).join('')}
-            </div>
-          </div>
-
-          <!-- Linear Angle Controls -->
-          <div id="container-linear-angle" style="${fillType === 'linear' ? '' : 'display:none;'}">
-            <div class="prop-row">
-              <span class="prop-label">Ángulo</span>
-              <div style="display:flex; gap:4px; flex:1; align-items:center;">
-                <input type="number" class="prop-input" id="gradient-angle" value="${grad.angle ?? 0}" min="0" max="360" step="15" style="width:55px;" />
-                <select class="prop-input" id="gradient-angle-presets" style="cursor:pointer; flex:1;">
-                  <option value="0" ${(grad.angle ?? 0) === 0 ? 'selected' : ''}>0° (→)</option>
-                  <option value="45" ${(grad.angle ?? 0) === 45 ? 'selected' : ''}>45° (↗)</option>
-                  <option value="90" ${(grad.angle ?? 0) === 90 ? 'selected' : ''}>90° (↑)</option>
-                  <option value="135" ${(grad.angle ?? 0) === 135 ? 'selected' : ''}>135° (↖)</option>
-                  <option value="180" ${(grad.angle ?? 0) === 180 ? 'selected' : ''}>180° (←)</option>
-                  <option value="225" ${(grad.angle ?? 0) === 225 ? 'selected' : ''}>225° (↙)</option>
-                  <option value="270" ${(grad.angle ?? 0) === 270 ? 'selected' : ''}>270° (↓)</option>
-                  <option value="315" ${(grad.angle ?? 0) === 315 ? 'selected' : ''}>315° (↘)</option>
-                </select>
-                <button class="prop-input" id="btn-reverse-gradient" style="width: 26px; height: 26px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;" title="Invertir paradas de color">⇄</button>
+                </div>
               </div>
-            </div>
-          </div>
-
-          <!-- Radial Center / Radius / Focus Controls -->
-          <div id="container-radial-params" style="${fillType === 'radial' ? '' : 'display:none;'}">
-            <!-- Center Position (cx, cy) -->
-            <div class="prop-row">
-              <span class="prop-label">Centro</span>
-              <div style="display:flex; gap:4px; flex:1; align-items:center;">
-                <span style="font-size:10px; color:var(--text-muted);">X</span>
-                <input type="number" class="prop-input" id="gradient-radial-cx" value="${Math.round((grad.cx ?? 0.5) * 100)}" min="-100" max="200" step="5" style="width:48px;" title="Posición horizontal del centro (50% = centro del vector)" />
-                <span style="font-size:10px; color:var(--text-muted); margin-left:4px;">Y</span>
-                <input type="number" class="prop-input" id="gradient-radial-cy" value="${Math.round((grad.cy ?? 0.5) * 100)}" min="-100" max="200" step="5" style="width:48px;" title="Posición vertical del centro (50% = centro del vector)" />
-                <button class="prop-input" id="btn-reset-radial-center" style="width: 26px; height: 26px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;" title="Restablecer centro a (50%, 50%)">⟲</button>
-              </div>
-            </div>
-            <!-- Radius (r) -->
-            <div class="prop-row">
-              <span class="prop-label">Radio</span>
-              <div style="display:flex; gap:4px; flex:1; align-items:center;">
-                <input type="number" class="prop-input" id="gradient-radial-r" value="${Math.round((grad.r ?? 0.5) * 100)}" min="5" max="300" step="5" style="width:55px;" title="Radio de difusión radial (50% = cubre hasta los bordes del vector)" />
-                <span style="font-size:11px; color:var(--text-muted);">%</span>
-                <button class="prop-input" id="btn-reverse-radial-gradient" style="width: 26px; height: 26px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; margin-left: auto;" title="Invertir paradas de color">⇄</button>
-              </div>
+              <button class="prop-input" id="btn-reset-radial-radius" style="width: 26px; height: 26px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;" title="Restablecer radios al 50%">⟲</button>
             </div>
             <!-- Focal Point (fx, fy) -->
-            <div class="prop-row">
-              <span class="prop-label">Foco</span>
-              <div style="display:flex; gap:4px; flex:1; align-items:center;">
-                <span style="font-size:10px; color:var(--text-muted);">X</span>
-                <input type="number" class="prop-input" id="gradient-radial-fx" value="${Math.round((grad.fx ?? grad.cx ?? 0.5) * 100)}" min="-100" max="200" step="5" style="width:48px;" title="Punto focal de iluminación horizontal (fx)" />
-                <span style="font-size:10px; color:var(--text-muted); margin-left:4px;">Y</span>
-                <input type="number" class="prop-input" id="gradient-radial-fy" value="${Math.round((grad.fy ?? grad.cy ?? 0.5) * 100)}" min="-100" max="200" step="5" style="width:48px;" title="Punto focal de iluminación vertical (fy)" />
-                <button class="prop-input" id="btn-sync-radial-focus" style="width: 26px; height: 26px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;" title="Igualar foco al centro">⟲</button>
+            <div class="prop-row" style="gap: 6px;">
+              <span class="prop-label" style="width: 46px;" title="Punto focal de iluminación (fx / fy)">Foco</span>
+              <div class="prop-coord-group">
+                <div class="prop-coord-box" title="Posición X del foco (%)">
+                  <span class="prop-coord-sublabel">X</span>
+                  <input type="number" class="prop-coord-input" id="radial-fx" value="${Math.round((grad.fx ?? grad.cx ?? 0.5) * 100)}" min="-100" max="200" step="5" />
+                  <span class="prop-coord-sublabel">%</span>
+                </div>
+                <div class="prop-coord-box" title="Posición Y del foco (%)">
+                  <span class="prop-coord-sublabel">Y</span>
+                  <input type="number" class="prop-coord-input" id="radial-fy" value="${Math.round((grad.fy ?? grad.cy ?? 0.5) * 100)}" min="-100" max="200" step="5" />
+                  <span class="prop-coord-sublabel">%</span>
+                </div>
               </div>
+              <button class="prop-input" id="btn-sync-radial-focus" style="width: 26px; height: 26px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;" title="Igualar foco al centro">⟲</button>
             </div>
+            <!-- Rotation -->
+            <div class="prop-row" style="gap: 6px;">
+              <span class="prop-label" style="width: 46px;">Rotación</span>
+              <input type="number" class="prop-input" id="radial-rotation" value="${grad.rotation ?? 0}" min="0" max="360" step="15" style="flex:1;" />
+              <button class="prop-input" id="btn-reset-radial-rotation" style="width: 26px; height: 26px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;" title="Restablecer rotación a 0°">⟲</button>
+            </div>
+          </div>
 
             <!-- Fill Transformation Locks & Aspect Reset Controls -->
             <div style="margin: 8px 0 6px 0; padding: 6px 0; border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); display: flex; flex-direction: column; gap: 5px;">
@@ -308,7 +261,7 @@ export class AppearanceInspector {
             <div class="prop-row">
               <span class="prop-label">Color</span>
               <div class="color-picker-row">
-                <input type="color" class="color-swatch" id="gradient-stop-color" value="${grad.stops[0]?.color ?? '#4f46e5'}" />
+                <button type="button" class="color-swatch" id="gradient-stop-color" style="background-color: ${grad.stops[0]?.color ?? '#4f46e5'};" title="Seleccionar color de parada"></button>
                 <input type="text" class="prop-input" id="gradient-stop-color-hex" value="${grad.stops[0]?.color ?? '#4f46e5'}" />
               </div>
             </div>
@@ -335,7 +288,7 @@ export class AppearanceInspector {
     const gradControls = container.querySelector<HTMLElement>('#fill-gradient-controls');
     const angleRow = container.querySelector<HTMLElement>('#gradient-angle-row');
     const radialControls = container.querySelector<HTMLElement>('#fill-radial-controls');
-    const elFillColor = container.querySelector<HTMLInputElement>('#el-fill-color');
+    const elFillColor = container.querySelector<HTMLElement>('#el-fill-color');
     const elFillHex = container.querySelector<HTMLInputElement>('#el-fill-hex');
 
     const computeGradientCss = (g: GradientConfig): string => {
@@ -367,7 +320,7 @@ export class AppearanceInspector {
           el.attributes.d = model.compilePathD(el.vertices, true);
         }
       }
-      el.attributes['fill'] = elFillColor?.value || '#4f46e5';
+      el.attributes['fill'] = elFillHex?.value || '#4f46e5';
       delete el.attributes['data-gradient'];
       callbacks.onUpdateElement(el);
       onReRender();
@@ -399,7 +352,7 @@ export class AppearanceInspector {
           el.isClosed = true;
           el.attributes.d = model.compilePathD(el.vertices, true);
         }
-        el.attributes['fill'] = elFillColor?.value || '#4f46e5';
+        el.attributes['fill'] = elFillHex?.value || '#4f46e5';
         delete el.attributes['data-gradient'];
       } else {
         if (!isClosed && el.vertices && el.vertices.length > 2) {
@@ -422,14 +375,14 @@ export class AppearanceInspector {
       if (!stop) return;
       const stopOffset = container.querySelector<HTMLInputElement>('#gradient-stop-offset');
       const stopOpacity = container.querySelector<HTMLInputElement>('#gradient-stop-opacity');
-      const stopColor = container.querySelector<HTMLInputElement>('#gradient-stop-color');
+      const stopColor = container.querySelector<HTMLElement>('#gradient-stop-color');
       const stopColorHex = container.querySelector<HTMLInputElement>('#gradient-stop-color-hex');
       const stopSelect = container.querySelector<HTMLSelectElement>('#gradient-active-stop-select');
       const delStopBtn = container.querySelector<HTMLButtonElement>('#btn-delete-gradient-stop');
 
       if (stopOffset) stopOffset.value = Math.round(stop.offset * 100).toString();
       if (stopOpacity) stopOpacity.value = Math.round(stop.opacity * 100).toString();
-      if (stopColor) stopColor.value = stop.color;
+      if (stopColor) stopColor.style.backgroundColor = stop.color;
       if (stopColorHex) stopColorHex.value = stop.color;
       if (stopSelect) {
         stopSelect.innerHTML = grad.stops
@@ -483,31 +436,55 @@ export class AppearanceInspector {
     }
 
     if (elFillColor) {
-      let isPickingFill = false;
-      elFillColor.addEventListener('pointerdown', () => {
-        if (!isPickingFill && callbacks.onPushUndo) {
-          callbacks.onPushUndo();
-          isPickingFill = true;
-        }
-      });
-      elFillColor.addEventListener('input', () => {
-        if (fillType === 'solid') {
-          if (!isPickingFill && callbacks.onPushUndo) {
-            callbacks.onPushUndo();
-            isPickingFill = true;
-          }
-          el.attributes['fill'] = elFillColor.value;
-          delete el.attributes['data-gradient'];
-          if (elFillHex) elFillHex.value = elFillColor.value;
-          callbacks.onUpdateElement(el);
-        }
-      });
-      elFillColor.addEventListener('change', () => {
-        isPickingFill = false;
-        onReRender();
+      elFillColor.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (el.attributes['fill'] === 'currentColor') return;
+
+        const currentFill = el.attributes['fill'] && el.attributes['fill'] !== 'none' && !el.attributes['fill'].startsWith('url')
+          ? el.attributes['fill']
+          : '#4f46e5';
+        const currentOp = parseFloat(el.attributes['fill-opacity'] || '1');
+
+        ColorPickerPopover.show({
+          anchor: elFillColor,
+          initialColor: currentFill,
+          initialOpacity: currentOp,
+          showAlpha: true,
+          onChange: ({ hex, alpha }) => {
+            if (fillType === 'solid') {
+              el.attributes['fill'] = hex;
+              delete el.attributes['data-gradient'];
+              if (alpha < 1) {
+                el.attributes['fill-opacity'] = alpha.toFixed(2);
+              } else {
+                delete el.attributes['fill-opacity'];
+              }
+              if (elFillHex) elFillHex.value = hex;
+              elFillColor.style.backgroundColor = hex;
+              callbacks.onUpdateElement(el);
+            }
+          },
+          onCommit: () => {
+            if (callbacks.onPushUndo) callbacks.onPushUndo();
+            callbacks.onUpdateElement(el);
+          },
+        });
       });
     }
+
     if (elFillHex) {
+      elFillHex.addEventListener('input', () => {
+        if (fillType === 'solid') {
+          const val = elFillHex.value.trim();
+          if (val.startsWith('#') && (val.length === 4 || val.length === 7 || val.length === 9)) {
+            el.attributes['fill'] = val;
+            delete el.attributes['data-gradient'];
+            if (elFillColor) elFillColor.style.backgroundColor = val;
+            callbacks.onUpdateElement(el);
+          }
+        }
+      });
       elFillHex.addEventListener('change', () => {
         if (fillType === 'solid') {
           if (callbacks.onPushUndo) callbacks.onPushUndo();
@@ -518,7 +495,7 @@ export class AppearanceInspector {
           } else {
             el.attributes['fill'] = val.startsWith('#') || val === 'none' ? val : `#${val}`;
             delete el.attributes['data-gradient'];
-            if (elFillColor) elFillColor.value = el.attributes['fill'];
+            if (elFillColor) elFillColor.style.backgroundColor = el.attributes['fill'];
           }
           callbacks.onUpdateElement(el);
           onReRender();
@@ -559,37 +536,53 @@ export class AppearanceInspector {
       });
     }
 
-    const stopColor = container.querySelector<HTMLInputElement>('#gradient-stop-color');
+    const stopColor = container.querySelector<HTMLElement>('#gradient-stop-color');
     const stopColorHex = container.querySelector<HTMLInputElement>('#gradient-stop-color-hex');
     if (stopColor) {
-      let isPickingStopColor = false;
-      stopColor.addEventListener('pointerdown', () => {
-        if (!isPickingStopColor && callbacks.onPushUndo) {
-          callbacks.onPushUndo();
-          isPickingStopColor = true;
-        }
-      });
-      stopColor.addEventListener('input', () => {
-        if (!isPickingStopColor && callbacks.onPushUndo) {
-          callbacks.onPushUndo();
-          isPickingStopColor = true;
-        }
-        if (grad.stops[activeStopIdx]) {
-          grad.stops[activeStopIdx].color = stopColor.value;
-          if (stopColorHex) stopColorHex.value = stopColor.value;
-          applyFillChanges();
-        }
-      });
-      stopColor.addEventListener('change', () => {
-        isPickingStopColor = false;
+      stopColor.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const curStop = grad.stops[activeStopIdx] || grad.stops[0];
+        if (!curStop) return;
+
+        ColorPickerPopover.show({
+          anchor: stopColor,
+          initialColor: curStop.color || '#4f46e5',
+          initialOpacity: curStop.opacity ?? 1,
+          showAlpha: true,
+          onChange: ({ hex, alpha }) => {
+            if (grad.stops[activeStopIdx]) {
+              grad.stops[activeStopIdx].color = hex;
+              grad.stops[activeStopIdx].opacity = alpha;
+              if (stopColorHex) stopColorHex.value = hex;
+              stopColor.style.backgroundColor = hex;
+              applyFillChanges();
+            }
+          },
+          onCommit: () => {
+            if (callbacks.onPushUndo) callbacks.onPushUndo();
+            applyFillChanges();
+          },
+        });
       });
     }
+
     if (stopColorHex) {
+      stopColorHex.addEventListener('input', () => {
+        const val = stopColorHex.value.trim();
+        if (val.startsWith('#') && (val.length === 4 || val.length === 7)) {
+          if (grad.stops[activeStopIdx]) {
+            grad.stops[activeStopIdx].color = val;
+            if (stopColor) stopColor.style.backgroundColor = val;
+            applyFillChanges();
+          }
+        }
+      });
       stopColorHex.addEventListener('change', () => {
         if (callbacks.onPushUndo) callbacks.onPushUndo();
         if (grad.stops[activeStopIdx]) {
           grad.stops[activeStopIdx].color = stopColorHex.value;
-          if (stopColor) stopColor.value = stopColorHex.value;
+          if (stopColor) stopColor.style.backgroundColor = stopColorHex.value;
           applyFillChanges();
         }
       });

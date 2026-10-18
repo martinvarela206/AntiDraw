@@ -3,6 +3,7 @@ import { GlobalSwatch, GlobalSwatchManager } from '../../engine/color/GlobalSwat
 import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
 import { ToolIcons } from '../../icons/ToolIcons.js';
 import { I18nService } from '../../i18n/index.js';
+import { ColorPickerPopover } from '../ColorPickerPopover.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Modular Swatch Palette Inspector (SwatchPaletteInspector)
@@ -95,7 +96,7 @@ export class SwatchPaletteInspector {
           <div class="prop-row">
             <span class="prop-label">${I18nService.t('common.color')}</span>
             <div style="display:flex; gap:4px; flex:1; align-items:center;">
-              <input type="color" class="color-swatch" id="swatch-edit-color" />
+              <button type="button" class="color-swatch" id="swatch-edit-color" style="background-color: #3b82f6;" title="${I18nService.t('common.color')}"></button>
               <input type="text" class="prop-input" id="swatch-edit-hex" style="flex:1;" />
             </div>
           </div>
@@ -226,7 +227,7 @@ export class SwatchPaletteInspector {
     // Editor Popover
     const editorContainer = container.querySelector<HTMLElement>('#swatch-editor-container');
     const editName = container.querySelector<HTMLInputElement>('#swatch-edit-name');
-    const editColor = container.querySelector<HTMLInputElement>('#swatch-edit-color');
+    const editColor = container.querySelector<HTMLButtonElement>('#swatch-edit-color');
     const editHex = container.querySelector<HTMLInputElement>('#swatch-edit-hex');
     const btnCloseEditor = container.querySelector<HTMLButtonElement>('#btn-close-swatch-editor');
     const btnSaveSwatch = container.querySelector<HTMLButtonElement>('#btn-save-swatch');
@@ -238,7 +239,7 @@ export class SwatchPaletteInspector {
       if (!editorContainer || !editName || !editColor || !editHex) return;
       activeEditingSwatchId = swatch.id;
       editName.value = swatch.name;
-      editColor.value = swatch.color;
+      editColor.style.backgroundColor = swatch.color;
       editHex.value = swatch.color;
       editorContainer.style.display = 'block';
     };
@@ -251,13 +252,28 @@ export class SwatchPaletteInspector {
     }
 
     if (editColor && editHex) {
-      editColor.addEventListener('input', () => {
-        editHex.value = editColor.value;
+      editColor.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const initial = editHex.value || '#3b82f6';
+        ColorPickerPopover.show({
+          anchorEl: editColor,
+          initialColor: initial.startsWith('#') ? initial : '#3b82f6',
+          showAlpha: false,
+          onChange: ({ hex }) => {
+            editHex.value = hex;
+            editColor.style.backgroundColor = hex;
+          },
+          onCommit: ({ hex }) => {
+            editHex.value = hex;
+            editColor.style.backgroundColor = hex;
+          }
+        });
       });
       editHex.addEventListener('change', () => {
         const val = editHex.value.trim();
         const hex = val.startsWith('#') ? val : `#${val}`;
-        editColor.value = hex;
+        editColor.style.backgroundColor = hex;
+        editHex.value = hex;
       });
     }
 

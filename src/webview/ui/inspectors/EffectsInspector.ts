@@ -1,6 +1,7 @@
 import { VectorElement, DropShadowConfig, InnerShadowConfig } from '../../engine/VectorModel.js';
 import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
 import { I18nService } from '../../i18n/index.js';
+import { ColorPickerPopover } from '../ColorPickerPopover.js';
 
 /**
  * EffectsInspector
@@ -42,7 +43,7 @@ export class EffectsInspector {
           <div class="prop-row">
             <span class="prop-label">${I18nService.t('common.color')}</span>
             <div class="color-picker-row">
-              <input type="color" class="color-swatch" id="shadow-drop-color" value="${ds.color || '#000000'}" />
+              <button type="button" class="color-swatch" id="shadow-drop-color" style="background-color: ${ds.color || '#000000'};" title="${I18nService.t('common.color')}"></button>
               <input type="text" class="prop-input" id="shadow-drop-color-hex" value="${ds.color || '#000000'}" />
             </div>
           </div>
@@ -71,7 +72,7 @@ export class EffectsInspector {
           <div class="prop-row">
             <span class="prop-label">${I18nService.t('common.color')}</span>
             <div class="color-picker-row">
-              <input type="color" class="color-swatch" id="shadow-inner-color" value="${is.color || '#000000'}" />
+              <button type="button" class="color-swatch" id="shadow-inner-color" style="background-color: ${is.color || '#000000'};" title="${I18nService.t('common.color')}"></button>
               <input type="text" class="prop-input" id="shadow-inner-color-hex" value="${is.color || '#000000'}" />
             </div>
           </div>
@@ -93,7 +94,7 @@ export class EffectsInspector {
     const shadowDropDy = container.querySelector<HTMLInputElement>('#shadow-drop-dy');
     const shadowDropBlur = container.querySelector<HTMLInputElement>('#shadow-drop-blur');
     const shadowDropOpacity = container.querySelector<HTMLInputElement>('#shadow-drop-opacity');
-    const shadowDropColor = container.querySelector<HTMLInputElement>('#shadow-drop-color');
+    const shadowDropColor = container.querySelector<HTMLButtonElement>('#shadow-drop-color');
     const shadowDropColorHex = container.querySelector<HTMLInputElement>('#shadow-drop-color-hex');
 
     const shadowInnerEnable = container.querySelector<HTMLInputElement>('#shadow-inner-enable');
@@ -102,7 +103,7 @@ export class EffectsInspector {
     const shadowInnerDy = container.querySelector<HTMLInputElement>('#shadow-inner-dy');
     const shadowInnerBlur = container.querySelector<HTMLInputElement>('#shadow-inner-blur');
     const shadowInnerOpacity = container.querySelector<HTMLInputElement>('#shadow-inner-opacity');
-    const shadowInnerColor = container.querySelector<HTMLInputElement>('#shadow-inner-color');
+    const shadowInnerColor = container.querySelector<HTMLButtonElement>('#shadow-inner-color');
     const shadowInnerColorHex = container.querySelector<HTMLInputElement>('#shadow-inner-color-hex');
 
     const applyShadowChanges = () => {
@@ -163,20 +164,33 @@ export class EffectsInspector {
       });
     }
     if (shadowDropColor) {
-      shadowDropColor.addEventListener('input', () => {
-        ds.color = shadowDropColor.value;
-        if (shadowDropColorHex) shadowDropColorHex.value = shadowDropColor.value;
-        applyShadowChanges();
-      });
-      shadowDropColor.addEventListener('change', () => {
-        if (callbacks.onPushUndo) callbacks.onPushUndo();
+      shadowDropColor.addEventListener('click', (e) => {
+        e.stopPropagation();
+        ColorPickerPopover.show({
+          anchorEl: shadowDropColor,
+          initialColor: ds.color || '#000000',
+          showAlpha: false,
+          onChange: ({ hex }) => {
+            ds.color = hex;
+            shadowDropColor.style.backgroundColor = hex;
+            if (shadowDropColorHex) shadowDropColorHex.value = hex;
+            applyShadowChanges();
+          },
+          onCommit: ({ hex }) => {
+            if (callbacks.onPushUndo) callbacks.onPushUndo();
+            ds.color = hex;
+            shadowDropColor.style.backgroundColor = hex;
+            if (shadowDropColorHex) shadowDropColorHex.value = hex;
+            applyShadowChanges();
+          }
+        });
       });
     }
     if (shadowDropColorHex) {
       shadowDropColorHex.addEventListener('change', () => {
         if (callbacks.onPushUndo) callbacks.onPushUndo();
         ds.color = shadowDropColorHex.value;
-        if (shadowDropColor) shadowDropColor.value = shadowDropColorHex.value;
+        if (shadowDropColor) shadowDropColor.style.backgroundColor = shadowDropColorHex.value;
         applyShadowChanges();
       });
     }
@@ -220,20 +234,33 @@ export class EffectsInspector {
       });
     }
     if (shadowInnerColor) {
-      shadowInnerColor.addEventListener('input', () => {
-        is.color = shadowInnerColor.value;
-        if (shadowInnerColorHex) shadowInnerColorHex.value = shadowInnerColor.value;
-        applyShadowChanges();
-      });
-      shadowInnerColor.addEventListener('change', () => {
-        if (callbacks.onPushUndo) callbacks.onPushUndo();
+      shadowInnerColor.addEventListener('click', (e) => {
+        e.stopPropagation();
+        ColorPickerPopover.show({
+          anchorEl: shadowInnerColor,
+          initialColor: is.color || '#000000',
+          showAlpha: false,
+          onChange: ({ hex }) => {
+            is.color = hex;
+            shadowInnerColor.style.backgroundColor = hex;
+            if (shadowInnerColorHex) shadowInnerColorHex.value = hex;
+            applyShadowChanges();
+          },
+          onCommit: ({ hex }) => {
+            if (callbacks.onPushUndo) callbacks.onPushUndo();
+            is.color = hex;
+            shadowInnerColor.style.backgroundColor = hex;
+            if (shadowInnerColorHex) shadowInnerColorHex.value = hex;
+            applyShadowChanges();
+          }
+        });
       });
     }
     if (shadowInnerColorHex) {
       shadowInnerColorHex.addEventListener('change', () => {
         if (callbacks.onPushUndo) callbacks.onPushUndo();
         is.color = shadowInnerColorHex.value;
-        if (shadowInnerColor) shadowInnerColor.value = shadowInnerColorHex.value;
+        if (shadowInnerColor) shadowInnerColor.style.backgroundColor = shadowInnerColorHex.value;
         applyShadowChanges();
       });
     }

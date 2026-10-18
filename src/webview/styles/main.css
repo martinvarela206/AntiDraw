@@ -1082,9 +1082,266 @@ button.prop-input.active {
   width: 24px;
   height: 24px;
   border-radius: 4px;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.2));
   cursor: pointer;
   flex-shrink: 0;
+  position: relative;
+  background-image: repeating-conic-gradient(#808080 0% 25%, #ffffff 0% 50%) 50% / 8px 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: transform 0.1s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.color-swatch:hover:not(:disabled) {
+  border-color: var(--figma-brand, #0d99ff);
+  transform: scale(1.06);
+  box-shadow: 0 0 0 2px rgba(13, 153, 255, 0.25);
+}
+
+.color-swatch:focus-visible {
+  outline: 2px solid var(--figma-brand, #0d99ff);
+  outline-offset: 1px;
+}
+
+.color-swatch:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Figma-Style In-DOM Color Picker Popover */
+.color-picker-popover {
+  position: fixed;
+  z-index: 99999;
+  width: 240px;
+  background: var(--figma-bg-panel, #242424);
+  border: 1px solid var(--figma-border-strong, rgba(255, 255, 255, 0.16));
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.25);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: var(--figma-text-primary, #ffffff);
+  font-family: inherit;
+  font-size: 11px;
+  box-sizing: border-box;
+  user-select: none;
+  animation: cpPopoverFadeIn 0.12s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes cpPopoverFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.color-picker-sv {
+  position: relative;
+  width: 100%;
+  height: 130px;
+  border-radius: 6px;
+  cursor: crosshair;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
+}
+
+.color-picker-sv-white {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to right, #ffffff, transparent);
+}
+
+.color-picker-sv-black {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, #000000, transparent);
+}
+
+.color-picker-sv-handle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.8), inset 0 0 2px rgba(0, 0, 0, 0.5);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.color-picker-sliders-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.color-picker-slider-track {
+  position: relative;
+  width: 100%;
+  height: 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
+}
+
+.color-picker-hue-track {
+  background: linear-gradient(to right,
+    #ff0000 0%, #ffff00 17%, #00ff00 33%,
+    #00ffff 50%, #0000ff 67%, #ff00ff 83%, #ff0000 100%);
+}
+
+.color-picker-alpha-track {
+  background-image: repeating-conic-gradient(#808080 0% 25%, #ffffff 0% 50%) 50% / 8px 8px;
+  overflow: hidden;
+}
+
+.color-picker-alpha-gradient {
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+}
+
+.color-picker-slider-handle {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.color-picker-inputs-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.color-picker-preview-box {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: 1px solid var(--figma-border-subtle, rgba(255, 255, 255, 0.15));
+  background-image: repeating-conic-gradient(#808080 0% 25%, #ffffff 0% 50%) 50% / 8px 8px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.color-picker-preview-swatch {
+  width: 100%;
+  height: 100%;
+}
+
+.color-picker-btn-icon {
+  all: unset;
+  box-sizing: border-box;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  border: 1px solid var(--figma-border-subtle, rgba(255, 255, 255, 0.1));
+  background: var(--figma-bg-input, #1e1e1e);
+  color: var(--figma-text-secondary, #b3b3b3);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.color-picker-btn-icon:hover {
+  background: var(--figma-bg-hover, #333333);
+  color: var(--figma-text-primary, #ffffff);
+}
+
+.color-picker-hex-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background: var(--figma-bg-input, #1e1e1e);
+  border: 1px solid var(--figma-border-subtle, rgba(255, 255, 255, 0.12));
+  border-radius: 4px;
+  padding: 0 6px;
+  gap: 2px;
+}
+
+.color-picker-hex-prefix {
+  color: var(--figma-text-tertiary, #757575);
+  font-family: monospace;
+  font-size: 11px;
+}
+
+.color-picker-hex-input {
+  width: 100%;
+  border: none !important;
+  background: transparent !important;
+  padding: 4px 0 !important;
+  font-family: monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--figma-text-primary, #ffffff);
+  outline: none !important;
+}
+
+.color-picker-alpha-wrap {
+  width: 52px;
+  display: flex;
+  align-items: center;
+  background: var(--figma-bg-input, #1e1e1e);
+  border: 1px solid var(--figma-border-subtle, rgba(255, 255, 255, 0.12));
+  border-radius: 4px;
+  padding: 0 4px;
+}
+
+.color-picker-alpha-input {
+  width: 100%;
+  border: none !important;
+  background: transparent !important;
+  padding: 4px 0 !important;
+  font-family: monospace;
+  font-size: 11px;
+  text-align: right;
+  color: var(--figma-text-primary, #ffffff);
+  outline: none !important;
+}
+
+.color-picker-alpha-suffix {
+  color: var(--figma-text-tertiary, #757575);
+  font-size: 10px;
+  padding-left: 2px;
+}
+
+.color-picker-swatches-section {
+  border-top: 1px solid var(--figma-border-subtle, rgba(255, 255, 255, 0.08));
+  padding-top: 8px;
+}
+
+.color-picker-swatches-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+
+.color-picker-chip {
+  all: unset;
+  box-sizing: border-box;
+  aspect-ratio: 1;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  transition: transform 0.1s ease, border-color 0.15s ease;
+}
+
+.color-picker-chip:hover {
+  transform: scale(1.15);
+  border-color: #ffffff;
+  z-index: 1;
 }
 
 .slider-container {
