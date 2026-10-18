@@ -998,6 +998,7 @@ export class NodeToolHandler implements IToolHandler {
   }
 
   public deactivate(): void {
+    this.subgroupController.miniHud.hide();
     this.cancel();
     this.pendingSingleVertexId = null;
     this.nodeEditorTool.selectedVertexId = null;
@@ -1385,12 +1386,17 @@ export class NodeToolHandler implements IToolHandler {
       }
     }
 
-    // 7. Micro-Bounding Box and Subgroup Transform Overlay for N >= 2 Selected Nodes
+      // 7. Micro-Bounding Box and Subgroup Transform Overlay for N >= 2 Selected Nodes
     if (
       selectedEls.length === 1 &&
       this.marqueeSelector.selectedVertexIds.size >= 2 &&
       this.ctx.getActiveTool() === 'node'
     ) {
+      this.subgroupController.miniHud.show(this.subgroupController.mode, (newMode) => {
+        this.subgroupController.setMode(newMode);
+        this.ctx.renderOverlay();
+      });
+
       const activeEl = this.ghostNodeVertices
         ? { ...selectedEls[0], vertices: this.ghostNodeVertices }
         : selectedEls[0];
@@ -1403,6 +1409,8 @@ export class NodeToolHandler implements IToolHandler {
       if (subgroupHtml) {
         descriptors.push({ type: 'raw', html: subgroupHtml });
       }
+    } else {
+      this.subgroupController.miniHud.hide();
     }
 
     return descriptors;

@@ -60,6 +60,8 @@ export class PolylineToolHandler implements IToolHandler {
     const otherVertices = this.ctx.getOtherVertices();
     this.currentPolylineVertices.forEach((v) => otherVertices.push({ x: v.x, y: v.y }));
     const snappedPt = (e.shiftKey && this.currentPolylineVertices.length > 0) ? evalPt : this.ctx.snapPoint(pt, otherVertices);
+    const z = this.ctx.canvasMgr.zoom || 1;
+    const closeRadius = 14 / z;
 
     // Si hace click en el primer vértice, cerrar polígono
     if (this.currentPolylineVertices.length >= 2) {

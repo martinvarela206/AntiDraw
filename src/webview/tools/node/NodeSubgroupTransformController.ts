@@ -450,12 +450,6 @@ export class NodeSubgroupTransformController {
       });
     }
 
-    // 4. Floating Mini-HUD
-    const hudBox: BoundingBox = this.mode === 'rotate'
-      ? { ...box, y: box.y - 18 / z }
-      : box;
-    html += this.miniHud.renderOverlay(hudBox, this.mode, z);
-
     return html;
   }
 

@@ -3,6 +3,18 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.91.0] - 2026-10-18
+
+### 🚀 Added / 🛠️ Enhanced
+- **Relocalización de la Píldora Contextual Mini-HUD (`SelectionMiniHud`)**:
+  - Se reubicó el panel flotante de modos (`[ ✥ Mover | ⤢ Escalar | ⟳ Rotar ]`) fuera del overlay SVG del lienzo para desacoplarlo por completo del borde superior del bounding box.
+  - El Mini-HUD ahora se ancla directamente dentro del contenedor del área de trabajo (`#canvas-container`), centrado horizontalmente justo por debajo de la regla superior (`.ruler-top-container`).
+  - **Experiencia de edición sin colisiones**: Elimina completamente la obstrucción visual y el secuestro de clics sobre vértices, nodos superiores y tangentes Bézier que antes quedaban cubiertos por el badge sobre el marco de selección.
+  - Implementado como un elemento DOM HTML con aceleración de hardware, estética de vidrio esmerilado Figma (`backdrop-filter: blur(12px)`), tokens de diseño dual (Dark/Light) y sincronización reactiva de estado activo para herramientas de Selección (`SelectToolHandler`) y Nodos (`NodeToolHandler` / `NodeSubgroupTransformController`).
+  - Detección automática de reglas: en modo sin reglas (`.no-rulers`), se posiciona con un margen limpio de 8px en la parte superior del canvas.
+
+---
+
 ## [0.90.0] - 2026-10-18
 
 ### 🚀 Added

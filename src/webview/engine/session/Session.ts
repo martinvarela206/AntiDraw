@@ -131,6 +131,9 @@ export class Session {
 
     this.callbacks.onResetPropertyPanel?.();
 
+    if (tool !== 'select' && tool !== 'stroke') {
+      (this.selectHandler as any)?.deactivate?.();
+    }
     if (tool !== 'polyline') {
       this.polylineHandler.deactivate();
     }

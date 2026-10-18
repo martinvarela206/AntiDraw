@@ -87,6 +87,8 @@ export class AppLayoutManager {
             <canvas id="canvas-hit" style="position:absolute;top:0;left:0;display:none;"></canvas>
           </div>
         </div>
+        <!-- Contextual Floating Mini-HUD (Docked under top ruler) -->
+        <div class="selection-mini-hud" id="selection-mini-hud" style="display:none;" role="toolbar" aria-label="Selection Mode HUD"></div>
       </div>
       <div class="right-panel" id="right-panel"></div>
       <div class="status-bar">

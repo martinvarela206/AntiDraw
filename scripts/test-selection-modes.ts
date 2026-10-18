@@ -343,7 +343,8 @@ export async function runSelectionModesTests(): Promise<boolean> {
   const groupBox = selectionTool.getGroupSelectionBoundingBox([rectEl], 0)!;
   assert(groupBox !== null, 'Mini-HUD: Selection bounding box calculated (100x100 at 100,100)');
 
-  // 5.1 Hit Testing on Mini-HUD Segments
+  // 5.1 Hit Testing on Mini-HUD Segments (Analytical Calculation)
+  miniHud.setDockedMode(false);
   const hudY = groupBox.y - 23; // Default screen offset with zoom 1.0
   const hitMove = miniHud.hitTest(groupBox, { x: groupBox.cx - 68, y: hudY }, 1.0);
   assert(hitMove === 'move', 'Mini-HUD: Hit test at left segment returns "move"');
@@ -381,7 +382,7 @@ export async function runSelectionModesTests(): Promise<boolean> {
   const hudSvgRotate = miniHud.renderOverlay(groupBox, 'rotate', 1.0);
   assert(hudSvgRotate.includes('fill="#8b5cf6"'), 'Mini-HUD SVG: Rotate mode highlights with purple hue (#8b5cf6)');
 
-  // 5.4 One-Click Mode Switching via SelectToolHandler
+  // 5.4 One-Click Mode Switching via SelectToolHandler in un-docked mode
   let hudSelectionChanged = 0;
   const hudCallbacks = {
     onSelectionChanged: () => {
@@ -389,6 +390,7 @@ export async function runSelectionModesTests(): Promise<boolean> {
     },
   };
   const hudSelectHandler = new SelectToolHandler(mockCtx, {} as any, hudCallbacks);
+  (hudSelectHandler as any).transformInteraction.miniHud.setDockedMode(false);
 
   // Click on "move" segment
   selectionTool.selectionMode = 'scale';
@@ -415,6 +417,13 @@ export async function runSelectionModesTests(): Promise<boolean> {
   );
   assert(handledScaleClick === true, 'SelectToolHandler: Pointer down on Scale HUD segment consumed event');
   assert(selectionTool.selectionMode === 'scale', 'SelectToolHandler: Clicking Scale HUD segment switched selectionMode to "scale"');
+
+  // 5.5 Anti-Collision Workspace Top-Ruler Docked Architecture
+  miniHud.setDockedMode(true);
+  const hitDocked = miniHud.hitTest(groupBox, { x: groupBox.cx - 68, y: hudY }, 1.0);
+  assert(hitDocked === null, 'Mini-HUD: Docked mode guarantees zero collision over canvas coordinates (returns null)');
+  assert(miniHud.getHoverCursor(groupBox, { x: groupBox.cx - 68, y: hudY }, 1.0) === null, 'Mini-HUD: Hover cursor returns null in docked mode, leaving vertices unhindered');
+  assert(miniHud.getIsDockedMode() === true, 'Mini-HUD: Operates in workspace top-ruler docked mode by default');
 
   // -----------------------------------------------------------------------------------
   // 6. Ciclo Cromático Secundario por Clics Pausados y Cursores con Micro-Insignia

@@ -8,39 +8,203 @@ export type SelectionHudMode = 'move' | 'scale' | 'rotate';
  * ARCHITECTURAL RATIONALE: Contextual Floating Selection Mini-HUD (SOLID / SRP)
  *
  * 1. Single Responsibility:
- *    Encapsulates rendering and hit-testing for the on-canvas contextual mode badge:
- *    `[ ✥ Mover | ⤢ Escalar | ⟳ Rotar ]`.
+ *    Encapsulates DOM lifecycle, active mode state synchronization, and user interaction
+ *    for the workspace-anchored contextual mode pill: `[ ✥ Mover | ⤢ Escalar | ⟳ Rotar ]`.
  *
- * 2. Ergonomic Mouse-Only Mode Switching:
- *    Eliminates geometric click ambiguity (where bounding box resize corners overlap
- *    identical element vertices needed for precision snapping). Allows instant 1-click
- *    mode toggling without requiring keyboard hotkeys (W/R/E) or traveling across the screen
- *    to the sidebar property panel.
+ * 2. Unobstructed Canvas Workspace (Anti-Collision UX):
+ *    Anchored inside `#canvas-container` immediately beneath the top ruler (`.ruler-top-container`).
+ *    By eliminating on-canvas SVG overlay badges floating directly above the selection bounding box,
+ *    it guarantees 100% collision-free access to vertices, Bézier tangent handles, and upper geometry
+ *    in both Selection (`SelectToolHandler`) and Node editing (`NodeToolHandler`) tools.
  *
- * 3. Physical Screen-Space Invariance:
- *    Projects at constant screen-pixel dimensions (204px width x 26px height) regardless of
- *    canvas zoom scale, providing comfortable, reliable click targets at 10% or 1000% zoom.
+ * 3. Physical Screen-Space Invariance & Accessibility:
+ *    Rendered as hardware-accelerated, crisp HTML elements with Figma-grade frosted glass styling.
+ *    Provides comfortable 24px click targets regardless of canvas zoom scale, with instant 1-click
+ *    mode toggling without requiring hotkeys or traveling to the right inspector panel.
  */
 export class SelectionMiniHud {
   public static readonly HUD_WIDTH = 204;
   public static readonly HUD_HEIGHT = 26;
   public static readonly HUD_RADIUS = 13;
   public static readonly SEGMENT_WIDTH = 68;
-  public static readonly VERTICAL_OFFSET = 23; // Screen pixels above bounding box top edge
+  public static readonly VERTICAL_OFFSET = 23; // Historical screen pixels above bounding box
+
+  private containerEl: HTMLElement | null = null;
+  private currentMode: SelectionHudMode = 'scale';
+  private onSelectCallback: ((mode: SelectionHudMode) => void) | null = null;
+  private isDockedMode: boolean = true;
+  private unsubscribeI18n: (() => void) | null = null;
+
+  constructor() {
+    if (typeof I18nService !== 'undefined' && I18nService.onLanguageChange) {
+      this.unsubscribeI18n = I18nService.onLanguageChange(() => {
+        const el = this.getContainer();
+        if (el) {
+          this.rebuildButtons(el);
+        }
+      });
+    }
+  }
+
+  /**
+   * Resolves or caches the DOM container `#selection-mini-hud`.
+   */
+  public getContainer(): HTMLElement | null {
+    if (this.containerEl && typeof document !== 'undefined' && document.body?.contains && document.body.contains(this.containerEl)) {
+      return this.containerEl;
+    }
+    if (typeof document !== 'undefined' && typeof document.getElementById === 'function') {
+      this.containerEl = document.getElementById('selection-mini-hud');
+    }
+    return this.containerEl;
+  }
+
+  /**
+   * Configures whether the HUD operates in top-ruler docked mode (default) or legacy on-canvas mode.
+   */
+  public setDockedMode(docked: boolean): void {
+    this.isDockedMode = docked;
+  }
+
+  public getIsDockedMode(): boolean {
+    return this.isDockedMode;
+  }
+
+  /**
+   * Displays the floating Mini-HUD docked below the top ruler.
+   *
+   * @param mode Current active selection mode ('move' | 'scale' | 'rotate')
+   * @param onSelect Callback invoked when a mode button is clicked
+   */
+  public show(
+    mode: SelectionHudMode,
+    onSelect: (mode: SelectionHudMode) => void
+  ): void {
+    this.currentMode = mode;
+    this.onSelectCallback = onSelect;
+
+    const el = this.getContainer();
+    if (!el) return;
+
+    if (el.children.length === 0) {
+      this.rebuildButtons(el);
+    } else {
+      this.updateActiveButton(el);
+    }
+    el.style.display = 'flex';
+  }
+
+  /**
+   * Hides the floating Mini-HUD.
+   */
+  public hide(): void {
+    const el = this.getContainer();
+    if (el) {
+      el.style.display = 'none';
+    }
+  }
+
+  /**
+   * Returns whether the floating Mini-HUD is currently visible in the DOM.
+   */
+  public isVisible(): boolean {
+    const el = this.getContainer();
+    return !!el && el.style.display !== 'none';
+  }
+
+  /**
+   * Returns current active mode.
+   */
+  public getMode(): SelectionHudMode {
+    return this.currentMode;
+  }
+
+  /**
+   * Updates the active mode visually without altering callbacks.
+   */
+  public setMode(mode: SelectionHudMode): void {
+    this.currentMode = mode;
+    const el = this.getContainer();
+    if (el) {
+      this.updateActiveButton(el);
+    }
+  }
+
+  /**
+   * Rebuilds the HTML buttons inside the container element with proper localized text.
+   */
+  private rebuildButtons(container: HTMLElement): void {
+    container.innerHTML = `
+      <button type="button" class="mini-hud-btn ${this.currentMode === 'move' ? 'active' : ''}" data-mode="move" title="${I18nService.t('miniHud.moveTitle')}">
+        <span class="mini-hud-icon">✥</span> ${I18nService.t('miniHud.move')}
+      </button>
+      <button type="button" class="mini-hud-btn ${this.currentMode === 'scale' ? 'active' : ''}" data-mode="scale" title="${I18nService.t('miniHud.scaleTitle')}">
+        <span class="mini-hud-icon">⤢</span> ${I18nService.t('miniHud.scale')}
+      </button>
+      <button type="button" class="mini-hud-btn ${this.currentMode === 'rotate' ? 'active' : ''}" data-mode="rotate" title="${I18nService.t('miniHud.rotateTitle')}">
+        <span class="mini-hud-icon">⟳</span> ${I18nService.t('miniHud.rotate')}
+      </button>
+    `;
+
+    const buttons = container.querySelectorAll<HTMLButtonElement>('.mini-hud-btn');
+    buttons.forEach((btn) => {
+      const handleTrigger = (e: Event) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const targetMode = btn.dataset.mode as SelectionHudMode;
+        if (targetMode) {
+          this.currentMode = targetMode;
+          this.updateActiveButton(container);
+          this.onSelectCallback?.(targetMode);
+        }
+      };
+
+      btn.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+      btn.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+      btn.addEventListener('click', handleTrigger);
+    });
+  }
+
+  /**
+   * Updates CSS `.active` classes on buttons matching `this.currentMode`.
+   */
+  private updateActiveButton(container: HTMLElement): void {
+    const buttons = container.querySelectorAll<HTMLButtonElement>('.mini-hud-btn');
+    buttons.forEach((btn) => {
+      if (btn.dataset.mode === this.currentMode) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+  }
 
   /**
    * Tests whether a canvas coordinate point hits any button within the floating Mini-HUD.
+   * In docked mode (default), returns null so canvas coordinates never collide with geometry or vertices.
    *
    * @param groupBox Axis-aligned selection bounding box
    * @param pt Point in canvas coordinates
    * @param zoom Current canvas viewport zoom level
-   * @returns 'move' | 'scale' | 'rotate' if a button was hit, or null
+   * @param forceAnalytical If true, forces analytical calculation regardless of docked state
+   * @returns 'move' | 'scale' | 'rotate' if hit, or null
    */
   public hitTest(
     groupBox: BoundingBox,
     pt: Point,
-    zoom: number
+    zoom: number,
+    forceAnalytical: boolean = false
   ): SelectionHudMode | null {
+    if (this.isDockedMode && !forceAnalytical) {
+      return null;
+    }
+
     const z = zoom || 1;
     const hudCx = groupBox.cx;
     const hudCy = groupBox.y - SelectionMiniHud.VERTICAL_OFFSET / z;
@@ -70,18 +234,24 @@ export class SelectionMiniHud {
 
   /**
    * Returns 'pointer' cursor if hovering over any segment of the Mini-HUD.
+   * In docked mode, returns null so canvas hovering does not alter cursor.
    */
   public getHoverCursor(
     groupBox: BoundingBox,
     pt: Point,
-    zoom: number
+    zoom: number,
+    forceAnalytical: boolean = false
   ): string | null {
-    const hit = this.hitTest(groupBox, pt, zoom);
+    if (this.isDockedMode && !forceAnalytical) {
+      return null;
+    }
+    const hit = this.hitTest(groupBox, pt, zoom, forceAnalytical);
     return hit ? 'pointer' : null;
   }
 
   /**
    * Generates high-fidelity SVG overlay markup for the floating Mini-HUD pill.
+   * Retained for standalone testing and rendering compatibility.
    */
   public renderOverlay(
     groupBox: BoundingBox,

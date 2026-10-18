@@ -715,6 +715,9 @@ export class SelectToolHandler implements IToolHandler {
   }
 
   public deactivate(): void {
+    this.transformInteraction.miniHud.hide();
+    this.isDragging = false;
+    this.activeHandle = null;
     this.cancel();
   }
 

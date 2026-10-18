@@ -560,6 +560,12 @@ export class TransformInteraction {
       const groupBox = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 0);
       if (groupBox) {
         const mode = ctx.selectionTool.selectionMode;
+        const hudMode = (mode === 'distort' ? 'scale' : mode) as import('./SelectionMiniHud.js').SelectionHudMode;
+        this.miniHud.show(hudMode, (newMode) => {
+          ctx.selectionTool.selectionMode = newMode;
+          ctx.renderOverlay();
+        });
+
         const boxStroke = mode === 'distort' ? '#f59e0b' : mode === 'rotate' ? '#8b5cf6' : mode === 'move' ? '#10b981' : '#0d99ff';
         
         // Render bounding box outline across scale/rotate/move modes, visually distinguishing states by hue
@@ -787,9 +793,6 @@ export class TransformInteraction {
         if (activeHandle?.startsWith('distort-') && this.currentScaleSnappedPt) {
           html += `<circle cx="${this.currentScaleSnappedPt.x}" cy="${this.currentScaleSnappedPt.y}" r="${6 / z}" fill="none" stroke="#10b981" stroke-width="1.5" stroke-dasharray="2 2" vector-effect="non-scaling-stroke" />`;
         }
-
-        // Contextual Floating Mini-HUD ([ ✥ Mover | ⤢ Escalar | ⟳ Rotar ])
-        html += this.miniHud.renderOverlay(groupBox, mode, z);
       }
 
       // Radial & Linear Gradient overlay
@@ -803,6 +806,8 @@ export class TransformInteraction {
           }
         });
       }
+    } else {
+      this.miniHud.hide();
     }
 
     // Ghost Transform Vector

@@ -131,8 +131,12 @@ export async function runNodeSubgroupTransformTests(): Promise<boolean> {
 
   // Test Mini-HUD hit
   // HUD is centered at box.cx (15) and box.y - 23/z = -23
+  controller.miniHud.setDockedMode(false);
   const hudHit = controller.hitTest(dummyEl, selectedIds, { x: 15, y: -23 }, 1);
   assert(hudHit !== null && hudHit.type === 'hud', 'Hit-testing Mini-HUD above micro-bounding box detected');
+  controller.miniHud.setDockedMode(true);
+  const hudHitDocked = controller.hitTest(dummyEl, selectedIds, { x: 15, y: -23 }, 1);
+  assert(hudHitDocked === null, 'Mini-HUD in docked mode leaves canvas coordinates collision-free');
 
   // Test 6: Mode Cycling & Keyboard Switches
   controller.setMode('scale');

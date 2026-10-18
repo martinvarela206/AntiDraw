@@ -46,6 +46,8 @@ export class PenToolHandler implements IToolHandler {
     const otherVertices = this.ctx.getOtherVertices();
     this.currentPenVertices.forEach((v) => otherVertices.push({ x: v.x, y: v.y }));
     const snappedPt = (e.shiftKey && this.currentPenVertices.length > 0) ? evalPt : this.ctx.snapPoint(pt, otherVertices);
+    const z = this.ctx.canvasMgr.zoom || 1;
+    const closeRadius = 14 / z;
 
     // Check if clicking start node to close path
     if (this.currentPenVertices.length >= 2) {
