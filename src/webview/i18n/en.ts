@@ -334,6 +334,10 @@ export const en: Translations = {
     segmentConversion: 'Segment Conversion',
     toLine: 'To Straight Line',
     toCurve: 'To Bézier Curve',
+    bezierHandles: 'Bézier Handles',
+    handleIn: 'In Handle',
+    handleOut: 'Out Handle',
+    closeCurve: 'Close Path',
 
     // Guides & Grids
     gridIsometric: 'Isometric Grid',

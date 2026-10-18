@@ -342,6 +342,10 @@ export interface Translations {
     segmentConversion: string;
     toLine: string;
     toCurve: string;
+    bezierHandles: string;
+    handleIn: string;
+    handleOut: string;
+    closeCurve: string;
 
     // Guides & Grids
     gridIsometric: string;

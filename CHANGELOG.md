@@ -3,6 +3,30 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.93.0] - 2026-10-18
+
+### 🚀 Added / 🛠️ Enhanced
+- **Selección Concurrente de Nodos al Clicar Segmentos**:
+  - Al hacer clic sobre cualquier segmento de un trazado con la herramienta de nodos, ahora se seleccionan simultáneamente ambos nodos extremos que delimitan el segmento en lugar de solo uno.
+  - La marquesina de selección interna y el contador de nodos seleccionados reflejan correctamente la selección dual (`selectedCount = 2`), permitiendo transformaciones y operaciones contextuales de segmento de forma inmediata.
+- **Prioridad Absoluta de Tiradores Bézier frente a Segmentos**:
+  - Se corrigió la colisión de interacción donde arrastrar un tirador Bézier adyacente o coincidente con el trazado era secuestrado por la detección de segmento (`hitTestSegment`), provocando el arrastre accidental de todo el segmento y ambos nodos.
+  - Se implementó detección prioritaria universal de tiradores (`hitTestVertices` con verificación de manijas extendidas) antes de evaluar segmentos, garantizando una manipulación fluida y precisa de las tangentes de curvatura.
+- **Conversión de Segmentos Coordinada y Tipos de Nodo (`asymmetric`)**:
+  - Al convertir un segmento a Curva Bézier (`convertSegmentToCurve`), ambos vértices extremos del segmento se actualizan de vértice recto (`sharp`) a nodo asimétrico (`asymmetric`), creando sus tiradores Bézier tangenciales con proyección proporcional al segmento.
+  - Al revertir a línea recta (`convertSegmentToLine`), se eliminan los tiradores correspondientes y el nodo regresa a vértice recto (`sharp`) si no posee otras tangentes activas.
+- **Controles Numéricos de Alta Precisión para Tiradores Bézier y Vértices**:
+  - Se añadieron campos de entrada numérica en el panel de propiedades (`NodeInspector`) para inspeccionar y calibrar al milímetro las coordenadas absolutas de las manijas de control: `In X`, `In Y`, `Out X` y `Out Y`.
+  - Los campos `Position X` y `Position Y` del vértice activo ahora son completamente editables de forma bidireccional con confirmación por teclado (`Enter`, `change`).
+  - Actualización reactiva a 60fps sin interferir con la edición activa del usuario (`activeElement`).
+- **Botón Contextual de Conversión de Segmento y Limpieza de Acciones de Nodo**:
+  - El panel de propiedades ahora muestra un único botón contextual según el estado actual del segmento activo: `[ A Curva Bézier ]` cuando el segmento es recto, o `[ A Línea Recta ]` cuando el segmento es curvo.
+  - Se depuró la sección de `Acciones de Nodo`: se removió el texto plano `✓ (cerrado)` y se estandarizaron las acciones con botones consistentes en grilla con iconos y atajos de teclado (`Cerrar Trazo (Z)`, `Dividir Nodo`, `Unir Nodos (Ctrl+J)`).
+- **Suite de Pruebas Automatizadas**:
+  - Creada la suite `test-node-editing-ux.ts` (suite 37) validando selección dual de segmento, prioridad de hit-testing de manijas, conversión simétrica/asimétrica y renderizado contextual del inspector.
+
+---
+
 ## [0.92.0] - 2026-10-18
 
 ### 🚀 Added / 🛠️ Enhanced

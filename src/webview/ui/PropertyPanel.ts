@@ -12,6 +12,8 @@ export interface PropertyPanelCallbacks {
   onJoinNodes?: () => void;
   onConvertSegmentToLine?: () => void;
   onConvertSegmentToCurve?: () => void;
+  onUpdateNodePosition?: (vertexId: string, pos: Point) => void;
+  onUpdateNodeHandle?: (vertexId: string, handleType: 'handleIn' | 'handleOut', pos: Point) => void;
   onPenNodeTypeChange?: (nodeType: NodeType) => void;
   onFinishPenPath?: (close: boolean) => void;
   onFinishPolylinePath?: (close: boolean) => void;
@@ -886,7 +888,7 @@ export class PropertyPanel {
   private renderNodeProperties(el: VectorElement, v: PathVertex, selectedCount: number = 1): void {
     const isParametric = this.model.isParametricElement(el);
     this.inspectorContainer.innerHTML = NodeInspector.renderHtml(el, v, selectedCount, isParametric);
-    NodeInspector.bindEvents(this.inspectorContainer, this.callbacks, el);
+    NodeInspector.bindEvents(this.inspectorContainer, this.callbacks, el, v);
   }
 
     /**

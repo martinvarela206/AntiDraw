@@ -104,40 +104,27 @@ export class NodeEditorTool {
       }
     }
 
-    // 2. Check handles of selected vertex and adjacent visible handles
-    if (selectedVertexId) {
-      const selIdx = vertices.findIndex((v) => v.id === selectedVertexId);
-      if (selIdx >= 0) {
-        const candidateIndices = [selIdx];
-        const prevIdx = selIdx > 0 ? selIdx - 1 : vertices.length - 1;
-        const nextIdx = (selIdx + 1) % vertices.length;
-        candidateIndices.push(prevIdx, nextIdx);
-
-        for (const idx of candidateIndices) {
-          const v = vertices[idx];
-          if (!v) continue;
-
-          if (v.handleIn) {
-            const dIn = Math.hypot(pt.x - v.handleIn.x, pt.y - v.handleIn.y);
-            const handleLen = Math.hypot(v.handleIn.x - v.x, v.handleIn.y - v.y);
-            // Ignore collapsed handles (< 2px from anchor)
-            if (handleLen >= 2 && dIn <= radius) {
-              // Handle overrides anchor only if it is strictly closer than anchor
-              if (!bestHit || dIn < bestHit.dist) {
-                bestHit = { vertex: v, type: 'handleIn', dist: dIn };
-              }
-            }
+    // 2. Check handles of all vertices with extended handles (handleLen >= 2)
+    for (const v of vertices) {
+      if (v.handleIn) {
+        const dIn = Math.hypot(pt.x - v.handleIn.x, pt.y - v.handleIn.y);
+        const handleLen = Math.hypot(v.handleIn.x - v.x, v.handleIn.y - v.y);
+        // Ignore collapsed handles (< 2px from anchor)
+        if (handleLen >= 2 && dIn <= radius) {
+          // Handle overrides anchor or previous hit if closer
+          if (!bestHit || dIn < bestHit.dist) {
+            bestHit = { vertex: v, type: 'handleIn', dist: dIn };
           }
+        }
+      }
 
-          if (v.handleOut) {
-            const dOut = Math.hypot(pt.x - v.handleOut.x, pt.y - v.handleOut.y);
-            const handleLen = Math.hypot(v.handleOut.x - v.x, v.handleOut.y - v.y);
-            // Ignore collapsed handles (< 2px from anchor)
-            if (handleLen >= 2 && dOut <= radius) {
-              if (!bestHit || dOut < bestHit.dist) {
-                bestHit = { vertex: v, type: 'handleOut', dist: dOut };
-              }
-            }
+      if (v.handleOut) {
+        const dOut = Math.hypot(pt.x - v.handleOut.x, pt.y - v.handleOut.y);
+        const handleLen = Math.hypot(v.handleOut.x - v.x, v.handleOut.y - v.y);
+        // Ignore collapsed handles (< 2px from anchor)
+        if (handleLen >= 2 && dOut <= radius) {
+          if (!bestHit || dOut < bestHit.dist) {
+            bestHit = { vertex: v, type: 'handleOut', dist: dOut };
           }
         }
       }
@@ -240,13 +227,20 @@ export class NodeEditorTool {
 
     return vertices.map((v, idx) => {
       if (idx === segmentIdx) {
-        return { ...v, handleOut: undefined };
+        const hasOther = !!v.handleIn;
+        return {
+          ...v,
+          handleOut: undefined,
+          nodeType: !hasOther ? 'sharp' : v.nodeType,
+        };
       }
       if (idx === nextIdx) {
+        const hasOther = !!v.handleOut;
         return {
           ...v,
           handleIn: undefined,
           command: v.command === 'M' ? 'M' : 'L',
+          nodeType: !hasOther ? 'sharp' : v.nodeType,
         };
       }
       return v;
@@ -273,14 +267,18 @@ export class NodeEditorTool {
 
     return vertices.map((v, idx) => {
       if (idx === segmentIdx) {
-        return { ...v, handleOut: h1 };
+        return {
+          ...v,
+          handleOut: h1,
+          nodeType: v.nodeType === 'sharp' ? 'asymmetric' : v.nodeType,
+        };
       }
       if (idx === nextIdx) {
         return {
           ...v,
           handleIn: h2,
           command: 'C',
-          nodeType: v.nodeType === 'sharp' ? 'smooth' : v.nodeType,
+          nodeType: v.nodeType === 'sharp' ? 'asymmetric' : v.nodeType,
         };
       }
       return v;

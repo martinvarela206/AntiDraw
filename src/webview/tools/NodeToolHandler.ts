@@ -375,6 +375,27 @@ export class NodeToolHandler implements IToolHandler {
         const isAdditive = isShift || isCtrl;
         const wasAlreadySelected = this.marqueeSelector.isVertexSelected(hitNode.vertex.id);
 
+        if (hitNode.type === 'handleIn' || hitNode.type === 'handleOut') {
+          // Dedicated Bézier handle manipulation: isolate active handle and vertex
+          this.pendingSingleVertexId = null;
+          this.marqueeSelector.clearSelection();
+          this.marqueeSelector.selectVertex(hitNode.vertex.id, true);
+          this.nodeEditorTool.selectedVertexId = hitNode.vertex.id;
+          this.nodeEditorTool.selectedHandleType = hitNode.type;
+          this.nodeEditorTool.selectedSegmentIdx = null;
+          this.activeHandle = hitNode.type;
+          this.dragStartPt = { x: pt.x, y: pt.y };
+          this.initialVertices = JSON.parse(JSON.stringify(selectedEl.vertices));
+          this.ghostNodeVertices = null;
+          this.isDragging = true;
+
+          if (this.callbacks.onNodeSelected) {
+            this.callbacks.onNodeSelected(hitNode.vertex, selectedEl, 1);
+          }
+          this.ctx.render();
+          return true;
+        }
+
         /**
          * ARCHITECTURAL RATIONALE: Multi-Vertex Selection Preservation & Shift Toggle
          * 1. Shift / Ctrl Toggle:
@@ -444,6 +465,12 @@ export class NodeToolHandler implements IToolHandler {
       if (hitSegment !== null) {
         this.nodeEditorTool.selectedSegmentIdx = hitSegment;
         const nextIdx = (hitSegment + 1) % selectedEl.vertices.length;
+
+        // Select BOTH bounding vertices of the segment
+        this.marqueeSelector.clearSelection();
+        this.marqueeSelector.selectVertex(selectedEl.vertices[hitSegment].id, true);
+        this.marqueeSelector.selectVertex(selectedEl.vertices[nextIdx].id, true);
+
         this.nodeEditorTool.selectedVertexId = selectedEl.vertices[nextIdx].id;
         this.nodeEditorTool.selectedHandleType = null;
         this.activeHandle = 'segment';
@@ -453,7 +480,7 @@ export class NodeToolHandler implements IToolHandler {
         this.isDragging = true;
 
         if (this.callbacks.onNodeSelected) {
-          this.callbacks.onNodeSelected(selectedEl.vertices[nextIdx], selectedEl);
+          this.callbacks.onNodeSelected(selectedEl.vertices[nextIdx], selectedEl, 2);
         }
         this.ctx.render();
         return true;
@@ -1045,12 +1072,28 @@ export class NodeToolHandler implements IToolHandler {
     if (!selectedEl || !selectedEl.vertices || selectedEl.vertices.length < 2) return;
 
     let segIdx = this.nodeEditorTool.selectedSegmentIdx;
-    if (segIdx === null && this.nodeEditorTool.selectedVertexId) {
-      const vIdx = selectedEl.vertices.findIndex((v) => v.id === this.nodeEditorTool.selectedVertexId);
-      if (vIdx > 0) {
-        segIdx = vIdx - 1;
-      } else if (vIdx === 0 && selectedEl.vertices.length > 2) {
-        segIdx = selectedEl.vertices.length - 1;
+    if (segIdx === null) {
+      const verts = selectedEl.vertices;
+      if (this.marqueeSelector.selectedVertexIds.size === 2) {
+        const indices = Array.from(this.marqueeSelector.selectedVertexIds)
+          .map((id) => verts.findIndex((v) => v.id === id))
+          .filter((idx) => idx !== -1)
+          .sort((a, b) => a - b);
+        if (indices.length === 2) {
+          if (indices[1] === indices[0] + 1) {
+            segIdx = indices[0];
+          } else if (indices[0] === 0 && indices[1] === verts.length - 1) {
+            segIdx = verts.length - 1;
+          }
+        }
+      }
+      if (segIdx === null && this.nodeEditorTool.selectedVertexId) {
+        const vIdx = verts.findIndex((v) => v.id === this.nodeEditorTool.selectedVertexId);
+        if (vIdx > 0) {
+          segIdx = vIdx - 1;
+        } else if (vIdx === 0 && verts.length > 2) {
+          segIdx = verts.length - 1;
+        }
       }
     }
     if (segIdx === null) return;
@@ -1059,7 +1102,14 @@ export class NodeToolHandler implements IToolHandler {
     const isClosed = this.isElementClosed(selectedEl);
     selectedEl.vertices = this.nodeEditorTool.convertSegmentToLine(selectedEl.vertices, segIdx, isClosed);
     selectedEl.attributes.d = this.ctx.model.compilePathD(selectedEl.vertices, isClosed);
+    this.nodeEditorTool.selectedSegmentIdx = segIdx;
     this.ctx.render();
+    if (this.nodeEditorTool.selectedVertexId && this.callbacks.onNodeSelected) {
+      const activeV = selectedEl.vertices.find((v) => v.id === this.nodeEditorTool.selectedVertexId);
+      if (activeV) {
+        this.callbacks.onNodeSelected(activeV, selectedEl, Math.max(1, this.marqueeSelector.selectedVertexIds.size));
+      }
+    }
     this.ctx.syncToHost();
   }
 
@@ -1081,12 +1131,28 @@ export class NodeToolHandler implements IToolHandler {
     }
 
     let segIdx = this.nodeEditorTool.selectedSegmentIdx;
-    if (segIdx === null && this.nodeEditorTool.selectedVertexId) {
-      const vIdx = selectedEl.vertices.findIndex((v) => v.id === this.nodeEditorTool.selectedVertexId);
-      if (vIdx > 0) {
-        segIdx = vIdx - 1;
-      } else if (vIdx === 0 && selectedEl.vertices.length > 2) {
-        segIdx = selectedEl.vertices.length - 1;
+    if (segIdx === null) {
+      const verts = selectedEl.vertices;
+      if (this.marqueeSelector.selectedVertexIds.size === 2) {
+        const indices = Array.from(this.marqueeSelector.selectedVertexIds)
+          .map((id) => verts.findIndex((v) => v.id === id))
+          .filter((idx) => idx !== -1)
+          .sort((a, b) => a - b);
+        if (indices.length === 2) {
+          if (indices[1] === indices[0] + 1) {
+            segIdx = indices[0];
+          } else if (indices[0] === 0 && indices[1] === verts.length - 1) {
+            segIdx = verts.length - 1;
+          }
+        }
+      }
+      if (segIdx === null && this.nodeEditorTool.selectedVertexId) {
+        const vIdx = verts.findIndex((v) => v.id === this.nodeEditorTool.selectedVertexId);
+        if (vIdx > 0) {
+          segIdx = vIdx - 1;
+        } else if (vIdx === 0 && verts.length > 2) {
+          segIdx = verts.length - 1;
+        }
       }
     }
     if (segIdx === null) return;
@@ -1095,13 +1161,51 @@ export class NodeToolHandler implements IToolHandler {
     const isClosed = this.isElementClosed(selectedEl);
     selectedEl.vertices = this.nodeEditorTool.convertSegmentToCurve(selectedEl.vertices, segIdx, isClosed);
     selectedEl.attributes.d = this.ctx.model.compilePathD(selectedEl.vertices, isClosed);
+    this.nodeEditorTool.selectedSegmentIdx = segIdx;
     this.ctx.render();
     if (this.nodeEditorTool.selectedVertexId && this.callbacks.onNodeSelected) {
       const activeV = selectedEl.vertices.find((v) => v.id === this.nodeEditorTool.selectedVertexId);
       if (activeV) {
-        this.callbacks.onNodeSelected(activeV, selectedEl, 1);
+        this.callbacks.onNodeSelected(activeV, selectedEl, Math.max(1, this.marqueeSelector.selectedVertexIds.size));
       }
     }
+    this.ctx.syncToHost();
+  }
+
+  public handleUpdateNodePosition(vertexId: string, pos: Point): void {
+    const selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
+    if (!selectedEl || !selectedEl.vertices) return;
+    const v = selectedEl.vertices.find((item) => item.id === vertexId);
+    if (!v) return;
+
+    this.ctx.pushUndo();
+    const dx = pos.x - v.x;
+    const dy = pos.y - v.y;
+    v.x = pos.x;
+    v.y = pos.y;
+    if (v.handleIn) {
+      v.handleIn.x += dx;
+      v.handleIn.y += dy;
+    }
+    if (v.handleOut) {
+      v.handleOut.x += dx;
+      v.handleOut.y += dy;
+    }
+    const isClosed = this.isElementClosed(selectedEl);
+    selectedEl.attributes.d = this.ctx.model.compilePathD(selectedEl.vertices, isClosed);
+    this.ctx.render();
+    this.ctx.syncToHost();
+  }
+
+  public handleUpdateNodeHandle(vertexId: string, handleType: 'handleIn' | 'handleOut', pos: Point): void {
+    const selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
+    if (!selectedEl || !selectedEl.vertices) return;
+
+    this.ctx.pushUndo();
+    selectedEl.vertices = this.nodeEditorTool.moveHandle(selectedEl.vertices, vertexId, handleType, pos);
+    const isClosed = this.isElementClosed(selectedEl);
+    selectedEl.attributes.d = this.ctx.model.compilePathD(selectedEl.vertices, isClosed);
+    this.ctx.render();
     this.ctx.syncToHost();
   }
 

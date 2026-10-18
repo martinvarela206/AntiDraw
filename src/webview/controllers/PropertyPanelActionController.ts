@@ -65,6 +65,12 @@ export class PropertyPanelActionController {
       onJoinNodes: () => tools.nodeToolHandler.handleJoinSelectedNodes(),
       onConvertSegmentToLine: () => tools.nodeToolHandler.handleConvertSegmentToLine(),
       onConvertSegmentToCurve: () => tools.nodeToolHandler.handleConvertSegmentToCurve(),
+      onUpdateNodePosition: (vertexId: string, pos: Point) => {
+        tools.nodeToolHandler.handleUpdateNodePosition(vertexId, pos);
+      },
+      onUpdateNodeHandle: (vertexId: string, handleType: 'handleIn' | 'handleOut', pos: Point) => {
+        tools.nodeToolHandler.handleUpdateNodeHandle(vertexId, handleType, pos);
+      },
       onPenNodeTypeChange: (nodeType: NodeType) => {
         tools.penToolHandler.penNodeType = nodeType;
         s.workspaceLayout.render();
