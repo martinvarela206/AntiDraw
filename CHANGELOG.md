@@ -3,6 +3,23 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.88.1] - 2026-10-18
+
+### 🚀 Added
+- **Storage Mode Choice Gate (`ImageStorageChoiceModal`)**: Added an interactive ingestion dialog prompted whenever an image is added via toolbar, drag-and-drop, or clipboard paste, allowing users to explicitly choose between:
+  - *Linked Asset* (`./[svgName]_[id]_img.ext`): keeps SVG XML lightweight and portable with clean Git diffs.
+  - *Embedded Data URI* (`data:image/...;base64`): creates a 100% self-contained standalone SVG.
+  - *Save for Web Optimizer*: 1-click transition to granular dimension downscaling, color quantization, and compression.
+
+### 🛠️ Fixed
+- **Omnichannel Drag & Drop Interception**: Fixed an issue where dragging an image into the AntiDraw canvas caused VS Code to open the image in a new tab with the image preview plugin. Drag events (`dragenter`, `dragover`, `dragleave`, `drop`) are now captured at window root level in the capture phase, supporting both OS file drops (`File` blobs) and VS Code Explorer sidebar drops (`text/uri-list`).
+- **Webview Relative Image Resolution & 404 Prevention**: Fixed broken image placeholder icon when saving linked relative assets (`./name.png`) by configuring `<base href>` in the webview head and providing an in-memory live asset resolver in `SvgDomRenderer`.
+- **Image Bounding Box Hit-Testing**: Fixed an issue where `<image>` elements could only be selected by clicking their perimeter edges. `<image>` elements are now recognized as solid bodies in `HitTestService`, allowing instant selection and transformation when clicking anywhere inside their bounding box.
+- **Canvas Click Flicker**: Resolved the flickering of broken image icons upon clicking anywhere on the document by eliminating 404 reload cycles during reactive canvas re-renders.
+- **Local Test Scratch Artifacts**: Added `sample_test_*` to `.gitignore` and `.vscodeignore` to ensure temporary test assets never pollute repository commits or VSIX package bundles.
+
+---
+
 ## [0.88.0] - 2026-10-18
 
 ### 🚀 Added
@@ -20,12 +37,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Linked Asset Storage & Naming Standard**: Ability to copy and link images on disk alongside the SVG document (`[svgName]_[imageId]_img.[ext]`) keeping the SVG XML lightweight and portable, as well as embedding as standard Base64 Data URIs.
 - **W3C SVG Image Serialization & Roundtrip**: Lossless deserialization and serialization of `<image>` and `<pattern>` nodes in `SvgSerializer` and `SvgDeserializer` adhering strictly to W3C standards.
 - **Bilingual Localization (ES / EN)**: Full symmetrical localization for all new modal options, tooltips, and image workflow notifications.
-
-### 🛠️ Fixed
-- **Omnichannel Drag & Drop Interception**: Fixed an issue where dragging an image into the AntiDraw canvas caused VS Code to open the image in a new tab with the image preview plugin. Drag events (`dragenter`, `dragover`, `dragleave`, `drop`) are now captured at window root level in the capture phase, supporting both OS file drops (`File` blobs) and VS Code Explorer sidebar drops (`text/uri-list`).
-- **Webview Relative Image Resolution & 404 Prevention**: Fixed broken image placeholder icon when saving linked relative assets (`./name.png`) by configuring `<base href>` in the webview head and providing an in-memory live asset resolver in `SvgDomRenderer`.
-- **Image Bounding Box Hit-Testing**: Fixed an issue where `<image>` elements could only be selected by clicking their perimeter edges. `<image>` elements are now recognized as solid bodies in `HitTestService`, allowing instant selection and transformation when clicking anywhere inside their bounding box.
-- **Canvas Click Flicker**: Resolved the flickering of broken image icons upon clicking anywhere on the document by eliminating 404 reload cycles during reactive canvas re-renders.
 
 ---
 
