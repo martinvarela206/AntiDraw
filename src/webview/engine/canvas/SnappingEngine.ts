@@ -347,27 +347,6 @@ export class SnappingEngine {
           const cos30 = Math.sqrt(3) / 2;
           const sin30 = 0.5;
 
-          if (grid.alignmentMode === 'cell-center') {
-            // Isometric diamond cell centers and triangle barycenters
-            const relX = pt.x - phaseX;
-            const relY = pt.y - phaseY;
-            const kX = Math.round(relX / tileW);
-            const kY = Math.round(relY / rowSpacing);
-
-            // Candidate cell center in alternating isometric lattice
-            const candidateCenterX = phaseX + kX * tileW + (Math.abs(kY) % 2 === 1 ? colSpacing : 0);
-            const candidateCenterY = phaseY + kY * rowSpacing;
-            const distCenter = Math.hypot(pt.x - candidateCenterX, pt.y - candidateCenterY);
-
-            if (distCenter <= threshold) {
-              snappedX = candidateCenterX;
-              snappedY = candidateCenterY;
-              xSnapped = true;
-              ySnapped = true;
-              break;
-            }
-          }
-
           const relX = pt.x - phaseX;
           const relY = pt.y - phaseY;
 
@@ -394,40 +373,74 @@ export class SnappingEngine {
           const proj2X = pt.x - signedDist2 * sin30;
           const proj2Y = pt.y - signedDist2 * cos30;
 
-          // 4. Analytical Intersections
-          // a) Intersection of +30° and -30° diagonals
-          const interYDiag = phaseY + (c1Snap + c2Snap) / 2;
-          const interXDiag = phaseX + (c2Snap - c1Snap) * cos30;
-          const distInterDiag = Math.hypot(pt.x - interXDiag, pt.y - interYDiag);
+          // Analytical Candidates:
+          // Point 1: Intersections (diagonal-diagonal and diagonal-vertical)
+          // Point 2: Cell centers (diamond centers)
+          // Point 3: Segment midpoints (midpoints along vertical and diagonal segments)
+          const candidates: Point[] = [];
 
-          // b) Intersection of +30° diagonal with vertical line
-          const interYV1 = phaseY + m * (snapColX - phaseX) + c1Snap;
-          const distInterV1 = Math.hypot(pt.x - snapColX, pt.y - interYV1);
+          // 1. Intersections
+          candidates.push({
+            x: phaseX + (c2Snap - c1Snap) * cos30,
+            y: phaseY + (c1Snap + c2Snap) / 2,
+          });
+          candidates.push({
+            x: snapColX,
+            y: phaseY + m * (snapColX - phaseX) + c1Snap,
+          });
+          candidates.push({
+            x: snapColX,
+            y: phaseY - m * (snapColX - phaseX) + c2Snap,
+          });
 
-          // c) Intersection of -30° diagonal with vertical line
-          const interYV2 = phaseY - m * (snapColX - phaseX) + c2Snap;
-          const distInterV2 = Math.hypot(pt.x - snapColX, pt.y - interYV2);
-
-          // Prioritize closest intersection within threshold
-          let bestInterDist = threshold + 1;
-          let bestInterPt: Point | null = null;
-
-          if (distInterDiag <= threshold && distInterDiag < bestInterDist) {
-            bestInterDist = distInterDiag;
-            bestInterPt = { x: interXDiag, y: interYDiag };
+          // 2. Cell Centers (Diamond Centers)
+          const kXDia = Math.round(relX / tileW);
+          const kYDia = Math.round(relY / rowSpacing);
+          for (let dx = -1; dx <= 1; dx++) {
+            for (let dy = -1; dy <= 1; dy++) {
+              const curKX = kXDia + dx;
+              const curKY = kYDia + dy;
+              candidates.push({
+                x: phaseX + curKX * tileW + (Math.abs(curKY) % 2 === 1 ? colSpacing : 0),
+                y: phaseY + curKY * rowSpacing,
+              });
+            }
           }
-          if (distInterV1 <= threshold && distInterV1 < bestInterDist) {
-            bestInterDist = distInterV1;
-            bestInterPt = { x: snapColX, y: interYV1 };
-          }
-          if (distInterV2 <= threshold && distInterV2 < bestInterDist) {
-            bestInterDist = distInterV2;
-            bestInterPt = { x: snapColX, y: interYV2 };
+
+          // 3. Segment Midpoints
+          // Vertical segment midpoints
+          candidates.push({
+            x: snapColX,
+            y: phaseY + m * (snapColX - phaseX) + c1Snap + rowSpacing / 2,
+          });
+          candidates.push({
+            x: snapColX,
+            y: phaseY - m * (snapColX - phaseX) + c2Snap + rowSpacing / 2,
+          });
+          // Diagonal segment midpoints
+          candidates.push({
+            x: phaseX + (c2Snap - c1Snap) * cos30 + (cos30 * rowSpacing) / 2,
+            y: phaseY + (c1Snap + c2Snap) / 2 + rowSpacing / 4,
+          });
+          candidates.push({
+            x: phaseX + (c2Snap - c1Snap) * cos30 - (cos30 * rowSpacing) / 2,
+            y: phaseY + (c1Snap + c2Snap) / 2 + rowSpacing / 4,
+          });
+
+          // Prioritize closest keypoint within threshold
+          let bestDist = threshold + 1;
+          let bestPt: Point | null = null;
+          for (const cand of candidates) {
+            const d = Math.hypot(pt.x - cand.x, pt.y - cand.y);
+            if (d <= threshold && d < bestDist) {
+              bestDist = d;
+              bestPt = cand;
+            }
           }
 
-          if (bestInterPt) {
-            snappedX = bestInterPt.x;
-            snappedY = bestInterPt.y;
+          if (bestPt) {
+            snappedX = bestPt.x;
+            snappedY = bestPt.y;
             xSnapped = true;
             ySnapped = true;
             break;
@@ -452,28 +465,14 @@ export class SnappingEngine {
           }
         } else if (grid.type === 'axonometric') {
           /**
-           * ARCHITECTURAL RATIONALE: Rigorous Axonometric Grid Snapping
-           * Continuous sliding projection onto ±45° diagonals and intersection snapping.
+           * ARCHITECTURAL RATIONALE: Unified Axonometric Grid Snapping
+           * Concurrently snaps to:
+           * 1. Intersections: ±45° diagonal crossings and diagonal-vertical vertices
+           * 2. Cell Centers: Center of square axonometric tiles
+           * 3. Segment Midpoints: Halfway along vertical and diagonal segments
            */
           const tileW = S;
           const tileH = S;
-
-          if (grid.alignmentMode === 'cell-center') {
-            const relX = pt.x - phaseX;
-            const relY = pt.y - phaseY;
-            const kX = Math.round((relX - tileW / 2) / tileW);
-            const kY = Math.round((relY - tileH / 2) / tileH);
-            const candidateCenterX = phaseX + kX * tileW + tileW / 2;
-            const candidateCenterY = phaseY + kY * tileH + tileH / 2;
-            const distCenter = Math.hypot(pt.x - candidateCenterX, pt.y - candidateCenterY);
-            if (distCenter <= threshold) {
-              snappedX = candidateCenterX;
-              snappedY = candidateCenterY;
-              xSnapped = true;
-              ySnapped = true;
-              break;
-            }
-          }
 
           const relX = pt.x - phaseX;
           const relY = pt.y - phaseY;
@@ -501,36 +500,53 @@ export class SnappingEngine {
           const proj2X = pt.x - signedDist2 / Math.SQRT2;
           const proj2Y = pt.y - signedDist2 / Math.SQRT2;
 
-          // Intersections
+          // 2D Candidate Keypoints:
+          // 1. Intersections
           const ixDiag = phaseX + (c2Snap - c1Snap) / 2;
           const iyDiag = phaseY + (c1Snap + c2Snap) / 2;
-          const distInterDiag = Math.hypot(pt.x - ixDiag, pt.y - iyDiag);
-
           const iyV1 = phaseY + (snapX - phaseX) + c1Snap;
-          const distInterV1 = Math.hypot(pt.x - snapX, pt.y - iyV1);
-
           const iyV2 = phaseY - (snapX - phaseX) + c2Snap;
-          const distInterV2 = Math.hypot(pt.x - snapX, pt.y - iyV2);
 
-          let bestInterDist = threshold + 1;
-          let bestInterPt: Point | null = null;
+          // 2. Cell Centers
+          const kXCenter = Math.round((relX - tileW / 2) / tileW);
+          const kYCenter = Math.round((relY - tileH / 2) / tileH);
+          const centerX = phaseX + kXCenter * tileW + tileW / 2;
+          const centerY = phaseY + kYCenter * tileH + tileH / 2;
 
-          if (distInterDiag <= threshold && distInterDiag < bestInterDist) {
-            bestInterDist = distInterDiag;
-            bestInterPt = { x: ixDiag, y: iyDiag };
-          }
-          if (distInterV1 <= threshold && distInterV1 < bestInterDist) {
-            bestInterDist = distInterV1;
-            bestInterPt = { x: snapX, y: iyV1 };
-          }
-          if (distInterV2 <= threshold && distInterV2 < bestInterDist) {
-            bestInterDist = distInterV2;
-            bestInterPt = { x: snapX, y: iyV2 };
+          // 3. Segment Midpoints
+          const kYMid = Math.round((relY - tileH / 2) / tileH);
+          const midYV = phaseY + kYMid * tileH + tileH / 2;
+          const kXMid = Math.round((relX - tileW / 2) / tileW);
+          const midXH = phaseX + kXMid * tileW + tileW / 2;
+          const midXDiag1 = ixDiag + tileW / 4;
+          const midYDiag1 = iyDiag + tileH / 4;
+          const midXDiag2 = ixDiag - tileW / 4;
+          const midYDiag2 = iyDiag - tileH / 4;
+
+          const candidates: Point[] = [
+            { x: ixDiag, y: iyDiag },
+            { x: snapX, y: iyV1 },
+            { x: snapX, y: iyV2 },
+            { x: centerX, y: centerY },
+            { x: snapX, y: midYV },
+            { x: midXH, y: phaseY + Math.round(relY / tileH) * tileH },
+            { x: midXDiag1, y: midYDiag1 },
+            { x: midXDiag2, y: midYDiag2 },
+          ];
+
+          let bestDist = threshold + 1;
+          let bestPt: Point | null = null;
+          for (const cand of candidates) {
+            const d = Math.hypot(pt.x - cand.x, pt.y - cand.y);
+            if (d <= threshold && d < bestDist) {
+              bestDist = d;
+              bestPt = cand;
+            }
           }
 
-          if (bestInterPt) {
-            snappedX = bestInterPt.x;
-            snappedY = bestInterPt.y;
+          if (bestPt) {
+            snappedX = bestPt.x;
+            snappedY = bestPt.y;
             xSnapped = true;
             ySnapped = true;
             break;
@@ -553,37 +569,50 @@ export class SnappingEngine {
             xSnapped = true;
           }
         } else {
-          // ARCHITECTURAL RATIONALE: Orthogonal Grid Barycentric / Cell-Center Snapping
-          // Why phase shift (+S/2, +S/2) is applied strictly to snapping targets:
-          // 1. Decoupled Snapping Coordinates: The visual grid lines remain anchored at (origX, origY)
-          //    defining boundary segments [k*S, (k+1)*S]. Cell centers are geometrically at (k + 0.5) * S.
-          // 2. Pixel Precision Alignment:
-          //    For a 1px x 1px grid (S = 1), vertices snap to 0.5, 1.5, 2.5... which places 1px vector
-          //    strokes dead-center inside the pixel cell, rendering cleanly between integer boundaries
-          //    without fuzzy subpixel anti-aliasing.
-          // 3. Coordinate Symmetry: Works identically across positive and negative quadrants.
-          if (grid.alignmentMode === 'cell-center') {
-            phaseX += S / 2;
-            phaseY += S / 2;
+          /**
+           * ARCHITECTURAL RATIONALE: Comprehensive Orthogonal Grid Snapping
+           * Natively integrates 3 concurrent snapping targets without requiring manual mode toggling:
+           * 1. Grid Line Intersections / Corners (k * S, m * S)
+           * 2. Cell Centers ((k + 0.5) * S, (m + 0.5) * S)
+           * 3. Grid Line Segment Midpoints ((k + 0.5) * S, m * S) and (k * S, (m + 0.5) * S)
+           */
+          const halfS = S / 2;
+          const kXHalf = Math.round((pt.x - phaseX) / halfS);
+          const kYHalf = Math.round((pt.y - phaseY) / halfS);
+          const candX = phaseX + kXHalf * halfS;
+          const candY = phaseY + kYHalf * halfS;
+          const dist2D = Math.hypot(pt.x - candX, pt.y - candY);
+
+          // 1. Prioritize 2D Keypoint Snap: Intersections (1), Cell Centers (2), and Segment Midpoints (3)
+          if (dist2D <= threshold) {
+            snappedX = candX;
+            snappedY = candY;
+            xSnapped = true;
+            ySnapped = true;
+            break;
           }
 
-          const relX = pt.x - phaseX;
-          const relY = pt.y - phaseY;
-
+          // 2. Continuous 1D Line Projections (Grid lines prioritized, then half-step lines)
           if (!xSnapped) {
-            const kX = Math.round(relX / S);
-            const targetX = phaseX + kX * S;
-            if (Math.abs(pt.x - targetX) <= threshold) {
-              snappedX = targetX;
+            const kXFull = Math.round((pt.x - phaseX) / S);
+            const lineXFull = phaseX + kXFull * S;
+            if (Math.abs(pt.x - lineXFull) <= threshold) {
+              snappedX = lineXFull;
+              xSnapped = true;
+            } else if (Math.abs(pt.x - candX) <= threshold) {
+              snappedX = candX;
               xSnapped = true;
             }
           }
 
           if (!ySnapped) {
-            const kY = Math.round(relY / S);
-            const targetY = phaseY + kY * S;
-            if (Math.abs(pt.y - targetY) <= threshold) {
-              snappedY = targetY;
+            const kYFull = Math.round((pt.y - phaseY) / S);
+            const lineYFull = phaseY + kYFull * S;
+            if (Math.abs(pt.y - lineYFull) <= threshold) {
+              snappedY = lineYFull;
+              ySnapped = true;
+            } else if (Math.abs(pt.y - candY) <= threshold) {
+              snappedY = candY;
               ySnapped = true;
             }
           }

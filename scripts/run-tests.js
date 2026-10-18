@@ -66,8 +66,9 @@ async function main() {
   const ok33 = await runSuite(path.join(__dirname, 'test-i18n-system.ts'), 'runI18nSystemTests');
   const ok34 = await runSuite(path.join(__dirname, 'test-image-optimization.ts'), 'runImageOptimizationTests');
   const ok35 = await runSuite(path.join(__dirname, 'test-hairline-and-angle-constraints.ts'), 'runHairlineAndAngleConstraintsTests');
+  const ok36 = await runSuite(path.join(__dirname, 'test-unified-grid-snapping.ts'), 'runUnifiedGridSnappingTests');
 
-  const results = [ok1, ok2, ok3, ok4, ok5, ok6, ok7, ok8, ok9, ok10, ok11, ok12, ok13, ok14, ok15, ok16, ok17, ok18, ok19, ok20, ok21, ok22, ok23, ok24, ok25, ok26, ok27, ok28, ok29, ok30, ok31, ok32, ok33, ok34, ok35];
+  const results = [ok1, ok2, ok3, ok4, ok5, ok6, ok7, ok8, ok9, ok10, ok11, ok12, ok13, ok14, ok15, ok16, ok17, ok18, ok19, ok20, ok21, ok22, ok23, ok24, ok25, ok26, ok27, ok28, ok29, ok30, ok31, ok32, ok33, ok34, ok35, ok36];
   results.forEach((r, i) => {
     if (!r) console.error(`❌ Suite ok${i + 1} returned false!`);
   });

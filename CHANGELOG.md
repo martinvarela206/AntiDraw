@@ -3,6 +3,23 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.92.0] - 2026-10-18
+
+### 🚀 Added / 🛠️ Enhanced
+- **Atracción Magnética Unificada Multi-Objetivo a Grilla (`SnappingEngine`)**:
+  - Se unificó el cálculo de snap a grillas ortogonales, isométricas y axonométricas para contemplar de manera simultánea e interactiva los 3 tipos de anclaje esenciales sin requerir alternar modos:
+    1. **Punto 1 (Intersecciones)**: Cruce analítico de líneas de grilla (líneas ortogonales, diagonales ±30° isométricas, diagonales ±45° axonométricas y ejes verticales).
+    2. **Punto 2 (Centros de Celda)**: Baricentro y punto medio de las celdas o rombos formados por la malla.
+    3. **Punto 3 (Puntos Medios de Segmento)**: Puntos medios exactos de cada segmento que delimita las celdas de la grilla (líneas horizontales, verticales y diagonales).
+  - Admite deslizamiento magnético continuo sobre líneas de grilla cuando el cursor no se encuentra en la proximidad directa de un vértice o centro de celda.
+- **Simplificación y Depuración de Interfaz**:
+  - Se eliminaron las opciones manuales y redundantes de alternar snap ("Línea (0,0)" y "Celda (0,0)") tanto de la barra de estado inferior (`AppLayoutManager`) como de los inspectores de propiedades (`CanvasInspector` y `RulerGuideInspector`).
+  - La activación del snap a grilla ahora abarca automáticamente y sin fricción cognitiva todos los puntos clave de construcción geométrica.
+- **Suite de Pruebas Automatizadas**:
+  - Incorporada la suite de validación `test-unified-grid-snapping.ts` cubriendo la atracción magnética concurrente en grillas ortogonales, isométricas y axonométricas.
+
+---
+
 ## [0.91.0] - 2026-10-18
 
 ### 🚀 Added / 🛠️ Enhanced

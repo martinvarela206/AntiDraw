@@ -98,10 +98,6 @@ export class AppLayoutManager {
         </div>
         <div class="status-right">
           <button class="status-btn" id="btn-canvas-props" title="${I18nService.t('statusbar.canvasPropsTooltip')}">${ToolIcons.canvasTool} <span id="status-canvas-text">${I18nService.t('toolbar.canvas')}</span></button>
-          <div class="status-grid-align-group" style="display:inline-flex; gap:2px;">
-            <button class="status-btn" id="status-grid-align-origin" title="${I18nService.t('statusbar.gridAlignOriginTooltip')}">${I18nService.t('statusbar.gridAlignOrigin')}</button>
-            <button class="status-btn" id="status-grid-align-center" title="${I18nService.t('statusbar.gridAlignCenterTooltip')}">${I18nService.t('statusbar.gridAlignCenter')}</button>
-          </div>
           <button class="status-btn" id="btn-recenter-viewbox" title="${I18nService.t('statusbar.recenterViewBox')}">${ToolIcons.target} <span id="status-recenter-text">${I18nService.t('statusbar.recenterViewBox')}</span></button>
           <span id="status-info">${I18nService.t('common.ready')}</span>
           <button class="status-zoom-btn" id="status-zoom" title="${I18nService.t('statusbar.zoomResetTooltip')}">100%</button>

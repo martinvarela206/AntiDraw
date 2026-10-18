@@ -77,17 +77,6 @@ export class RulerGuideInspector {
         </div>
       </div>
 
-      <div class="panel-section">
-        <div class="panel-title">${I18nService.t('inspector.gridAlignment')}</div>
-        <div class="prop-row" style="display:flex; gap:6px;">
-          <button class="prop-input ${gridAlignmentMode === 'origin' ? 'active' : ''}" id="btn-grid-align-origin" style="cursor:pointer; text-align:center; flex:1; padding:6px 4px; font-size:11px;" title="${I18nService.t('statusbar.gridAlignOriginTooltip')}">
-            ${I18nService.t('inspector.gridAlignOriginCanvas')}
-          </button>
-          <button class="prop-input ${gridAlignmentMode === 'cell-center' ? 'active' : ''}" id="btn-grid-align-center" style="cursor:pointer; text-align:center; flex:1; padding:6px 4px; font-size:11px;" title="${I18nService.t('statusbar.gridAlignCenterTooltip')}">
-            ${I18nService.t('inspector.gridAlignCenterCanvas')}
-          </button>
-        </div>
-      </div>
 
       <!-- EXPLORADOR DE GRILLAS -->
       <div class="panel-section">
@@ -274,14 +263,6 @@ export class RulerGuideInspector {
       });
     }
 
-    bindInspectorMouseDown(container, 'btn-grid-align-origin', () => {
-      if (callbacks.onGridAlignmentChange) callbacks.onGridAlignmentChange('origin');
-      onReRender(config, 'origin');
-    });
-    bindInspectorMouseDown(container, 'btn-grid-align-center', () => {
-      if (callbacks.onGridAlignmentChange) callbacks.onGridAlignmentChange('cell-center');
-      onReRender(config, 'cell-center');
-    });
 
     // Bind Grid Explorer actions
     grids.forEach((g) => {
