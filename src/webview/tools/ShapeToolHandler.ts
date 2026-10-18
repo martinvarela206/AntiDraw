@@ -1,6 +1,6 @@
 import { IToolHandler, ToolContext } from './IToolHandler.js';
 import { ToolType } from './ToolType.js';
-import { Point, VectorElement, PathVertex } from '../engine/VectorModel.js';
+import { Point, PointUtils, VectorElement, PathVertex } from '../engine/VectorModel.js';
 import { formatNum } from '../engine/geometry/PathGeometryCompiler.js';
 import { ActionIntent, ActionIntentFactory } from './contracts/ActionIntent.js';
 import { CommandRegistry } from '../engine/commands/CommandRegistry.js';
@@ -202,17 +202,9 @@ export class ShapeToolHandler implements IToolHandler {
       this.frozenSpaceDelta = null;
     }
 
-    // Restricción angular a pasos de 45° en líneas con Shift
+    // Restricción angular a pasos de 15° en líneas con Shift (incluye 0°, 15°, 30°, 45°, 60°, 75°, 90°, etc.)
     if (activeTool === 'line' && e.shiftKey) {
-      const dx = currentPt.x - this.shapeStartPt.x;
-      const dy = currentPt.y - this.shapeStartPt.y;
-      const dist = Math.hypot(dx, dy);
-      const angle = Math.atan2(dy, dx);
-      const snapAngle = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
-      currentPt = {
-        x: this.shapeStartPt.x + dist * Math.cos(snapAngle),
-        y: this.shapeStartPt.y + dist * Math.sin(snapAngle),
-      };
+      currentPt = PointUtils.snapAngle(this.shapeStartPt, currentPt, Math.PI / 12);
     }
 
     // 09.1 & 10.3: Ctrl en creación de estrella - fija el radio exterior y ajusta interactivamente el radio interior
@@ -590,8 +582,10 @@ export class ShapeToolHandler implements IToolHandler {
         x2,
         y2,
         fill: 'none',
-        stroke: '#ffffff',
-        'stroke-width': '2',
+        stroke: this.ctx.model.canvas.svgStroke || '#ffffff',
+        'stroke-width': '1',
+        'vector-effect': 'non-scaling-stroke',
+        'data-stroke-hairline': 'true',
         'data-node-types': 'asymmetric,asymmetric',
         'data-shape': 'line',
         'data-parametric': 'true',
@@ -662,8 +656,10 @@ export class ShapeToolHandler implements IToolHandler {
       id,
       d,
       fill: isClosed ? '#6366f1' : 'none',
-      stroke: '#ffffff',
-      'stroke-width': '2',
+      stroke: this.ctx.model.canvas.svgStroke || '#ffffff',
+      'stroke-width': '1',
+      'vector-effect': 'non-scaling-stroke',
+      'data-stroke-hairline': 'true',
       'data-node-types': vertices.map((v) => v.nodeType).join(','),
       'data-shape': tool,
     };

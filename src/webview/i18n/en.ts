@@ -192,6 +192,9 @@ export const en: Translations = {
 
     // Stroke
     strokeWidth: 'Width',
+    decreaseStrokeWidth: 'Decrease width (-)',
+    increaseStrokeWidth: 'Increase width (+)',
+    hairlineStrokeWidth: 'Hairline border (min)',
     strokeCap: 'Line Caps',
     strokeJoin: 'Line Joins',
     strokeMiter: 'Miter Limit Angle',

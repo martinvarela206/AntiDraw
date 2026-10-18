@@ -815,6 +815,7 @@ export class PropertyPanel {
       dashAlignCorners,
       isShapeRestricted,
       shapeTagName: el.tagName,
+      isHairline: el.attributes['vector-effect'] === 'non-scaling-stroke' || el.attributes['data-stroke-hairline'] === 'true',
     };
   }
 

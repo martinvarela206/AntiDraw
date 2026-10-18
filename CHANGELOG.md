@@ -3,6 +3,24 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.90.0] - 2026-10-18
+
+### 🚀 Added
+- **Borde Mínimo Hairline (`vector-effect="non-scaling-stroke"`)**:
+  - Al dibujar cualquier vector (Pluma Bézier, Polilínea o Formas paramétricas), el borde se inicializa por defecto en "mínimo" (`vector-effect="non-scaling-stroke"`, `stroke-width="1"`), asegurando un trazo visualmente constante de exactamente 1px de dispositivo sin importar el nivel de zoom o escala del viewBox.
+  - Se añadieron tres botones paso a paso en el panel de propiedades (`StrokeInspector`): `[-]`, `[+]`, y `[min]`.
+  - El botón `[min]` activa instantáneamente el modo de borde mínimo ("hairline") y resalta visualmente en el inspector.
+  - Al hacer click en `[-]` estando en mínimo, la propiedad transiciona a `0` (sin borde / `stroke="none"`).
+  - Al hacer click en `[+]` estando en mínimo, la propiedad transiciona a `1` (borde de 1px con escalabilidad estándar).
+  - Al hacer click en `[-]` desde `1`, el grosor desciende elegantemente a `min`.
+- **Restricción Angular a 15° con Shift en Dibujo y Desplazamiento**:
+  - Al dibujar con la Pluma Bézier (`PenToolHandler`), Línea (`ShapeToolHandler`), o Polilínea (`PolylineToolHandler`), mantener presionado <kbd>Shift</kbd> restringe la ubicación del nuevo nodo a los ejes ortogonales X e Y, y a incrementos angulares discretos de 15° (0°, 15°, 30°, 45°, 60°, 75°, 90°, etc.).
+  - Al manipular tiradores y tangentes Bézier durante la creación con pluma, mantener presionado <kbd>Shift</kbd> restringe el ángulo de los manejadores simétricos o asimétricos a múltiplos de 15°.
+  - Al desplazar o mover elementos seleccionados en el lienzo (`TranslateInteraction`) con <kbd>Shift</kbd>, el desplazamiento se bloquea con precisión en rayos de 15°, garantizando alineación horizontal, vertical o diagonal sin desvíos.
+  - Soporte homólogo en el editor de nodos (`NodeToolHandler`) para traslación individual y múltiple de vértices y manejadores.
+
+---
+
 ## [0.89.1] - 2026-10-18
 
 ### 🛠️ Fixed

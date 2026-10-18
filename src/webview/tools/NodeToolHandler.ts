@@ -1,6 +1,6 @@
 import { IToolHandler, ToolContext } from './IToolHandler.js';
 import { ToolType } from './ToolType.js';
-import { Point, PathVertex, NodeType, VectorElement, RectCorners } from '../engine/VectorModel.js';
+import { Point, PointUtils, PathVertex, NodeType, VectorElement, RectCorners } from '../engine/VectorModel.js';
 import { NodeEditorTool } from '../engine/NodeEditorTool.js';
 import { ParametricHandleController } from './node/ParametricHandleController.js';
 import { NodeMarqueeSelector } from './node/NodeMarqueeSelector.js';
@@ -574,11 +574,9 @@ export class NodeToolHandler implements IToolHandler {
           let dx = snappedPt.x - this.dragStartPt.x;
           let dy = snappedPt.y - this.dragStartPt.y;
           if (isShift) {
-            if (Math.abs(dx) > Math.abs(dy)) {
-              dy = 0;
-            } else {
-              dx = 0;
-            }
+            const snappedAnglePt = PointUtils.snapAngle({ x: 0, y: 0 }, { x: dx, y: dy }, Math.PI / 12);
+            dx = snappedAnglePt.x;
+            dy = snappedAnglePt.y;
           }
           this.ghostNodeVertices = this.initialVertices.map((v) => {
             if (this.marqueeSelector.isVertexSelected(v.id)) {
@@ -677,10 +675,18 @@ export class NodeToolHandler implements IToolHandler {
           }
         }
 
+        let effVertexPt = snappedPt;
+        if (isShift) {
+          const initV = this.initialVertices.find((v) => v.id === this.nodeEditorTool.selectedVertexId);
+          if (initV) {
+            effVertexPt = PointUtils.snapAngle({ x: initV.x, y: initV.y }, snappedPt, Math.PI / 12);
+          }
+        }
+
         const result = this.nodeEditorTool.moveVertex(
           this.initialVertices,
           this.nodeEditorTool.selectedVertexId,
-          snappedPt,
+          effVertexPt,
           isCtrl,
           this.ctx.model.elements
         );
@@ -699,13 +705,19 @@ export class NodeToolHandler implements IToolHandler {
           if (v.handleIn) otherVertices.push({ x: v.handleIn.x, y: v.handleIn.y });
           if (v.handleOut) otherVertices.push({ x: v.handleOut.x, y: v.handleOut.y });
         });
-        const snappedPt = this.ctx.snapPoint(pt, otherVertices);
+        let effHandlePt = this.ctx.snapPoint(pt, otherVertices);
+        if (isShift) {
+          const v = this.initialVertices.find((item) => item.id === this.nodeEditorTool.selectedVertexId);
+          if (v) {
+            effHandlePt = PointUtils.snapAngle({ x: v.x, y: v.y }, effHandlePt, Math.PI / 12);
+          }
+        }
 
         this.ghostNodeVertices = this.nodeEditorTool.moveHandle(
           this.initialVertices,
           this.nodeEditorTool.selectedVertexId,
           this.activeHandle,
-          snappedPt
+          effHandlePt
         );
         this.ctx.renderOverlay();
         return true;

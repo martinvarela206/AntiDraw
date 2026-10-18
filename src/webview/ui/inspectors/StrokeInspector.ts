@@ -29,6 +29,7 @@ export interface StrokeInspectorProps {
   dashAlignCorners?: boolean;
   isShapeRestricted?: boolean;
   shapeTagName?: string;
+  isHairline?: boolean;
 }
 
 /**
@@ -83,6 +84,7 @@ export class StrokeInspector {
       dashAlignCorners,
       isShapeRestricted,
       shapeTagName,
+      isHairline: propIsHairline,
     } = props;
 
     const widthProfile = SpineCurveService.getWidthProfile(el);
@@ -92,7 +94,9 @@ export class StrokeInspector {
     const sketchRough = widthProfile?.sketchParams?.roughness ?? 0.3;
 
     const isCurrentColor = stroke === 'currentColor';
-    const hasStroke = stroke !== 'none' && stroke !== '' && stroke !== undefined && strokeWidth !== '0';
+    const isHairline = propIsHairline ?? (el.attributes['vector-effect'] === 'non-scaling-stroke' || el.attributes['data-stroke-hairline'] === 'true');
+    const hasStroke = stroke !== 'none' && stroke !== '' && stroke !== undefined && (isHairline || strokeWidth !== '0');
+    const displayWidth = isHairline ? 'min' : strokeWidth;
 
     return `
       <div class="panel-section">
@@ -127,7 +131,14 @@ export class StrokeInspector {
           </div>
         <div class="prop-row">
           <span class="prop-label">${I18nService.t('inspector.strokeWidth')}</span>
-          <input type="number" class="prop-input" id="el-stroke-width" value="${strokeWidth}" min="0" step="0.5" />
+          <div style="display:flex; gap:4px; align-items:center; flex:1;">
+            <input type="text" class="prop-input" id="el-stroke-width" value="${displayWidth}" style="flex:1; min-width:0; text-align:center;" />
+            <div style="display:flex; gap:2px; align-items:center;">
+              <button type="button" class="prop-input" id="btn-stroke-width-dec" title="${I18nService.t('inspector.decreaseStrokeWidth')}" style="cursor:pointer; width:22px; padding:0; text-align:center; font-weight:bold; font-size:12px; line-height:20px;">-</button>
+              <button type="button" class="prop-input" id="btn-stroke-width-inc" title="${I18nService.t('inspector.increaseStrokeWidth')}" style="cursor:pointer; width:22px; padding:0; text-align:center; font-weight:bold; font-size:12px; line-height:20px;">+</button>
+              <button type="button" class="prop-input ${isHairline ? 'active' : ''}" id="btn-stroke-width-min" title="${I18nService.t('inspector.hairlineStrokeWidth')}" style="cursor:pointer; width:30px; padding:0 2px; text-align:center; font-size:10px; font-weight:bold; line-height:20px; ${isHairline ? 'background:var(--accent-color, #3b82f6); color:#ffffff;' : ''}">min</button>
+            </div>
+          </div>
         </div>
         <div class="prop-row" style="align-items:flex-start;">
           <span class="prop-label" style="margin-top:4px;">${I18nService.t('inspector.strokeDash')}</span>
@@ -361,6 +372,87 @@ export class StrokeInspector {
       });
     }
 
+    const btnStrokeWidthDec = container.querySelector<HTMLButtonElement>('#btn-stroke-width-dec');
+    const btnStrokeWidthInc = container.querySelector<HTMLButtonElement>('#btn-stroke-width-inc');
+    const btnStrokeWidthMin = container.querySelector<HTMLButtonElement>('#btn-stroke-width-min');
+
+    if (btnStrokeWidthMin) {
+      btnStrokeWidthMin.addEventListener('click', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        el.attributes['stroke-width'] = '1';
+        el.attributes['vector-effect'] = 'non-scaling-stroke';
+        el.attributes['data-stroke-hairline'] = 'true';
+        if (!el.attributes['stroke'] || el.attributes['stroke'] === 'none') {
+          el.attributes['stroke'] = '#000000';
+        }
+        callbacks.onUpdateElement(el);
+        onReRender();
+      });
+    }
+
+    if (btnStrokeWidthDec) {
+      btnStrokeWidthDec.addEventListener('click', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        const isCurrentlyMin = el.attributes['vector-effect'] === 'non-scaling-stroke' || el.attributes['data-stroke-hairline'] === 'true';
+        if (isCurrentlyMin) {
+          // User requirement: Si se le hace click en - cuando esta en minimo pasa a 0
+          el.attributes['stroke-width'] = '0';
+          el.attributes['stroke'] = 'none';
+          delete el.attributes['vector-effect'];
+          delete el.attributes['data-stroke-hairline'];
+        } else {
+          const currentW = parseFloat(el.attributes['stroke-width'] || '1') || 0;
+          if (currentW <= 1) {
+            // Drops down to min
+            el.attributes['stroke-width'] = '1';
+            el.attributes['vector-effect'] = 'non-scaling-stroke';
+            el.attributes['data-stroke-hairline'] = 'true';
+            if (!el.attributes['stroke'] || el.attributes['stroke'] === 'none') {
+              el.attributes['stroke'] = '#000000';
+            }
+          } else {
+            const nextW = Math.max(1, Math.round((currentW - 1) * 10) / 10);
+            el.attributes['stroke-width'] = nextW.toString();
+            delete el.attributes['vector-effect'];
+            delete el.attributes['data-stroke-hairline'];
+          }
+        }
+        callbacks.onUpdateElement(el);
+        onReRender();
+      });
+    }
+
+    if (btnStrokeWidthInc) {
+      btnStrokeWidthInc.addEventListener('click', () => {
+        if (callbacks.onPushUndo) callbacks.onPushUndo();
+        const isCurrentlyMin = el.attributes['vector-effect'] === 'non-scaling-stroke' || el.attributes['data-stroke-hairline'] === 'true';
+        if (isCurrentlyMin) {
+          // User requirement: y si se le hace + cuando esta en minimo pasa a 1.
+          el.attributes['stroke-width'] = '1';
+          delete el.attributes['vector-effect'];
+          delete el.attributes['data-stroke-hairline'];
+          if (!el.attributes['stroke'] || el.attributes['stroke'] === 'none') {
+            el.attributes['stroke'] = '#000000';
+          }
+        } else {
+          const currentW = parseFloat(el.attributes['stroke-width'] || '0') || 0;
+          if (currentW <= 0 || el.attributes['stroke'] === 'none') {
+            el.attributes['stroke-width'] = '1';
+            if (!el.attributes['stroke'] || el.attributes['stroke'] === 'none') {
+              el.attributes['stroke'] = '#000000';
+            }
+          } else {
+            const nextW = Math.round((currentW + 1) * 10) / 10;
+            el.attributes['stroke-width'] = nextW.toString();
+            delete el.attributes['vector-effect'];
+            delete el.attributes['data-stroke-hairline'];
+          }
+        }
+        callbacks.onUpdateElement(el);
+        onReRender();
+      });
+    }
+
     if (elStrokeWidth) {
       let isEditingWidth = false;
       elStrokeWidth.addEventListener('pointerdown', () => {
@@ -374,11 +466,56 @@ export class StrokeInspector {
           callbacks.onPushUndo();
           isEditingWidth = true;
         }
-        el.attributes['stroke-width'] = elStrokeWidth.value;
-        callbacks.onUpdateElement(el);
+        const val = elStrokeWidth.value.trim().toLowerCase();
+        if (val === 'min' || val === 'm') {
+          el.attributes['stroke-width'] = '1';
+          el.attributes['vector-effect'] = 'non-scaling-stroke';
+          el.attributes['data-stroke-hairline'] = 'true';
+          if (!el.attributes['stroke'] || el.attributes['stroke'] === 'none') {
+            el.attributes['stroke'] = '#000000';
+          }
+          callbacks.onUpdateElement(el);
+        } else {
+          const num = parseFloat(val);
+          if (!isNaN(num)) {
+            if (num <= 0) {
+              el.attributes['stroke-width'] = '0';
+              delete el.attributes['vector-effect'];
+              delete el.attributes['data-stroke-hairline'];
+            } else {
+              el.attributes['stroke-width'] = val;
+              delete el.attributes['vector-effect'];
+              delete el.attributes['data-stroke-hairline'];
+              if (!el.attributes['stroke'] || el.attributes['stroke'] === 'none') {
+                el.attributes['stroke'] = '#000000';
+              }
+            }
+            callbacks.onUpdateElement(el);
+          }
+        }
       });
       elStrokeWidth.addEventListener('change', () => {
         isEditingWidth = false;
+        const val = elStrokeWidth.value.trim().toLowerCase();
+        if (val === 'min' || val === 'm') {
+          el.attributes['stroke-width'] = '1';
+          el.attributes['vector-effect'] = 'non-scaling-stroke';
+          el.attributes['data-stroke-hairline'] = 'true';
+        } else {
+          const num = parseFloat(val);
+          if (isNaN(num) || num <= 0) {
+            el.attributes['stroke-width'] = '0';
+            el.attributes['stroke'] = 'none';
+            delete el.attributes['vector-effect'];
+            delete el.attributes['data-stroke-hairline'];
+          } else {
+            el.attributes['stroke-width'] = num.toString();
+            delete el.attributes['vector-effect'];
+            delete el.attributes['data-stroke-hairline'];
+          }
+        }
+        callbacks.onUpdateElement(el);
+        onReRender();
       });
     }
 

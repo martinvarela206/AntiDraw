@@ -1,6 +1,6 @@
 import { IToolHandler, ToolContext } from './IToolHandler.js';
 import { ToolType } from './ToolType.js';
-import { Point, PathVertex, VectorElement } from '../engine/VectorModel.js';
+import { Point, PointUtils, PathVertex, VectorElement } from '../engine/VectorModel.js';
 import { formatNum } from '../engine/geometry/PathGeometryCompiler.js';
 import { ActionIntent, ActionIntentFactory } from './contracts/ActionIntent.js';
 import { CommandRegistry } from '../engine/commands/CommandRegistry.js';
@@ -51,11 +51,15 @@ export class PolylineToolHandler implements IToolHandler {
     const activeTool = this.ctx.getActiveTool();
     if (activeTool !== 'polyline' || e.button !== 0) return ActionIntentFactory.none();
 
-    const z = this.ctx.canvasMgr.zoom || 1;
-    const closeRadius = 14 / z;
+    let evalPt = pt;
+    if (e.shiftKey && this.currentPolylineVertices.length > 0) {
+      const lastV = this.currentPolylineVertices[this.currentPolylineVertices.length - 1];
+      evalPt = PointUtils.snapAngle({ x: lastV.x, y: lastV.y }, evalPt, Math.PI / 12);
+    }
+
     const otherVertices = this.ctx.getOtherVertices();
     this.currentPolylineVertices.forEach((v) => otherVertices.push({ x: v.x, y: v.y }));
-    const snappedPt = this.ctx.snapPoint(pt, otherVertices);
+    const snappedPt = (e.shiftKey && this.currentPolylineVertices.length > 0) ? evalPt : this.ctx.snapPoint(pt, otherVertices);
 
     // Si hace click en el primer vértice, cerrar polígono
     if (this.currentPolylineVertices.length >= 2) {
@@ -108,13 +112,20 @@ export class PolylineToolHandler implements IToolHandler {
     return false;
   }
 
-  public evalPointerMove(_e: PointerEvent, pt: Point): ActionIntent {
+  public evalPointerMove(e: PointerEvent, pt: Point): ActionIntent {
     const activeTool = this.ctx.getActiveTool();
     if (activeTool !== 'polyline') return ActionIntentFactory.none();
 
+    let evalPt = pt;
+    if (e.shiftKey && this.currentPolylineVertices.length > 0) {
+      const lastV = this.currentPolylineVertices[this.currentPolylineVertices.length - 1];
+      evalPt = PointUtils.snapAngle({ x: lastV.x, y: lastV.y }, evalPt, Math.PI / 12);
+      return ActionIntentFactory.preview('polyline.hover', { point: evalPt });
+    }
+
     const otherVertices = this.ctx.getOtherVertices();
     this.currentPolylineVertices.forEach((v) => otherVertices.push({ x: v.x, y: v.y }));
-    const snappedPt = this.ctx.snapPoint(pt, otherVertices);
+    const snappedPt = this.ctx.snapPoint(evalPt, otherVertices);
     return ActionIntentFactory.preview('polyline.hover', { point: snappedPt });
   }
 
@@ -148,6 +159,10 @@ export class PolylineToolHandler implements IToolHandler {
   }
 
   public onKeyDown(e: KeyboardEvent): boolean {
+    if (e.key === 'Shift') {
+      this.ctx.renderOverlay();
+      return true;
+    }
     if (e.key === 'Enter') {
       if (this.currentPolylineVertices.length >= 2) {
         this.finishPolylinePath(false);
@@ -212,8 +227,10 @@ export class PolylineToolHandler implements IToolHandler {
         id,
         d: pathD,
         fill: close ? '#6366f1' : 'none',
-        stroke: '#ffffff',
-        'stroke-width': '2',
+        stroke: this.ctx.model.canvas.svgStroke || '#ffffff',
+        'stroke-width': '1',
+        'vector-effect': 'non-scaling-stroke',
+        'data-stroke-hairline': 'true',
         'data-node-types': cleanVerts.map(() => 'asymmetric').join(','),
         'data-shape': shapeType,
         'data-parametric': 'true',

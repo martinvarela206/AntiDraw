@@ -1,5 +1,5 @@
 import { ToolContext } from '../IToolHandler.js';
-import { VectorElement, PathVertex, Point } from '../../engine/VectorModel.js';
+import { VectorElement, PathVertex, Point, PointUtils } from '../../engine/VectorModel.js';
 import type { SelectToolCallbacks } from '../SelectToolHandler.js';
 import { NodeCatalogService } from '../../engine/selection/NodeCatalogService.js';
 import { BaseHelper } from '../../engine/canvas/helpers/index.js';
@@ -359,7 +359,9 @@ export class TranslateInteraction {
     const dx = pt.x - dragStartPt.x;
     const dy = pt.y - dragStartPt.y;
 
-    this.isOrthogonal = !!(e && e.ctrlKey);
+    const isShiftConstrained = !!(e && e.shiftKey);
+    const isCtrlOrthogonal = !!(e && e.ctrlKey);
+    this.isOrthogonal = isShiftConstrained || isCtrlOrthogonal;
     this.isDuplicateMode = !!(e && e.altKey);
 
     if (callbacks?.setCursor) {
@@ -382,7 +384,11 @@ export class TranslateInteraction {
 
     let effDx = dx;
     let effDy = dy;
-    if (this.isOrthogonal) {
+    if (isShiftConstrained) {
+      const snapped = PointUtils.snapAngle({ x: 0, y: 0 }, { x: dx, y: dy }, Math.PI / 12);
+      effDx = snapped.x;
+      effDy = snapped.y;
+    } else if (isCtrlOrthogonal) {
       if (Math.abs(dx) >= Math.abs(dy)) {
         effDy = 0;
       } else {
@@ -390,7 +396,10 @@ export class TranslateInteraction {
       }
     }
 
-    if (!this.isMultiCandidate) {
+    if (isShiftConstrained) {
+      this.ghostDragOffset = { x: effDx, y: effDy };
+      this.activeSnapLandmark = this.dragAnchorPt;
+    } else if (!this.isMultiCandidate) {
       // Direct Single-Anchor Snapping (user clicked directly on a vertex, handle, box corner or edge)
       if (this.isOrthogonal) {
         if (Math.abs(dx) >= Math.abs(dy)) {

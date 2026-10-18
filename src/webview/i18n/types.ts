@@ -200,6 +200,9 @@ export interface Translations {
 
     // Stroke
     strokeWidth: string;
+    decreaseStrokeWidth: string;
+    increaseStrokeWidth: string;
+    hairlineStrokeWidth: string;
     strokeCap: string;
     strokeJoin: string;
     strokeMiter: string;

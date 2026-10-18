@@ -101,4 +101,32 @@ export class PointUtils {
     if (mag <= 1e-12) return { x: 0, y: 0 };
     return { x: p.x / mag, y: p.y / mag };
   }
+
+  /**
+   * Constrains a target point relative to an origin point by snapping the ray angle
+   * to discrete step increments (default 15° = Math.PI / 12).
+   * Snapping to 15° increments inherently guarantees strict alignment along the X (0°, 180°)
+   * and Y (90°, 270°) orthogonal axes while also supporting intermediate 15° multiples.
+   */
+  public static snapAngle(origin: Point, target: Point, stepRadians: number = Math.PI / 12): Point {
+    const dx = target.x - origin.x;
+    const dy = target.y - origin.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist <= 1e-9) return { x: target.x, y: target.y };
+
+    const rawAngle = Math.atan2(dy, dx);
+    const snappedAngle = Math.round(rawAngle / stepRadians) * stepRadians;
+
+    let nx = dist * Math.cos(snappedAngle);
+    let ny = dist * Math.sin(snappedAngle);
+
+    // Clean up floating point precision around orthogonal axes
+    if (Math.abs(nx) < 1e-10) nx = 0;
+    if (Math.abs(ny) < 1e-10) ny = 0;
+
+    return {
+      x: origin.x + nx,
+      y: origin.y + ny,
+    };
+  }
 }

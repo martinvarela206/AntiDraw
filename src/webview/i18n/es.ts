@@ -192,6 +192,9 @@ export const es: Translations = {
 
     // Stroke
     strokeWidth: 'Grosor',
+    decreaseStrokeWidth: 'Disminuir grosor (-)',
+    increaseStrokeWidth: 'Aumentar grosor (+)',
+    hairlineStrokeWidth: 'Borde mínimo (Hairline)',
     strokeCap: 'Remates',
     strokeJoin: 'Uniones',
     strokeMiter: 'Ángulo de Inglete',

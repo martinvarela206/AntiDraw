@@ -1,6 +1,6 @@
 import { IToolHandler, ToolContext } from './IToolHandler.js';
 import { ToolType } from './ToolType.js';
-import { Point, PathVertex, NodeType, VectorElement } from '../engine/VectorModel.js';
+import { Point, PointUtils, PathVertex, NodeType, VectorElement } from '../engine/VectorModel.js';
 import { ActionIntent, ActionIntentFactory } from './contracts/ActionIntent.js';
 import { CommandRegistry } from '../engine/commands/CommandRegistry.js';
 import { OverlayDescriptor } from '../engine/canvas/OverlayDescriptor.js';
@@ -37,11 +37,15 @@ export class PenToolHandler implements IToolHandler {
     const activeTool = this.ctx.getActiveTool();
     if (activeTool !== 'pen' || e.button !== 0) return ActionIntentFactory.none();
 
-    const z = this.ctx.canvasMgr.zoom || 1;
-    const closeRadius = 14 / z;
+    let evalPt = pt;
+    if (e.shiftKey && this.currentPenVertices.length > 0) {
+      const lastV = this.currentPenVertices[this.currentPenVertices.length - 1];
+      evalPt = PointUtils.snapAngle({ x: lastV.x, y: lastV.y }, evalPt, Math.PI / 12);
+    }
+
     const otherVertices = this.ctx.getOtherVertices();
     this.currentPenVertices.forEach((v) => otherVertices.push({ x: v.x, y: v.y }));
-    const snappedPt = this.ctx.snapPoint(pt, otherVertices);
+    const snappedPt = (e.shiftKey && this.currentPenVertices.length > 0) ? evalPt : this.ctx.snapPoint(pt, otherVertices);
 
     // Check if clicking start node to close path
     if (this.currentPenVertices.length >= 2) {
@@ -103,7 +107,10 @@ export class PenToolHandler implements IToolHandler {
       this.currentPenVertices.forEach((item, idx) => {
         if (idx !== this.penActiveVertexIdx) otherVertices.push({ x: item.x, y: item.y });
       });
-      const snappedPt = this.ctx.snapPoint(pt, otherVertices);
+      let snappedPt = this.ctx.snapPoint(pt, otherVertices);
+      if (e.shiftKey) {
+        snappedPt = PointUtils.snapAngle({ x: v.x, y: v.y }, snappedPt, Math.PI / 12);
+      }
 
       const dx = snappedPt.x - v.x;
       const dy = snappedPt.y - v.y;
@@ -130,9 +137,16 @@ export class PenToolHandler implements IToolHandler {
     }
 
     // Hover mode (cursor preview)
-    const otherVertices = this.ctx.getOtherVertices();
-    this.currentPenVertices.forEach((v) => otherVertices.push({ x: v.x, y: v.y }));
-    this.penHoverPoint = this.ctx.snapPoint(pt, otherVertices);
+    let hoverPt = pt;
+    if (e.shiftKey && this.currentPenVertices.length > 0) {
+      const lastV = this.currentPenVertices[this.currentPenVertices.length - 1];
+      hoverPt = PointUtils.snapAngle({ x: lastV.x, y: lastV.y }, hoverPt, Math.PI / 12);
+      this.penHoverPoint = hoverPt;
+    } else {
+      const otherVertices = this.ctx.getOtherVertices();
+      this.currentPenVertices.forEach((v) => otherVertices.push({ x: v.x, y: v.y }));
+      this.penHoverPoint = this.ctx.snapPoint(pt, otherVertices);
+    }
     this.ctx.renderOverlay();
     return true;
   }
@@ -167,6 +181,10 @@ export class PenToolHandler implements IToolHandler {
   }
 
   public onKeyDown(e: KeyboardEvent): boolean {
+    if (e.key === 'Shift') {
+      this.ctx.renderOverlay();
+      return true;
+    }
     if (e.key === 'Alt') {
       if (this.isDragging && this.penActiveVertexIdx !== null) {
         this.isCuspBroken = true;
@@ -234,8 +252,10 @@ export class PenToolHandler implements IToolHandler {
           id,
           d: pathD,
           fill: close ? '#4f46e5' : 'none',
-          stroke: '#ffffff',
-          'stroke-width': '2',
+          stroke: this.ctx.model.canvas.svgStroke || '#ffffff',
+          'stroke-width': '1',
+          'vector-effect': 'non-scaling-stroke',
+          'data-stroke-hairline': 'true',
           'data-node-types': cleanVerts.map((v) => v.nodeType).join(','),
         },
         vertices: cleanVerts,
