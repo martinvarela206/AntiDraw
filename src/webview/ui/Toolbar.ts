@@ -1,6 +1,7 @@
 import { ToolIcons } from '../icons/ToolIcons.js';
 import { ToolType } from '../tools/ToolType.js';
 import { I18nService } from '../i18n/I18nService.js';
+import { ImageIngestionService } from '../services/ImageIngestionService.js';
 
 export type { ToolType };
 
@@ -205,6 +206,7 @@ export class Toolbar {
       { type: 'divider' },
 
       // 5. Utilidades y Espacio de Trabajo
+      { type: 'tool', id: 'image', title: t('imageOptimization.toolImageTooltip'), icon: ToolIcons.imageTool },
       { type: 'tool', id: 'addVertex', title: t('toolbar.addVertex'), icon: ToolIcons.addVertexTool },
       { type: 'tool', id: 'zoom', title: t('toolbar.zoom'), icon: ToolIcons.zoomTool },
     ];
@@ -234,6 +236,10 @@ export class Toolbar {
 
         btn.addEventListener('click', (e) => {
           e.preventDefault();
+          if (item.id === 'image') {
+            ImageIngestionService.getInstance()?.triggerImageSelection();
+            return;
+          }
           this.setTool(item.id);
         });
 

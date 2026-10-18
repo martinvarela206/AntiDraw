@@ -3,6 +3,26 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.88.0] - 2026-10-18
+
+### 🚀 Added
+- **Image Tool in Toolbar (`ImageTool`)**: Added a dedicated Image tool to the left toolbar with a 1.4px precision SVG icon, supporting direct image file selection, canvas drag-and-drop, and clipboard paste (<kbd>Ctrl+V</kbd>).
+- **Contextual Ingestion Architecture**:
+  - *No element selected*: Inserts the image as an independent, scalable `<image>` element in the SVG canvas with interactive bounding box transformation.
+  - *Vector element selected*: Seamlessly assigns the image as a responsive `<pattern>` background texture to the vector's `fill` attribute using `patternContentUnits="objectBoundingBox"`.
+- **Smart Ingestion Thresholding**: Automatic detection for files over 1.5 MB or 1920 px resolution. Files below the threshold pass through instantly with zero friction, while larger assets trigger the optimization modal.
+- **Save for Web Optimization Modal**: Interactive 2-up dual viewport comparison dialog inspired by Adobe Fireworks/Photoshop "Save for Web & Devices":
+  - Real-time side-by-side comparison of original vs. optimized preview with live byte savings calculation.
+  - Multi-scale dimension resizing (width, height, percentage, locked aspect ratio).
+  - Color mode control (RGB 24/32-bit vs. indexed palette color quantization to 256, 128, 64, 32, 16 colors).
+  - Compression quality slider (WebP/JPEG) and smoothing/noise reduction filter.
+  - Background matte color and alpha transparency control.
+- **Linked Asset Storage & Naming Standard**: Ability to copy and link images on disk alongside the SVG document (`[svgName]_[imageId]_img.[ext]`) keeping the SVG XML lightweight and portable, as well as embedding as standard Base64 Data URIs.
+- **W3C SVG Image Serialization & Roundtrip**: Lossless deserialization and serialization of `<image>` and `<pattern>` nodes in `SvgSerializer` and `SvgDeserializer` adhering strictly to W3C standards.
+- **Bilingual Localization (ES / EN)**: Full symmetrical localization for all new modal options, tooltips, and image workflow notifications.
+
+---
+
 ## [0.87.3] - 2026-10-17
 
 ### 🛠️ Fixed

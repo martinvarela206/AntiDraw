@@ -41,6 +41,7 @@ import GridVisibilitySvg from '../../assets/icons/grid_visibility.svg';
 import GuideDoubleArrowVerticalLeftRotateSvg from '../../assets/icons/guide_double_arrow_vertical_left_rotate.svg';
 import GuideDoubleArrowVerticalRightRotateSvg from '../../assets/icons/guide_double_arrow_vertical_right_rotate.svg';
 import GuidesVisibilitySvg from '../../assets/icons/guides_visibility.svg';
+import ImageToolSvg from '../../assets/icons/image_tool.svg';
 import IntersectSvg from '../../assets/icons/intersect.svg';
 import JoinNodesSvg from '../../assets/icons/join_nodes.svg';
 import KnifeToolSvg from '../../assets/icons/knife_tool.svg';
@@ -118,6 +119,7 @@ export const ICONS = {
   guideDoubleArrowVerticalLeftRotate: GuideDoubleArrowVerticalLeftRotateSvg,
   guideDoubleArrowVerticalRightRotate: GuideDoubleArrowVerticalRightRotateSvg,
   guidesVisibility: GuidesVisibilitySvg,
+  imageTool: ImageToolSvg,
   intersect: IntersectSvg,
   joinNodes: JoinNodesSvg,
   knifeTool: KnifeToolSvg,

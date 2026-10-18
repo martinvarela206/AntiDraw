@@ -28,4 +28,6 @@ export type ToolType =
   | 'eraser'
   // Operaciones de Topología - Sub-cajón B (Construcción)
   | 'smartFill'
-  | 'shapeBuilder';
+  | 'shapeBuilder'
+  // Herramientas de Multimedia
+  | 'image';

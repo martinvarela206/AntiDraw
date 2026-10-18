@@ -443,4 +443,43 @@ export interface Translations {
     guideBadge: string;
     recenterViewBox: string;
   };
+
+  // Image Optimization Modal (Save for Web inspired)
+  imageOptimization: {
+    modalTitle: string;
+    originalLabel: string;
+    previewLabel: string;
+    savingsBadge: string;
+    storageSection: string;
+    storageLinked: string;
+    storageLinkedHint: string;
+    storageEmbedded: string;
+    storageEmbeddedHint: string;
+    formatSection: string;
+    colorSection: string;
+    colorModeRgb: string;
+    colorModePalette: string;
+    paletteColors: string;
+    transparency: string;
+    matteColor: string;
+    advancedSection: string;
+    quality: string;
+    smoothing: string;
+    transformSection: string;
+    width: string;
+    height: string;
+    percent: string;
+    maintainAspect: string;
+    zoomIn: string;
+    zoomOut: string;
+    zoomFit: string;
+    zoom100: string;
+    panTool: string;
+    keepOriginal: string;
+    saveAndInsert: string;
+    cancel: string;
+    toolImage: string;
+    toolImageTooltip: string;
+    toolImageBgTooltip: string;
+  };
 }

@@ -432,7 +432,7 @@ export class SvgDeserializer {
           return;
         }
 
-        if (['path', 'rect', 'ellipse', 'circle', 'line', 'polygon', 'polyline', 'star'].includes(tag)) {
+        if (['path', 'rect', 'ellipse', 'circle', 'line', 'polygon', 'polyline', 'star', 'image'].includes(tag)) {
           // Suppress importing compiled secondary appearance layers as orphaned standalone canvas elements
           const nodeClass = node.getAttribute('class') || '';
           const nodeId = node.getAttribute('id') || '';
@@ -450,6 +450,9 @@ export class SvgDeserializer {
           for (let i = 0; i < node.attributes.length; i++) {
             const attr = node.attributes[i];
             attrs[attr.name] = attr.value;
+          }
+          if (!attrs.href && attrs['xlink:href']) {
+            attrs.href = attrs['xlink:href'];
           }
 
           // Merge inline presentation styles if present

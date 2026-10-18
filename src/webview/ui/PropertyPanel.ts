@@ -68,7 +68,6 @@ import { QuickHelpInspector } from './inspectors/QuickHelpInspector.js';
 import { BlendEngine } from '../engine/blend/BlendEngine.js';
 import { BlendInspector } from './inspectors/BlendInspector.js';
 import { I18nService } from '../i18n/index.js';
-import { ToolIcons } from '../icons/ToolIcons.js';
 
 export class PropertyPanel {
   private container: HTMLElement;

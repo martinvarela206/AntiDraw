@@ -9,7 +9,7 @@ import {
   RectCorners,
   VectorElement,
 } from '../VectorModel.js';
-import { PathGeometryCompiler } from '../geometry/PathGeometryCompiler.js';
+import { PathGeometryCompiler, formatNum } from '../geometry/PathGeometryCompiler.js';
 import { DashCornerAligner } from '../geometry/DashCornerAligner.js';
 import { AppearanceStackManager } from '../appearance/AppearanceStackManager.js';
 
@@ -681,7 +681,23 @@ export class SvgSerializer {
           svg += `  <${el.tagName}${serializeCleanAttrs(cleanAttrs)} />\n`;
         }
       } else {
-        if (el.vertices && el.vertices.length > 0) {
+        if (el.tagName === 'image') {
+          if (el.vertices && el.vertices.length >= 4) {
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            for (const v of el.vertices) {
+              if (v.x < minX) minX = v.x;
+              if (v.x > maxX) maxX = v.x;
+              if (v.y < minY) minY = v.y;
+              if (v.y > maxY) maxY = v.y;
+            }
+            if (minX !== Infinity) {
+              el.attributes.x = formatNum(minX);
+              el.attributes.y = formatNum(minY);
+              el.attributes.width = formatNum(Math.max(1, maxX - minX));
+              el.attributes.height = formatNum(Math.max(1, maxY - minY));
+            }
+          }
+        } else if (el.vertices && el.vertices.length > 0) {
           el.attributes.d = ctx.compilePathD(el.vertices, el.isClosed);
           // Persist nodeType for each vertex in memory so companion metadata captures it
           el.attributes['data-node-types'] = el.vertices.map((v) => v.nodeType).join(',');

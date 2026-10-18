@@ -14,7 +14,7 @@
   <a href="https://open-vsx.org/extension/martinvarela206/antidraw"><img src="https://img.shields.io/badge/Open--VSX-Registry-purple?style=flat-square" alt="Open VSX Registry"></a>
   <a href="https://github.com/martinvarela206/AntiDraw"><img src="https://img.shields.io/badge/GitHub-Repository-181717?style=flat-square&logo=github" alt="GitHub Repository"></a>
   <a href="https://github.com/martinvarela206/AntiDraw/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-Source--Available-blue?style=flat-square" alt="Source-Available License"></a>
-  <a href="https://github.com/martinvarela206/AntiDraw"><img src="https://img.shields.io/badge/Status-Beta%20v0.87.3-orange?style=flat-square" alt="Status"></a>
+  <a href="https://github.com/martinvarela206/AntiDraw"><img src="https://img.shields.io/badge/Status-Beta%20v0.88.0-orange?style=flat-square" alt="Status"></a>
 </p>
 
 <p align="center">
@@ -38,7 +38,7 @@ Whether you discovered AntiDraw through GitHub, VS Code Marketplace, or Open VSX
 ---
 
 > [!NOTE]
-> **Project Status: Public Beta (v0.87.2)**  
+> **Project Status: Public Beta (v0.88.0)**  
 > AntiDraw is under active, continuous development. While vector editing, Bézier curves, snapping, and boolean topology are fully functional and stable, you may encounter occasional edge cases.  
 > Found a bug or have a feature request? Please [open an issue on GitHub](https://github.com/martinvarela206/AntiDraw/issues) — your feedback directly shapes upcoming releases!
 
@@ -105,6 +105,17 @@ Frontend developers, UI engineers, and technical designers constantly face a pai
 * **Instant Bilingual Switching**: 1-click live toggle between English (<kbd>EN</kbd>) and Spanish (<kbd>ES</kbd>) from the status bar with zero editor reloads.
 * **Universal Coverage**: All property panels, tooltips, shortcuts cheatsheet, and floating Mini-HUD adapt instantaneously to the chosen language.
 * **100% Crisp Vector Iconography**: Slenderized `1.4px` precision stroke geometry, eliminating emojis in favor of professional technical SVG design.
+
+### 🖼️ 9. Images, Textures & Save for Web Optimizer
+* **Interactive Image Tool**: Insert bitmap images (PNG, JPEG, WebP) directly from the toolbar, canvas Drag & Drop, or clipboard paste (<kbd>Ctrl</kbd> + <kbd>V</kbd>).
+* **Contextual Ingestion Flow**:
+  * *No selection*: Places an independent, scalable `<image>` element on the canvas.
+  * *Vector selected*: Assigns the image as a responsive `<pattern>` background texture directly to the vector's `fill`.
+* **Smart Ingestion Thresholding**: Files under 1.5 MB or 1920 px pass through instantly, while larger assets trigger the Save for Web dialog.
+* **Save for Web Dialog (Dual 2-Up Viewport)**:
+  * Split side-by-side comparison (Original vs. Optimized) with synchronized zoom & pan and real-time byte savings telemetry.
+  * Multi-scale resizing with aspect ratio lock, color quantization (256 down to 16 colors), smoothing filter, and lossy/lossless compression control.
+* **Linked vs. Embedded Assets**: Option to copy and link the image in disk alongside the SVG (`svgName_id_img.ext`) keeping the SVG XML lightweight, or embed cleanly in Base64 Data URI.
 
 ---
 

@@ -271,7 +271,18 @@ export class PrimitiveDetector {
       return Number.isFinite(n) ? n : fallback;
     };
 
-    if (tag === 'rect') {
+    if (tag === 'image') {
+      const x = toFinite(attrs.x, 0);
+      const y = toFinite(attrs.y, 0);
+      const w = Math.max(0.1, toFinite(attrs.width, 100));
+      const h = Math.max(0.1, toFinite(attrs.height, 100));
+      return [
+        mkV(x, y, undefined, undefined, 'sharp'),
+        mkV(x + w, y, undefined, undefined, 'sharp'),
+        mkV(x + w, y + h, undefined, undefined, 'sharp'),
+        mkV(x, y + h, undefined, undefined, 'sharp'),
+      ];
+    } else if (tag === 'rect') {
       const x = toFinite(attrs.x, 0);
       const y = toFinite(attrs.y, 0);
       const w = Math.max(0.1, toFinite(attrs.width, 100));

@@ -52,6 +52,24 @@ export interface LoadSvgPayload {
   text: string;
   metadata?: CompanionMetadata | null;
   locale?: string;
+  fileName?: string;
+  documentUri?: string;
+  documentDirUri?: string;
+}
+
+export interface SaveLinkedImageResponse {
+  success: boolean;
+  relativePath?: string;
+  webviewUri?: string;
+  fileName?: string;
+  error?: string;
+}
+
+export interface ImageFileSelectedPayload {
+  base64: string;
+  fileName: string;
+  sizeBytes: number;
+  sourceUri: string;
 }
 
 declare function acquireVsCodeApi(): {
@@ -65,6 +83,9 @@ export class VsCodeBridge {
   private vscodeApi: ReturnType<typeof acquireVsCodeApi>;
   private isUpdatingFromWebview: boolean = false;
   private loadSvgCallbacks: Array<(payload: LoadSvgPayload) => void> = [];
+  private imageFileSelectedCallbacks: Array<(payload: ImageFileSelectedPayload) => void> = [];
+  private pendingImageSaveResolvers: Map<string, (res: SaveLinkedImageResponse) => void> = new Map();
+  private currentFileName: string = 'drawing.svg';
 
   constructor() {
     this.vscodeApi = acquireVsCodeApi();
@@ -78,16 +99,26 @@ export class VsCodeBridge {
     return VsCodeBridge.instance;
   }
 
+  public getCurrentFileName(): string {
+    return this.currentFileName;
+  }
+
   private initMessageListener(): void {
     window.addEventListener('message', (event: MessageEvent) => {
       const msg = event.data;
       if (!msg || typeof msg !== 'object') return;
 
       if (msg.type === 'loadSvg') {
+        if (msg.fileName) {
+          this.currentFileName = msg.fileName;
+        }
         const payload: LoadSvgPayload = {
           text: msg.text || '',
           metadata: msg.metadata || null,
           locale: msg.locale,
+          fileName: msg.fileName,
+          documentUri: msg.documentUri,
+          documentDirUri: msg.documentDirUri,
         };
 
         if (this.isUpdatingFromWebview) {
@@ -99,6 +130,28 @@ export class VsCodeBridge {
         for (const cb of this.loadSvgCallbacks) {
           cb(payload);
         }
+      } else if (msg.type === 'saveLinkedImageResponse') {
+        const resolver = this.pendingImageSaveResolvers.get(msg.requestId);
+        if (resolver) {
+          this.pendingImageSaveResolvers.delete(msg.requestId);
+          resolver({
+            success: !!msg.success,
+            relativePath: msg.relativePath,
+            webviewUri: msg.webviewUri,
+            fileName: msg.fileName,
+            error: msg.error,
+          });
+        }
+      } else if (msg.type === 'imageFileSelected') {
+        const payload: ImageFileSelectedPayload = {
+          base64: msg.base64,
+          fileName: msg.fileName,
+          sizeBytes: msg.sizeBytes,
+          sourceUri: msg.sourceUri,
+        };
+        for (const cb of this.imageFileSelectedCallbacks) {
+          cb(payload);
+        }
       }
     });
   }
@@ -108,6 +161,43 @@ export class VsCodeBridge {
     return () => {
       this.loadSvgCallbacks = this.loadSvgCallbacks.filter((cb) => cb !== callback);
     };
+  }
+
+  public onImageFileSelected(callback: (payload: ImageFileSelectedPayload) => void): () => void {
+    this.imageFileSelectedCallbacks.push(callback);
+    return () => {
+      this.imageFileSelectedCallbacks = this.imageFileSelectedCallbacks.filter((cb) => cb !== callback);
+    };
+  }
+
+  public openImageFileDialog(): void {
+    this.vscodeApi.postMessage({ type: 'openImageFileDialog', requestId: `req_${Date.now()}_${Math.random()}` });
+  }
+
+  public async saveLinkedImage(
+    imageId: string,
+    extension: string,
+    base64Data: string
+  ): Promise<SaveLinkedImageResponse> {
+    const requestId = `save_img_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+    return new Promise((resolve) => {
+      this.pendingImageSaveResolvers.set(requestId, resolve);
+      this.vscodeApi.postMessage({
+        type: 'saveLinkedImage',
+        requestId,
+        imageId,
+        extension,
+        base64Data,
+      });
+
+      // Timeout safety
+      setTimeout(() => {
+        if (this.pendingImageSaveResolvers.has(requestId)) {
+          this.pendingImageSaveResolvers.delete(requestId);
+          resolve({ success: false, error: 'Timeout waiting for image save in host' });
+        }
+      }, 10000);
+    });
   }
 
   public notifyReady(): void {

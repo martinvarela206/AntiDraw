@@ -14,6 +14,7 @@ import { PropertyPanelActionController } from './controllers/PropertyPanelAction
 import { ChromeActionController } from './controllers/ChromeActionController.js';
 import { CommandShortcutController } from './controllers/CommandShortcutController.js';
 import { LayerReorderService } from './engine/layout/LayerReorderService.js';
+import { ImageIngestionService } from './services/ImageIngestionService.js';
 import './styles/main.css';
 
 /**
@@ -217,7 +218,33 @@ class AntiDrawApp {
       recenterViewBox: () => this.viewportCtrl.recenterViewBox(),
     });
 
-    // 6. Commands, Shortcuts & Context Menus
+    // 6. Image Ingestion Service (Toolbar tool, Drag & Drop, Paste, Save for Web modal)
+    ImageIngestionService.initialize({
+      model: this.model,
+      selectionTool: this.selectionTool,
+      getHistoryService: () => this.services.historyService,
+      getHostSyncService: () => this.hostSyncService,
+      renderCanvas: () => {
+        this.services.workspaceLayout.render();
+        this.services.workspaceLayout.renderOverlay();
+      },
+      screenToSvgCoord: (clientX: number, clientY: number) => {
+        const svg = this.layoutMgr?.svgCanvas;
+        if (!svg) return { x: clientX, y: clientY };
+        const pt = svg.createSVGPoint();
+        pt.x = clientX;
+        pt.y = clientY;
+        const ctm = svg.getScreenCTM();
+        if (ctm) {
+          const inv = ctm.inverse();
+          const svgPt = pt.matrixTransform(inv);
+          return { x: svgPt.x, y: svgPt.y };
+        }
+        return { x: clientX, y: clientY };
+      },
+    });
+
+    // 7. Commands, Shortcuts & Context Menus
     this.commandShortcutCtrl = new CommandShortcutController({
       model: this.model,
       selectionTool: this.selectionTool,

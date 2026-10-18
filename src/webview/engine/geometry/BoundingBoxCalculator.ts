@@ -40,6 +40,23 @@ export class BoundingBoxCalculator {
     if (element.tagName === 'g' && element.children && element.children.length > 0) {
       return this.getGroupBoundingBox(element.children);
     }
+    if (element.tagName === 'image') {
+      if (element.vertices && element.vertices.length > 0) {
+        return this.getVerticesBoundingBox(element.vertices);
+      }
+      const x = parseFloat(element.attributes.x || '0');
+      const y = parseFloat(element.attributes.y || '0');
+      const w = Math.max(1, parseFloat(element.attributes.width || '100'));
+      const h = Math.max(1, parseFloat(element.attributes.height || '100'));
+      return {
+        x,
+        y,
+        width: w,
+        height: h,
+        cx: x + w / 2,
+        cy: y + h / 2,
+      };
+    }
     if (!element.vertices || element.vertices.length === 0) return null;
     return this.getVerticesBoundingBox(element.vertices);
   }

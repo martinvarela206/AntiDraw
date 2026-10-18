@@ -25,11 +25,14 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
     webviewPanel: vscode.WebviewPanel,
     _token: vscode.CancellationToken
   ): Promise<void> {
+    const docDir = vscode.Uri.joinPath(document.uri, '..');
     webviewPanel.webview.options = {
       enableScripts: true,
       localResourceRoots: [
         vscode.Uri.joinPath(this.context.extensionUri, 'dist'),
         vscode.Uri.joinPath(this.context.extensionUri, 'media'),
+        docDir,
+        ...(vscode.workspace.workspaceFolders?.map((f) => f.uri) || []),
       ],
     };
 
@@ -69,11 +72,15 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
     const updateWebview = async () => {
       if (pendingWebviewEdits === 0) {
         const metadata = await readSidecarMetadata();
+        const baseFileName = document.uri.path.split('/').pop() || 'untitled.svg';
         webviewPanel.webview.postMessage({
           type: 'loadSvg',
           text: document.getText(),
           metadata: metadata || null,
           locale: vscode.env.language,
+          documentUri: document.uri.toString(),
+          documentDirUri: docDir.toString(),
+          fileName: baseFileName,
         });
       }
     };
@@ -116,6 +123,87 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
         case 'updateMetadata': {
           if (message.metadata !== undefined) {
             await writeSidecarMetadata(message.metadata);
+          }
+          break;
+        }
+
+        case 'saveLinkedImage': {
+          try {
+            const { imageId, extension, base64Data, requestId } = message;
+            const baseFileName = (document.uri.path.split('/').pop() || 'drawing.svg').replace(/\.svg$/i, '');
+            const cleanExt = (extension || 'png').replace(/^\./, '').toLowerCase();
+            const cleanId = (imageId || Date.now().toString()).replace(/[^a-zA-Z0-9_-]/g, '_');
+            const targetFileName = `${baseFileName}_${cleanId}_img.${cleanExt}`;
+            const targetUri = vscode.Uri.joinPath(docDir, targetFileName);
+
+            const rawBase64 = (base64Data || '').replace(/^data:[^;]+;base64,/, '');
+            const buffer = Buffer.from(rawBase64, 'base64');
+            await vscode.workspace.fs.writeFile(targetUri, buffer);
+
+            const relativePath = `./${targetFileName}`;
+            const webviewUri = webviewPanel.webview.asWebviewUri(targetUri).toString();
+
+            webviewPanel.webview.postMessage({
+              type: 'saveLinkedImageResponse',
+              requestId,
+              success: true,
+              relativePath,
+              webviewUri,
+              fileName: targetFileName,
+            });
+          } catch (err: any) {
+            vscode.window.showErrorMessage(`[AntiDraw] Error al guardar imagen asociada: ${err?.message || err}`);
+            if (message.requestId) {
+              webviewPanel.webview.postMessage({
+                type: 'saveLinkedImageResponse',
+                requestId: message.requestId,
+                success: false,
+                error: err?.message || String(err),
+              });
+            }
+          }
+          break;
+        }
+
+        case 'openImageFileDialog': {
+          try {
+            const uris = await vscode.window.showOpenDialog({
+              canSelectFiles: true,
+              canSelectFolders: false,
+              canSelectMany: false,
+              filters: {
+                Images: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg', 'bmp'],
+              },
+              title: 'Seleccionar imagen para AntiDraw',
+            });
+            if (uris && uris.length > 0) {
+              const selectedUri = uris[0];
+              const fileData = await vscode.workspace.fs.readFile(selectedUri);
+              const ext = selectedUri.path.split('.').pop()?.toLowerCase() || 'png';
+              const mime =
+                ext === 'jpg' || ext === 'jpeg'
+                  ? 'image/jpeg'
+                  : ext === 'webp'
+                  ? 'image/webp'
+                  : ext === 'gif'
+                  ? 'image/gif'
+                  : ext === 'svg'
+                  ? 'image/svg+xml'
+                  : 'image/png';
+              const base64 = `data:${mime};base64,${Buffer.from(fileData).toString('base64')}`;
+              const fileName = selectedUri.path.split('/').pop() || 'image.png';
+
+              webviewPanel.webview.postMessage({
+                type: 'imageFileSelected',
+                requestId: message.requestId,
+                base64,
+                fileName,
+                sizeBytes: fileData.byteLength,
+                sourceUri: selectedUri.toString(),
+              });
+            }
+          } catch (err: any) {
+            vscode.window.showErrorMessage(`[AntiDraw] Error al abrir imagen: ${err?.message || err}`);
           }
           break;
         }
