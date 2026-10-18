@@ -1,5 +1,17 @@
 # AntiDraw Project Specific Rules
 
+## 0. Versionado SemVer y Commit Atómico Obligatorio en CADA Modificación (Fix / Feat)
+- **Incremento Obligatorio:** CADA VEZ que se realice una modificación de código en el repositorio, sea una corrección de bugs puntual (`fix`) o una nueva capacidad (`feat`), sin importar si es una solicitud aislada de un solo mensaje o un plan complejo:
+  - **Patch (`x.y.Z+1`)**: Obligatorio para correcciones de bugs, fixes de UI, ajustes de interacción o refactorizaciones.
+  - **Minor (`x.Y+1.0`)**: Obligatorio para nuevas herramientas, nuevos paneles, o capacidades funcionales añadidas.
+- **Sincronización y Commit Simultáneo:** En ese mismo turno, es **ESTRICTAMENTE OBLIGATORIO** ejecutar:
+  1. El incremento de versión en `package.json`.
+  2. La entrada en `changelog.md` con fecha y desglose de cambios (`Fixed`, `Added`, etc.).
+  3. La actualización de la insignia de versión en `readme.md`.
+  4. La compilación y empaquetado del artefacto `.vsix` con `pnpm run package`.
+  5. **El Commit Atómico Inmediato:** Realizar el commit en Git con formato convencional (`fix: ...`, `feat: ...`, o `chore(release): bump version to X.Y.Z`).
+- **Prohibición:** Queda terminantemente PROHIBIDO finalizar un turno de trabajo donde se haya modificado código funcional o documentación sin haber ejecutado el commit en Git correspondiente.
+
 ## 1. Generación Obligatoria de Artefacto VSIX con Cada Commit
 - **Empaquetado Inmediato con Cada Commit:** Cada vez que se culmine una tarea atómica, se actualice la versión en `package.json` y se realice su correspondiente commit, **ES OBLIGATORIO** ejecutar `pnpm run package` para compilar y empaquetar el binario `.vsix` instalable actualizado (ej. `antidraw-X.Y.Z.vsix`).
 - **Sincronización Permanente:** El desarrollador o diseñador debe contar siempre con el artefacto `.vsix` listo para instalar y probar en VS Code reflejando exactamente el estado del último commit.

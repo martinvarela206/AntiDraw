@@ -3,6 +3,17 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.89.1] - 2026-10-18
+
+### 🛠️ Fixed
+- **Persistent In-DOM Color Picker Popover (`ColorPickerPopover`)**:
+  - Replaced native `<input type="color">` across all inspectors with a custom, in-DOM Figma-styled color picker popover to resolve the VS Code webview focus-stealing bug where color dialogues immediately closed or dismissed upon clicking.
+  - The picker popover now stays open continuously while selecting colors, dragging in the 2D Saturation-Value box, adjusting the Hue or Alpha sliders, picking colors with the Eyedropper API, or typing Hex codes. It closes exclusively when clicking outside the popover or pressing <kbd>Escape</kbd>.
+  - Protected inspector DOM from reactive canvas destruction during real-time color dragging by guarding `WorkspaceLayoutService.render()` with `ColorPickerPopover.isOpen()`.
+  - Harmonized color picking across Fill, Gradient Stops, Stroke, Multi-Stroke Layers, Batch Selection, Canvas Background, CurrentColor, Drop/Inner Shadows, Guides, Grids, and Global Swatches.
+
+---
+
 ## [0.89.0] - 2026-10-18
 
 ### 🚀 Added
