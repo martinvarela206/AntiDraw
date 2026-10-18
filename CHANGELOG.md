@@ -3,6 +3,16 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.93.2] - 2026-10-18
+
+### 🛠️ Fixed
+- **Estilos Figma Studio Dual-Theme (Dark & Light) en Acciones de Nodo y Conversión de Segmento**:
+  - Se incorporó la clase `.tool-btn` y contenedor `.button-group` en `main.css` utilizando las variables de diseño dual-theme de Figma Studio (`--figma-bg-input`, `--figma-border-subtle`, `--figma-text-primary`, `--figma-bg-hover` y `--figma-brand`).
+  - Se eliminaron estilos inline que generaban fondos blancos con texto blanco en modo oscuro o cajas desalineadas.
+  - Se reemplazaron glifos Unicode por iconos vectoriales SVG limpios y consistentes para las acciones `Cerrar Trazo (Z)`, `A Línea Recta` y `A Curva Bézier`, garantizando total nitidez y soporte en modo claro y oscuro sin emojis.
+
+---
+
 ## [0.93.1] - 2026-10-18
 
 ### 🛠️ Fixed

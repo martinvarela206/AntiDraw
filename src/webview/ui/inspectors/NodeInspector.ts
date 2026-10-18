@@ -105,18 +105,21 @@ export class NodeInspector {
         <div class="panel-title">${I18nService.t('inspector.nodeActions')}</div>
         <div class="prop-row" style="flex-direction:column; gap:6px;">
           ${!isClosed ? `
-            <button class="tool-btn" id="btn-close-curve" style="width:100%; height:26px; display:flex; align-items:center; justify-content:center; gap:6px; cursor:pointer; font-weight:600;" title="Z">
-              <span>⟳</span>
+            <button class="tool-btn" id="btn-close-curve" title="${I18nService.t('inspector.closeCurve')} (Z)">
+              <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M 13 8 A 5 5 0 1 1 8 3 L 10 3" />
+                <polyline points="8 1 10 3 8 5" />
+              </svg>
               <span>${I18nService.t('inspector.closeCurve')} (Z)</span>
             </button>
           ` : ''}
           ${isMulti ? `
-          <button class="tool-btn" id="btn-join-nodes" style="width:100%; height:26px; cursor:${isParametric ? 'not-allowed' : 'pointer'}; text-align:center; font-weight:600; color:var(--text-primary); display:inline-flex; align-items:center; justify-content:center; gap:6px; ${isParametric ? 'opacity: 0.35; filter: grayscale(1); pointer-events: none;' : ''}" ${isParametric ? 'disabled' : ''} title="${I18nService.t('inspector.joinNodes')} (Ctrl+J)">
+          <button class="tool-btn" id="btn-join-nodes" ${isParametric ? 'disabled' : ''} title="${I18nService.t('inspector.joinNodes')} (Ctrl+J)">
             ${ToolIcons.joinNodes}
             <span>${I18nService.t('inspector.joinNodes')} (Ctrl+J)</span>
           </button>
           ` : `
-          <button class="tool-btn" id="btn-split-node" style="width:100%; height:26px; cursor:${isParametric ? 'not-allowed' : 'pointer'}; display:inline-flex; align-items:center; justify-content:center; gap:6px; font-weight:600; ${isParametric ? 'opacity: 0.35; filter: grayscale(1); pointer-events: none;' : ''}" ${isParametric ? 'disabled' : ''} title="${I18nService.t('inspector.splitNode')}">
+          <button class="tool-btn" id="btn-split-node" ${isParametric ? 'disabled' : ''} title="${I18nService.t('inspector.splitNode')}">
             ${ToolIcons.splitNode}
             <span>${I18nService.t('inspector.splitNode')}</span>
           </button>
@@ -126,15 +129,23 @@ export class NodeInspector {
 
       <div class="panel-section">
         <div class="panel-title">${I18nService.t('inspector.segmentConversion')}</div>
-        <div class="prop-row" style="display:flex;">
+        <div class="prop-row">
           ${isCurved ? `
-          <button class="tool-btn" id="btn-segment-to-line" style="cursor:pointer; width:100%; height:26px; display:flex; align-items:center; justify-content:center; gap:6px;" title="${I18nService.t('inspector.toLine')} (L)">
-            <span>—</span>
+          <button class="tool-btn" id="btn-segment-to-line" title="${I18nService.t('inspector.toLine')} (L)">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+              <line x1="2" y1="14" x2="14" y2="2" />
+              <circle cx="2" cy="14" r="1.5" fill="currentColor" stroke="none" />
+              <circle cx="14" cy="2" r="1.5" fill="currentColor" stroke="none" />
+            </svg>
             <span>${I18nService.t('inspector.toLine')}</span>
           </button>
           ` : `
-          <button class="tool-btn" id="btn-segment-to-curve" style="cursor:${isParametric ? 'not-allowed' : 'pointer'}; width:100%; height:26px; display:flex; align-items:center; justify-content:center; gap:6px; ${isParametric ? 'opacity: 0.35; filter: grayscale(1); pointer-events: none;' : ''}" ${isParametric ? 'disabled' : ''} title="${I18nService.t('inspector.toCurve')} (C)">
-            <span>∿</span>
+          <button class="tool-btn" id="btn-segment-to-curve" ${isParametric ? 'disabled' : ''} title="${I18nService.t('inspector.toCurve')} (C)">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+              <path d="M 2 13 C 6 13 6 3 14 3" />
+              <circle cx="2" cy="13" r="1.5" fill="currentColor" stroke="none" />
+              <circle cx="14" cy="3" r="1.5" fill="currentColor" stroke="none" />
+            </svg>
             <span>${I18nService.t('inspector.toCurve')}</span>
           </button>
           `}
