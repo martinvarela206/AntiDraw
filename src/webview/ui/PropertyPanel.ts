@@ -1,5 +1,6 @@
 import { VectorModel, VectorElement, PathVertex, NodeType, DropShadowConfig, InnerShadowConfig, GradientConfig, GradientStop, RectCorners, Point } from '../engine/VectorModel.js';
 import { SelectionTool, BoundingBox } from '../engine/SelectionTool.js';
+import { NodeEditorTool } from '../engine/NodeEditorTool.js';
 import { GuideLine, RulerConfig, ShapeToolConfig, GridAlignmentMode, GridConfig, GridType } from '../engine/CanvasManager.js';
 import { ToolIcons } from '../icons/ToolIcons.js';
 
@@ -78,6 +79,8 @@ export class PropertyPanel {
   private model: VectorModel;
   private selectionTool: SelectionTool;
   private activeVertex: PathVertex | null = null;
+  private selectedSegmentIdx: number | null = null;
+  private selectedVertexIds: string[] = [];
   public selectedNodeCount: number = 1;
   private activeTool: string = 'select';
   public penNodeType: NodeType = 'symmetric';
@@ -148,10 +151,14 @@ export class PropertyPanel {
     grids: GridConfig[] = [],
     guides: GuideLine[] = [],
     selectedNodeCount: number = 1,
-    selectedGuides: GuideLine[] = []
+    selectedGuides: GuideLine[] = [],
+    selectedSegmentIdx: number | null = null,
+    selectedVertexIds: string[] = []
   ): void {
     this.activeVertex = selectedVertex;
     this.selectedNodeCount = selectedNodeCount;
+    this.selectedSegmentIdx = selectedSegmentIdx;
+    this.selectedVertexIds = selectedVertexIds;
     this.activeTool = activeTool;
     this.penNodeType = penNodeType;
     this.penVertexCount = penVertexCount;
@@ -188,6 +195,8 @@ export class PropertyPanel {
   public resetPanelMode(): void {
     this.currentPanelMode = null;
     this.activeVertex = null;
+    this.selectedSegmentIdx = null;
+    this.selectedVertexIds = [];
     this.activeGuide = null;
     this.selectedGuides = [];
     this.activeRulerConfig = null;
@@ -283,7 +292,7 @@ export class PropertyPanel {
       this.activeRulerConfig = null;
 
       if (this.activeVertex && selectedEls.length === 1 && this.activeTool === 'node') {
-        if (this.currentPanelMode === 'node' && this.selectedNodeCount <= 1) {
+        if (this.currentPanelMode === 'node' && this.selectedNodeCount <= 1 && this.selectedSegmentIdx === null) {
           // Panel already shows node properties — update in place without destroying DOM
           this.updateNodePropertiesInPlace(this.activeVertex);
         } else {
@@ -887,7 +896,22 @@ export class PropertyPanel {
   // Render Node Properties for single or multiple selected vertices
   private renderNodeProperties(el: VectorElement, v: PathVertex, selectedCount: number = 1): void {
     const isParametric = this.model.isParametricElement(el);
-    this.inspectorContainer.innerHTML = NodeInspector.renderHtml(el, v, selectedCount, isParametric);
+    const isClosed = this.model.isElementClosed(el);
+    const segmentState = el.vertices
+      ? NodeEditorTool.getSegmentConversionState(
+          el.vertices,
+          this.selectedSegmentIdx,
+          this.selectedVertexIds,
+          isClosed
+        )
+      : 'none';
+    this.inspectorContainer.innerHTML = NodeInspector.renderHtml(
+      el,
+      v,
+      selectedCount,
+      isParametric,
+      segmentState
+    );
     NodeInspector.bindEvents(this.inspectorContainer, this.callbacks, el, v);
   }
 

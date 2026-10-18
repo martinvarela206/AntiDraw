@@ -3,6 +3,21 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.93.3] - 2026-10-18
+
+### 🛠️ Fixed
+- **Aislamiento Estricto de Tiradores Bézier al Seleccionar Segmentos**:
+  - Al seleccionar un segmento en la herramienta de edición de nodos, se restringe la visualización y renderizado de tiradores Bézier exclusivamente a aquellos que pertenecen al segmento activo (`v1.handleOut` y `v2.handleIn`).
+  - Se eliminó la fuga de tiradores donde nodos vecinos o adyacentes no pertenecientes al segmento mostraban tangentes en pantalla. Si un segmento recto es seleccionado, no se muestra ningún tirador en dicho tramo.
+- **Evaluación Topológica de Conversión de Segmento y Detección de Segmentos Mixtos (`Segmentos Mixtos`)**:
+  - `NodeEditorTool.getSegmentConversionState`: Evalúa de forma fidedigna el estado del segmento activo o de los segmentos abarcados por nodos seleccionados en lugar de limitarse a inspeccionar si el nodo individual posee alguna tangente saliente hacia otro tramo no seleccionado.
+  - Al seleccionar un segmento recto, el panel de propiedades muestra correctamente `[ A Curva Bézier ]`, permitiendo convertirlo a curva.
+  - Al seleccionar múltiples nodos o segmentos con estados discrepantes (tramos rectos combinados con tramos curvos), el panel de propiedades despliega el indicador inhabilitado `[ Segmentos Mixtos ]`, impidiendo conversiones ambiguas hasta que la selección sea uniforme.
+- **Soporte de Conversión Multi-Segmento Homogénea**:
+  - Al convertir con múltiples nodos seleccionados donde todos los segmentos intermedios son rectas o todos son curvas, la acción convierte de manera uniforme todos los segmentos abarcados y actualiza el inspector instantáneamente.
+
+---
+
 ## [0.93.2] - 2026-10-18
 
 ### 🛠️ Fixed

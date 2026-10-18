@@ -106,6 +106,72 @@ export async function runNodeEditingUxTests(): Promise<boolean> {
   assert(lineHtml.includes('id="btn-segment-to-curve"'), 'Displays [A Curva Bézier] button when segment is straight line');
   assert(!lineHtml.includes('id="btn-segment-to-line"'), 'Omits redundant [A Línea Recta] button when already straight');
 
+  // Test 6: getSegmentConversionState with straight, curve, and mixed segments
+  console.log('\n[6. Segment Conversion State Evaluation (Straight, Curved & Mixed)]');
+  // Scenario matching user screenshot:
+  // v3 (node 3) -> v1 (node 1) is straight segment
+  // v1 (node 1) -> v4 (node 4) is curved segment
+  const mixedVerts: PathVertex[] = [
+    { id: 'node3', x: 20, y: 50, nodeType: 'sharp', command: 'M' },
+    { id: 'node1', x: 50, y: 30, nodeType: 'asymmetric', command: 'L', handleOut: { x: 52, y: 20 } },
+    { id: 'node4', x: 30, y: 10, nodeType: 'asymmetric', command: 'C', handleIn: { x: 42, y: 12 } },
+  ];
+
+  // When segment 0 (node3 to node1) is selected: it is straight!
+  const seg0State = NodeEditorTool.getSegmentConversionState(mixedVerts, 0, ['node3', 'node1'], true);
+  assert(seg0State === 'line', `Straight segment 0 evaluates to 'line' -> got ${seg0State}`);
+
+  // When segment 1 (node1 to node4) is selected: it is curved!
+  const seg1State = NodeEditorTool.getSegmentConversionState(mixedVerts, 1, ['node1', 'node4'], true);
+  assert(seg1State === 'curve', `Curved segment 1 evaluates to 'curve' -> got ${seg1State}`);
+
+  // When nodes spanning both straight and curved segments are selected (node3, node1, node4)
+  const mixedState = NodeEditorTool.getSegmentConversionState(mixedVerts, null, ['node3', 'node1', 'node4'], false);
+  assert(mixedState === 'mixed', `Spanning straight and curved segments evaluates to 'mixed' -> got ${mixedState}`);
+
+  // Test 7: NodeInspector Mixed Segments State UI
+  console.log('\n[7. NodeInspector Mixed Segments UI Rendering]');
+  const mixedHtml = NodeInspector.renderHtml(testEl, mixedVerts[1], 3, false, 'mixed');
+  assert(mixedHtml.includes('id="btn-segment-mixed"'), 'Renders [Segmentos Mixtos] button when state is mixed');
+  assert(mixedHtml.includes('disabled'), '[Segmentos Mixtos] button is disabled');
+  assert(!mixedHtml.includes('id="btn-segment-to-line"'), 'Omits [A Línea Recta] button in mixed state');
+  assert(!mixedHtml.includes('id="btn-segment-to-curve"'), 'Omits [A Curva Bézier] button in mixed state');
+
+  // Test 8: Handle Isolation in NodeOverlayBuilder (Zero Leakage)
+  console.log('\n[8. Bézier Handle Isolation & Leakage Prevention in Overlay]');
+  const { NodeOverlayBuilder } = await import('../src/webview/tools/node/NodeOverlayBuilder.js');
+  const overlayNodeEditor = new NodeEditorTool();
+  const mockCtx: any = {
+    model: {
+      isParametricElement: () => false,
+      isElementClosed: () => true,
+    },
+  };
+  const overlayBuilder = new NodeOverlayBuilder(mockCtx, overlayNodeEditor);
+
+  const leakTestEl: VectorElement = {
+    id: 'leakEl',
+    tagName: 'path',
+    vertices: mixedVerts,
+    isClosed: true,
+  };
+
+  // Select straight segment 0 (from node3 to node1). Node 1 has handleOut to node4, but segment 0 is straight!
+  overlayNodeEditor.selectedSegmentIdx = 0;
+  overlayNodeEditor.selectedVertexIds = new Set(['node3', 'node1']);
+  overlayNodeEditor.selectedVertexId = 'node1';
+
+  const overlayHtml = overlayBuilder.renderIdleBezierHandles(leakTestEl, 1);
+  assert(overlayHtml === '', `Straight segment selection renders NO handles (zero leakage) -> got length ${overlayHtml.length}`);
+
+  // Now select curved segment 1 (from node1 to node4)
+  overlayNodeEditor.selectedSegmentIdx = 1;
+  overlayNodeEditor.selectedVertexIds = new Set(['node1', 'node4']);
+  overlayNodeEditor.selectedVertexId = 'node4';
+
+  const curvedOverlayHtml = overlayBuilder.renderIdleBezierHandles(leakTestEl, 1);
+  assert(curvedOverlayHtml.includes('circle'), 'Curved segment selection renders its handles');
+
   console.log('\nNode Editing UX & Handle Precision Tests complete: ALL PASSED.');
   return true;
 }

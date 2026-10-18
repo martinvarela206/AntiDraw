@@ -287,6 +287,88 @@ export class NodeEditorTool {
   }
 
   /**
+   * ARCHITECTURAL RATIONALE: Topological Segment State Evaluation & Mixed Segments Disambiguation
+   *
+   * Evaluates the conversion state of currently selected segment(s) or vertices.
+   * - 'line': All evaluated segments are straight lines (eligible for conversion to curve).
+   * - 'curve': All evaluated segments are Bézier curves (eligible for conversion to line).
+   * - 'mixed': Selection contains both straight and curved segments (forbid conversion).
+   * - 'none': No valid segment or vertex selection.
+   */
+  public static getSegmentConversionState(
+    vertices: PathVertex[],
+    selectedSegmentIdx: number | null,
+    selectedVertexIds: string[] | Set<string>,
+    isClosed: boolean = true
+  ): 'line' | 'curve' | 'mixed' | 'none' {
+    if (!vertices || vertices.length < 2) return 'none';
+    const n = vertices.length;
+
+    const isSegmentCurved = (idx: number): boolean => {
+      const v1 = vertices[idx];
+      const nextIdx = (idx + 1) % n;
+      const v2 = vertices[nextIdx];
+      return v2.command === 'C' || !!v1.handleOut || !!v2.handleIn;
+    };
+
+    // Case 1: An explicit segment is selected
+    if (selectedSegmentIdx !== null && selectedSegmentIdx >= 0 && selectedSegmentIdx < n) {
+      if (!isClosed && selectedSegmentIdx === n - 1) return 'none';
+      return isSegmentCurved(selectedSegmentIdx) ? 'curve' : 'line';
+    }
+
+    // Case 2: Evaluate segments spanned by selected vertices
+    const idSet = selectedVertexIds instanceof Set ? selectedVertexIds : new Set(selectedVertexIds);
+    if (idSet.size === 0) return 'none';
+
+    const spannedSegmentIndices: number[] = [];
+    const maxSegments = isClosed ? n : n - 1;
+
+    for (let i = 0; i < maxSegments; i++) {
+      const nextIdx = (i + 1) % n;
+      if (idSet.has(vertices[i].id) && idSet.has(vertices[nextIdx].id)) {
+        spannedSegmentIndices.push(i);
+      }
+    }
+
+    if (spannedSegmentIndices.length > 0) {
+      let hasCurve = false;
+      let hasLine = false;
+
+      for (const segIdx of spannedSegmentIndices) {
+        if (isSegmentCurved(segIdx)) {
+          hasCurve = true;
+        } else {
+          hasLine = true;
+        }
+      }
+
+      if (hasCurve && hasLine) return 'mixed';
+      if (hasCurve) return 'curve';
+      return 'line';
+    }
+
+    // Fallback: If only 1 vertex is selected (or non-adjacent vertices),
+    // evaluate the incident handles of the selected vertex/vertices.
+    let hasCurve = false;
+    let hasLine = false;
+    for (const v of vertices) {
+      if (idSet.has(v.id)) {
+        if (v.handleIn || v.handleOut || v.command === 'C') {
+          hasCurve = true;
+        } else {
+          hasLine = true;
+        }
+      }
+    }
+    if (hasCurve && hasLine) return 'mixed';
+    if (hasCurve) return 'curve';
+    if (hasLine) return 'line';
+
+    return 'none';
+  }
+
+  /**
    * ARCHITECTURAL RATIONALE: Topological Contour Auto-Closure ('Z') and Coincident Node Fusion
    * Why this solution is engineered this way:
    * 1. Vector Graph Closure: An open path in SVG does not fill predictably across different renderers

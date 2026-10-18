@@ -20,32 +20,52 @@ export class NodeOverlayBuilder {
   }
 
   /**
-   * Renders idle Bézier handles and tangent lines for the selected vertex and its immediate neighbors.
+   * ARCHITECTURAL RATIONALE: Bézier Handle Isolation & Leakage Prevention
+   *
+   * 1. Segment-Targeted Isolation:
+   *    When a specific segment is selected (selectedSegmentIdx !== null), only the handles
+   *    belonging directly to that segment (v1.handleOut leaving v1 towards v2, and v2.handleIn
+   *    entering v2 from v1) are rendered. Tangents belonging to adjacent unselected segments
+   *    (v1.handleIn or v2.handleOut) and outside neighbor vertices are strictly excluded.
+   * 2. Vertex-Targeted Scoping:
+   *    When individual vertices are selected (selectedSegmentIdx === null), only handles
+   *    belonging to the explicitly selected vertices are rendered. Unselected neighbor vertices
+   *    never sprout ghost handles.
    */
   public renderIdleBezierHandles(el: VectorElement, z: number): string {
     if (!el.vertices || this.ctx.model.isParametricElement(el)) return '';
     const verts = el.vertices;
+    const isClosed = this.ctx.model.isElementClosed(el);
+
+    // Case 1: Active Segment Selected - Strictly isolate handles to this segment
+    if (this.nodeEditorTool.selectedSegmentIdx !== null) {
+      const segIdx = this.nodeEditorTool.selectedSegmentIdx;
+      if (segIdx < 0 || segIdx >= verts.length) return '';
+      if (!isClosed && segIdx === verts.length - 1) return '';
+      const nextIdx = (segIdx + 1) % verts.length;
+      const v1 = verts[segIdx];
+      const v2 = verts[nextIdx];
+
+      let html = '';
+      if (v1.handleOut) {
+        html += GizmoRenderer.renderHandleHtml(v1.x, v1.y, v1.handleOut.x, v1.handleOut.y, z);
+      }
+      if (v2.handleIn) {
+        html += GizmoRenderer.renderHandleHtml(v2.x, v2.y, v2.handleIn.x, v2.handleIn.y, z);
+      }
+      return html;
+    }
+
+    // Case 2: Selected Vertices - Only render handles of explicitly selected vertices
     const selectedIds = new Set(this.nodeEditorTool.selectedVertexIds || []);
     if (this.nodeEditorTool.selectedVertexId) {
       selectedIds.add(this.nodeEditorTool.selectedVertexId);
     }
     if (selectedIds.size === 0) return '';
 
-    const isClosed = this.ctx.model.isElementClosed(el);
-    const showHandlesFor = new Set<number>();
-    verts.forEach((v, idx) => {
-      if (selectedIds.has(v.id)) {
-        showHandlesFor.add(idx);
-        const prevIdx = idx > 0 ? idx - 1 : isClosed ? verts.length - 1 : -1;
-        if (prevIdx >= 0) showHandlesFor.add(prevIdx);
-        const nextIdx = idx < verts.length - 1 ? idx + 1 : isClosed ? 0 : -1;
-        if (nextIdx >= 0) showHandlesFor.add(nextIdx);
-      }
-    });
-
     let html = '';
-    verts.forEach((v, idx) => {
-      if (showHandlesFor.has(idx)) {
+    verts.forEach((v) => {
+      if (selectedIds.has(v.id)) {
         if (v.handleIn) {
           html += GizmoRenderer.renderHandleHtml(v.x, v.y, v.handleIn.x, v.handleIn.y, z);
         }
@@ -111,7 +131,7 @@ export class NodeOverlayBuilder {
     const nextSegIdx = selSeg !== null ? (isClosed ? (selSeg + 1) % ghostVertices.length : selSeg + 1) : -1;
     const segV2Id = nextSegIdx >= 0 && nextSegIdx < ghostVertices.length ? ghostVertices[nextSegIdx].id : null;
 
-    ghostVertices.forEach((gv) => {
+    ghostVertices.forEach((gv, idx) => {
       const isSelected =
         gv.id === this.nodeEditorTool.selectedVertexId ||
         marqueeSelector.isVertexSelected(gv.id) ||
@@ -124,7 +144,27 @@ export class NodeOverlayBuilder {
         z
       );
 
-      if (isSelected) {
+      if (selSeg !== null) {
+        if (idx === selSeg && gv.handleOut) {
+          html += GizmoRenderer.renderHandleHtml(
+            gv.x,
+            gv.y,
+            gv.handleOut.x,
+            gv.handleOut.y,
+            z,
+            GizmoTheme.handle.colorGhost
+          );
+        } else if (idx === nextSegIdx && gv.handleIn) {
+          html += GizmoRenderer.renderHandleHtml(
+            gv.x,
+            gv.y,
+            gv.handleIn.x,
+            gv.handleIn.y,
+            z,
+            GizmoTheme.handle.colorGhost
+          );
+        }
+      } else if (isSelected) {
         if (gv.handleIn) {
           html += GizmoRenderer.renderHandleHtml(
             gv.x,

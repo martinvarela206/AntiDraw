@@ -110,7 +110,7 @@ export class ToolFactory {
     const penToolHandler = new PenToolHandler(toolCtx);
 
     const nodeToolHandler = new NodeToolHandler(toolCtx, ctx.nodeEditorTool, {
-      onNodeSelected: (v, _e, cnt = 1) =>
+      onNodeSelected: (v, _e, cnt = 1, segIdx = null, selIds = []) =>
         ctx.getPropertyPanel()?.update(
           v,
           'node',
@@ -121,7 +121,10 @@ export class ToolFactory {
           ctx.canvasMgr.gridAlignmentMode,
           ctx.canvasMgr.grids,
           ctx.canvasMgr.guides,
-          cnt
+          cnt,
+          [],
+          segIdx,
+          selIds
         ),
       onDeselectNode: () => ctx.getPropertyPanel()?.resetPanelMode(),
       setCursor: (cursor) => ctx.getCanvasView()?.setCursor(cursor),

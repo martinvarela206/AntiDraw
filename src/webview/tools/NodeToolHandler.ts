@@ -9,7 +9,13 @@ import { NodeSubgroupTransformController } from './node/NodeSubgroupTransformCon
 import { OverlayDescriptor } from '../engine/canvas/OverlayDescriptor.js';
 
 export interface NodeToolCallbacks {
-  onNodeSelected?: (vertex: PathVertex, element: VectorElement, selectedCount?: number) => void;
+  onNodeSelected?: (
+    vertex: PathVertex,
+    element: VectorElement,
+    selectedCount?: number,
+    selectedSegmentIdx?: number | null,
+    selectedVertexIds?: string[]
+  ) => void;
   onDeselectNode?: () => void;
   setCursor?: (cursor: string) => void;
 }
@@ -237,7 +243,13 @@ export class NodeToolHandler implements IToolHandler {
       this.ghostNodeVertices = null;
       const newV = selectedEl.vertices.find((v) => v.id === res.newVertexId);
       if (newV && this.callbacks.onNodeSelected) {
-        this.callbacks.onNodeSelected(newV, selectedEl);
+        this.callbacks.onNodeSelected(
+          newV,
+          selectedEl,
+          1,
+          this.nodeEditorTool.selectedSegmentIdx,
+          Array.from(this.marqueeSelector.selectedVertexIds)
+        );
       }
       if (this.ctx.applyCanvasSize) this.ctx.applyCanvasSize();
       this.ctx.render();
@@ -391,7 +403,13 @@ export class NodeToolHandler implements IToolHandler {
           this.isDragging = true;
 
           if (this.callbacks.onNodeSelected) {
-            this.callbacks.onNodeSelected(hitNode.vertex, selectedEl, 1);
+            this.callbacks.onNodeSelected(
+              hitNode.vertex,
+              selectedEl,
+              1,
+              null,
+              [hitNode.vertex.id]
+            );
           }
           this.ctx.render();
           return true;
@@ -441,7 +459,13 @@ export class NodeToolHandler implements IToolHandler {
           const activeV = selectedEl.vertices.find((v) => v.id === this.nodeEditorTool.selectedVertexId);
           if (activeV) {
             const selCount = Math.max(1, this.marqueeSelector.selectedVertexIds.size);
-            this.callbacks.onNodeSelected(activeV, selectedEl, selCount);
+            this.callbacks.onNodeSelected(
+              activeV,
+              selectedEl,
+              selCount,
+              this.nodeEditorTool.selectedSegmentIdx,
+              Array.from(this.marqueeSelector.selectedVertexIds)
+            );
           }
         } else if (!this.nodeEditorTool.selectedVertexId && this.callbacks.onDeselectNode) {
           this.callbacks.onDeselectNode();
@@ -481,7 +505,13 @@ export class NodeToolHandler implements IToolHandler {
         this.isDragging = true;
 
         if (this.callbacks.onNodeSelected) {
-          this.callbacks.onNodeSelected(selectedEl.vertices[nextIdx], selectedEl, 2);
+          this.callbacks.onNodeSelected(
+            selectedEl.vertices[nextIdx],
+            selectedEl,
+            2,
+            hitSegment,
+            Array.from(this.marqueeSelector.selectedVertexIds)
+          );
         }
         this.ctx.render();
         return true;
@@ -817,7 +847,15 @@ export class NodeToolHandler implements IToolHandler {
         this.ghostNodeVertices = null;
         if (selectedEl && this.callbacks.onNodeSelected) {
           const v = selectedEl.vertices?.find((vert) => vert.id === this.nodeEditorTool.selectedVertexId);
-          if (v) this.callbacks.onNodeSelected(v, selectedEl, 1);
+          if (v) {
+            this.callbacks.onNodeSelected(
+              v,
+              selectedEl,
+              1,
+              this.nodeEditorTool.selectedSegmentIdx,
+              Array.from(this.marqueeSelector.selectedVertexIds)
+            );
+          }
         }
         this.ctx.render();
         return true;
@@ -837,7 +875,13 @@ export class NodeToolHandler implements IToolHandler {
           this.nodeEditorTool.selectedHandleType = 'vertex';
           const v = selectedEl.vertices?.find((vert) => vert.id === firstSelectedId);
           if (v && this.callbacks.onNodeSelected) {
-            this.callbacks.onNodeSelected(v, selectedEl, selCount);
+            this.callbacks.onNodeSelected(
+              v,
+              selectedEl,
+              selCount,
+              this.nodeEditorTool.selectedSegmentIdx,
+              Array.from(this.marqueeSelector.selectedVertexIds)
+            );
           }
         } else if (!this.marqueeSelector.isAdditive) {
           this.nodeEditorTool.selectedVertexId = null;
@@ -899,7 +943,13 @@ export class NodeToolHandler implements IToolHandler {
           const activeV = selectedEl.vertices.find((v) => v.id === this.nodeEditorTool.selectedVertexId);
           if (activeV) {
             const selCount = Math.max(1, this.marqueeSelector.selectedVertexIds.size);
-            this.callbacks.onNodeSelected(activeV, selectedEl, selCount);
+            this.callbacks.onNodeSelected(
+              activeV,
+              selectedEl,
+              selCount,
+              this.nodeEditorTool.selectedSegmentIdx,
+              Array.from(this.marqueeSelector.selectedVertexIds)
+            );
           }
         }
 
@@ -1068,55 +1118,107 @@ export class NodeToolHandler implements IToolHandler {
     return false;
   }
 
+  /**
+   * Resolves the target segment indices for conversion operations.
+   * If a specific segment is active (selectedSegmentIdx !== null), returns [selectedSegmentIdx].
+   * If multiple vertices are selected, returns all spanned segments.
+   * Fallback: preceding segment of single selected vertex.
+   */
+  private getTargetSegmentIndices(selectedEl: VectorElement): number[] {
+    if (!selectedEl.vertices || selectedEl.vertices.length < 2) return [];
+    const verts = selectedEl.vertices;
+    const n = verts.length;
+    const isClosed = this.isElementClosed(selectedEl);
+
+    // If an explicit segment was clicked, that's the only target
+    if (this.nodeEditorTool.selectedSegmentIdx !== null) {
+      const idx = this.nodeEditorTool.selectedSegmentIdx;
+      if (idx >= 0 && idx < n) {
+        if (isClosed || idx < n - 1) return [idx];
+      }
+      return [];
+    }
+
+    // Collect all spanned segments from marqueeSelector
+    const idSet = this.marqueeSelector.selectedVertexIds;
+    if (idSet.size >= 2) {
+      const spanned: number[] = [];
+      const maxSeg = isClosed ? n : n - 1;
+      for (let i = 0; i < maxSeg; i++) {
+        const nextIdx = (i + 1) % n;
+        if (idSet.has(verts[i].id) && idSet.has(verts[nextIdx].id)) {
+          spanned.push(i);
+        }
+      }
+      if (spanned.length > 0) return spanned;
+    }
+
+    // Single vertex fallback
+    if (this.nodeEditorTool.selectedVertexId) {
+      const vIdx = verts.findIndex((v) => v.id === this.nodeEditorTool.selectedVertexId);
+      if (vIdx > 0) {
+        return [vIdx - 1];
+      } else if (vIdx === 0 && verts.length > 2 && isClosed) {
+        return [verts.length - 1];
+      }
+    }
+
+    return [];
+  }
+
+  private notifySelectionChange(selectedEl: VectorElement): void {
+    if (!this.callbacks.onNodeSelected) return;
+    const activeV =
+      selectedEl.vertices?.find((v) => v.id === this.nodeEditorTool.selectedVertexId) ||
+      selectedEl.vertices?.[0];
+    if (activeV) {
+      const count = Math.max(1, this.marqueeSelector.selectedVertexIds.size);
+      const segIdx = this.nodeEditorTool.selectedSegmentIdx;
+      const ids = Array.from(this.marqueeSelector.selectedVertexIds);
+      this.callbacks.onNodeSelected(activeV, selectedEl, count, segIdx, ids);
+    }
+  }
+
   public handleConvertSegmentToLine(): void {
     const selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
     if (!selectedEl || !selectedEl.vertices || selectedEl.vertices.length < 2) return;
 
-    let segIdx = this.nodeEditorTool.selectedSegmentIdx;
-    if (segIdx === null) {
-      const verts = selectedEl.vertices;
-      if (this.marqueeSelector.selectedVertexIds.size === 2) {
-        const indices = Array.from(this.marqueeSelector.selectedVertexIds)
-          .map((id) => verts.findIndex((v) => v.id === id))
-          .filter((idx) => idx !== -1)
-          .sort((a, b) => a - b);
-        if (indices.length === 2) {
-          if (indices[1] === indices[0] + 1) {
-            segIdx = indices[0];
-          } else if (indices[0] === 0 && indices[1] === verts.length - 1) {
-            segIdx = verts.length - 1;
-          }
-        }
-      }
-      if (segIdx === null && this.nodeEditorTool.selectedVertexId) {
-        const vIdx = verts.findIndex((v) => v.id === this.nodeEditorTool.selectedVertexId);
-        if (vIdx > 0) {
-          segIdx = vIdx - 1;
-        } else if (vIdx === 0 && verts.length > 2) {
-          segIdx = verts.length - 1;
-        }
-      }
-    }
-    if (segIdx === null) return;
+    const isClosed = this.isElementClosed(selectedEl);
+    const segState = NodeEditorTool.getSegmentConversionState(
+      selectedEl.vertices,
+      this.nodeEditorTool.selectedSegmentIdx,
+      this.marqueeSelector.selectedVertexIds,
+      isClosed
+    );
+    if (segState === 'mixed' || segState === 'none') return;
+
+    const segIndices = this.getTargetSegmentIndices(selectedEl);
+    if (segIndices.length === 0) return;
 
     this.ctx.pushUndo();
-    const isClosed = this.isElementClosed(selectedEl);
-    selectedEl.vertices = this.nodeEditorTool.convertSegmentToLine(selectedEl.vertices, segIdx, isClosed);
-    selectedEl.attributes.d = this.ctx.model.compilePathD(selectedEl.vertices, isClosed);
-    this.nodeEditorTool.selectedSegmentIdx = segIdx;
-    this.ctx.render();
-    if (this.nodeEditorTool.selectedVertexId && this.callbacks.onNodeSelected) {
-      const activeV = selectedEl.vertices.find((v) => v.id === this.nodeEditorTool.selectedVertexId);
-      if (activeV) {
-        this.callbacks.onNodeSelected(activeV, selectedEl, Math.max(1, this.marqueeSelector.selectedVertexIds.size));
-      }
+    let updatedVerts = selectedEl.vertices;
+    for (const idx of segIndices) {
+      updatedVerts = this.nodeEditorTool.convertSegmentToLine(updatedVerts, idx, isClosed);
     }
+    selectedEl.vertices = updatedVerts;
+    selectedEl.attributes.d = this.ctx.model.compilePathD(selectedEl.vertices, isClosed);
+    this.ctx.render();
+    this.notifySelectionChange(selectedEl);
     this.ctx.syncToHost();
   }
 
   public async handleConvertSegmentToCurve(): Promise<void> {
     const selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
     if (!selectedEl || !selectedEl.vertices || selectedEl.vertices.length < 2) return;
+
+    const isClosed = this.isElementClosed(selectedEl);
+    const segState = NodeEditorTool.getSegmentConversionState(
+      selectedEl.vertices,
+      this.nodeEditorTool.selectedSegmentIdx,
+      this.marqueeSelector.selectedVertexIds,
+      isClosed
+    );
+    if (segState === 'mixed' || segState === 'none') return;
 
     if (this.ctx.model.isParametricElement(selectedEl)) {
       const confirmed = await this.ctx.confirm({
@@ -1131,45 +1233,18 @@ export class NodeToolHandler implements IToolHandler {
       this.ctx.model.convertToCurves(selectedEl);
     }
 
-    let segIdx = this.nodeEditorTool.selectedSegmentIdx;
-    if (segIdx === null) {
-      const verts = selectedEl.vertices;
-      if (this.marqueeSelector.selectedVertexIds.size === 2) {
-        const indices = Array.from(this.marqueeSelector.selectedVertexIds)
-          .map((id) => verts.findIndex((v) => v.id === id))
-          .filter((idx) => idx !== -1)
-          .sort((a, b) => a - b);
-        if (indices.length === 2) {
-          if (indices[1] === indices[0] + 1) {
-            segIdx = indices[0];
-          } else if (indices[0] === 0 && indices[1] === verts.length - 1) {
-            segIdx = verts.length - 1;
-          }
-        }
-      }
-      if (segIdx === null && this.nodeEditorTool.selectedVertexId) {
-        const vIdx = verts.findIndex((v) => v.id === this.nodeEditorTool.selectedVertexId);
-        if (vIdx > 0) {
-          segIdx = vIdx - 1;
-        } else if (vIdx === 0 && verts.length > 2) {
-          segIdx = verts.length - 1;
-        }
-      }
-    }
-    if (segIdx === null) return;
+    const segIndices = this.getTargetSegmentIndices(selectedEl);
+    if (segIndices.length === 0) return;
 
     this.ctx.pushUndo();
-    const isClosed = this.isElementClosed(selectedEl);
-    selectedEl.vertices = this.nodeEditorTool.convertSegmentToCurve(selectedEl.vertices, segIdx, isClosed);
-    selectedEl.attributes.d = this.ctx.model.compilePathD(selectedEl.vertices, isClosed);
-    this.nodeEditorTool.selectedSegmentIdx = segIdx;
-    this.ctx.render();
-    if (this.nodeEditorTool.selectedVertexId && this.callbacks.onNodeSelected) {
-      const activeV = selectedEl.vertices.find((v) => v.id === this.nodeEditorTool.selectedVertexId);
-      if (activeV) {
-        this.callbacks.onNodeSelected(activeV, selectedEl, Math.max(1, this.marqueeSelector.selectedVertexIds.size));
-      }
+    let updatedVerts = selectedEl.vertices;
+    for (const idx of segIndices) {
+      updatedVerts = this.nodeEditorTool.convertSegmentToCurve(updatedVerts, idx, isClosed);
     }
+    selectedEl.vertices = updatedVerts;
+    selectedEl.attributes.d = this.ctx.model.compilePathD(selectedEl.vertices, isClosed);
+    this.ctx.render();
+    this.notifySelectionChange(selectedEl);
     this.ctx.syncToHost();
   }
 
@@ -1303,7 +1378,15 @@ export class NodeToolHandler implements IToolHandler {
 
       if (this.callbacks.onNodeSelected && this.nodeEditorTool.selectedVertexId) {
         const v = selectedEl.vertices.find((vert) => vert.id === this.nodeEditorTool.selectedVertexId);
-        if (v) this.callbacks.onNodeSelected(v, selectedEl, this.marqueeSelector.selectedVertexIds.size);
+        if (v) {
+          this.callbacks.onNodeSelected(
+            v,
+            selectedEl,
+            this.marqueeSelector.selectedVertexIds.size,
+            this.nodeEditorTool.selectedSegmentIdx,
+            Array.from(this.marqueeSelector.selectedVertexIds)
+          );
+        }
       } else if (this.callbacks.onDeselectNode) {
         this.callbacks.onDeselectNode();
       }
@@ -1367,7 +1450,13 @@ export class NodeToolHandler implements IToolHandler {
       if (savedVertexId && this.callbacks.onNodeSelected) {
         const activeV = selectedEl.vertices.find((v) => v.id === savedVertexId);
         if (activeV) {
-          this.callbacks.onNodeSelected(activeV, selectedEl, idsToChange.size);
+          this.callbacks.onNodeSelected(
+            activeV,
+            selectedEl,
+            idsToChange.size,
+            this.nodeEditorTool.selectedSegmentIdx,
+            Array.from(this.marqueeSelector.selectedVertexIds)
+          );
         }
       }
       this.ctx.syncToHost();
@@ -1421,7 +1510,13 @@ export class NodeToolHandler implements IToolHandler {
 
       const newSelectedV = selectedEl.vertices.find((v) => v.id === this.nodeEditorTool.selectedVertexId);
       if (newSelectedV && this.callbacks.onNodeSelected) {
-        this.callbacks.onNodeSelected(newSelectedV, selectedEl);
+        this.callbacks.onNodeSelected(
+          newSelectedV,
+          selectedEl,
+          1,
+          this.nodeEditorTool.selectedSegmentIdx,
+          Array.from(this.marqueeSelector.selectedVertexIds)
+        );
       }
       this.ctx.render();
       this.ctx.syncToHost();

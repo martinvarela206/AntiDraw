@@ -342,6 +342,7 @@ export interface Translations {
     segmentConversion: string;
     toLine: string;
     toCurve: string;
+    mixedSegments: string;
     bezierHandles: string;
     handleIn: string;
     handleOut: string;

@@ -24,7 +24,8 @@ export class NodeInspector {
     el: VectorElement,
     v: PathVertex,
     selectedCount: number = 1,
-    isParametric: boolean = false
+    isParametric: boolean = false,
+    segmentState?: 'line' | 'curve' | 'mixed' | 'none'
   ): string {
     const isMulti = selectedCount > 1;
     const isSharp = v.nodeType === 'sharp' || (!v.handleIn && !v.handleOut);
@@ -34,7 +35,11 @@ export class NodeInspector {
         ['rect', 'circle', 'ellipse', 'star', 'polygon'].includes(el.tagName) ||
         (el.attributes.d ? /z/i.test(el.attributes.d) : false));
 
-    const isCurved = !!(v.handleIn || v.handleOut || v.command === 'C');
+    let effSegmentState = segmentState;
+    if (!effSegmentState || effSegmentState === 'none') {
+      const isCurved = !!(v.handleIn || v.handleOut || v.command === 'C');
+      effSegmentState = isCurved ? 'curve' : 'line';
+    }
 
     return `
       <div class="panel-section">
@@ -130,7 +135,17 @@ export class NodeInspector {
       <div class="panel-section">
         <div class="panel-title">${I18nService.t('inspector.segmentConversion')}</div>
         <div class="prop-row">
-          ${isCurved ? `
+          ${effSegmentState === 'mixed' ? `
+          <button class="tool-btn" id="btn-segment-mixed" disabled title="${I18nService.t('inspector.mixedSegments')}">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+              <path d="M 2 13 C 5 13 5 8 8 8 L 14 3" />
+              <circle cx="2" cy="13" r="1.5" fill="currentColor" stroke="none" />
+              <circle cx="8" cy="8" r="1.5" fill="currentColor" stroke="none" />
+              <circle cx="14" cy="3" r="1.5" fill="currentColor" stroke="none" />
+            </svg>
+            <span>${I18nService.t('inspector.mixedSegments')}</span>
+          </button>
+          ` : effSegmentState === 'curve' ? `
           <button class="tool-btn" id="btn-segment-to-line" title="${I18nService.t('inspector.toLine')} (L)">
             <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
               <line x1="2" y1="14" x2="14" y2="2" />
