@@ -3,7 +3,7 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.88.1] - 2026-10-18
+## [0.89.0] - 2026-10-18
 
 ### 🚀 Added
 - **Figma Studio Design System & Dual-Theme (`figma-ux-ui`)**:
@@ -13,6 +13,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Quiet Chrome / Canvas First principle: removed saturated blue gradients (`#2563eb`/`#1d4ed8`) and heavy glow filters from toolbars and ruler corners, replacing them with flat, high-density Figma Blue accents (`#0d99ff`).
   - Layer Tree & Vector Explorer refinement: indented hierarchy with hover-revealed tools (`opacity: 0.4` -> `1.0`), clean selection accents, and Natural Title Case headers.
   - ViewBox artboard card elevation: crisp boundary contrast with subtle drop shadow (`box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25)`) differentiating artboard surfaces from the workspace canvas.
+
+---
+
+## [0.88.1] - 2026-10-18
+
+### 🚀 Added
 - **Storage Mode Choice Gate (`ImageStorageChoiceModal`)**: Added an interactive ingestion dialog prompted whenever an image is added via toolbar, drag-and-drop, or clipboard paste, allowing users to explicitly choose between:
   - *Linked Asset* (`./[svgName]_[id]_img.ext`): keeps SVG XML lightweight and portable with clean Git diffs.
   - *Embedded Data URI* (`data:image/...;base64`): creates a 100% self-contained standalone SVG.
