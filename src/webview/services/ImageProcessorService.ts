@@ -41,6 +41,7 @@ export interface OptimizedImageResult {
   width: number;
   height: number;
   format: 'webp' | 'png' | 'jpeg';
+  destination: 'linked' | 'embedded';
   previewUrl: string;
   savingsPercent: number;
 }
@@ -159,6 +160,7 @@ export class ImageProcessorService {
       width: targetW,
       height: targetH,
       format: config.format,
+      destination: config.destination,
       previewUrl,
       savingsPercent: savings,
     };

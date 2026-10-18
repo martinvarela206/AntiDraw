@@ -484,6 +484,15 @@ export class ImageOptimizationModal {
         triggerProcess();
       });
 
+      sidebarEl.querySelectorAll('input[name="ad-opt-dest"]').forEach((radio) => {
+        radio.addEventListener('change', () => {
+          const checked = sidebarEl.querySelector('input[name="ad-opt-dest"]:checked') as HTMLInputElement;
+          if (checked) {
+            config.destination = checked.value as 'linked' | 'embedded';
+          }
+        });
+      });
+
       // Cleanup
       const closeModal = () => {
         if (this.activeModal) {
@@ -513,6 +522,7 @@ export class ImageOptimizationModal {
           width: sourceMeta.width,
           height: sourceMeta.height,
           format: (sourceMeta.format === 'unknown' ? 'png' : sourceMeta.format) as any,
+          destination: config.destination,
           previewUrl: sourceMeta.base64,
           savingsPercent: 0,
         });
@@ -521,10 +531,12 @@ export class ImageOptimizationModal {
       container.querySelector('#ad-img-opt-btn-save')?.addEventListener('click', async () => {
         closeModal();
         if (currentResult) {
+          currentResult.destination = config.destination;
           resolve(currentResult);
         } else {
           // If not ready, run synchronous process
           const res = await ImageProcessorService.processImage(sourceImg, config, sourceMeta.sizeBytes);
+          res.destination = config.destination;
           resolve(res);
         }
       });

@@ -481,5 +481,14 @@ export interface Translations {
     toolImage: string;
     toolImageTooltip: string;
     toolImageBgTooltip: string;
+    choiceTitle: string;
+    choiceQuestion: string;
+    choiceLinkedTitle: string;
+    choiceLinkedDesc: string;
+    choiceEmbeddedTitle: string;
+    choiceEmbeddedDesc: string;
+    choiceOptimizeBtn: string;
+    recommendedBadge: string;
+    largeImageWarning: string;
   };
 }

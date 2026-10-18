@@ -21,6 +21,7 @@ import { I18nService } from '../i18n/index.js';
 import { ImageProcessorService } from './ImageProcessorService.js';
 import { ImageOptimizationModal } from '../ui/ImageOptimizationModal.js';
 import { PrimitiveDetector } from '../engine/primitives/PrimitiveDetector.js';
+import { ImageStorageChoiceModal } from '../ui/ImageStorageChoiceModal.js';
 
 export interface ImageIngestionContext {
   model: VectorModel;
@@ -210,15 +211,20 @@ export class ImageIngestionService {
       // 1. Analyze image source
       const meta = await ImageProcessorService.analyzeImage(base64, fileName, sizeBytes);
 
+      // 2. Storage Choice Gate (Prompt user: Linked vs Embedded vs Optimize)
+      const choice = await ImageStorageChoiceModal.show(meta);
+      if (!choice) {
+        // User cancelled ingestion
+        return;
+      }
+
       let finalBase64 = meta.base64;
       let finalFormat = meta.format === 'unknown' ? 'png' : meta.format;
       let finalWidth = meta.width;
       let finalHeight = meta.height;
       let storageMode: 'linked' | 'embedded' = 'linked';
 
-      // 2. Threshold Check
-      const exceeds = ImageProcessorService.isExceedingThreshold(meta.sizeBytes, meta.width, meta.height);
-      if (exceeds) {
+      if (choice === 'optimize') {
         // Open dual-viewport Save for Web optimization dialog
         const modalResult = await ImageOptimizationModal.show(meta);
         if (!modalResult) {
@@ -229,6 +235,9 @@ export class ImageIngestionService {
         finalFormat = modalResult.format;
         finalWidth = modalResult.width;
         finalHeight = modalResult.height;
+        storageMode = modalResult.destination || 'linked';
+      } else {
+        storageMode = choice; // 'linked' or 'embedded'
       }
 
       // 3. Asset Persistence (Linked in disk vs Embedded)

@@ -11,6 +11,7 @@ esbuild.js
 install.bat
 install.ps1
 install.sh
+sample_test*
 sample_test.svg
 sample_test.json
 pnpm-lock.yaml
