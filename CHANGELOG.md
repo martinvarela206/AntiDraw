@@ -3,6 +3,21 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.93.4] - 2026-10-18
+
+### 🛠️ Fixed
+- **Eliminación de Falsos Positivos por `command === 'C'` en Segmentos Rectos**:
+  - `NodeEditorTool.isSegmentCurved`: Se eliminó por completo la verificación errónea de `v2.command === 'C'`. En SVG y trazados vectoriales, los comandos de vértice solo indican metadatos de importación; un tramo es matemática y geométricamente curvo única y exclusivamente si posee tangentes de control en dicho segmento (`v1.handleOut || v2.handleIn`).
+  - Al hacer clic sobre cualquier segmento recto que comparte un nodo con un segmento curvo adyacente, el inspector ahora muestra fielmente **`[ A Curva Bézier ]`** y permite curvar dicho tramo sin bloqueos ni falsos estados de curva.
+- **Resolución Topológica y Detección de Segmentos Mixtos en Selecciones Multi-Nodo No Adyacentes**:
+  - `NodeEditorTool.getTargetSegmentIndices`: Si no hay nodos contiguos seleccionados (como seleccionar 4 esquinas aisladas en figuras complejas), se recolectan todos los segmentos incidentes (entrantes y salientes) de los nodos seleccionados.
+  - Al abarcar simultáneamente segmentos curvos y segmentos rectos, el panel despliega con precisión el estado **`[ Segmentos Mixtos ]`** (deshabilitado), impidiendo acciones ambiguas.
+  - `NodeToolHandler.getTargetSegmentIndices`: Se unificó la resolución de segmentos objetivo delegando directamente a `NodeEditorTool.getTargetSegmentIndices`, garantizando paridad total entre lo que el inspector evalúa y lo que la herramienta convierte.
+- **Sincronización Reactiva de Inspector de Nodos al Alternar Vértices**:
+  - Se implementó `lastRenderedVertexId` en `PropertyPanel` para garantizar que alternar entre nodos distintos reconstruya completamente las acciones de segmento y las filas de tiradores Bézier, preservando a su vez el renderizado in-situ de alto rendimiento a 60 fps durante el arrastre continuo de un mismo nodo.
+
+---
+
 ## [0.93.3] - 2026-10-18
 
 ### 🛠️ Fixed

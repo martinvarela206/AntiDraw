@@ -240,7 +240,7 @@ export class NodeEditorTool {
         return {
           ...v,
           handleIn: undefined,
-          command: v.command === 'M' ? 'M' : 'L',
+          command: v.command === 'M' ? 'M' : (hasOther ? 'C' : 'L'),
           nodeType: !hasOther ? 'sharp' : v.nodeType,
         };
       }
@@ -278,7 +278,7 @@ export class NodeEditorTool {
         return {
           ...v,
           handleIn: h2,
-          command: 'C',
+          command: v.command === 'M' ? 'M' : 'C',
           nodeType: v.nodeType === 'sharp' ? 'asymmetric' : v.nodeType,
         };
       }
@@ -287,12 +287,92 @@ export class NodeEditorTool {
   }
 
   /**
+   * ARCHITECTURAL RATIONALE: Rigorous Segment Curvature Evaluation
+   * A segment between vertex i and vertex (i+1)%n is visually, mathematically, and in SVG
+   * a cubic Bézier curve IF AND ONLY IF at least one control handle exists on that segment:
+   * (vertices[i].handleOut || vertices[nextIdx].handleIn).
+   *
+   * Under no circumstance should `v2.command === 'C'` be used to evaluate segment curvature:
+   * `command: 'C'` is SVG metadata indicating the operator of a vertex command in SVG paths,
+   * but straight edges (L commands or flattened segments) sharing a vertex with an adjacent curve
+   * frequently have `command: 'C'`. Checking `command === 'C'` causes false positives on straight edges,
+   * blocking conversion to Bézier curve and corrupting UI state.
+   */
+  public static isSegmentCurved(vertices: PathVertex[], idx: number, isClosed: boolean = true): boolean {
+    const n = vertices.length;
+    if (idx < 0 || idx >= n) return false;
+    if (!isClosed && idx === n - 1) return false;
+    const v1 = vertices[idx];
+    const nextIdx = (idx + 1) % n;
+    const v2 = vertices[nextIdx];
+    return !!(v1.handleOut || v2.handleIn);
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Topological Segment Target Resolution
+   * Resolves the target segment indices for conversion operations ('to line' or 'to curve'):
+   * 1. Priority 1 (Explicit Segment): If `selectedSegmentIdx !== null`, exactly that segment is targeted.
+   * 2. Priority 2 (Spanned Segments): If 2 or more adjacent selected vertices span segments, all
+   *    spanned segments (where BOTH endpoints are selected) are targeted.
+   * 3. Priority 3 (Incident Segments Fallback): If selected vertices are non-adjacent or isolated,
+   *    all incident segments (incoming and outgoing) connected to each selected vertex are collected.
+   */
+  public static getTargetSegmentIndices(
+    vertices: PathVertex[],
+    selectedSegmentIdx: number | null,
+    selectedVertexIds: string[] | Set<string>,
+    isClosed: boolean = true
+  ): number[] {
+    if (!vertices || vertices.length < 2) return [];
+    const n = vertices.length;
+    const maxSeg = isClosed ? n : n - 1;
+
+    // 1. Explicit segment selection has highest priority
+    if (selectedSegmentIdx !== null && selectedSegmentIdx >= 0 && selectedSegmentIdx < maxSeg) {
+      return [selectedSegmentIdx];
+    }
+
+    const idSet = selectedVertexIds instanceof Set ? selectedVertexIds : new Set(selectedVertexIds);
+    if (idSet.size === 0) return [];
+
+    // 2. Check segments spanned by adjacent selected vertices
+    const spanned: number[] = [];
+    for (let i = 0; i < maxSeg; i++) {
+      const nextIdx = (i + 1) % n;
+      if (idSet.has(vertices[i].id) && idSet.has(vertices[nextIdx].id)) {
+        spanned.push(i);
+      }
+    }
+    if (spanned.length > 0) {
+      return spanned;
+    }
+
+    // 3. Fallback when no adjacent vertices are selected (non-adjacent multi-selection or single vertex):
+    // Collect all incident segments (both incoming and outgoing) for each selected vertex.
+    const incident = new Set<number>();
+    for (let i = 0; i < n; i++) {
+      if (idSet.has(vertices[i].id)) {
+        const inSeg = (i - 1 + n) % n;
+        if (isClosed || i > 0) {
+          incident.add(inSeg);
+        }
+        const outSeg = i;
+        if (isClosed || i < n - 1) {
+          incident.add(outSeg);
+        }
+      }
+    }
+
+    return Array.from(incident).sort((a, b) => a - b);
+  }
+
+  /**
    * ARCHITECTURAL RATIONALE: Topological Segment State Evaluation & Mixed Segments Disambiguation
    *
-   * Evaluates the conversion state of currently selected segment(s) or vertices.
-   * - 'line': All evaluated segments are straight lines (eligible for conversion to curve).
-   * - 'curve': All evaluated segments are Bézier curves (eligible for conversion to line).
-   * - 'mixed': Selection contains both straight and curved segments (forbid conversion).
+   * Evaluates the conversion state of currently selected segment(s) or vertices:
+   * - 'line': All targeted segments are straight lines (eligible for conversion to curve).
+   * - 'curve': All targeted segments are Bézier curves (eligible for conversion to line).
+   * - 'mixed': Targeted segments contain a mixture of both straight lines and curves (forbid conversion).
    * - 'none': No valid segment or vertex selection.
    */
   public static getSegmentConversionState(
@@ -302,69 +382,30 @@ export class NodeEditorTool {
     isClosed: boolean = true
   ): 'line' | 'curve' | 'mixed' | 'none' {
     if (!vertices || vertices.length < 2) return 'none';
-    const n = vertices.length;
 
-    const isSegmentCurved = (idx: number): boolean => {
-      const v1 = vertices[idx];
-      const nextIdx = (idx + 1) % n;
-      const v2 = vertices[nextIdx];
-      return v2.command === 'C' || !!v1.handleOut || !!v2.handleIn;
-    };
+    const targetIndices = NodeEditorTool.getTargetSegmentIndices(
+      vertices,
+      selectedSegmentIdx,
+      selectedVertexIds,
+      isClosed
+    );
 
-    // Case 1: An explicit segment is selected
-    if (selectedSegmentIdx !== null && selectedSegmentIdx >= 0 && selectedSegmentIdx < n) {
-      if (!isClosed && selectedSegmentIdx === n - 1) return 'none';
-      return isSegmentCurved(selectedSegmentIdx) ? 'curve' : 'line';
-    }
+    if (targetIndices.length === 0) return 'none';
 
-    // Case 2: Evaluate segments spanned by selected vertices
-    const idSet = selectedVertexIds instanceof Set ? selectedVertexIds : new Set(selectedVertexIds);
-    if (idSet.size === 0) return 'none';
-
-    const spannedSegmentIndices: number[] = [];
-    const maxSegments = isClosed ? n : n - 1;
-
-    for (let i = 0; i < maxSegments; i++) {
-      const nextIdx = (i + 1) % n;
-      if (idSet.has(vertices[i].id) && idSet.has(vertices[nextIdx].id)) {
-        spannedSegmentIndices.push(i);
-      }
-    }
-
-    if (spannedSegmentIndices.length > 0) {
-      let hasCurve = false;
-      let hasLine = false;
-
-      for (const segIdx of spannedSegmentIndices) {
-        if (isSegmentCurved(segIdx)) {
-          hasCurve = true;
-        } else {
-          hasLine = true;
-        }
-      }
-
-      if (hasCurve && hasLine) return 'mixed';
-      if (hasCurve) return 'curve';
-      return 'line';
-    }
-
-    // Fallback: If only 1 vertex is selected (or non-adjacent vertices),
-    // evaluate the incident handles of the selected vertex/vertices.
     let hasCurve = false;
     let hasLine = false;
-    for (const v of vertices) {
-      if (idSet.has(v.id)) {
-        if (v.handleIn || v.handleOut || v.command === 'C') {
-          hasCurve = true;
-        } else {
-          hasLine = true;
-        }
+
+    for (const segIdx of targetIndices) {
+      if (NodeEditorTool.isSegmentCurved(vertices, segIdx, isClosed)) {
+        hasCurve = true;
+      } else {
+        hasLine = true;
       }
     }
+
     if (hasCurve && hasLine) return 'mixed';
     if (hasCurve) return 'curve';
     if (hasLine) return 'line';
-
     return 'none';
   }
 

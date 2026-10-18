@@ -1120,50 +1120,18 @@ export class NodeToolHandler implements IToolHandler {
 
   /**
    * Resolves the target segment indices for conversion operations.
-   * If a specific segment is active (selectedSegmentIdx !== null), returns [selectedSegmentIdx].
-   * If multiple vertices are selected, returns all spanned segments.
-   * Fallback: preceding segment of single selected vertex.
+   * Delegates directly to NodeEditorTool.getTargetSegmentIndices to maintain single-source-of-truth
+   * parity between state evaluation and mutation.
    */
   private getTargetSegmentIndices(selectedEl: VectorElement): number[] {
     if (!selectedEl.vertices || selectedEl.vertices.length < 2) return [];
-    const verts = selectedEl.vertices;
-    const n = verts.length;
     const isClosed = this.isElementClosed(selectedEl);
-
-    // If an explicit segment was clicked, that's the only target
-    if (this.nodeEditorTool.selectedSegmentIdx !== null) {
-      const idx = this.nodeEditorTool.selectedSegmentIdx;
-      if (idx >= 0 && idx < n) {
-        if (isClosed || idx < n - 1) return [idx];
-      }
-      return [];
-    }
-
-    // Collect all spanned segments from marqueeSelector
-    const idSet = this.marqueeSelector.selectedVertexIds;
-    if (idSet.size >= 2) {
-      const spanned: number[] = [];
-      const maxSeg = isClosed ? n : n - 1;
-      for (let i = 0; i < maxSeg; i++) {
-        const nextIdx = (i + 1) % n;
-        if (idSet.has(verts[i].id) && idSet.has(verts[nextIdx].id)) {
-          spanned.push(i);
-        }
-      }
-      if (spanned.length > 0) return spanned;
-    }
-
-    // Single vertex fallback
-    if (this.nodeEditorTool.selectedVertexId) {
-      const vIdx = verts.findIndex((v) => v.id === this.nodeEditorTool.selectedVertexId);
-      if (vIdx > 0) {
-        return [vIdx - 1];
-      } else if (vIdx === 0 && verts.length > 2 && isClosed) {
-        return [verts.length - 1];
-      }
-    }
-
-    return [];
+    return NodeEditorTool.getTargetSegmentIndices(
+      selectedEl.vertices,
+      this.nodeEditorTool.selectedSegmentIdx,
+      this.marqueeSelector.selectedVertexIds,
+      isClosed
+    );
   }
 
   private notifySelectionChange(selectedEl: VectorElement): void {

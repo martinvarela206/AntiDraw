@@ -109,17 +109,17 @@ export async function runNodeEditingUxTests(): Promise<boolean> {
   // Test 6: getSegmentConversionState with straight, curve, and mixed segments
   console.log('\n[6. Segment Conversion State Evaluation (Straight, Curved & Mixed)]');
   // Scenario matching user screenshot:
-  // v3 (node 3) -> v1 (node 1) is straight segment
+  // v3 (node 3) -> v1 (node 1) is straight segment, EVEN IF node1 has command: 'C' (SVG path parsed)
   // v1 (node 1) -> v4 (node 4) is curved segment
   const mixedVerts: PathVertex[] = [
     { id: 'node3', x: 20, y: 50, nodeType: 'sharp', command: 'M' },
-    { id: 'node1', x: 50, y: 30, nodeType: 'asymmetric', command: 'L', handleOut: { x: 52, y: 20 } },
+    { id: 'node1', x: 50, y: 30, nodeType: 'asymmetric', command: 'C', handleOut: { x: 52, y: 20 } },
     { id: 'node4', x: 30, y: 10, nodeType: 'asymmetric', command: 'C', handleIn: { x: 42, y: 12 } },
   ];
 
-  // When segment 0 (node3 to node1) is selected: it is straight!
+  // When segment 0 (node3 to node1) is selected: it is straight despite node1.command === 'C'!
   const seg0State = NodeEditorTool.getSegmentConversionState(mixedVerts, 0, ['node3', 'node1'], true);
-  assert(seg0State === 'line', `Straight segment 0 evaluates to 'line' -> got ${seg0State}`);
+  assert(seg0State === 'line', `Straight segment 0 evaluates to 'line' despite command 'C' -> got ${seg0State}`);
 
   // When segment 1 (node1 to node4) is selected: it is curved!
   const seg1State = NodeEditorTool.getSegmentConversionState(mixedVerts, 1, ['node1', 'node4'], true);
@@ -128,6 +128,24 @@ export async function runNodeEditingUxTests(): Promise<boolean> {
   // When nodes spanning both straight and curved segments are selected (node3, node1, node4)
   const mixedState = NodeEditorTool.getSegmentConversionState(mixedVerts, null, ['node3', 'node1', 'node4'], false);
   assert(mixedState === 'mixed', `Spanning straight and curved segments evaluates to 'mixed' -> got ${mixedState}`);
+
+  // When multiple non-adjacent nodes touching different segment types are selected (user screenshot scenario)
+  const multiNodeShape: PathVertex[] = [
+    { id: 'top-left', x: 20, y: 10, nodeType: 'asymmetric', command: 'M', handleOut: { x: 10, y: 20 } },
+    { id: 'top-mid', x: 40, y: 10, nodeType: 'sharp', command: 'L' },
+    { id: 'top-right', x: 60, y: 10, nodeType: 'asymmetric', command: 'C', handleOut: { x: 70, y: 20 } },
+    { id: 'bot-right', x: 60, y: 50, nodeType: 'sharp', command: 'L' },
+    { id: 'bot-mid', x: 40, y: 50, nodeType: 'sharp', command: 'L' },
+    { id: 'bot-left', x: 20, y: 50, nodeType: 'sharp', command: 'L' },
+  ];
+  // Select 4 corner nodes (non-adjacent: top-left, top-right, bot-left, bot-right)
+  const nonAdjacentMixed = NodeEditorTool.getSegmentConversionState(
+    multiNodeShape,
+    null,
+    ['top-left', 'top-right', 'bot-left', 'bot-right'],
+    true
+  );
+  assert(nonAdjacentMixed === 'mixed', `Non-adjacent nodes connected to curve and straight segments evaluate to 'mixed' -> got ${nonAdjacentMixed}`);
 
   // Test 7: NodeInspector Mixed Segments State UI
   console.log('\n[7. NodeInspector Mixed Segments UI Rendering]');

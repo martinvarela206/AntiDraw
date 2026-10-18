@@ -79,6 +79,7 @@ export class PropertyPanel {
   private model: VectorModel;
   private selectionTool: SelectionTool;
   private activeVertex: PathVertex | null = null;
+  private lastRenderedVertexId: string | null = null;
   private selectedSegmentIdx: number | null = null;
   private selectedVertexIds: string[] = [];
   public selectedNodeCount: number = 1;
@@ -195,6 +196,7 @@ export class PropertyPanel {
   public resetPanelMode(): void {
     this.currentPanelMode = null;
     this.activeVertex = null;
+    this.lastRenderedVertexId = null;
     this.selectedSegmentIdx = null;
     this.selectedVertexIds = [];
     this.activeGuide = null;
@@ -292,8 +294,9 @@ export class PropertyPanel {
       this.activeRulerConfig = null;
 
       if (this.activeVertex && selectedEls.length === 1 && this.activeTool === 'node') {
-        if (this.currentPanelMode === 'node' && this.selectedNodeCount <= 1 && this.selectedSegmentIdx === null) {
-          // Panel already shows node properties — update in place without destroying DOM
+        const isSameNode = this.lastRenderedVertexId === this.activeVertex.id;
+        if (isSameNode && this.currentPanelMode === 'node' && this.selectedNodeCount <= 1 && this.selectedSegmentIdx === null) {
+          // Panel already shows this exact node's properties — update in place without destroying DOM
           this.updateNodePropertiesInPlace(this.activeVertex);
         } else {
           this.renderNodeProperties(selectedEls[0], this.activeVertex, this.selectedNodeCount);
@@ -895,13 +898,17 @@ export class PropertyPanel {
 
   // Render Node Properties for single or multiple selected vertices
   private renderNodeProperties(el: VectorElement, v: PathVertex, selectedCount: number = 1): void {
+    this.lastRenderedVertexId = v ? v.id : null;
     const isParametric = this.model.isParametricElement(el);
     const isClosed = this.model.isElementClosed(el);
+    const effectiveVertexIds = this.selectedVertexIds.length > 0
+      ? this.selectedVertexIds
+      : (v ? [v.id] : []);
     const segmentState = el.vertices
       ? NodeEditorTool.getSegmentConversionState(
           el.vertices,
           this.selectedSegmentIdx,
-          this.selectedVertexIds,
+          effectiveVertexIds,
           isClosed
         )
       : 'none';
