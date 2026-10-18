@@ -50,6 +50,7 @@ import LightningSvg from '../../assets/icons/lightning.svg';
 import LineToolSvg from '../../assets/icons/line_tool.svg';
 import LockSvg from '../../assets/icons/lock.svg';
 import LockGuidesSvg from '../../assets/icons/lock_guides.svg';
+import MoonSvg from '../../assets/icons/moon.svg';
 import NodeAsymmetricSvg from '../../assets/icons/node_asymmetric.svg';
 import NodeSharpSvg from '../../assets/icons/node_sharp.svg';
 import NodeSmoothSvg from '../../assets/icons/node_smooth.svg';
@@ -79,6 +80,7 @@ import SplitNodeSvg from '../../assets/icons/split_node.svg';
 import StarToolSvg from '../../assets/icons/star_tool.svg';
 import StrokeToolSvg from '../../assets/icons/stroke_tool.svg';
 import SubtractSvg from '../../assets/icons/subtract.svg';
+import SunSvg from '../../assets/icons/sun.svg';
 import TargetSvg from '../../assets/icons/target.svg';
 import TrashSvg from '../../assets/icons/trash.svg';
 import UndoSvg from '../../assets/icons/undo.svg';
@@ -128,6 +130,7 @@ export const ICONS = {
   lineTool: LineToolSvg,
   lock: LockSvg,
   lockGuides: LockGuidesSvg,
+  moon: MoonSvg,
   nodeAsymmetric: NodeAsymmetricSvg,
   nodeSharp: NodeSharpSvg,
   nodeSmooth: NodeSmoothSvg,
@@ -157,6 +160,7 @@ export const ICONS = {
   starTool: StarToolSvg,
   strokeTool: StrokeToolSvg,
   subtract: SubtractSvg,
+  sun: SunSvg,
   target: TargetSvg,
   trash: TrashSvg,
   undo: UndoSvg,

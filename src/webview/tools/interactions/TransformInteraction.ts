@@ -560,7 +560,7 @@ export class TransformInteraction {
       const groupBox = ctx.selectionTool.getGroupSelectionBoundingBox(selectedEls, 0);
       if (groupBox) {
         const mode = ctx.selectionTool.selectionMode;
-        const boxStroke = mode === 'distort' ? '#f59e0b' : mode === 'rotate' ? '#8b5cf6' : mode === 'move' ? '#10b981' : '#6366f1';
+        const boxStroke = mode === 'distort' ? '#f59e0b' : mode === 'rotate' ? '#8b5cf6' : mode === 'move' ? '#10b981' : '#0d99ff';
         
         // Render bounding box outline across scale/rotate/move modes, visually distinguishing states by hue
         if (mode !== 'distort') {
@@ -586,7 +586,7 @@ export class TransformInteraction {
             const hHalf = hSize / 2;
             const hRx = 1 / z;
             handles.forEach((hPos) => {
-              html += `<rect x="${hPos.x - hHalf}" y="${hPos.y - hHalf}" width="${hSize}" height="${hSize}" fill="#ffffff" stroke="#6366f1" stroke-width="1.2" rx="${hRx}" vector-effect="non-scaling-stroke" />`;
+              html += `<rect x="${hPos.x - hHalf}" y="${hPos.y - hHalf}" width="${hSize}" height="${hSize}" fill="#ffffff" stroke="#0d99ff" stroke-width="1.2" rx="${hRx}" vector-effect="non-scaling-stroke" />`;
             });
           } else if (mode === 'distort') {
             const q = this.currentDistortQuad || {
@@ -817,10 +817,10 @@ export class TransformInteraction {
            * Setting `fill="none"` when `!isClosed` prevents spurious solid chord fills
            * when transforming open polylines, lines, or open Bézier splines (scale, rotate, skew, distort).
            */
-          const ghostFill = isClosed ? 'rgba(99, 102, 241, 0.45)' : 'none';
-          html += `<path d="${d}" fill="${ghostFill}" stroke="#6366f1" stroke-width="3" stroke-dasharray="5 3" vector-effect="non-scaling-stroke" />`;
+          const ghostFill = isClosed ? 'rgba(13, 153, 255, 0.25)' : 'none';
+          html += `<path d="${d}" fill="${ghostFill}" stroke="#0d99ff" stroke-width="2.5" stroke-dasharray="5 3" vector-effect="non-scaling-stroke" />`;
           gVerts.forEach((gv) => {
-            html += `<circle cx="${gv.x}" cy="${gv.y}" r="${3.5 / z}" fill="#a5b4fc" stroke="#4338ca" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
+            html += `<circle cx="${gv.x}" cy="${gv.y}" r="${3.5 / z}" fill="#ffffff" stroke="#007be5" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
           });
         }
       });
@@ -838,7 +838,7 @@ export class TransformInteraction {
         });
       });
       if (gMinX !== Infinity) {
-        html += `<rect x="${gMinX}" y="${gMinY}" width="${Math.max(gMaxX - gMinX, 1)}" height="${Math.max(gMaxY - gMinY, 1)}" fill="none" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="4 4" vector-effect="non-scaling-stroke" />`;
+        html += `<rect x="${gMinX}" y="${gMinY}" width="${Math.max(gMaxX - gMinX, 1)}" height="${Math.max(gMaxY - gMinY, 1)}" fill="none" stroke="#0d99ff" stroke-width="1.5" stroke-dasharray="4 4" vector-effect="non-scaling-stroke" />`;
       }
     }
 
@@ -863,8 +863,8 @@ export class TransformInteraction {
       const badgeY = this.rotationPivot.y - 18 / z;
       html += `
         <g transform="translate(${badgeX}, ${badgeY}) scale(${inv})" pointer-events="none">
-          <rect x="0" y="-14" width="50" height="18" rx="3" fill="#1e1b4b" stroke="#6366f1" stroke-width="1" opacity="0.9" />
-          <text x="6" y="-1" font-size="11" fill="#c7d2fe" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" font-weight="600">${degText}</text>
+          <rect x="0" y="-14" width="50" height="18" rx="3" fill="#1e1e1e" stroke="#0d99ff" stroke-width="1" opacity="0.95" />
+          <text x="6" y="-1" font-size="11" fill="#ffffff" font-family="'JetBrains Mono', SFMono-Regular, Menlo, monospace" font-weight="600">${degText}</text>
         </g>
       `;
     }

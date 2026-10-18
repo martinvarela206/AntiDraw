@@ -10,6 +10,7 @@ import { VectorExplorerPanel, VectorExplorerCallbacks } from './VectorExplorerPa
 import { DropPosition } from '../engine/layout/LayerReorderService.js';
 import { ToolIcons } from '../icons/ToolIcons.js';
 import { I18nService } from '../i18n/I18nService.js';
+import { ThemeService } from '../services/ThemeService.js';
 
 export interface AppLayoutConfig {
   canvasMgr: CanvasManager;
@@ -103,6 +104,9 @@ export class AppLayoutManager {
           <span id="status-info">${I18nService.t('common.ready')}</span>
           <button class="status-zoom-btn" id="status-zoom" title="${I18nService.t('statusbar.zoomResetTooltip')}">100%</button>
           <button class="status-btn" id="btn-lang-toggle" title="${I18nService.t('statusbar.languageToggleTooltip')}" style="font-weight:700; padding:2px 8px; letter-spacing:0.5px; min-width:32px; text-align:center;">${I18nService.getLanguage().toUpperCase()}</button>
+          <button class="status-btn-circle" id="btn-theme-toggle" title="${I18nService.t('statusbar.themeToggleTooltip')}">
+            ${ThemeService.isDark() ? ToolIcons.sun : ToolIcons.moon}
+          </button>
         </div>
       </div>
     `;
@@ -276,8 +280,25 @@ export class AppLayoutManager {
       });
     }
 
+    // Theme toggle in Status Bar
+    const btnThemeToggle = document.getElementById('btn-theme-toggle');
+    if (btnThemeToggle) {
+      btnThemeToggle.addEventListener('click', () => {
+        const nextTheme = ThemeService.toggleTheme();
+        btnThemeToggle.innerHTML = nextTheme === 'dark' ? ToolIcons.sun : ToolIcons.moon;
+      });
+    }
+
+    ThemeService.onThemeChange((theme) => {
+      if (btnThemeToggle) {
+        btnThemeToggle.innerHTML = theme === 'dark' ? ToolIcons.sun : ToolIcons.moon;
+      }
+      this.rulerView?.render();
+    });
+
     I18nService.onLanguageChange((lang) => {
       if (btnLangToggle) btnLangToggle.textContent = lang.toUpperCase();
+      if (btnThemeToggle) btnThemeToggle.title = I18nService.t('statusbar.themeToggleTooltip');
       const statusCanvasText = document.getElementById('status-canvas-text');
       if (statusCanvasText) statusCanvasText.textContent = I18nService.t('toolbar.canvas');
       const btnCanvas = document.getElementById('btn-canvas-props');
@@ -310,3 +331,4 @@ export class AppLayoutManager {
     });
   }
 }
+

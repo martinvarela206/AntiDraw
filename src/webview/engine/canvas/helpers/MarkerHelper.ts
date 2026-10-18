@@ -55,8 +55,8 @@ export class MarkerHelper extends BaseHelper {
     const tagH = 16;
     return `
       <g transform="translate(${minX}, ${minY}) scale(${inv})" opacity="0.95">
-        <rect x="0" y="-20" width="${tagW}" height="${tagH}" rx="3" fill="#1e1b4b" stroke="#6366f1" stroke-width="1" />
-        <text x="6" y="-8" font-size="10" fill="#c7d2fe" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" font-weight="600">ViewBox: ${width} × ${height}</text>
+        <rect x="0" y="-20" width="${tagW}" height="${tagH}" rx="3" fill="#1e1e1e" stroke="#0d99ff" stroke-width="1" />
+        <text x="6" y="-8" font-size="10" fill="#ffffff" font-family="'JetBrains Mono', SFMono-Regular, Menlo, monospace" font-weight="600">ViewBox: ${width} × ${height}</text>
       </g>
     `;
   }
@@ -75,14 +75,14 @@ export class MarkerHelper extends BaseHelper {
   ): string {
     const inv = BaseHelper.getInverseScale(zoom);
     return `
-      <g opacity="0.9">
-        <line x1="${spanMinX}" y1="${oy}" x2="${spanMaxX}" y2="${oy}" stroke="#6366f1" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke" />
-        <line x1="${ox}" y1="${spanMinY}" x2="${ox}" y2="${spanMaxY}" stroke="#6366f1" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke" />
+      <g opacity="0.95">
+        <line x1="${spanMinX}" y1="${oy}" x2="${spanMaxX}" y2="${oy}" stroke="#0d99ff" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke" />
+        <line x1="${ox}" y1="${spanMinY}" x2="${ox}" y2="${spanMaxY}" stroke="#0d99ff" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke" />
         <g transform="translate(${ox}, ${oy}) scale(${inv})">
-          <circle cx="0" cy="0" r="8" fill="none" stroke="#6366f1" stroke-width="1.5" />
-          <circle cx="0" cy="0" r="2" fill="#6366f1" />
-          <rect x="10" y="-22" width="72" height="18" rx="3" fill="#1e1b4b" stroke="#6366f1" stroke-width="1" />
-          <text x="15" y="-9" font-size="10" fill="#c7d2fe" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" font-weight="600">Origin (0,0)</text>
+          <circle cx="0" cy="0" r="8" fill="none" stroke="#0d99ff" stroke-width="1.5" />
+          <circle cx="0" cy="0" r="2" fill="#0d99ff" />
+          <rect x="10" y="-22" width="76" height="18" rx="3" fill="#1e1e1e" stroke="#0d99ff" stroke-width="1" />
+          <text x="15" y="-9" font-size="10" fill="#ffffff" font-family="'JetBrains Mono', SFMono-Regular, Menlo, monospace" font-weight="600">Origin (0,0)</text>
         </g>
       </g>
     `;

@@ -58,7 +58,7 @@ export class MultiSelectionInspector {
           <span class="prop-label">${I18nService.t('inspector.mode')}</span>
           <div style="display:flex; gap:4px; flex:1;">
             <button class="prop-input" id="btn-multi-mode-move" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'move' ? 'background:#10b981; color:#ffffff;' : ''}" title="${I18nService.t('inspector.modeMove')} (W)">${I18nService.t('inspector.modeMove')}</button>
-            <button class="prop-input" id="btn-multi-mode-scale" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'scale' ? 'background:#6366f1; color:#ffffff;' : ''}" title="${I18nService.t('inspector.modeScale')} (R)">${I18nService.t('inspector.modeScale')}</button>
+            <button class="prop-input" id="btn-multi-mode-scale" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'scale' ? 'background:var(--figma-brand); color:#ffffff;' : ''}" title="${I18nService.t('inspector.modeScale')} (R)">${I18nService.t('inspector.modeScale')}</button>
             <button class="prop-input" id="btn-multi-mode-rotate" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'rotate' ? 'background:#8b5cf6; color:#ffffff;' : ''}" title="${I18nService.t('inspector.modeRotate')} (E)">${I18nService.t('inspector.modeRotate')}</button>
           </div>
         </div>

@@ -15,6 +15,7 @@ import { ChromeActionController } from './controllers/ChromeActionController.js'
 import { CommandShortcutController } from './controllers/CommandShortcutController.js';
 import { LayerReorderService } from './engine/layout/LayerReorderService.js';
 import { ImageIngestionService } from './services/ImageIngestionService.js';
+import { ThemeService } from './services/ThemeService.js';
 import './styles/main.css';
 
 /**
@@ -46,6 +47,9 @@ class AntiDrawApp {
   }
 
   private bootstrap(): void {
+    // 0. Theme initialization (figma-ux-ui)
+    ThemeService.init();
+
     // 1. Tool suite & interactive session
     this.tools = ToolFactory.createToolSuite({
       model: this.model,

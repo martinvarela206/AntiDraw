@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [0.88.1] - 2026-10-18
 
 ### 🚀 Added
+- **Figma Studio Design System & Dual-Theme (`figma-ux-ui`)**:
+  - Full native support for Dark and Light modes using the canonical Figma achromatic design token architecture (`--figma-bg-deep`, `--figma-bg-canvas`, `--figma-bg-panel`, `--figma-bg-card`, `--figma-bg-select`, `--figma-border-subtle`, `--figma-brand`).
+  - Added a circular theme toggle button (`#btn-theme-toggle`) in the status bar with custom, inline stroke 1.6 SVG Sun/Moon icons and persistent local storage caching via `ThemeService`.
+  - Micro-precision typography with active OpenType kerning (`font-feature-settings: "kern" 1`) and monospace tabular numerals (`--font-mono`: JetBrains Mono / SFMono / Menlo) across coordinates, zoom levels, ruler marks, and property inputs.
+  - Quiet Chrome / Canvas First principle: removed saturated blue gradients (`#2563eb`/`#1d4ed8`) and heavy glow filters from toolbars and ruler corners, replacing them with flat, high-density Figma Blue accents (`#0d99ff`).
+  - Layer Tree & Vector Explorer refinement: indented hierarchy with hover-revealed tools (`opacity: 0.4` -> `1.0`), clean selection accents, and Natural Title Case headers.
+  - ViewBox artboard card elevation: crisp boundary contrast with subtle drop shadow (`box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25)`) differentiating artboard surfaces from the workspace canvas.
 - **Storage Mode Choice Gate (`ImageStorageChoiceModal`)**: Added an interactive ingestion dialog prompted whenever an image is added via toolbar, drag-and-drop, or clipboard paste, allowing users to explicitly choose between:
   - *Linked Asset* (`./[svgName]_[id]_img.ext`): keeps SVG XML lightweight and portable with clean Git diffs.
   - *Embedded Data URI* (`data:image/...;base64`): creates a 100% self-contained standalone SVG.

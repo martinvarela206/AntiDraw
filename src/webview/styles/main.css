@@ -1,16 +1,100 @@
-:root {
-  --bg-dark: #121319;
-  --bg-panel: #1a1b23;
-  --bg-panel-hover: #242634;
-  --bg-active: #31354a;
-  --accent-color: #6366f1;
-  --accent-hover: #4f46e5;
-  --text-main: #f1f5f9;
-  --text-muted: #94a3b8;
-  --border-color: #2b2d3d;
-  --canvas-bg: #181920;
+:root,
+[data-theme="dark"] {
+  /* Superficies Dark (Figma Studio Tokens) */
+  --figma-bg-deep: #1e1e1e;          /* Base frame background */
+  --figma-bg-canvas: #181818;        /* Work area / canvas background */
+  --figma-bg-panel: #242424;         /* Side panels & top bar */
+  --figma-bg-card: #2c2c2c;          /* Cards & raised sections */
+  --figma-bg-hover: #333333;         /* Button & row hover */
+  --figma-bg-input: #1e1e1e;         /* Text fields & selects */
+  --figma-bg-select: rgba(13, 153, 255, 0.15); /* Selected element tint */
+
+  /* Bordes & Separadores */
+  --figma-border-subtle: rgba(255, 255, 255, 0.08);
+  --figma-border-strong: rgba(255, 255, 255, 0.16);
+  --figma-border-focus: #0d99ff;
+
+  /* Texto & Luminancia (4 Niveles) */
+  --figma-text-primary: #ffffff;     /* Titles, active values */
+  --figma-text-secondary: #b3b3b3;   /* Field labels, common text */
+  --figma-text-tertiary: #757575;    /* Placeholders, shortcuts */
+  --figma-text-dim: #4d4d4d;         /* Dim dividers, metadata */
+
+  /* Marca & Semántica */
+  --figma-brand: #0d99ff;
+  --figma-brand-hover: #007be5;
+  --figma-success: #10b981;
+  --figma-warning: #f59e0b;
+  --figma-danger: #ef4444;
+  --figma-purple: #5865f2;
+
+  /* Canvas */
+  --canvas-artboard-bg: #1e1e1e;
+  --grid-line-color: rgba(255, 255, 255, 0.08);
+  --ruler-text-color: #8c8c8c;
+
+  /* Compatibility Mapping */
+  --bg-dark: var(--figma-bg-deep);
+  --bg-panel: var(--figma-bg-panel);
+  --bg-panel-hover: var(--figma-bg-hover);
+  --bg-active: var(--figma-bg-card);
+  --accent-color: var(--figma-brand);
+  --accent-hover: var(--figma-brand-hover);
+  --text-main: var(--figma-text-primary);
+  --text-muted: var(--figma-text-secondary);
+  --border-color: var(--figma-border-subtle);
+  --canvas-bg: var(--figma-bg-canvas);
   --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
+
+[data-theme="light"] {
+  /* Superficies Light (Figma Studio Tokens) */
+  --figma-bg-deep: #f5f5f5;
+  --figma-bg-canvas: #e5e5e5;
+  --figma-bg-panel: #ffffff;
+  --figma-bg-card: #f8fafc;
+  --figma-bg-hover: #f0f0f0;
+  --figma-bg-input: #f5f5f5;
+  --figma-bg-select: rgba(13, 153, 255, 0.12);
+
+  /* Bordes & Separadores */
+  --figma-border-subtle: rgba(0, 0, 0, 0.08);
+  --figma-border-strong: rgba(0, 0, 0, 0.16);
+  --figma-border-focus: #0d99ff;
+
+  /* Texto & Luminancia */
+  --figma-text-primary: #000000;
+  --figma-text-secondary: #555555;
+  --figma-text-tertiary: #888888;
+  --figma-text-dim: #bbbbbb;
+
+  /* Marca & Semántica */
+  --figma-brand: #0d99ff;
+  --figma-brand-hover: #007be5;
+  --figma-success: #059669;
+  --figma-warning: #d97706;
+  --figma-danger: #dc2626;
+  --figma-purple: #5865f2;
+
+  /* Canvas */
+  --canvas-artboard-bg: #ffffff;
+  --grid-line-color: rgba(0, 0, 0, 0.08);
+  --ruler-text-color: #666666;
+
+  /* Compatibility Mapping */
+  --bg-dark: var(--figma-bg-deep);
+  --bg-panel: var(--figma-bg-panel);
+  --bg-panel-hover: var(--figma-bg-hover);
+  --bg-active: var(--figma-bg-card);
+  --accent-color: var(--figma-brand);
+  --accent-hover: var(--figma-brand-hover);
+  --text-main: var(--figma-text-primary);
+  --text-muted: var(--figma-text-secondary);
+  --border-color: var(--figma-border-subtle);
+  --canvas-bg: var(--figma-bg-canvas);
+}
+
 
 * {
   box-sizing: border-box;
@@ -98,22 +182,21 @@ body {
 }
 
 .btn-icon:hover {
-  background-color: var(--bg-panel-hover);
-  color: var(--text-main);
-  border-color: #3b3f54;
+  background-color: var(--figma-bg-hover);
+  color: var(--figma-text-primary);
+  border-color: var(--figma-border-subtle);
 }
 
 .btn-icon:active {
-  transform: scale(0.95);
+  transform: scale(0.96);
 }
 
 .btn-icon.active,
 .btn-icon[data-active="true"] {
-  background-color: #2563eb !important;
-  background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%) !important;
-  color: #ffffff !important;
-  border: 1px solid #60a5fa !important;
-  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.6), 0 0 10px rgba(59, 130, 246, 0.5) !important;
+  background-color: var(--figma-bg-select) !important;
+  color: var(--figma-brand) !important;
+  border: 1px solid var(--figma-brand) !important;
+  box-shadow: none !important;
 }
 
 .btn-icon svg {
@@ -125,8 +208,8 @@ body {
 
 .btn-icon.active svg,
 .btn-icon[data-active="true"] svg {
-  color: #ffffff !important;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+  color: var(--figma-brand) !important;
+  filter: none !important;
 }
 
 /* LEFT TOOLBAR */
@@ -159,9 +242,9 @@ body {
   top: 6px;
   bottom: 6px;
   width: 3px;
-  background-color: #60a5fa;
+  background-color: var(--figma-brand);
   border-radius: 0 2px 2px 0;
-  box-shadow: 0 0 8px #60a5fa;
+  box-shadow: none;
 }
 
 /* TOOLBAR DRAWERS, SEPARATORS & FLYOUTS */
@@ -287,16 +370,15 @@ body {
 }
 
 .ruler-corner:hover {
-  background-color: var(--bg-panel-hover);
-  color: var(--accent-color);
+  background-color: var(--figma-bg-hover);
+  color: var(--figma-text-primary);
 }
 
 .ruler-corner.active {
-  background-color: #2563eb !important;
-  background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%) !important;
-  color: #ffffff !important;
-  border-color: #60a5fa !important;
-  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.6), 0 0 10px rgba(59, 130, 246, 0.5) !important;
+  background-color: var(--figma-bg-select) !important;
+  color: var(--figma-brand) !important;
+  border-color: var(--figma-brand) !important;
+  box-shadow: none !important;
 }
 
 .ruler-top-container {
@@ -378,9 +460,9 @@ body {
   top: 0;
   left: 0;
   transform-origin: 0 0;
-  background-color: #12131c;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-  border: 1px solid #2b2d3d;
+  background-color: var(--canvas-artboard-bg);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--figma-border-subtle);
   flex-shrink: 0;
   box-sizing: content-box;
   overflow: visible;
@@ -558,12 +640,12 @@ body {
 }
 
 .tree-subgroup-title {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--text-muted);
-  padding: 4px 12px 2px 18px;
-  opacity: 0.7;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: -0.01em;
+  color: var(--figma-text-tertiary);
+  padding: 6px 12px 2px 14px;
 }
 
 .tree-empty-hint {
@@ -578,36 +660,36 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 12px 5px 16px;
+  padding: 5px 12px 5px 14px;
   font-size: 11px;
-  color: var(--text-muted);
+  color: var(--figma-text-secondary);
   cursor: pointer;
   transition: background-color 0.12s ease, color 0.12s ease;
   user-select: none;
 }
 
 .tree-item:hover {
-  background-color: var(--bg-panel-hover);
-  color: var(--text-main);
+  background-color: var(--figma-bg-hover);
+  color: var(--figma-text-primary);
 }
 
 .tree-item.selected {
-  background-color: rgba(99, 102, 241, 0.2);
-  color: #ffffff;
-  border-left: 2px solid var(--accent-color);
-  padding-left: 14px;
+  background-color: var(--figma-bg-select);
+  color: var(--figma-text-primary);
+  border-left: 2px solid var(--figma-brand);
+  padding-left: 12px;
 }
 
 .tree-item-icon {
   font-size: 12px;
   width: 16px;
   text-align: center;
-  color: var(--accent-color);
+  color: var(--figma-brand);
   flex-shrink: 0;
 }
 
 .tree-item.selected .tree-item-icon {
-  color: #a5b4fc;
+  color: var(--figma-brand);
 }
 
 .tree-item-label {
@@ -621,8 +703,8 @@ body {
   display: flex;
   align-items: center;
   gap: 2px;
-  opacity: 0.6;
-  transition: opacity 0.15s ease;
+  opacity: 0.4;
+  transition: opacity 0.12s ease;
 }
 
 .tree-item:hover .tree-item-actions,
@@ -871,11 +953,11 @@ body {
 
 .panel-title {
   font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--text-muted);
-  margin-bottom: 10px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: -0.01em;
+  color: var(--figma-text-primary);
+  margin-bottom: 8px;
 }
 
 .prop-row {
@@ -887,7 +969,7 @@ body {
 }
 
 .prop-label {
-  color: var(--text-muted);
+  color: var(--figma-text-secondary);
   width: 70px;
   font-size: 11px;
   flex-shrink: 0;
@@ -897,19 +979,20 @@ body {
 .prop-input {
   all: unset;
   box-sizing: border-box;
-  background-color: var(--bg-dark);
-  border: 1px solid var(--border-color);
-  color: var(--text-main);
+  background-color: var(--figma-bg-input);
+  border: 1px solid var(--figma-border-subtle);
+  color: var(--figma-text-primary);
   padding: 4px 8px;
   border-radius: 4px;
   font-size: 11px;
   width: 100%;
   height: 26px;
   line-height: 18px;
+  transition: border-color 0.12s ease;
 }
 
 .prop-input:focus {
-  border-color: var(--accent-color);
+  border-color: var(--figma-border-focus);
 }
 
 /* Numeric inputs: eliminate spinners that crowd compact UI controls */
@@ -920,6 +1003,8 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 input[type="number"] {
   -moz-appearance: textfield;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 /* COMPACT COORDINATE AND NUMERIC PAIR BOXES (e.g. Radial Gradient Focus and Center)
@@ -943,8 +1028,8 @@ input[type="number"] {
   flex: 1;
   min-width: 0;
   height: 26px;
-  background-color: var(--bg-dark);
-  border: 1px solid var(--border-color);
+  background-color: var(--figma-bg-input);
+  border: 1px solid var(--figma-border-subtle);
   border-radius: 4px;
   padding: 0 4px;
   box-sizing: border-box;
@@ -952,12 +1037,13 @@ input[type="number"] {
 }
 
 .prop-coord-box:focus-within {
-  border-color: var(--accent-color);
+  border-color: var(--figma-border-focus);
 }
 
 .prop-coord-sublabel {
   font-size: 10px;
-  color: var(--text-muted);
+  font-weight: 700;
+  color: var(--figma-text-tertiary);
   user-select: none;
   flex-shrink: 0;
 }
@@ -969,15 +1055,17 @@ input[type="number"] {
   min-width: 0;
   height: 100%;
   font-size: 11px;
-  color: var(--text-main);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--figma-text-primary);
   text-align: right;
   padding: 0 2px;
 }
 
 button.prop-input.active {
-  background-color: var(--accent-color);
-  color: #ffffff;
-  border-color: var(--accent-color);
+  background-color: var(--figma-bg-select);
+  color: var(--figma-brand);
+  border-color: var(--figma-brand);
   font-weight: 600;
 }
 
@@ -1015,19 +1103,19 @@ button.prop-input.active {
 /* STATUS BAR */
 .status-bar {
   grid-area: status;
-  background-color: var(--bg-dark);
-  border-top: 1px solid var(--border-color);
+  background-color: var(--figma-bg-deep);
+  border-top: 1px solid var(--figma-border-subtle);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   padding: 3px 12px;
   gap: 4px 12px;
-  min-height: 24px;
+  min-height: 26px;
   height: auto;
   box-sizing: border-box;
   font-size: 11px;
-  color: var(--text-muted);
+  color: var(--figma-text-secondary);
   z-index: 20;
 }
 
@@ -1036,20 +1124,26 @@ button.prop-input.active {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 10px;
+  gap: 4px 8px;
+}
+
+#status-coords,
+#status-zoom {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .status-zoom-btn,
 .status-btn {
   padding: 2px 8px;
   border-radius: 4px;
-  background-color: var(--bg-surface);
-  color: var(--text-color);
+  background-color: var(--figma-bg-card);
+  color: var(--figma-text-secondary);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
-  border: 1px solid var(--border-color);
-  transition: all 0.15s ease;
+  border: 1px solid var(--figma-border-subtle);
+  transition: all 0.12s ease;
   user-select: none;
   display: inline-flex;
   align-items: center;
@@ -1064,11 +1158,47 @@ button.prop-input.active {
 }
 
 .status-zoom-btn:hover,
-.status-btn:hover,
+.status-btn:hover {
+  background-color: var(--figma-bg-hover);
+  color: var(--figma-text-primary);
+  border-color: var(--figma-border-strong);
+}
+
+.status-zoom-btn.active,
 .status-btn.active {
-  background-color: var(--accent-color);
-  color: #ffffff;
-  border-color: var(--accent-color);
+  background-color: var(--figma-bg-select);
+  color: var(--figma-brand);
+  border-color: var(--figma-brand);
+}
+
+/* Circular button for theme toggle (Figma standard 4.A) */
+.status-btn-circle {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background-color: var(--figma-bg-card);
+  color: var(--figma-text-secondary);
+  border: 1px solid var(--figma-border-subtle);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: all 0.12s cubic-bezier(0.16, 1, 0.3, 1);
+  flex-shrink: 0;
+}
+
+.status-btn-circle:hover {
+  background-color: var(--figma-bg-hover);
+  color: var(--figma-text-primary);
+  border-color: var(--figma-border-strong);
+  transform: scale(1.08);
+}
+
+.status-btn-circle svg {
+  width: 13px;
+  height: 13px;
+  display: block;
 }
 
 /* CONTEXT MENU */

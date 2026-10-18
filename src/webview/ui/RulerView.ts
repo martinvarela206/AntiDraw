@@ -243,6 +243,10 @@ export class RulerView {
     }
   }
 
+  public render(): void {
+    this.renderRulers();
+  }
+
   public renderRulers(offsetCanvasX?: number, offsetCanvasY?: number): void {
     if (offsetCanvasX !== undefined) this.currentOffsetX = offsetCanvasX;
     if (offsetCanvasY !== undefined) this.currentOffsetY = offsetCanvasY;
@@ -266,6 +270,16 @@ export class RulerView {
     const vbScreenStartX = offsetCanvasXVal + (vb.minX - workBounds.minX) * zoom;
     const vbScreenStartY = offsetCanvasYVal + (vb.minY - workBounds.minY) * zoom;
 
+    // Theme token resolution for Dual-Theme support
+    const isLight = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'light';
+    const rulerBg = isLight ? '#ffffff' : '#1e1e1e';
+    const rulerArtboardBg = isLight ? '#f0f0f0' : '#282828';
+    const rulerTickColor = isLight ? 'rgba(0, 0, 0, 0.25)' : 'rgba(255, 255, 255, 0.2)';
+    const rulerTextColor = isLight ? '#666666' : '#8c8c8c';
+    const rulerBorderColor = isLight ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.08)';
+    const rulerFont = '9px "JetBrains Mono", SFMono-Regular, Menlo, Monaco, Consolas, monospace';
+    const rulerLeftFont = '8px "JetBrains Mono", SFMono-Regular, Menlo, Monaco, Consolas, monospace';
+
     // --- RENDER TOP RULER ---
     const tCtx = this.topCtx;
     const tW = this.topRulerCanvas.width / dpr;
@@ -276,17 +290,17 @@ export class RulerView {
     tCtx.clearRect(0, 0, tW, tH);
 
     // Background
-    tCtx.fillStyle = '#1a1b23';
+    tCtx.fillStyle = rulerBg;
     tCtx.fillRect(0, 0, tW, tH);
 
     // ViewBox artboard highlight region on ruler
-    tCtx.fillStyle = '#222533';
+    tCtx.fillStyle = rulerArtboardBg;
     tCtx.fillRect(vbScreenStartX, 0, vb.width * zoom, tH);
 
     // Draw ticks
-    tCtx.strokeStyle = '#475569';
-    tCtx.fillStyle = '#94a3b8';
-    tCtx.font = '9px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    tCtx.strokeStyle = rulerTickColor;
+    tCtx.fillStyle = rulerTextColor;
+    tCtx.font = rulerFont;
     tCtx.textAlign = 'left';
     tCtx.textBaseline = 'top';
 
@@ -342,7 +356,7 @@ export class RulerView {
     }
 
     // Ruler bottom border
-    tCtx.strokeStyle = '#2b2d3d';
+    tCtx.strokeStyle = rulerBorderColor;
     tCtx.beginPath();
     tCtx.moveTo(0, 19.5);
     tCtx.lineTo(tW, 19.5);
@@ -359,17 +373,17 @@ export class RulerView {
     lCtx.clearRect(0, 0, lW, lH);
 
     // Background
-    lCtx.fillStyle = '#1a1b23';
+    lCtx.fillStyle = rulerBg;
     lCtx.fillRect(0, 0, lW, lH);
 
     // ViewBox artboard highlight region on ruler
-    lCtx.fillStyle = '#222533';
+    lCtx.fillStyle = rulerArtboardBg;
     lCtx.fillRect(0, vbScreenStartY, lW, vb.height * zoom);
 
     // Draw ticks
-    lCtx.strokeStyle = '#475569';
-    lCtx.fillStyle = '#94a3b8';
-    lCtx.font = '8px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    lCtx.strokeStyle = rulerTickColor;
+    lCtx.fillStyle = rulerTextColor;
+    lCtx.font = rulerLeftFont;
 
     const minScreenY = 0;
     const maxScreenY = lH;
@@ -404,7 +418,7 @@ export class RulerView {
     }
 
     // Ruler right border
-    lCtx.strokeStyle = '#2b2d3d';
+    lCtx.strokeStyle = rulerBorderColor;
     lCtx.beginPath();
     lCtx.moveTo(19.5, 0);
     lCtx.lineTo(19.5, lH);

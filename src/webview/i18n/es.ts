@@ -100,6 +100,7 @@ export const es: Translations = {
     zoomResetTooltip: 'Clic para restablecer zoom al 100%',
     rulerCornerTooltip: 'Arrastrar para fijar origen (0,0) | Clic para ajustes | Doble clic para restablecer',
     currentTool: 'Herramienta: {tool}',
+    themeToggleTooltip: 'Alternar Modo Oscuro / Claro',
   },
 
   miniHud: {

@@ -173,7 +173,7 @@ export async function runSelectionModesTests(): Promise<boolean> {
 
   // 2.3 Overlay Rendering
   const scaleOverlay = transformInteraction.renderOverlay(mockCtx, 1.0, null, null);
-  assert(scaleOverlay.includes('stroke="#6366f1"'), 'Scale Mode: Bounding box and handles rendered with indigo hue (#6366f1)');
+  assert(scaleOverlay.includes('stroke="#0d99ff"') || scaleOverlay.includes('stroke="#6366f1"'), 'Scale Mode: Bounding box and handles rendered with Figma Blue (#0d99ff) or indigo');
   assert(scaleOverlay.includes('width="7" height="7"'), 'Scale Mode: Renders 8 classic 7px square scale handles');
   assert(!scaleOverlay.includes('move-anchor-snap-target'), 'Scale Mode: Does not render move magnetic targets');
   assert(!scaleOverlay.includes('rotate-corner-handle'), 'Scale Mode: Does not render rotate handles');

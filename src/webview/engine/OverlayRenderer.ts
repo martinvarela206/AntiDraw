@@ -88,7 +88,7 @@ export class OverlayRenderer {
         const x1 = Math.max(vb.minX, visibleBounds.minX);
         const x2 = Math.min(vbMaxX, visibleBounds.maxX);
         if (x1 < x2) {
-          html += `<line x1="${x1}" y1="${vb.minY}" x2="${x2}" y2="${vb.minY}" stroke="#6366f1" stroke-width="1.5" stroke-dasharray="6 3" opacity="0.85" vector-effect="non-scaling-stroke" />`;
+          html += `<line x1="${x1}" y1="${vb.minY}" x2="${x2}" y2="${vb.minY}" stroke="#0d99ff" stroke-width="1.5" stroke-dasharray="6 3" opacity="0.85" vector-effect="non-scaling-stroke" />`;
         }
       }
       // Bottom edge
@@ -96,7 +96,7 @@ export class OverlayRenderer {
         const x1 = Math.max(vb.minX, visibleBounds.minX);
         const x2 = Math.min(vbMaxX, visibleBounds.maxX);
         if (x1 < x2) {
-          html += `<line x1="${x1}" y1="${vbMaxY}" x2="${x2}" y2="${vbMaxY}" stroke="#6366f1" stroke-width="1.5" stroke-dasharray="6 3" opacity="0.85" vector-effect="non-scaling-stroke" />`;
+          html += `<line x1="${x1}" y1="${vbMaxY}" x2="${x2}" y2="${vbMaxY}" stroke="#0d99ff" stroke-width="1.5" stroke-dasharray="6 3" opacity="0.85" vector-effect="non-scaling-stroke" />`;
         }
       }
       // Left edge
@@ -104,7 +104,7 @@ export class OverlayRenderer {
         const y1 = Math.max(vb.minY, visibleBounds.minY);
         const y2 = Math.min(vbMaxY, visibleBounds.maxY);
         if (y1 < y2) {
-          html += `<line x1="${vb.minX}" y1="${y1}" x2="${vb.minX}" y2="${y2}" stroke="#6366f1" stroke-width="1.5" stroke-dasharray="6 3" opacity="0.85" vector-effect="non-scaling-stroke" />`;
+          html += `<line x1="${vb.minX}" y1="${y1}" x2="${vb.minX}" y2="${y2}" stroke="#0d99ff" stroke-width="1.5" stroke-dasharray="6 3" opacity="0.85" vector-effect="non-scaling-stroke" />`;
         }
       }
       // Right edge
@@ -112,7 +112,7 @@ export class OverlayRenderer {
         const y1 = Math.max(vb.minY, visibleBounds.minY);
         const y2 = Math.min(vbMaxY, visibleBounds.maxY);
         if (y1 < y2) {
-          html += `<line x1="${vbMaxX}" y1="${y1}" x2="${vbMaxX}" y2="${y2}" stroke="#6366f1" stroke-width="1.5" stroke-dasharray="6 3" opacity="0.85" vector-effect="non-scaling-stroke" />`;
+          html += `<line x1="${vbMaxX}" y1="${y1}" x2="${vbMaxX}" y2="${y2}" stroke="#0d99ff" stroke-width="1.5" stroke-dasharray="6 3" opacity="0.85" vector-effect="non-scaling-stroke" />`;
         }
       }
 

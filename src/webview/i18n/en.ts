@@ -100,6 +100,7 @@ export const en: Translations = {
     zoomResetTooltip: 'Click to reset zoom to 100%',
     rulerCornerTooltip: 'Drag to set (0,0) Origin | Click for Ruler Settings | Double-click to Reset Origin',
     currentTool: 'Tool: {tool}',
+    themeToggleTooltip: 'Toggle Dark / Light Theme',
   },
 
   miniHud: {
