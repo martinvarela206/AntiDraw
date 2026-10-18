@@ -170,6 +170,7 @@ export async function runNodeEditingUxTests(): Promise<boolean> {
   const leakTestEl: VectorElement = {
     id: 'leakEl',
     tagName: 'path',
+    attributes: {},
     vertices: mixedVerts,
     isClosed: true,
   };

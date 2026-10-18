@@ -6,121 +6,121 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [0.93.4] - 2026-10-18
 
 ### 🛠️ Fixed
-- **Eliminación de Falsos Positivos por `command === 'C'` en Segmentos Rectos**:
-  - `NodeEditorTool.isSegmentCurved`: Se eliminó por completo la verificación errónea de `v2.command === 'C'`. En SVG y trazados vectoriales, los comandos de vértice solo indican metadatos de importación; un tramo es matemática y geométricamente curvo única y exclusivamente si posee tangentes de control en dicho segmento (`v1.handleOut || v2.handleIn`).
-  - Al hacer clic sobre cualquier segmento recto que comparte un nodo con un segmento curvo adyacente, el inspector ahora muestra fielmente **`[ A Curva Bézier ]`** y permite curvar dicho tramo sin bloqueos ni falsos estados de curva.
-- **Resolución Topológica y Detección de Segmentos Mixtos en Selecciones Multi-Nodo No Adyacentes**:
-  - `NodeEditorTool.getTargetSegmentIndices`: Si no hay nodos contiguos seleccionados (como seleccionar 4 esquinas aisladas en figuras complejas), se recolectan todos los segmentos incidentes (entrantes y salientes) de los nodos seleccionados.
-  - Al abarcar simultáneamente segmentos curvos y segmentos rectos, el panel despliega con precisión el estado **`[ Segmentos Mixtos ]`** (deshabilitado), impidiendo acciones ambiguas.
-  - `NodeToolHandler.getTargetSegmentIndices`: Se unificó la resolución de segmentos objetivo delegando directamente a `NodeEditorTool.getTargetSegmentIndices`, garantizando paridad total entre lo que el inspector evalúa y lo que la herramienta convierte.
-- **Sincronización Reactiva de Inspector de Nodos al Alternar Vértices**:
-  - Se implementó `lastRenderedVertexId` en `PropertyPanel` para garantizar que alternar entre nodos distintos reconstruya completamente las acciones de segmento y las filas de tiradores Bézier, preservando a su vez el renderizado in-situ de alto rendimiento a 60 fps durante el arrastre continuo de un mismo nodo.
+- **Eliminate `command === 'C'` False Positives on Straight Segments**:
+  - `NodeEditorTool.isSegmentCurved`: Completely removed erroneous checking of `v2.command === 'C'`. In SVG paths and vector graphs, vertex commands indicate import metadata; a segment is mathematically and geometrically curved if and only if control handles exist on that specific segment (`v1.handleOut || v2.handleIn`).
+  - Clicking any straight segment that shares a node with an adjacent curve now reliably displays **`[ To Bézier Curve ]`** (`[ A Curva Bézier ]`), allowing immediate curve conversion without false curve detections.
+- **Topological Segment Target Resolution & Mixed Segment Detection (`Mixed Segments`)**:
+  - `NodeEditorTool.getTargetSegmentIndices`: When non-adjacent or isolated nodes are selected (e.g. 4 opposite corners), incident segments (both incoming and outgoing) for all selected vertices are gathered.
+  - When selection spans both straight and curved segments, the Property Panel displays the disabled state **`[ Mixed Segments ]`** (`[ Segmentos Mixtos ]`), preventing ambiguous conversions.
+  - `NodeToolHandler.getTargetSegmentIndices`: Unified segment resolution by delegating directly to `NodeEditorTool.getTargetSegmentIndices`, guaranteeing single-source-of-truth parity between inspector state and tool execution.
+- **Reactive Node Inspector Synchronization on Vertex Switching**:
+  - Introduced `lastRenderedVertexId` in `PropertyPanel` to ensure switching between different vertices completely reconstructs contextual segment actions and Bézier handle rows, while preserving 60fps in-place DOM mutation during active node dragging.
 
 ---
 
 ## [0.93.3] - 2026-10-18
 
 ### 🛠️ Fixed
-- **Aislamiento Estricto de Tiradores Bézier al Seleccionar Segmentos**:
-  - Al seleccionar un segmento en la herramienta de edición de nodos, se restringe la visualización y renderizado de tiradores Bézier exclusivamente a aquellos que pertenecen al segmento activo (`v1.handleOut` y `v2.handleIn`).
-  - Se eliminó la fuga de tiradores donde nodos vecinos o adyacentes no pertenecientes al segmento mostraban tangentes en pantalla. Si un segmento recto es seleccionado, no se muestra ningún tirador en dicho tramo.
-- **Evaluación Topológica de Conversión de Segmento y Detección de Segmentos Mixtos (`Segmentos Mixtos`)**:
-  - `NodeEditorTool.getSegmentConversionState`: Evalúa de forma fidedigna el estado del segmento activo o de los segmentos abarcados por nodos seleccionados en lugar de limitarse a inspeccionar si el nodo individual posee alguna tangente saliente hacia otro tramo no seleccionado.
-  - Al seleccionar un segmento recto, el panel de propiedades muestra correctamente `[ A Curva Bézier ]`, permitiendo convertirlo a curva.
-  - Al seleccionar múltiples nodos o segmentos con estados discrepantes (tramos rectos combinados con tramos curvos), el panel de propiedades despliega el indicador inhabilitado `[ Segmentos Mixtos ]`, impidiendo conversiones ambiguas hasta que la selección sea uniforme.
-- **Soporte de Conversión Multi-Segmento Homogénea**:
-  - Al convertir con múltiples nodos seleccionados donde todos los segmentos intermedios son rectas o todos son curvas, la acción convierte de manera uniforme todos los segmentos abarcados y actualiza el inspector instantáneamente.
+- **Strict Bézier Handle Isolation on Segment Selection**:
+  - Selecting a path segment in the node editor now restricts display and rendering of Bézier handles exclusively to those belonging to the active segment (`v1.handleOut` and `v2.handleIn`).
+  - Eliminated handle leakage where neighbor or adjacent vertices not belonging to the segment rendered outside handles. Selecting a straight segment renders zero handles along that chord.
+- **Topological Segment Conversion Evaluation and Mixed Segment State**:
+  - `NodeEditorTool.getSegmentConversionState`: Evaluates active segment state or segments spanned by selected vertices rather than checking whether an individual node has outgoing handles towards unselected chords.
+  - Selecting a straight segment displays `[ To Bézier Curve ]`, allowing conversion to curve.
+  - Selecting multiple nodes or segments with mixed states displays the disabled button `[ Mixed Segments ]`, preventing ambiguous mutations.
+- **Homogeneous Multi-Segment Conversion**:
+  - Converting multiple selected nodes where all intermediate segments are lines or all are curves converts all spanned segments uniformly and updates the inspector immediately.
 
 ---
 
 ## [0.93.2] - 2026-10-18
 
 ### 🛠️ Fixed
-- **Estilos Figma Studio Dual-Theme (Dark & Light) en Acciones de Nodo y Conversión de Segmento**:
-  - Se incorporó la clase `.tool-btn` y contenedor `.button-group` en `main.css` utilizando las variables de diseño dual-theme de Figma Studio (`--figma-bg-input`, `--figma-border-subtle`, `--figma-text-primary`, `--figma-bg-hover` y `--figma-brand`).
-  - Se eliminaron estilos inline que generaban fondos blancos con texto blanco en modo oscuro o cajas desalineadas.
-  - Se reemplazaron glifos Unicode por iconos vectoriales SVG limpios y consistentes para las acciones `Cerrar Trazo (Z)`, `A Línea Recta` y `A Curva Bézier`, garantizando total nitidez y soporte en modo claro y oscuro sin emojis.
+- **Figma Studio Dual-Theme (Dark & Light) Styling for Node Actions and Segment Conversion**:
+  - Added `.tool-btn` class and `.button-group` container in `main.css` utilizing Figma Studio dual-theme design tokens (`--figma-bg-input`, `--figma-border-subtle`, `--figma-text-primary`, `--figma-bg-hover`, and `--figma-brand`).
+  - Removed unstyled inline backgrounds that caused white-on-white text in dark mode or misaligned boxes.
+  - Replaced Unicode glyphs with clean, scalable SVG vector icons for `Close Curve (Z)`, `To Straight Line`, and `To Bézier Curve`, ensuring crisp rendering across Dark and Light themes without platform emojis.
 
 ---
 
 ## [0.93.1] - 2026-10-18
 
 ### 🛠️ Fixed
-- **Detección y Prioridad de Tiradores Bézier Sub-2px y Adyacentes a Segmentos**:
-  - Se eliminó la restricción artificial `handleLen >= 2` que descartaba tiradores con longitud menor a 2 unidades de coordenadas, impidiendo seleccionar manijas en trazados de precisión o iconos con viewBox compactos (e.g. 64x64, 48x48 o 32x32).
-  - Se implementó un radio de captura generoso para tiradores Bézier (`effHandleRadius = 16 / z`) frente a una tolerancia de segmento más ajustada (`8 / z`), asegurando que al clicar sobre o cerca de un tirador posicionado directamente sobre la cuerda del segmento, la interacción seleccione y arrastre siempre el tirador sin secuestro por parte del segmento.
-  - Sincronización del cursor en hover (`CanvasInteractionController`): muestra cursor `pointer` con prioridad al sobrevolar tiradores Bézier incluso cuando coinciden exactamente con la trayectoria del segmento.
+- **Detection and Priority for Sub-2px Bézier Handles Adjacent to Segments**:
+  - Removed artificial `handleLen >= 2` restriction that discarded handles shorter than 2 coordinate units, unblocking handle selection in precision paths or compact viewBoxes (e.g. 64x64, 48x48, 32x32).
+  - Implemented generous hit radius for Bézier handles (`effHandleRadius = 16 / z`) against tighter segment tolerance (`8 / z`), ensuring clicks on or near handles lying directly on segment chords always select and drag handles without segment hijacking.
+  - Hover cursor synchronization (`CanvasInteractionController`): prioritizes pointer cursor over Bézier handles even when coincident with segment paths.
 
 ---
 
 ## [0.93.0] - 2026-10-18
 
 ### 🚀 Added / 🛠️ Enhanced
-- **Selección Concurrente de Nodos al Clicar Segmentos**:
-  - Al hacer clic sobre cualquier segmento de un trazado con la herramienta de nodos, ahora se seleccionan simultáneamente ambos nodos extremos que delimitan el segmento en lugar de solo uno.
-  - La marquesina de selección interna y el contador de nodos seleccionados reflejan correctamente la selección dual (`selectedCount = 2`), permitiendo transformaciones y operaciones contextuales de segmento de forma inmediata.
-- **Prioridad Absoluta de Tiradores Bézier frente a Segmentos**:
-  - Se corrigió la colisión de interacción donde arrastrar un tirador Bézier adyacente o coincidente con el trazado era secuestrado por la detección de segmento (`hitTestSegment`), provocando el arrastre accidental de todo el segmento y ambos nodos.
-  - Se implementó detección prioritaria universal de tiradores (`hitTestVertices` con verificación de manijas extendidas) antes de evaluar segmentos, garantizando una manipulación fluida y precisa de las tangentes de curvatura.
-- **Conversión de Segmentos Coordinada y Tipos de Nodo (`asymmetric`)**:
-  - Al convertir un segmento a Curva Bézier (`convertSegmentToCurve`), ambos vértices extremos del segmento se actualizan de vértice recto (`sharp`) a nodo asimétrico (`asymmetric`), creando sus tiradores Bézier tangenciales con proyección proporcional al segmento.
-  - Al revertir a línea recta (`convertSegmentToLine`), se eliminan los tiradores correspondientes y el nodo regresa a vértice recto (`sharp`) si no posee otras tangentes activas.
-- **Controles Numéricos de Alta Precisión para Tiradores Bézier y Vértices**:
-  - Se añadieron campos de entrada numérica en el panel de propiedades (`NodeInspector`) para inspeccionar y calibrar al milímetro las coordenadas absolutas de las manijas de control: `In X`, `In Y`, `Out X` y `Out Y`.
-  - Los campos `Position X` y `Position Y` del vértice activo ahora son completamente editables de forma bidireccional con confirmación por teclado (`Enter`, `change`).
-  - Actualización reactiva a 60fps sin interferir con la edición activa del usuario (`activeElement`).
-- **Botón Contextual de Conversión de Segmento y Limpieza de Acciones de Nodo**:
-  - El panel de propiedades ahora muestra un único botón contextual según el estado actual del segmento activo: `[ A Curva Bézier ]` cuando el segmento es recto, o `[ A Línea Recta ]` cuando el segmento es curvo.
-  - Se depuró la sección de `Acciones de Nodo`: se removió el texto plano `✓ (cerrado)` y se estandarizaron las acciones con botones consistentes en grilla con iconos y atajos de teclado (`Cerrar Trazo (Z)`, `Dividir Nodo`, `Unir Nodos (Ctrl+J)`).
-- **Suite de Pruebas Automatizadas**:
-  - Creada la suite `test-node-editing-ux.ts` (suite 37) validando selección dual de segmento, prioridad de hit-testing de manijas, conversión simétrica/asimétrica y renderizado contextual del inspector.
+- **Concurrent Node Selection on Segment Click**:
+  - Clicking any path segment with the node tool selects both boundary vertices delimiting the segment simultaneously instead of just one.
+  - Internal marquee selection and node count reflect dual selection (`selectedCount = 2`), enabling immediate contextual segment operations.
+- **Absolute Priority of Bézier Handles over Segments**:
+  - Resolved interaction collision where dragging a Bézier handle coincident with or adjacent to a path was hijacked by segment detection (`hitTestSegment`), dragging the entire segment and both nodes.
+  - Universal prioritized handle hit-testing (`hitTestVertices` with extended handle checks) runs before segment evaluation, guaranteeing smooth, precise tangent manipulation.
+- **Coordinated Segment Conversion and Node Types (`asymmetric`)**:
+  - Converting a segment to Bézier Curve (`convertSegmentToCurve`) updates both endpoint vertices from `sharp` to `asymmetric`, creating tangential handles projected proportionally along the chord.
+  - Reverting to straight line (`convertSegmentToLine`) removes corresponding handles and restores `sharp` corner type if no other tangents remain.
+- **High-Precision Numerical Inputs for Bézier Handles and Vertices**:
+  - Added numerical coordinate fields in Property Panel (`NodeInspector`) to inspect and calibrate absolute handle coordinates: `In X`, `In Y`, `Out X`, and `Out Y`.
+  - Active vertex `Position X` and `Position Y` inputs are fully bidirectional with keyboard confirmation (`Enter`, `change`).
+  - Reactive 60fps updates without disrupting active input focus (`activeElement`).
+- **Contextual Segment Conversion Button and Node Actions Polish**:
+  - Property Panel displays a single contextual button according to active segment state: `[ To Bézier Curve ]` when straight, or `[ To Straight Line ]` when curved.
+  - Polished `Node Actions` section: removed plain `✓ (cerrado)` text and standardized actions into consistent button grid with SVG icons and shortcuts (`Close Curve (Z)`, `Split Node`, `Join Nodes (Ctrl+J)`).
+- **Automated Test Suite**:
+  - Created `test-node-editing-ux.ts` (suite 37) validating dual-node segment selection, handle hit-test priority, symmetric/asymmetric conversion, and inspector markup.
 
 ---
 
 ## [0.92.0] - 2026-10-18
 
 ### 🚀 Added / 🛠️ Enhanced
-- **Atracción Magnética Unificada Multi-Objetivo a Grilla (`SnappingEngine`)**:
-  - Se unificó el cálculo de snap a grillas ortogonales, isométricas y axonométricas para contemplar de manera simultánea e interactiva los 3 tipos de anclaje esenciales sin requerir alternar modos:
-    1. **Punto 1 (Intersecciones)**: Cruce analítico de líneas de grilla (líneas ortogonales, diagonales ±30° isométricas, diagonales ±45° axonométricas y ejes verticales).
-    2. **Punto 2 (Centros de Celda)**: Baricentro y punto medio de las celdas o rombos formados por la malla.
-    3. **Punto 3 (Puntos Medios de Segmento)**: Puntos medios exactos de cada segmento que delimita las celdas de la grilla (líneas horizontales, verticales y diagonales).
-  - Admite deslizamiento magnético continuo sobre líneas de grilla cuando el cursor no se encuentra en la proximidad directa de un vértice o centro de celda.
-- **Simplificación y Depuración de Interfaz**:
-  - Se eliminaron las opciones manuales y redundantes de alternar snap ("Línea (0,0)" y "Celda (0,0)") tanto de la barra de estado inferior (`AppLayoutManager`) como de los inspectores de propiedades (`CanvasInspector` y `RulerGuideInspector`).
-  - La activación del snap a grilla ahora abarca automáticamente y sin fricción cognitiva todos los puntos clave de construcción geométrica.
-- **Suite de Pruebas Automatizadas**:
-  - Incorporada la suite de validación `test-unified-grid-snapping.ts` cubriendo la atracción magnética concurrente en grillas ortogonales, isométricas y axonométricas.
+- **Unified Multi-Target Magnetic Grid Snapping (`SnappingEngine`)**:
+  - Unified grid snapping across orthogonal, isometric, and axonometric grids to simultaneously snap across all 3 essential target types without toggling modes:
+    1. **Point 1 (Intersections)**: Analytical crossing of grid lines (orthogonal lines, isometric ±30° diagonals, axonometric ±45° diagonals, and vertical axes).
+    2. **Point 2 (Cell Centers)**: Center of gravity / midpoint of mesh cells or diamonds.
+    3. **Point 3 (Segment Midpoints)**: Exact midpoints of every segment bounding grid cells (horizontal, vertical, and diagonal lines).
+  - Supports continuous magnetic sliding along grid lines when cursor is not directly near a vertex or cell center.
+- **UI Simplification and Cleanup**:
+  - Removed manual, redundant snap mode toggles ("Line (0,0)" and "Cell (0,0)") from both status bar (`AppLayoutManager`) and property inspectors (`CanvasInspector`, `RulerGuideInspector`).
+  - Activating grid snapping frictionlessly covers all key geometric construction points.
+- **Automated Test Suite**:
+  - Added `test-unified-grid-snapping.ts` validating concurrent snapping across orthogonal, isometric, and axonometric grids.
 
 ---
 
 ## [0.91.0] - 2026-10-18
 
 ### 🚀 Added / 🛠️ Enhanced
-- **Relocalización de la Píldora Contextual Mini-HUD (`SelectionMiniHud`)**:
-  - Se reubicó el panel flotante de modos (`[ ✥ Mover | ⤢ Escalar | ⟳ Rotar ]`) fuera del overlay SVG del lienzo para desacoplarlo por completo del borde superior del bounding box.
-  - El Mini-HUD ahora se ancla directamente dentro del contenedor del área de trabajo (`#canvas-container`), centrado horizontalmente justo por debajo de la regla superior (`.ruler-top-container`).
-  - **Experiencia de edición sin colisiones**: Elimina completamente la obstrucción visual y el secuestro de clics sobre vértices, nodos superiores y tangentes Bézier que antes quedaban cubiertos por el badge sobre el marco de selección.
-  - Implementado como un elemento DOM HTML con aceleración de hardware, estética de vidrio esmerilado Figma (`backdrop-filter: blur(12px)`), tokens de diseño dual (Dark/Light) y sincronización reactiva de estado activo para herramientas de Selección (`SelectToolHandler`) y Nodos (`NodeToolHandler` / `NodeSubgroupTransformController`).
-  - Detección automática de reglas: en modo sin reglas (`.no-rulers`), se posiciona con un margen limpio de 8px en la parte superior del canvas.
+- **Relocation of Contextual Mini-HUD Pill (`SelectionMiniHud`)**:
+  - Repositioned floating mode pill (`[ ✥ Move | ⤢ Scale | ⟳ Rotate ]`) outside canvas SVG overlay to completely decouple it from bounding box top edge.
+  - Mini-HUD anchors directly inside workspace container (`#canvas-container`), centered horizontally right below top ruler (`.ruler-top-container`).
+  - **Collision-free editing**: Eliminates visual obstruction and click hijacking over top vertices and Bézier handles previously covered by badge.
+  - Implemented as hardware-accelerated HTML DOM element with Figma frosted glass styling (`backdrop-filter: blur(12px)`), dual tokens (Dark/Light), and reactive state sync for Selection (`SelectToolHandler`) and Node (`NodeToolHandler` / `NodeSubgroupTransformController`) tools.
+  - Automatic ruler detection: in rulerless mode (`.no-rulers`), cleanly offsets 8px from top of canvas.
 
 ---
 
 ## [0.90.0] - 2026-10-18
 
 ### 🚀 Added
-- **Borde Mínimo Hairline (`vector-effect="non-scaling-stroke"`)**:
-  - Al dibujar cualquier vector (Pluma Bézier, Polilínea o Formas paramétricas), el borde se inicializa por defecto en "mínimo" (`vector-effect="non-scaling-stroke"`, `stroke-width="1"`), asegurando un trazo visualmente constante de exactamente 1px de dispositivo sin importar el nivel de zoom o escala del viewBox.
-  - Se añadieron tres botones paso a paso en el panel de propiedades (`StrokeInspector`): `[-]`, `[+]`, y `[min]`.
-  - El botón `[min]` activa instantáneamente el modo de borde mínimo ("hairline") y resalta visualmente en el inspector.
-  - Al hacer click en `[-]` estando en mínimo, la propiedad transiciona a `0` (sin borde / `stroke="none"`).
-  - Al hacer click en `[+]` estando en mínimo, la propiedad transiciona a `1` (borde de 1px con escalabilidad estándar).
-  - Al hacer click en `[-]` desde `1`, el grosor desciende elegantemente a `min`.
-- **Restricción Angular a 15° con Shift en Dibujo y Desplazamiento**:
-  - Al dibujar con la Pluma Bézier (`PenToolHandler`), Línea (`ShapeToolHandler`), o Polilínea (`PolylineToolHandler`), mantener presionado <kbd>Shift</kbd> restringe la ubicación del nuevo nodo a los ejes ortogonales X e Y, y a incrementos angulares discretos de 15° (0°, 15°, 30°, 45°, 60°, 75°, 90°, etc.).
-  - Al manipular tiradores y tangentes Bézier durante la creación con pluma, mantener presionado <kbd>Shift</kbd> restringe el ángulo de los manejadores simétricos o asimétricos a múltiplos de 15°.
-  - Al desplazar o mover elementos seleccionados en el lienzo (`TranslateInteraction`) con <kbd>Shift</kbd>, el desplazamiento se bloquea con precisión en rayos de 15°, garantizando alineación horizontal, vertical o diagonal sin desvíos.
-  - Soporte homólogo en el editor de nodos (`NodeToolHandler`) para traslación individual y múltiple de vértices y manejadores.
+- **Hairline Minimum Stroke (`vector-effect="non-scaling-stroke"`)**:
+  - Vector creation (Bézier Pen, Polyline, Parametric Shapes) initializes stroke by default to "minimum" (`vector-effect="non-scaling-stroke"`, `stroke-width="1"`), ensuring a constant visual 1px stroke regardless of zoom level or viewBox scale.
+  - Added three-step stepper buttons in Property Panel (`StrokeInspector`): `[-]`, `[+]`, and `[min]`.
+  - `[min]` button instantly activates minimum hairline stroke with active visual highlight.
+  - Clicking `[-]` from minimum transitions to `0` (`stroke="none"`).
+  - Clicking `[+]` from minimum transitions to standard scalable 1px stroke.
+  - Clicking `[-]` from `1` smoothly steps down to `min`.
+- **15° Angle Constraints with Shift on Drawing and Translation**:
+  - Holding <kbd>Shift</kbd> during Bézier Pen (`PenToolHandler`), Line (`ShapeToolHandler`), or Polyline (`PolylineToolHandler`) creation constrains next node placement to orthogonal X/Y axes and discrete 15° radial increments (0°, 15°, 30°, 45°, 60°, 75°, 90°, etc.).
+  - Holding <kbd>Shift</kbd> while manipulating Bézier handles constrains symmetrical/asymmetrical tangents to 15° multiples.
+  - Holding <kbd>Shift</kbd> during canvas element translation (`TranslateInteraction`) locks movement to 15° rays, ensuring horizontal, vertical, or diagonal alignment without drift.
+  - Homologous support in Node Editor (`NodeToolHandler`) for single and multi-vertex/handle translation.
 
 ---
 

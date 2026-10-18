@@ -6,7 +6,7 @@
   - **Minor (`x.Y+1.0`)**: Obligatorio para nuevas herramientas, nuevos paneles, o capacidades funcionales añadidas.
 - **Sincronización y Commit Simultáneo:** En ese mismo turno, es **ESTRICTAMENTE OBLIGATORIO** ejecutar:
   1. El incremento de versión en `package.json`.
-  2. La entrada en `changelog.md` con fecha y desglose de cambios (`Fixed`, `Added`, etc.).
+  2. La entrada en `changelog.md` exclusivamente en idioma inglés con fecha y desglose de cambios (`Fixed`, `Added`, etc.).
   3. La actualización de la insignia de versión en `readme.md`.
   4. La compilación y empaquetado del artefacto `.vsix` con `pnpm run package`.
   5. **El Commit Atómico Inmediato:** Realizar el commit en Git con formato convencional (`fix: ...`, `feat: ...`, o `chore(release): bump version to X.Y.Z`).
@@ -38,7 +38,7 @@
 
 ## 6. Sincronización Pre-Commit Obligatoria de Documentación, README y Changelog
 - **Prohibición de Commits Huérfanos de Documentación:** Antes de ejecutar cualquier commit que incorpore nuevas características, correcciones, mejoras visuales o bumps de versión en el repositorio principal `AntiDraw`, es **ESTRICTAMENTE OBLIGATORIO** haber actualizado previamente todos los documentos relacionados del proyecto:
-  1. **`changelog.md`**: Registrar bajo el estándar *Keep a Changelog* la nueva versión, fecha y desglose exhaustivo de cambios (`Added`, `Changed`, `Fixed`, etc.).
+  1. **`changelog.md`**: Registrar bajo el estándar *Keep a Changelog* la nueva versión, fecha y desglose exhaustivo de cambios (`Added`, `Changed`, `Fixed`, etc.). **Idioma Obligatorio:** El archivo `changelog.md` se debe redactar y mantener **ESTRICTAMENTE EN INGLÉS** para todas las versiones y entradas.
   2. **`readme.md`**: Actualizar la insignia de versión (ej. `v0.87.0`), las descripciones de nuevas capacidades (ej. i18n bilingüe, barras de herramientas actualizadas), enlaces a marketplaces y tablas de soporte.
   3. **`package.json`**: Verificar coherencia total entre la versión declarada, scripts y metadatos.
   4. **Documentación Técnica en `Docs/`**: Toda modificación en herramientas, atajos, parámetros o flujos debe quedar reflejada en `Descripción de las herramientas.md`, `Catálogo de Iconos y Herramientas.md`, guías operativas y `Docs/TODO.md`, completando su propio commit atómico en el sub-repositorio `AntiDraw-Docs` antes o en simultáneo.
@@ -47,4 +47,8 @@
 ## 7. Sincronización Bilingüe Obligatoria en Correcciones y Textos (i18n Espejado)
 - **Paridad Obligatoria Español-Inglés:** Cualquier adición, modificación o corrección de textos en la interfaz de usuario, cadenas de internacionalización (`src/webview/i18n/es.ts`), mensajes de error, tooltips o documentación técnica que se realice en español debe realizarse **estricta y simétricamente en inglés** (`src/webview/i18n/en.ts`), y viceversa.
 - **Prohibición de Textos Huérfanos o Asimétricos:** No se permite introducir cadenas hardcodeadas en un solo idioma ni actualizar las claves de traducción de un archivo de localización sin reflejar de inmediato su contraparte exacta con su tipado correspondiente en `types.ts`.
-- **Escape de Caracteres HTML en Textos de UI:** Al incluir referencias a etiquetas o elementos sintácticos (como `<svg>`, `<div>`, etc.) en cadenas de traducción que se renderizan mediante `innerHTML`, es obligatorio usar entidades HTML (`&lt;svg&gt;`) para evitar que el motor del navegador los interprete como elementos del DOM provocando deformaciones de layout o renderizados vacíos.
+- **Escape de Caracteres HTML en Textos de UI:** Al incluir referencias a etiquetas o elementos sintácticos (como `<svg>`, `<div>`, etc.) en cadenas de traducción que se renderizan mediante `innerHTML`, es obligatorio usar entidades HTML (`&lt;svg&gt;`) para evitar que el motor del navegador los interprete como elementos del DOM provocando deformaciones de layout o renderizados vacíos.
+
+## 8. Idioma Exclusivo en Inglés para el Changelog (`changelog.md`)
+- **Redacción Obligatoria en Inglés:** Toda entrada, descripción de versión, título de sección (`Added`, `Changed`, `Fixed`, `Deprecated`, `Removed`) y viñeta explicativa en `changelog.md` debe redactarse **exclusivamente en idioma inglés**, siguiendo el estándar internacional *Keep a Changelog*.
+- **Prohibición de Entradas en Español en Changelog:** Queda terminantemente prohibido incorporar entradas, títulos o explicaciones en español en `changelog.md`. Todo registro histórico y nuevas versiones deben mantenerse en inglés técnico de alta precisión.
