@@ -3,6 +3,15 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.93.6] - 2026-10-19
+
+### 📚 Documentation
+- **Purge Absolute Disk Links & Replace with Relative Paths**:
+  - Corrected `README.md` license link from local filesystem URI (`file:///d:/...`) to relative repository link `[LICENSE](LICENSE)`.
+  - Standardized internal documentation references across `Docs/PRD.md`, `Docs/TODO.md`, `Docs/Plan-Implementacion.md`, `Docs/Brief-Diseno-UI.md`, `Docs/Catálogo de Iconos y Herramientas.md`, and `Docs/VectorCraft MDWiki/10-Analisis-Herramientas-y-Propiedades-VectorCraft-vs-AntiDraw.md` to use clean relative paths instead of absolute local file URIs.
+
+---
+
 ## [0.93.5] - 2026-10-18
 
 ### 🛠️ Fixed

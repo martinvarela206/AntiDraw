@@ -168,4 +168,4 @@ AntiDraw is licensed under the **PolyForm Noncommercial License 1.0.0** (Source-
 * **Mandatory Attribution**: All forks and distributed copies must preserve original copyright notices and credit Martin Varela.
 * **Commercial Redistribution Prohibited**: You may not repackage, rebrand, or sell AntiDraw (or its derivatives) as a commercial product without explicit written consent from the author.
 
-See the full [LICENSE](file:///d:/9.Proyectos/IDEProjects/AntiDraw/LICENSE) file for complete legal terms.
+See the full [LICENSE](LICENSE) file for complete legal terms.
