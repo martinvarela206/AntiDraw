@@ -3,6 +3,19 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.93.5] - 2026-10-18
+
+### 🛠️ Fixed
+- **Exact Analytical Bézier Curve Extrema in Bounding Box Calculation**:
+  - `BoundingBoxCalculator.getPathBoundingBox`: Implemented analytical calculus-based extrema determination for cubic Bézier curve segments by solving $B'(t) = 0$ for $t \in (0, 1)$ across both dimensions ($X$ and $Y$).
+  - Incorporated convex hull property optimization ($B(t) \in \text{ConvexHull}(P_0, P_1, P_2, P_3)$) to bypass derivative root computations whenever control handles lie within the current anchor $[\min, \max]$ boundaries, maintaining sub-millisecond execution.
+  - Eliminated false-rejections in `HitTestService` where clicks on curve peaks protruding outside the anchor nodes were prematurely discarded by early AABB checks. Users can now click, select, and manipulate paths with outward-bulging Bézier curves directly on their outer lobes.
+  - Aligned selection gizmos and bounding box handles with the exact visual contour and mathematical extrema of curved shapes.
+- **Dynamic VSIX Installer Script**:
+  - Updated `install.bat` with automated wildcard resolution (`antidraw-*.vsix`) to seamlessly install the latest compiled version without requiring manual version edits.
+
+---
+
 ## [0.93.4] - 2026-10-18
 
 ### 🛠️ Fixed

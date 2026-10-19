@@ -2,6 +2,8 @@ import { NodeEditorTool } from '../src/webview/engine/NodeEditorTool.js';
 import { NodeInspector } from '../src/webview/ui/inspectors/NodeInspector.js';
 import { PathVertex, VectorElement } from '../src/webview/engine/VectorModel.js';
 import { PathGeometryCompiler } from '../src/webview/engine/geometry/PathGeometryCompiler.js';
+import { BoundingBoxCalculator } from '../src/webview/engine/geometry/BoundingBoxCalculator.js';
+import { HitTestService } from '../src/webview/engine/selection/HitTestService.js';
 
 function assert(condition: boolean, msg: string) {
   if (!condition) {
@@ -190,6 +192,36 @@ export async function runNodeEditingUxTests(): Promise<boolean> {
 
   const curvedOverlayHtml = overlayBuilder.renderIdleBezierHandles(leakTestEl, 1);
   assert(curvedOverlayHtml.includes('circle'), 'Curved segment selection renders its handles');
+
+  // Test 9: Bézier Curve Analytical Extrema Bounding Box & Outer Bulge Hit-Testing
+  console.log('\n[9. Bézier Analytical Extrema Bounding Box & Outer Bulge Hit-Testing]');
+  // Shape with anchors at y=100, but curve bulging upward towards y=25
+  const bulgeVertices: PathVertex[] = [
+    { id: 'b0', x: 0, y: 100, nodeType: 'asymmetric', command: 'M', handleOut: { x: 0, y: 0 } },
+    { id: 'b1', x: 100, y: 100, nodeType: 'asymmetric', command: 'C', handleIn: { x: 100, y: 0 } },
+    { id: 'b2', x: 100, y: 150, nodeType: 'sharp', command: 'L' },
+    { id: 'b3', x: 0, y: 150, nodeType: 'sharp', command: 'L' },
+  ];
+
+  const bulgeEl: VectorElement = {
+    id: 'bulgeEl',
+    tagName: 'path',
+    attributes: { fill: '#ff0000', stroke: '#000000' },
+    vertices: bulgeVertices,
+    isClosed: true,
+  };
+
+  const calculatedBox = BoundingBoxCalculator.getBoundingBox(bulgeEl);
+  assert(calculatedBox !== null, 'Bounding box computed for curved element');
+  // For P0=100, P1=0, P2=0, P3=100, the minimum is at t=0.5 where B(0.5) = 25.
+  // Anchor min Y was 100; with extrema calculation, box.y must be exactly 25!
+  assert(Math.abs(calculatedBox!.y - 25) < 1e-3, `Bounding box y encompasses Bézier peak (y=25) -> got ${calculatedBox!.y}`);
+  assert(Math.abs(calculatedBox!.height - 125) < 1e-3, `Bounding box height spans from y=25 to y=150 (height=125) -> got ${calculatedBox!.height}`);
+
+  // Test hit testing on the bulging curve apex outside anchor bounds (e.g. at (50, 26))
+  const hitBulge = HitTestService.hitTest([bulgeEl], { x: 50, y: 26 }, 1.0, 8);
+  assert(hitBulge !== null, 'HitTestService successfully detects click on curve bulge outside anchor box');
+  assert(hitBulge?.element.id === 'bulgeEl', `Hit element is bulgeEl -> got ${hitBulge?.element.id}`);
 
   console.log('\nNode Editing UX & Handle Precision Tests complete: ALL PASSED.');
   return true;
