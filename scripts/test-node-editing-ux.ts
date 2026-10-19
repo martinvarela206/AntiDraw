@@ -223,6 +223,42 @@ export async function runNodeEditingUxTests(): Promise<boolean> {
   assert(hitBulge !== null, 'HitTestService successfully detects click on curve bulge outside anchor box');
   assert(hitBulge?.element.id === 'bulgeEl', `Hit element is bulgeEl -> got ${hitBulge?.element.id}`);
 
+  // Test 10: Direct Bézier Curve Bending & Segment T Parameter Calculation
+  console.log('\n[10. Direct Bézier Curve Bending & Segment T Parameter Calculation]');
+  const lineVertices: PathVertex[] = [
+    { id: 'lv0', x: 0, y: 0, nodeType: 'sharp', command: 'M' },
+    { id: 'lv1', x: 100, y: 0, nodeType: 'sharp', command: 'L' },
+  ];
+
+  // 10.1 Parametric t calculation on straight line
+  const tStart = nodeEditor.calculateSegmentT(lineVertices[0], lineVertices[1], { x: 20, y: 0 });
+  assert(Math.abs(tStart - 0.2) < 1e-2, `T near start calculates ~0.2 -> got ${tStart.toFixed(2)}`);
+
+  const tMid = nodeEditor.calculateSegmentT(lineVertices[0], lineVertices[1], { x: 50, y: 0 });
+  assert(Math.abs(tMid - 0.5) < 1e-2, `T at midpoint calculates ~0.5 -> got ${tMid.toFixed(2)}`);
+
+  const tEnd = nodeEditor.calculateSegmentT(lineVertices[0], lineVertices[1], { x: 80, y: 0 });
+  assert(Math.abs(tEnd - 0.8) < 1e-2, `T near end calculates ~0.8 -> got ${tEnd.toFixed(2)}`);
+
+  // 10.2 Bending at midpoint (t = 0.5): Symmetric deflection
+  const bentMid = nodeEditor.bendSegment(lineVertices, 0, 0.5, 0, 30, false);
+  assert(bentMid[0].handleOut !== undefined, 'v0 receives handleOut on bend');
+  assert(bentMid[1].handleIn !== undefined, 'v1 receives handleIn on bend');
+  assert(bentMid[1].command === 'C', 'Segment converts to curve command C');
+  assert(Math.abs(bentMid[0].handleOut!.y - bentMid[1].handleIn!.y) < 1e-3, 'Handles deflect symmetrically at t=0.5');
+
+  // 10.3 Bending near start (t = 0.2): handleOut deflection > handleIn deflection
+  const bentStart = nodeEditor.bendSegment(lineVertices, 0, 0.2, 0, 30, false);
+  const hOutDeltaY = bentStart[0].handleOut!.y;
+  const hInDeltaY = bentStart[1].handleIn!.y;
+  assert(hOutDeltaY > hInDeltaY, `Near-start drag deflects handleOut (${hOutDeltaY.toFixed(1)}) more than handleIn (${hInDeltaY.toFixed(1)})`);
+
+  // 10.4 Bending near end (t = 0.8): handleIn deflection > handleOut deflection
+  const bentEnd = nodeEditor.bendSegment(lineVertices, 0, 0.8, 0, 30, false);
+  const endHOutY = bentEnd[0].handleOut!.y;
+  const endHInY = bentEnd[1].handleIn!.y;
+  assert(endHInY > endHOutY, `Near-end drag deflects handleIn (${endHInY.toFixed(1)}) more than handleOut (${endHOutY.toFixed(1)})`);
+
   console.log('\nNode Editing UX & Handle Precision Tests complete: ALL PASSED.');
   return true;
 }

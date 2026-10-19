@@ -287,6 +287,109 @@ export class NodeEditorTool {
   }
 
   /**
+   * ARCHITECTURAL RATIONALE: Direct Bézier Curve Manipulation (Segment Bending)
+   *
+   * Inspired by CorelDraw's Shape Tool (F10), Inkscape's Node Tool, and Illustrator's Curvature Tool:
+   * When dragging a curve or straight segment directly with the mouse without moving its endpoints:
+   * 1. Parametric Proximity (calculateSegmentT):
+   *    Calculates where along the segment chord or cubic curve (parameter t in [0.05, 0.95]) the drag started.
+   * 2. Proportional Tangent Deflection (bendSegment):
+   *    - Dragging near vertex 1 (t -> 0) deflects v1.handleOut predominantly.
+   *    - Dragging near vertex 2 (t -> 1) deflects v2.handleIn predominantly.
+   *    - Dragging near the midpoint (t ~ 0.5) distributes curvature equally to both handles.
+   * 3. Seamless Auto-Conversion:
+   *    If the segment was linear (command 'L' and without handles), initial handles at 1/3 and 2/3
+   *    are synthesized so bending transitions continuously without sudden jumps.
+   * 4. Numerical Stability:
+   *    t is clamped to [0.15, 0.85] in denominator calculations to ensure smooth, non-explosive deformation.
+   */
+  public calculateSegmentT(v1: PathVertex, v2: PathVertex, pt: Point): number {
+    const isCurve = !!(v1.handleOut || v2.handleIn);
+    if (!isCurve) {
+      const dx = v2.x - v1.x;
+      const dy = v2.y - v1.y;
+      const lenSq = dx * dx + dy * dy;
+      if (lenSq < 0.0001) return 0.5;
+      const rawT = ((pt.x - v1.x) * dx + (pt.y - v1.y) * dy) / lenSq;
+      return Math.max(0.05, Math.min(0.95, rawT));
+    }
+
+    const p0 = v1;
+    const p1 = v1.handleOut || { x: v1.x, y: v1.y };
+    const p2 = v2.handleIn || { x: v2.x, y: v2.y };
+    const p3 = v2;
+
+    let bestT = 0.5;
+    let minD2 = Infinity;
+    const steps = 24;
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const mt = 1 - t;
+      const bx = mt * mt * mt * p0.x + 3 * mt * mt * t * p1.x + 3 * mt * t * t * p2.x + t * t * t * p3.x;
+      const by = mt * mt * mt * p0.y + 3 * mt * mt * t * p1.y + 3 * mt * t * t * p2.y + t * t * t * p3.y;
+      const d2 = (pt.x - bx) ** 2 + (pt.y - by) ** 2;
+      if (d2 < minD2) {
+        minD2 = d2;
+        bestT = t;
+      }
+    }
+    return Math.max(0.05, Math.min(0.95, bestT));
+  }
+
+  public bendSegment(
+    vertices: PathVertex[],
+    segmentIdx: number,
+    t: number,
+    dx: number,
+    dy: number,
+    isClosed: boolean = true
+  ): PathVertex[] {
+    const n = vertices.length;
+    if (segmentIdx < 0 || segmentIdx >= n) return vertices;
+    const nextIdx = (segmentIdx + 1) % n;
+    if (!isClosed && segmentIdx === n - 1) return vertices;
+
+    const v1 = vertices[segmentIdx];
+    const v2 = vertices[nextIdx];
+
+    const h1 = v1.handleOut
+      ? { ...v1.handleOut }
+      : { x: v1.x + (v2.x - v1.x) / 3, y: v1.y + (v2.y - v1.y) / 3 };
+    const h2 = v2.handleIn
+      ? { ...v2.handleIn }
+      : { x: v1.x + (2 * (v2.x - v1.x)) / 3, y: v1.y + (2 * (v2.y - v1.y)) / 3 };
+
+    const ct = Math.max(0.15, Math.min(0.85, t));
+
+    const dh1x = dx / (3 * ct);
+    const dh1y = dy / (3 * ct);
+    const dh2x = dx / (3 * (1 - ct));
+    const dh2y = dy / (3 * (1 - ct));
+
+    const newH1 = { x: h1.x + dh1x, y: h1.y + dh1y };
+    const newH2 = { x: h2.x + dh2x, y: h2.y + dh2y };
+
+    return vertices.map((v, idx) => {
+      if (idx === segmentIdx) {
+        return {
+          ...v,
+          handleOut: newH1,
+          nodeType: v.nodeType === 'sharp' ? 'asymmetric' : v.nodeType,
+        };
+      }
+      if (idx === nextIdx) {
+        return {
+          ...v,
+          handleIn: newH2,
+          command: v.command === 'M' ? 'M' : 'C',
+          nodeType: v.nodeType === 'sharp' ? 'asymmetric' : v.nodeType,
+        };
+      }
+      return v;
+    });
+  }
+
+  /**
    * ARCHITECTURAL RATIONALE: Rigorous Segment Curvature Evaluation
    * A segment between vertex i and vertex (i+1)%n is visually, mathematically, and in SVG
    * a cubic Bézier curve IF AND ONLY IF at least one control handle exists on that segment:

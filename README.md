@@ -14,7 +14,7 @@
   <a href="https://open-vsx.org/extension/martinvarela206/antidraw"><img src="https://img.shields.io/badge/Open--VSX-Registry-purple?style=flat-square" alt="Open VSX Registry"></a>
   <a href="https://github.com/martinvarela206/AntiDraw"><img src="https://img.shields.io/badge/GitHub-Repository-181717?style=flat-square&logo=github" alt="GitHub Repository"></a>
   <a href="https://github.com/martinvarela206/AntiDraw/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-Source--Available-blue?style=flat-square" alt="Source-Available License"></a>
-  <a href="https://github.com/martinvarela206/AntiDraw"><img src="https://img.shields.io/badge/Status-Beta%20v0.93.2-orange?style=flat-square" alt="Status"></a>
+  <a href="https://github.com/martinvarela206/AntiDraw"><img src="https://img.shields.io/badge/Status-Beta%20v0.94.0-orange?style=flat-square" alt="Status"></a>
 </p>
 
 <p align="center">
@@ -75,6 +75,9 @@ Frontend developers, UI engineers, and technical designers constantly face a pai
 * **Floating Contextual Mini-HUD**: Instant access to alignment, dimensions, stroke widths, and fills right next to your selection.
 
 ### 🖋️ 3. Advanced Bézier Curve & Node Tool
+* **Direct Bézier Segment Bending**: Click and drag any path segment directly to sculpt organic curves into place without fiddling with tangents, backed by analytical Bernstein polynomial weighting.
+* **On-the-Fly Straight Line Auto-Conversion**: Dragging linear segments automatically promotes them to cubic Bézier curves, accelerating silhouette vectorization workflows (trace rough polygons with Pen <kbd>P</kbd> and curve smoothly with Node <kbd>N</kbd>).
+* **Contextual Drag Disambiguation**: Intelligently switches between direct curve bending and rigid solidary node translation based on node pre-selection, with on-demand <kbd>Alt</kbd> inversion and predictive cursor feedback.
 * **Handle Modes**: Full mathematical support for Cusp (Corner), Smooth, and Symmetric Bézier handles.
 * **Subgroup Node Transformations**: Multi-select $N \ge 2$ nodes to scale, rotate, or skew them around their dynamic local centroid while preserving tangents.
 * **Node Welding / Join** (<kbd>Ctrl</kbd> + <kbd>J</kbd>): Seamlessly fuse coincident nodes without leaving zero-length segments.

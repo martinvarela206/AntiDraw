@@ -52,12 +52,16 @@ export class NodeToolHandler implements IToolHandler {
   public readonly overlayBuilder: NodeOverlayBuilder;
   public readonly subgroupController: NodeSubgroupTransformController;
 
+  public static readonly CURVE_CURSOR =
+    'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'24\' height=\'24\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%23000\' stroke-width=\'1.5\'%3E%3Cpath d=\'M3 3l7 14 3-5 6-1L3 3z\' fill=\'%23fff\'/%3E%3Cpath d=\'M12 17c2-3 5-3 8-1\' stroke=\'%236366f1\' stroke-width=\'2\' stroke-linecap=\'round\' fill=\'none\'/%3E%3C/svg%3E") 3 3, pointer';
+
   public ghostNodeVertices: PathVertex[] | null = null;
   public activeHandle:
     | 'vertex'
     | 'handleIn'
     | 'handleOut'
     | 'segment'
+    | 'segment-curve'
     | 'quadrant'
     | 'ellipse-inner'
     | 'corner-tl'
@@ -67,6 +71,7 @@ export class NodeToolHandler implements IToolHandler {
     | 'marquee'
     | null = null;
   public dragStartPt: Point = { x: 0, y: 0 };
+  public dragSegmentT: number = 0.5;
   public initialVertices: PathVertex[] = [];
   public isDragging: boolean = false;
 
@@ -490,19 +495,44 @@ export class NodeToolHandler implements IToolHandler {
       if (hitSegment !== null) {
         this.nodeEditorTool.selectedSegmentIdx = hitSegment;
         const nextIdx = (hitSegment + 1) % selectedEl.vertices.length;
+        const v1 = selectedEl.vertices[hitSegment];
+        const v2 = selectedEl.vertices[nextIdx];
 
-        // Select BOTH bounding vertices of the segment
+        // Check if BOTH bounding vertices of this segment were already selected prior to this click
+        const bothVerticesPreSelected =
+          this.marqueeSelector.selectedVertexIds.has(v1.id) &&
+          this.marqueeSelector.selectedVertexIds.has(v2.id);
+
+        // Disambiguation rule:
+        // - Default: if both nodes were pre-selected -> rigid translation ('segment')
+        //            if not both pre-selected -> direct curve bending ('segment-curve')
+        // - Alt key: inverts this decision
+        const wantsRigidMove = e.altKey ? !bothVerticesPreSelected : bothVerticesPreSelected;
+
+        // Select BOTH bounding vertices of the segment for inspector display
         this.marqueeSelector.clearSelection();
-        this.marqueeSelector.selectVertex(selectedEl.vertices[hitSegment].id, true);
-        this.marqueeSelector.selectVertex(selectedEl.vertices[nextIdx].id, true);
+        this.marqueeSelector.selectVertex(v1.id, true);
+        this.marqueeSelector.selectVertex(v2.id, true);
 
-        this.nodeEditorTool.selectedVertexId = selectedEl.vertices[nextIdx].id;
+        this.nodeEditorTool.selectedVertexId = v2.id;
         this.nodeEditorTool.selectedHandleType = null;
-        this.activeHandle = 'segment';
         this.dragStartPt = { x: pt.x, y: pt.y };
-        this.initialVertices = JSON.parse(JSON.stringify(selectedEl.vertices));
         this.ghostNodeVertices = null;
         this.isDragging = true;
+
+        if (wantsRigidMove) {
+          this.activeHandle = 'segment';
+          this.initialVertices = JSON.parse(JSON.stringify(selectedEl.vertices));
+        } else {
+          this.activeHandle = 'segment-curve';
+          // Auto-convert to Bézier curve on the fly if straight linear segment
+          let baseVertices = JSON.parse(JSON.stringify(selectedEl.vertices));
+          if (!v1.handleOut && !v2.handleIn) {
+            baseVertices = this.nodeEditorTool.convertSegmentToCurve(baseVertices, hitSegment, isClosed);
+          }
+          this.initialVertices = baseVertices;
+          this.dragSegmentT = this.nodeEditorTool.calculateSegmentT(v1, v2, pt);
+        }
 
         if (this.callbacks.onNodeSelected) {
           this.callbacks.onNodeSelected(
@@ -782,6 +812,25 @@ export class NodeToolHandler implements IToolHandler {
       }
 
       if (
+        this.activeHandle === 'segment-curve' &&
+        this.nodeEditorTool.selectedSegmentIdx !== null
+      ) {
+        const dx = pt.x - this.dragStartPt.x;
+        const dy = pt.y - this.dragStartPt.y;
+
+        this.ghostNodeVertices = this.nodeEditorTool.bendSegment(
+          this.initialVertices,
+          this.nodeEditorTool.selectedSegmentIdx,
+          this.dragSegmentT,
+          dx,
+          dy,
+          isClosed
+        );
+        this.ctx.renderOverlay();
+        return true;
+      }
+
+      if (
         this.activeHandle === 'segment' &&
         this.nodeEditorTool.selectedSegmentIdx !== null
       ) {
@@ -804,20 +853,40 @@ export class NodeToolHandler implements IToolHandler {
 
     if (!this.isDragging) {
       const selectedEl = this.ctx.model.elements.find((el) => this.ctx.selectionTool.isSelected(el.id));
-      if (selectedEl && this.marqueeSelector.selectedVertexIds.size >= 2) {
+      if (selectedEl) {
         const z = this.ctx.canvasMgr.zoom || 1;
-        const hoverCursor = this.subgroupController.getHoverCursor(
-          selectedEl,
-          this.marqueeSelector.selectedVertexIds,
-          pt,
-          z
-        );
-        if (hoverCursor) {
-          this.callbacks.setCursor?.(hoverCursor);
-          return true;
-        } else {
-          this.callbacks.setCursor?.('default');
+        if (this.marqueeSelector.selectedVertexIds.size >= 2) {
+          const hoverCursor = this.subgroupController.getHoverCursor(
+            selectedEl,
+            this.marqueeSelector.selectedVertexIds,
+            pt,
+            z
+          );
+          if (hoverCursor) {
+            this.callbacks.setCursor?.(hoverCursor);
+            return true;
+          }
         }
+
+        // Check hover over segments for predictive curvature / move cursor
+        if (selectedEl.vertices && selectedEl.vertices.length >= 2 && !this.ctx.model.isParametricElement(selectedEl)) {
+          const isClosed = this.isElementClosed(selectedEl);
+          const hitSegment = this.nodeEditorTool.hitTestSegment(selectedEl.vertices, pt, 8 / z, isClosed);
+          if (hitSegment !== null) {
+            const nextIdx = (hitSegment + 1) % selectedEl.vertices.length;
+            const v1Id = selectedEl.vertices[hitSegment].id;
+            const v2Id = selectedEl.vertices[nextIdx].id;
+            const bothSelected =
+              this.marqueeSelector.selectedVertexIds.has(v1Id) &&
+              this.marqueeSelector.selectedVertexIds.has(v2Id);
+            const isAlt = e.altKey;
+            const willMove = isAlt ? !bothSelected : bothSelected;
+            this.callbacks.setCursor?.(willMove ? 'move' : NodeToolHandler.CURVE_CURSOR);
+            return true;
+          }
+        }
+
+        this.callbacks.setCursor?.('default');
       }
     }
 

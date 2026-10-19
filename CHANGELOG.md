@@ -3,6 +3,24 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.94.0] - 2026-10-19
+
+### 🚀 Added
+- **Direct Bézier Segment Bending & Interactive Curvature Manipulation**:
+  - `NodeEditorTool.calculateSegmentT`: Analytical parametric proximity calculation mapping mouse click coordinates to curve parameter $t \in [0.05, 0.95]$ along cubic Bézier splines and linear segments.
+  - `NodeEditorTool.bendSegment`: Direct curvature deformation of path segments without touching tangents manually. Distributes deflections dynamically to `v1.handleOut` and `v2.handleIn` using Bernstein polynomial weighting based on $t$, ensuring smooth, stable deformation.
+  - **On-the-fly Straight Line Auto-Conversion**: Dragging any linear segment (`command === 'L'`) automatically synthesizes cubic Bézier handles at $1/3$ and $2/3$ chords and bends the curve seamlessly. Enables rapid silhouette vectorization workflows (blocking coarse polygons with Pen tool `P` and molding smooth organic curves with Node tool `N`).
+  - **Contextual Drag Disambiguation**:
+    - When clicking an unselected segment: direct Bézier bending mode is activated (`activeHandle = 'segment-curve'`).
+    - When dragging a segment whose bounding vertices were already selected: rigid solidary translation mode is activated (`activeHandle = 'segment'`).
+    - Holding `Alt` immediately toggles and inverts this behavior on demand.
+  - **Predictive Hover Cursor Feedback**:
+    - Hovering over a manipulable segment displays a specialized curve-bend cursor (`CURVE_CURSOR`).
+    - Hovering over pre-selected bounding vertices displays the rigid translation move cursor (`move`).
+  - **Test Suite Expansion**: Added Test 10 in `scripts/test-node-editing-ux.ts` verifying parametric $t$ calculations, symmetric midpoint deflections, and near-endpoint differential tangent weighting.
+
+---
+
 ## [0.93.6] - 2026-10-19
 
 ### 📚 Documentation
