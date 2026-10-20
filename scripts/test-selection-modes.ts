@@ -277,19 +277,7 @@ export async function runSelectionModesTests(): Promise<boolean> {
   });
 
   // Test KeyboardShortcutController dispatch with window keydown event
-  // Test W:
-  selectionTool.selectionMode = 'scale';
-  (globalThis as any).window.dispatchEvent({
-    type: 'keydown',
-    key: 'w',
-    ctrlKey: false,
-    metaKey: false,
-    preventDefault: () => {},
-  });
-  assert(selectionTool.selectionMode === 'move', 'Keyboard Controller: Dispatched "w" sets mode to "move"');
-  assert(propertyPanelUpdated >= 1, 'Keyboard Controller: Dispatched "w" triggers propertyPanel.update()');
-
-  // Test R (when select active): switches mode to scale without switching tool to rect
+  // Test R: activates rect tool without collision
   (globalThis as any).window.dispatchEvent({
     type: 'keydown',
     key: 'r',
@@ -297,10 +285,9 @@ export async function runSelectionModesTests(): Promise<boolean> {
     metaKey: false,
     preventDefault: () => {},
   });
-  assert(selectionTool.selectionMode === 'scale', 'Keyboard Controller: Dispatched "r" sets mode to "scale"');
-  assert(mockToolbar.activeTool === 'select', 'Keyboard Controller: Dispatched "r" preserves "select" tool instead of switching to "rect"');
+  assert(mockToolbar.activeTool === 'rect', 'Keyboard Controller: Dispatched "r" switches tool to "rect"');
 
-  // Test E (when select active): switches mode to rotate without switching tool to ellipse
+  // Test E: activates ellipse tool without collision
   (globalThis as any).window.dispatchEvent({
     type: 'keydown',
     key: 'e',
@@ -308,32 +295,27 @@ export async function runSelectionModesTests(): Promise<boolean> {
     metaKey: false,
     preventDefault: () => {},
   });
-  assert(selectionTool.selectionMode === 'rotate', 'Keyboard Controller: Dispatched "e" sets mode to "rotate"');
-  assert(mockToolbar.activeTool === 'select', 'Keyboard Controller: Dispatched "e" preserves "select" tool instead of switching to "ellipse"');
+  assert(mockToolbar.activeTool === 'ellipse', 'Keyboard Controller: Dispatched "e" switches tool to "ellipse"');
 
-  // Test W when another tool was active: activates select tool and sets move mode
-  activeToolName = 'pen';
+  // Test V: switches back to select tool
   (globalThis as any).window.dispatchEvent({
     type: 'keydown',
-    key: 'w',
+    key: 'v',
     ctrlKey: false,
     metaKey: false,
     preventDefault: () => {},
   });
-  assert(mockToolbar.activeTool === 'select', 'Keyboard Controller: Pressing "w" in other tool switches active tool to "select"');
-  assert(selectionTool.selectionMode === 'move', 'Keyboard Controller: Tool switched via "w" initializes directly into "move" mode');
+  assert(mockToolbar.activeTool === 'select', 'Keyboard Controller: Dispatched "v" activates "select" tool');
 
   // 4.5 QuickHelpInspector Documentation
   const selectHelp = (QuickHelpInspector as any).TOOL_HELP_MAP['select'];
   assert(selectHelp !== undefined, 'QuickHelpInspector contains select tool documentation');
-  const hasWHotkey = selectHelp.shortcuts.some((s: any) => s.keys.includes('W') && s.description.includes('Mover'));
-  const hasRHotkey = selectHelp.shortcuts.some((s: any) => s.keys.includes('R') && s.description.includes('Escala'));
-  const hasEHotkey = selectHelp.shortcuts.some((s: any) => s.keys.includes('E') && s.description.includes('Rotar'));
+  const hasVHotkey = selectHelp.shortcuts.some((s: any) => s.keys.includes('V') && s.description.includes('Selección'));
   const hasMiniHud = selectHelp.shortcuts.some((s: any) => s.keys.includes('Mini-HUD') && s.description.includes('Mover'));
-  assert(hasWHotkey, 'QuickHelpInspector documents "W" hotkey for Modo Mover');
-  assert(hasRHotkey, 'QuickHelpInspector documents "R" hotkey for Modo Escala');
-  assert(hasEHotkey, 'QuickHelpInspector documents "E" hotkey for Modo Rotar');
+  const hasDHotkeyInHelp = selectHelp.shortcuts.some((s: any) => s.keys.includes('D') && s.description.includes('Deformación Libre'));
+  assert(hasVHotkey, 'QuickHelpInspector documents "V" hotkey for Herramienta Selección');
   assert(hasMiniHud, 'QuickHelpInspector documents "Mini-HUD" floating widget on Bounding Box');
+  assert(hasDHotkeyInHelp, 'QuickHelpInspector documents "D" hotkey for Deformación Libre');
 
   // -----------------------------------------------------------------------------------
   // 5. Contextual Floating Mini-HUD ([ ✥ Mover | ⤢ Escalar | ⟳ Rotar ]) Suite

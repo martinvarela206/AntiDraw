@@ -1109,23 +1109,6 @@ export class NodeToolHandler implements IToolHandler {
   }
 
   public onKeyDown(e: KeyboardEvent): boolean {
-    if (this.marqueeSelector.selectedVertexIds.size >= 2) {
-      if (e.key === 'w' || e.key === 'W') {
-        this.subgroupController.setMode('move');
-        this.ctx.renderOverlay();
-        return true;
-      }
-      if (e.key === 'e' || e.key === 'E') {
-        this.subgroupController.setMode('rotate');
-        this.ctx.renderOverlay();
-        return true;
-      }
-      if (e.key === 'r' || e.key === 'R') {
-        this.subgroupController.setMode('scale');
-        this.ctx.renderOverlay();
-        return true;
-      }
-    }
     if ((e.ctrlKey || e.metaKey) && (e.key === 'j' || e.key === 'J')) {
       e.preventDefault();
       return this.handleJoinSelectedNodes();

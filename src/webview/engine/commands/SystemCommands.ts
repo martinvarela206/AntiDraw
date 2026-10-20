@@ -649,7 +649,7 @@ export function registerSystemCommands(registry: CommandRegistry): void {
     id: 'blend.create',
     label: 'Crear Fusión Paramétrica (Blend)',
     category: 'object',
-    shortcut: 'W',
+    shortcut: 'Ctrl+Alt+B',
     execute: (ctx: CommandContext) => {
       if (!ctx.model || !ctx.selectionTool) return { success: false, error: 'Contexto no disponible' };
       const selected = ctx.model.elements.filter((el: VectorElement) => ctx.selectionTool.isSelected(el.id));

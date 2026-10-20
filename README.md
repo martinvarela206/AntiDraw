@@ -14,7 +14,7 @@
   <a href="https://open-vsx.org/extension/martinvarela206/antidraw"><img src="https://img.shields.io/badge/Open--VSX-Registry-purple?style=flat-square" alt="Open VSX Registry"></a>
   <a href="https://github.com/martinvarela206/AntiDraw"><img src="https://img.shields.io/badge/GitHub-Repository-181717?style=flat-square&logo=github" alt="GitHub Repository"></a>
   <a href="https://github.com/martinvarela206/AntiDraw/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-Source--Available-blue?style=flat-square" alt="Source-Available License"></a>
-  <a href="https://github.com/martinvarela206/AntiDraw"><img src="https://img.shields.io/badge/Status-Beta%20v0.94.2-orange?style=flat-square" alt="Status"></a>
+  <a href="https://github.com/martinvarela206/AntiDraw"><img src="https://img.shields.io/badge/Status-Beta%20v0.94.3-orange?style=flat-square" alt="Status"></a>
 </p>
 
 <p align="center">
@@ -38,7 +38,7 @@ Whether you discovered AntiDraw through GitHub, VS Code Marketplace, or Open VSX
 ---
 
 > [!NOTE]
-> **Project Status: Public Beta (v0.94.2)**  
+> **Project Status: Public Beta (v0.94.3)**  
 > AntiDraw is under active, continuous development. While vector editing, Bézier curves, snapping, and boolean topology are fully functional and stable, you may encounter occasional edge cases.  
 > Found a bug or have a feature request? Please [open an issue on GitHub](https://github.com/martinvarela206/AntiDraw/issues) — your feedback directly shapes upcoming releases!
 
@@ -127,16 +127,29 @@ Frontend developers, UI engineers, and technical designers constantly face a pai
 | Shortcut | Action |
 | :--- | :--- |
 | <kbd>V</kbd> | Selection Tool |
-| <kbd>W</kbd> / <kbd>E</kbd> / <kbd>R</kbd> | Toggle Move / Scale / Rotate Mode |
-| <kbd>D</kbd> | Free Deformation Mode |
-| <kbd>N</kbd> / <kbd>A</kbd> | Node Editing Tool |
-| <kbd>P</kbd> | Pen Tool (Bézier curves) |
+| <kbd>A</kbd> | Node Editing Tool |
+| <kbd>P</kbd> | Bézier Pen Tool |
+| <kbd>L</kbd> | Straight Line Tool |
+| <kbd>Y</kbd> | Polyline Tool |
+| <kbd>R</kbd> | Rectangle Tool |
+| <kbd>O</kbd> | Circle Tool |
+| <kbd>E</kbd> | Ellipse Tool |
+| <kbd>G</kbd> | Regular Polygon Tool |
+| <kbd>S</kbd> | Star Tool |
+| <kbd>T</kbd> | Stroke Tool |
 | <kbd>C</kbd> | Scissors Tool |
+| <kbd>K</kbd> | Knife Tool |
 | <kbd>Shift</kbd> + <kbd>E</kbd> | Eraser Tool |
+| <kbd>F</kbd> | Smart Fill Tool |
+| <kbd>M</kbd> | Shape Builder Tool |
+| <kbd>I</kbd> | Image Ingestion Tool |
+| <kbd>+</kbd> | Add Vertex Tool |
+| <kbd>Z</kbd> | Zoom & Pan Tool |
+| <kbd>D</kbd> | Toggle Free Distortion / Homography 3x3 |
 | <kbd>Ctrl</kbd> + <kbd>J</kbd> | Join / Weld selected coincident nodes |
-| <kbd>Space</kbd> + Drag | Pan Canvas |
-| <kbd>Delete</kbd> / <kbd>Supr</kbd> | Delete selected elements or guide lines |
+| <kbd>Delete</kbd> / <kbd>Backspace</kbd> | Delete selected elements, nodes, or guide lines |
 | <kbd>Ctrl</kbd> + <kbd>Z</kbd> / <kbd>Ctrl</kbd> + <kbd>Y</kbd> | Undo / Redo |
+| <kbd>Ctrl</kbd> + <kbd>0</kbd> | Recenter / Fit ViewBox to Screen |
 
 ---
 

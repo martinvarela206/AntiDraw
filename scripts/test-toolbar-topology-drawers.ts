@@ -286,6 +286,38 @@ export async function runToolbarTopologyDrawersTests(): Promise<boolean> {
   (keyController as any).handleKeyDown(createKeyEvt('e', { shiftKey: false }));
   assert(toolbar.activeTool === 'ellipse', 'Key "e" without Shift activates Ellipse tool ("ellipse")');
 
+  // Press 'k' -> activates knife
+  (keyController as any).handleKeyDown(createKeyEvt('k'));
+  assert(toolbar.activeTool === 'knife', 'Key "k" activates Knife tool ("knife")');
+  assert(toolbar.drawerCut.activeChildId === 'knife', 'Drawer A slot synced to "knife" on key "k"');
+
+  // Press 'f' -> activates smartFill
+  (keyController as any).handleKeyDown(createKeyEvt('f'));
+  assert(toolbar.activeTool === 'smartFill', 'Key "f" activates Smart Fill tool ("smartFill")');
+  assert(toolbar.drawerConstruct.activeChildId === 'smartFill', 'Drawer B slot synced to "smartFill" on key "f"');
+
+  // Press 'm' -> activates shapeBuilder
+  (keyController as any).handleKeyDown(createKeyEvt('m'));
+  assert(toolbar.activeTool === 'shapeBuilder', 'Key "m" activates Shape Builder tool ("shapeBuilder")');
+  assert(toolbar.drawerConstruct.activeChildId === 'shapeBuilder', 'Drawer B slot synced to "shapeBuilder" on key "m"');
+
+  // Press 'a' -> activates node
+  (keyController as any).handleKeyDown(createKeyEvt('a'));
+  assert(toolbar.activeTool === 'node', 'Key "a" activates Node tool ("node")');
+
+  // Verify non-collision when select tool is active:
+  toolbar.setTool('select');
+  (keyController as any).handleKeyDown(createKeyEvt('E', { shiftKey: true }));
+  assert(toolbar.activeTool === 'eraser', 'Key "Shift+E" activates Eraser even when select is active');
+
+  toolbar.setTool('select');
+  (keyController as any).handleKeyDown(createKeyEvt('e', { shiftKey: false }));
+  assert(toolbar.activeTool === 'ellipse', 'Key "e" activates Ellipse even when select is active');
+
+  toolbar.setTool('select');
+  (keyController as any).handleKeyDown(createKeyEvt('r', { shiftKey: false }));
+  assert(toolbar.activeTool === 'rect', 'Key "r" activates Rect even when select is active');
+
   console.log(`\nToolbar Topology Drawers Tests complete: ${passedCount} passed, ${failedCount} failed.`);
   return failedCount === 0;
 }

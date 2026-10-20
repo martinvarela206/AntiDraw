@@ -105,39 +105,18 @@ export class KeyboardShortcutController {
     if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'SELECT') return;
 
     // Single-key Tool Switches & Selection Mode Shortcuts (when not holding Ctrl/Meta)
-    if (!e.ctrlKey && !e.metaKey) {
+    if (!e.ctrlKey && !e.metaKey && !e.altKey) {
       const isSelectActive = this.ctx.toolbar.activeTool === 'select' || this.ctx.selectionTool.selectedElementIds.size > 0;
 
-      // 3 Selection Modes Direct Hotkeys (W: Move, R: Scale, E: Rotate)
-      if (e.key === 'w' || e.key === 'W') {
+      // Shift+E: Herramienta Borrador (evaluado con prioridad antes de tecla E)
+      if (e.shiftKey && (e.key === 'E' || e.key === 'e')) {
         e.preventDefault();
-        if (this.ctx.toolbar.activeTool !== 'select') {
-          this.ctx.toolbar.setTool('select');
-        }
-        this.ctx.selectionTool.selectionMode = 'move';
-        this.ctx.propertyPanel.update();
-        this.ctx.renderOverlay();
+        this.ctx.toolbar.setTool('eraser');
         return;
       }
 
-      if (isSelectActive && (e.key === 'r' || e.key === 'R')) {
-        e.preventDefault();
-        this.ctx.selectionTool.selectionMode = 'scale';
-        this.ctx.propertyPanel.update();
-        this.ctx.renderOverlay();
-        return;
-      }
-
-      if (isSelectActive && (e.key === 'e' || e.key === 'E')) {
-        e.preventDefault();
-        this.ctx.selectionTool.selectionMode = 'rotate';
-        this.ctx.propertyPanel.update();
-        this.ctx.renderOverlay();
-        return;
-      }
-
-      // Dedicated Free Transform / Homography Shortcut (D) outside selection cycle
-      if (isSelectActive && (e.key === 'd' || e.key === 'D')) {
+      // Dedicated Free Transform / Homography Shortcut (D) cuando hay selección activa
+      if (isSelectActive && (e.key === 'd' || e.key === 'D') && !e.shiftKey) {
         e.preventDefault();
         this.ctx.selectionTool.selectionMode = this.ctx.selectionTool.selectionMode === 'distort' ? 'scale' : 'distort';
         this.ctx.propertyPanel.update();
@@ -145,23 +124,27 @@ export class KeyboardShortcutController {
         return;
       }
 
-      if (e.key === 'v' || e.key === 'V') this.ctx.toolbar.setTool('select');
-      if (e.key === 't' || e.key === 'T') this.ctx.toolbar.setTool('stroke');
-      if (e.key === 'n' || e.key === 'N') this.ctx.toolbar.setTool('node');
-      if (e.key === 'y' || e.key === 'Y') this.ctx.toolbar.setTool('polyline');
-      if (e.key === 'p' || e.key === 'P') this.ctx.toolbar.setTool('pen');
-      if (e.key === 'r' || e.key === 'R') this.ctx.toolbar.setTool('rect');
-      if (e.key === 'o' || e.key === 'O') this.ctx.toolbar.setTool('circle');
-      if (e.shiftKey && (e.key === 'E' || e.key === 'e')) {
-        this.ctx.toolbar.setTool('eraser');
-      } else if (e.key === 'e' || e.key === 'E') {
-        this.ctx.toolbar.setTool('ellipse');
+      // Atajos directos canónicos 1:1 para cada herramienta (sin modificadores)
+      if (!e.shiftKey) {
+        if (e.key === 'v' || e.key === 'V') { e.preventDefault(); this.ctx.toolbar.setTool('select'); return; }
+        if (e.key === 'a' || e.key === 'A' || e.key === 'n' || e.key === 'N') { e.preventDefault(); this.ctx.toolbar.setTool('node'); return; }
+        if (e.key === 't' || e.key === 'T') { e.preventDefault(); this.ctx.toolbar.setTool('stroke'); return; }
+        if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.ctx.toolbar.setTool('pen'); return; }
+        if (e.key === 'l' || e.key === 'L') { e.preventDefault(); this.ctx.toolbar.setTool('line'); return; }
+        if (e.key === 'y' || e.key === 'Y') { e.preventDefault(); this.ctx.toolbar.setTool('polyline'); return; }
+        if (e.key === 'r' || e.key === 'R') { e.preventDefault(); this.ctx.toolbar.setTool('rect'); return; }
+        if (e.key === 'o' || e.key === 'O') { e.preventDefault(); this.ctx.toolbar.setTool('circle'); return; }
+        if (e.key === 'e' || e.key === 'E') { e.preventDefault(); this.ctx.toolbar.setTool('ellipse'); return; }
+        if (e.key === 'g' || e.key === 'G') { e.preventDefault(); this.ctx.toolbar.setTool('polygon'); return; }
+        if (e.key === 's' || e.key === 'S') { e.preventDefault(); this.ctx.toolbar.setTool('star'); return; }
+        if (e.key === 'c' || e.key === 'C') { e.preventDefault(); this.ctx.toolbar.setTool('scissors'); return; }
+        if (e.key === 'k' || e.key === 'K') { e.preventDefault(); this.ctx.toolbar.setTool('knife'); return; }
+        if (e.key === 'f' || e.key === 'F') { e.preventDefault(); this.ctx.toolbar.setTool('smartFill'); return; }
+        if (e.key === 'm' || e.key === 'M') { e.preventDefault(); this.ctx.toolbar.setTool('shapeBuilder'); return; }
+        if (e.key === 'i' || e.key === 'I') { e.preventDefault(); this.ctx.toolbar.setTool('image'); return; }
+        if (e.key === '+' || e.key === '=') { e.preventDefault(); this.ctx.toolbar.setTool('addVertex'); return; }
+        if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); this.ctx.toolbar.setTool('zoom'); return; }
       }
-      if (e.key === 'l' || e.key === 'L') this.ctx.toolbar.setTool('line');
-      if (e.key === 'g' || e.key === 'G') this.ctx.toolbar.setTool('polygon');
-      if (e.key === 's' || e.key === 'S') this.ctx.toolbar.setTool('star');
-      if (e.key === 'c' || e.key === 'C') this.ctx.toolbar.setTool('scissors');
-      if (e.key === 'z' || e.key === 'Z') this.ctx.toolbar.setTool('zoom');
     }
 
     const isCtrl = e.ctrlKey || e.metaKey;
@@ -253,6 +236,46 @@ export class KeyboardShortcutController {
         e.preventDefault();
         cmdRegistry.execute('file.exportAsset');
         return;
+      }
+    }
+
+    if (isCtrl && e.key === '0') {
+      if (cmdRegistry.has('view.recenterViewBox') && cmdRegistry.isEnabled('view.recenterViewBox')) {
+        e.preventDefault();
+        cmdRegistry.execute('view.recenterViewBox');
+        return;
+      }
+    }
+
+    if (isCtrl && e.altKey) {
+      if (e.key === ';' || e.key === ':') {
+        if (cmdRegistry.has('guide.toggleLock')) {
+          e.preventDefault();
+          cmdRegistry.execute('guide.toggleLock');
+          return;
+        }
+      }
+      if (e.key === 'l' || e.key === 'L') {
+        if (cmdRegistry.has('layer.lockAllAbove') && cmdRegistry.isEnabled('layer.lockAllAbove')) {
+          e.preventDefault();
+          cmdRegistry.execute('layer.lockAllAbove');
+          return;
+        }
+      }
+      if (e.key === '2') {
+        if (cmdRegistry.has('layer.unlockAll')) {
+          e.preventDefault();
+          cmdRegistry.execute('layer.unlockAll');
+          return;
+        }
+      }
+      if (e.key === '3') {
+        const cmd = e.shiftKey ? 'layer.showAll' : 'layer.hideAllAbove';
+        if (cmdRegistry.has(cmd) && cmdRegistry.isEnabled(cmd)) {
+          e.preventDefault();
+          cmdRegistry.execute(cmd);
+          return;
+        }
       }
     }
 

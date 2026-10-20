@@ -55,11 +55,11 @@ export class Toolbar {
   public readonly drawerCut: DrawerGroupItem = {
     type: 'drawer',
     id: 'drawer-cut',
-    title: 'Corte y Partición (Tijeras C, Cuchilla, Borrador Shift+E)',
+    title: 'Corte y Partición (Tijeras C, Cuchilla K, Borrador Shift+E)',
     activeChildId: 'scissors',
     tools: [
       { id: 'scissors', title: 'Scissors Tool (C)', icon: ToolIcons.scissorsTool, shortcut: 'C' },
-      { id: 'knife', title: 'Knife Tool', icon: ToolIcons.knifeTool },
+      { id: 'knife', title: 'Knife Tool (K)', icon: ToolIcons.knifeTool, shortcut: 'K' },
       { id: 'eraser', title: 'Eraser Tool (Shift+E)', icon: ToolIcons.eraserTool, shortcut: 'Shift+E' },
     ],
   };
@@ -67,11 +67,11 @@ export class Toolbar {
   public readonly drawerConstruct: DrawerGroupItem = {
     type: 'drawer',
     id: 'drawer-construct',
-    title: 'Construcción y Composición (Relleno Inteligente, Constructor de Formas)',
+    title: 'Construcción y Composición (Relleno Inteligente F, Constructor de Formas M)',
     activeChildId: 'smartFill',
     tools: [
-      { id: 'smartFill', title: 'Smart Fill Tool', icon: ToolIcons.smartFillTool },
-      { id: 'shapeBuilder', title: 'Shape Builder Tool', icon: ToolIcons.shapeBuilderTool },
+      { id: 'smartFill', title: 'Smart Fill Tool (F)', icon: ToolIcons.smartFillTool, shortcut: 'F' },
+      { id: 'shapeBuilder', title: 'Shape Builder Tool (M)', icon: ToolIcons.shapeBuilderTool, shortcut: 'M' },
     ],
   };
 
@@ -182,7 +182,7 @@ export class Toolbar {
     return [
       // 1. Selección y Manipulación
       { type: 'tool', id: 'select', title: t('toolbar.select'), icon: ToolIcons.selectTool },
-      { type: 'tool', id: 'stroke', title: t('panels.stroke'), icon: ToolIcons.strokeTool },
+      { type: 'tool', id: 'stroke', title: t('toolbar.stroke'), icon: ToolIcons.strokeTool },
       { type: 'tool', id: 'node', title: t('toolbar.node'), icon: ToolIcons.nodeTool },
       { type: 'divider' },
 
@@ -206,7 +206,7 @@ export class Toolbar {
       { type: 'divider' },
 
       // 5. Utilidades y Espacio de Trabajo
-      { type: 'tool', id: 'image', title: t('imageOptimization.toolImageTooltip'), icon: ToolIcons.imageTool },
+      { type: 'tool', id: 'image', title: t('toolbar.image'), icon: ToolIcons.imageTool },
       { type: 'tool', id: 'addVertex', title: t('toolbar.addVertex'), icon: ToolIcons.addVertexTool },
       { type: 'tool', id: 'zoom', title: t('toolbar.zoom'), icon: ToolIcons.zoomTool },
     ];

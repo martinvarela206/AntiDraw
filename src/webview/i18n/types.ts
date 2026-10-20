@@ -83,6 +83,8 @@ export interface Translations {
     addVertex: string;
     zoom: string;
     canvas: string;
+    stroke: string;
+    image: string;
     drawerCutTooltip: string;
     drawerConstructTooltip: string;
     toolInDevelopment: string;

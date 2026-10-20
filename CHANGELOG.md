@@ -3,6 +3,21 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.94.3] - 2026-10-20
+
+### 🛠️ Fixed
+- **Canonical 1:1 Keyboard Shortcut Unification & Collision Elimination**:
+  - Eliminated primitive tool key interception: pressing <kbd>R</kbd> and <kbd>E</kbd> now always cleanly activates Rectangle (`rect`) and Ellipse (`ellipse`) tools regardless of active selection state (no longer hijacked by selection scale/rotate modes).
+  - Enforced strict modifier precedence: <kbd>Shift</kbd>+<kbd>E</kbd> (Eraser) is evaluated with priority before single-key <kbd>E</kbd>, ensuring seamless tool switching.
+  - Assigned dedicated canonical shortcuts to previously unmapped tools: Knife (<kbd>K</kbd>), Smart Fill (<kbd>F</kbd>), Shape Builder (<kbd>M</kbd>), Image Ingestion (<kbd>I</kbd>), and Add Vertex (<kbd>+</kbd>).
+  - Standardized Node Tool to canonical <kbd>A</kbd> (maintaining <kbd>N</kbd> as compatible alias).
+  - Removed misleading `(Z)` badge on Node Inspector's close curve button, eliminating collision with Zoom Tool (<kbd>Z</kbd>).
+  - Reassigned `blend.create` system command shortcut to <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>B</kbd>, removing single-key conflict on <kbd>W</kbd>.
+  - Wired active listeners in `KeyboardShortcutController` for menu-advertised commands: <kbd>Ctrl</kbd>+<kbd>0</kbd> (Recenter ViewBox), <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>;</kbd> (Toggle Guide Lock), and layer lock/hide family (<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>L</kbd>, <kbd>2</kbd>, <kbd>3</kbd>).
+  - Fully synchronized bilingual Quick Help (`QuickHelpInspector`), Toolbar tooltips, and documentation (`README.md`).
+
+---
+
 ## [0.94.2] - 2026-10-20
 
 ### 🛠️ Fixed

@@ -110,12 +110,12 @@ export class NodeInspector {
         <div class="panel-title">${I18nService.t('inspector.nodeActions')}</div>
         <div class="prop-row" style="flex-direction:column; gap:6px;">
           ${!isClosed ? `
-            <button class="tool-btn" id="btn-close-curve" title="${I18nService.t('inspector.closeCurve')} (Z)">
+            <button class="tool-btn" id="btn-close-curve" title="${I18nService.t('inspector.closeCurve')}">
               <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M 13 8 A 5 5 0 1 1 8 3 L 10 3" />
                 <polyline points="8 1 10 3 8 5" />
               </svg>
-              <span>${I18nService.t('inspector.closeCurve')} (Z)</span>
+              <span>${I18nService.t('inspector.closeCurve')}</span>
             </button>
           ` : ''}
           ${isMulti ? `
