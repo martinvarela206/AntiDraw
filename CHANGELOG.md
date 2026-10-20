@@ -3,6 +3,25 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.94.2] - 2026-10-20
+
+### 🛠️ Fixed
+- **Shared Seam & Internal Boundary Elimination in Boolean Union**:
+  - Implemented collinear line-line overlap and curve coincidence detection in `BezierCurveTrimmer.findSegmentIntersections` and `areSegmentsCoincident`.
+  - Prevented touching contiguous regions from prematurely falling into the non-intersecting disjoint compound path branch when intersecting along a line (`det === 0`).
+  - Added shared opposite-boundary segment cancellation in `BezierCurveTrimmer.booleanOpPair` during `op === 'union'`, stripping coincident interior edges completely from the segment pool before graph chaining. Eliminates double boundaries, interior seams, and degenerate cutout holes under `fill-rule="evenodd"`.
+  - Upgraded `PolygonBooleanService.union` to execute simultaneous N-way planar clipping via `polygonClipping.union(geoms[0], ...geoms.slice(1))`, eliminating pairwise iteration errors across complex contiguous regions.
+  - Added automatic sliver micro-hole filtering ($< 2.0\text{ px}^2$) in `PolygonUtils.multiPolygonToElement` to guarantee clean, watertight planar fills.
+
+### 🚀 Added
+- **Triple Interaction Mode Suite for Smart Fill & Shape Builder**:
+  - **Mode 1 (Single Click)**: Classic Smart Fill creating independent, isolated `<path>` fragments per enclosed region.
+  - **Mode 2 (<kbd>Shift</kbd> + Click - Incremental Step-by-Step Weld)**: Welds clicked enclosed regions directly into the currently active/selected shape in-place. Pushes dedicated, granular undo history entries (`pushUndo()`) for each step, allowing seamless step-by-step assembly with full rollback (<kbd>Ctrl+Z</kbd>) capability.
+  - **Mode 3 (Continuous Drag Sweep - Shape Builder style)**: Dynamically accumulates candidate regions crossed by the pointer trajectory with button down. Renders real-time combined preview highlights of all accumulated swept regions, and cleanly welds them into a single unified `<path>` on `pointerup`.
+  - **Additive Modifier Homogeneity**: Verified and enforced universal modifier standard: <kbd>Shift</kbd> is the canonical additive modifier across AntiDraw (multi-selection, node multi-selection, additive marquee, and additive region fusion).
+
+---
+
 ## [0.94.1] - 2026-10-20
 
 ### 🛠️ Fixed

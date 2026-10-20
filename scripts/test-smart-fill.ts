@@ -521,6 +521,187 @@ export async function runSmartFillTests(): Promise<boolean> {
     assert(ctrlModel.elements.length === 3, 'Topology tool without backend safely discards action with toast');
   }
 
+  // =========================================================================
+  // TEST SUITE 8: Mode 2 - Shift + Click Step-by-Step Additive Fusion
+  // =========================================================================
+  {
+    const mode2Model = new VectorModel();
+    const selectionTool = new SelectionTool();
+    const canvasMgr = new CanvasManager();
+    let undoCount = 0;
+
+    const toolCtx: ToolContext = {
+      model: mode2Model,
+      selectionTool,
+      canvasMgr,
+      pushUndo: () => { undoCount++; },
+      syncToHost: () => {},
+      render: () => {},
+      renderOverlay: () => {},
+      snapPoint: (pt) => pt,
+      getOtherVertices: () => [],
+      setTool: () => {},
+      getActiveTool: () => 'smartFill',
+      confirm: async () => true,
+    };
+
+    const handler = new SmartFillToolHandler(toolCtx);
+    const rVerts = mode2Model.convertShapeToVertices('rect', { x: '0', y: '0', width: '100', height: '100' });
+    const dVerts = mode2Model.convertShapeToVertices('line', { x1: '0', y1: '0', x2: '100', y2: '100' });
+    mode2Model.elements.push({
+      id: 'r_src',
+      tagName: 'rect',
+      shapeType: 'rect',
+      isParametric: true,
+      attributes: { id: 'r_src', x: '0', y: '0', width: '100', height: '100', fill: 'none' },
+      vertices: rVerts,
+      isClosed: true,
+    });
+    mode2Model.elements.push({
+      id: 'd_src',
+      tagName: 'line',
+      shapeType: 'line',
+      isParametric: true,
+      attributes: { id: 'd_src', x1: '0', y1: '0', x2: '100', y2: '100', fill: 'none' },
+      vertices: dVerts,
+      isClosed: false,
+    });
+
+    handler.activate();
+
+    // Step 1: Normal Click on Upper Triangle (Mode 1)
+    const evtDown1 = { button: 0, shiftKey: false } as PointerEvent;
+    const evtUp1 = { button: 0, shiftKey: false } as PointerEvent;
+    handler.onPointerDown(evtDown1, { x: 20, y: 10 });
+    handler.onPointerUp(evtUp1, { x: 20, y: 10 });
+    assert(mode2Model.elements.length === 3, 'Step 1 creates first piece (total 3 elements)');
+    assert(undoCount === 1, 'First piece recorded undo step 1');
+    const firstPieceId = mode2Model.elements[2].id;
+    assert(handler.lastActiveElementId === firstPieceId, 'First piece registered as active element');
+
+    // Step 2: Shift + Click on Adjacent Lower Triangle (Mode 2)
+    const evtDown2 = { button: 0, shiftKey: true } as PointerEvent;
+    const evtUp2 = { button: 0, shiftKey: true } as PointerEvent;
+    handler.onPointerDown(evtDown2, { x: 10, y: 20 });
+    handler.onPointerUp(evtUp2, { x: 10, y: 20 });
+
+    assert(mode2Model.elements.length === 3, 'Shift+Click welded adjacent region in-place (total elements remains 3)');
+    assert(undoCount === 2, 'Shift+Click recorded separate undo step 2 for granular undo capability');
+    const unifiedElement = mode2Model.elements[2];
+    assert(unifiedElement.id.startsWith('union_') || unifiedElement.id.startsWith('smart_fill_'), 'Result is unified shape');
+    const mCount = (unifiedElement.attributes.d.match(/M/g) || []).length;
+    assert(mCount === 1, 'Unified element forms a single outer continuous contour without internal seams');
+  }
+
+  // =========================================================================
+  // TEST SUITE 9: Mode 3 - Drag Sweep Continuous Gesture (Shape Builder)
+  // =========================================================================
+  {
+    const sweepModel = new VectorModel();
+    const selectionTool = new SelectionTool();
+    const canvasMgr = new CanvasManager();
+    let undoCount = 0;
+
+    const toolCtx: ToolContext = {
+      model: sweepModel,
+      selectionTool,
+      canvasMgr,
+      pushUndo: () => { undoCount++; },
+      syncToHost: () => {},
+      render: () => {},
+      renderOverlay: () => {},
+      snapPoint: (pt) => pt,
+      getOtherVertices: () => [],
+      setTool: () => {},
+      getActiveTool: () => 'smartFill',
+      confirm: async () => true,
+    };
+
+    const handler = new SmartFillToolHandler(toolCtx);
+    const rVerts = sweepModel.convertShapeToVertices('rect', { x: '0', y: '0', width: '100', height: '100' });
+    const dVerts = sweepModel.convertShapeToVertices('line', { x1: '0', y1: '0', x2: '100', y2: '100' });
+    sweepModel.elements.push({
+      id: 'r_swp',
+      tagName: 'rect',
+      shapeType: 'rect',
+      isParametric: true,
+      attributes: { id: 'r_swp', x: '0', y: '0', width: '100', height: '100', fill: 'none' },
+      vertices: rVerts,
+      isClosed: true,
+    });
+    sweepModel.elements.push({
+      id: 'd_swp',
+      tagName: 'line',
+      shapeType: 'line',
+      isParametric: true,
+      attributes: { id: 'd_swp', x1: '0', y1: '0', x2: '100', y2: '100', fill: 'none' },
+      vertices: dVerts,
+      isClosed: false,
+    });
+
+    handler.activate();
+
+    // 1. Pointer Down in upper triangle (20, 10)
+    handler.onPointerDown({ button: 0 } as PointerEvent, { x: 20, y: 10 });
+    assert(handler.sweptRegions.size === 1, 'Drag sweep initializes with region under pointerdown');
+
+    // 2. Pointer Move (drag) crossing diagonal into lower triangle (10, 20)
+    handler.onPointerMove({ button: 0, buttons: 1 } as PointerEvent, { x: 10, y: 20 });
+    assert(handler.isSweeping === true, 'Handler enters isSweeping mode upon displacement');
+    assert(handler.sweptRegions.size === 2, 'Sweep accumulated both adjacent regions (got 2)');
+    assert(handler.hoverRegionD !== null, 'Multi-region combined preview overlay generated');
+
+    // 3. Pointer Up
+    handler.onPointerUp({ button: 0 } as PointerEvent, { x: 10, y: 20 });
+    assert(sweepModel.elements.length === 3, 'Sweep release welded all accumulated regions into 1 unified element');
+    assert(undoCount === 1, 'Drag sweep committed in a single atomic undo step');
+    const sweepResult = sweepModel.elements[2];
+    const mCount = (sweepResult.attributes.d.match(/M/g) || []).length;
+    assert(mCount === 1, 'Sweep union dissolved common diagonal seam into single continuous boundary');
+    assert(handler.sweptRegions.size === 0, 'Swept regions cleared after release');
+  }
+
+  // =========================================================================
+  // TEST SUITE 10: Common Segment Elimination in Boolean Union
+  // =========================================================================
+  {
+    const piece1Verts: any[] = [
+      { id: 'p1_0', x: 0, y: 0, command: 'M', nodeType: 'sharp' },
+      { id: 'p1_1', x: 50, y: 0, command: 'L', nodeType: 'sharp' },
+      { id: 'p1_2', x: 50, y: 50, command: 'L', nodeType: 'sharp' },
+      { id: 'p1_3', x: 0, y: 50, command: 'L', nodeType: 'sharp' },
+    ];
+    const piece1: VectorElement = {
+      id: 'piece_1',
+      tagName: 'path',
+      shapeType: 'path',
+      attributes: { id: 'piece_1', d: 'M 0 0 L 50 0 L 50 50 L 0 50 Z', fill: '#6366f1' },
+      vertices: piece1Verts,
+      isClosed: true,
+    };
+
+    const piece2Verts: any[] = [
+      { id: 'p2_0', x: 50, y: 0, command: 'M', nodeType: 'sharp' },
+      { id: 'p2_1', x: 100, y: 0, command: 'L', nodeType: 'sharp' },
+      { id: 'p2_2', x: 100, y: 50, command: 'L', nodeType: 'sharp' },
+      { id: 'p2_3', x: 50, y: 50, command: 'L', nodeType: 'sharp' },
+    ];
+    const piece2: VectorElement = {
+      id: 'piece_2',
+      tagName: 'path',
+      shapeType: 'path',
+      attributes: { id: 'piece_2', d: 'M 50 0 L 100 0 L 100 50 L 50 50 Z', fill: '#6366f1' },
+      vertices: piece2Verts,
+      isClosed: true,
+    };
+
+    const testModel = new VectorModel();
+    const united = BooleanOperations.union([piece1, piece2], testModel);
+    assert(united !== null, 'Contiguous pieces with shared edge union successfully');
+    const mCount = (united!.attributes.d.match(/M/g) || []).length;
+    assert(mCount === 1, 'United contiguous pieces produce exactly 1 outer contour without internal seam');
+  }
+
   console.log(`\nSmart Fill Tests complete: ${passed} passed, ${failed} failed.\n`);
   return failed === 0;
 }

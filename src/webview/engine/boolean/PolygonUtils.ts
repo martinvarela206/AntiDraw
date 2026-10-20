@@ -230,8 +230,20 @@ export class PolygonUtils {
     const vertices: PathVertex[] = [];
 
     mp.forEach((polygon) => {
-      polygon.forEach((ring) => {
+      polygon.forEach((ring, ringIdx) => {
         if (ring.length < 3) return;
+
+        // Discard sliver micro-holes (< 2.0 px^2) caused by discretization or shared seams
+        if (ringIdx > 0) {
+          let holeArea = 0;
+          for (let k = 0; k < ring.length; k++) {
+            const nextK = (k + 1) % ring.length;
+            holeArea += ring[k][0] * ring[nextK][1] - ring[nextK][0] * ring[k][1];
+          }
+          if (Math.abs(holeArea) / 2 < 2.0) {
+            return;
+          }
+        }
 
         // Simplify consecutive duplicate points
         const cleanRing: Pair[] = [];

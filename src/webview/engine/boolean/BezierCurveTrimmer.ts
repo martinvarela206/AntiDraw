@@ -227,6 +227,39 @@ export class BezierCurveTrimmer {
             pt: { x: segA.p0.x + tA * dxA, y: segA.p0.y + tA * dyA },
           });
         }
+      } else {
+        // Collinear or parallel line segments: evaluate line-line overlap
+        const lenSqA = dxA * dxA + dyA * dyA;
+        if (lenSqA > 1e-6) {
+          const lenA = Math.sqrt(lenSqA);
+          const dist1 = Math.abs(dxA * (segA.p0.y - segB.p0.y) - dyA * (segA.p0.x - segB.p0.x)) / lenA;
+          const dist2 = Math.abs(dxA * (segA.p0.y - segB.p3.y) - dyA * (segA.p0.x - segB.p3.x)) / lenA;
+          if (dist1 < 0.35 && dist2 < 0.35) {
+            const t1 = ((segB.p0.x - segA.p0.x) * dxA + (segB.p0.y - segA.p0.y) * dyA) / lenSqA;
+            const t2 = ((segB.p3.x - segA.p0.x) * dxA + (segB.p3.y - segA.p0.y) * dyA) / lenSqA;
+            const startA = Math.max(0, Math.min(t1, t2));
+            const endA = Math.min(1, Math.max(t1, t2));
+            if (endA - startA > 1e-3) {
+              const dt = t2 - t1;
+              if (startA >= 1e-4 && startA <= 1 - 1e-4) {
+                const u = Math.abs(dt) > 1e-6 ? (startA - t1) / dt : 0;
+                results.push({
+                  tA: startA,
+                  tB: Math.max(0, Math.min(1, u)),
+                  pt: { x: segA.p0.x + startA * dxA, y: segA.p0.y + startA * dyA },
+                });
+              }
+              if (endA >= 1e-4 && endA <= 1 - 1e-4) {
+                const u = Math.abs(dt) > 1e-6 ? (endA - t1) / dt : 1;
+                results.push({
+                  tA: endA,
+                  tB: Math.max(0, Math.min(1, u)),
+                  pt: { x: segA.p0.x + endA * dxA, y: segA.p0.y + endA * dyA },
+                });
+              }
+            }
+          }
+        }
       }
       return results;
     }
@@ -385,8 +418,14 @@ export class BezierCurveTrimmer {
       }
     }
 
+    // Check if shapes share contiguous boundaries even if totalIntersections === 0
+    let hasSharedBoundary = false;
+    if (op === 'union') {
+      hasSharedBoundary = targetSegs.some((sA) => cutterSegs.some((sB) => this.areSegmentsCoincident(sA, sB)));
+    }
+
     // Handle non-intersecting shapes
-    if (totalIntersections === 0) {
+    if (totalIntersections === 0 && !hasSharedBoundary) {
       const sampleTargetPt = { x: targetEl.vertices[0].x, y: targetEl.vertices[0].y };
       const sampleCutterPt = { x: cutterEl.vertices[0].x, y: cutterEl.vertices[0].y };
 
@@ -496,11 +535,28 @@ export class BezierCurveTrimmer {
     let keptCutterSegs: CurveSegment[] = [];
 
     if (op === 'union') {
-      keptTargetSegs = targetSubsegs.filter((seg) => {
+      // Eliminate coincident / shared boundary segments between contiguous shapes
+      const targetCoincident = new Set<number>();
+      const cutterCoincident = new Set<number>();
+
+      for (let i = 0; i < targetSubsegs.length; i++) {
+        for (let j = 0; j < cutterSubsegs.length; j++) {
+          if (cutterCoincident.has(j)) continue;
+          if (this.areSegmentsCoincident(targetSubsegs[i], cutterSubsegs[j])) {
+            targetCoincident.add(i);
+            cutterCoincident.add(j);
+            break;
+          }
+        }
+      }
+
+      keptTargetSegs = targetSubsegs.filter((seg, idx) => {
+        if (targetCoincident.has(idx)) return false;
         const mid = this.evalSegment(seg, 0.5);
         return !this.isPointInPolygonRing(mid, cutterRing);
       });
-      keptCutterSegs = cutterSubsegs.filter((seg) => {
+      keptCutterSegs = cutterSubsegs.filter((seg, idx) => {
+        if (cutterCoincident.has(idx)) return false;
         const mid = this.evalSegment(seg, 0.5);
         return !this.isPointInPolygonRing(mid, targetRing);
       });
@@ -664,12 +720,35 @@ export class BezierCurveTrimmer {
   }
 
   /**
+   * Evaluates whether two subsegments share coincident geometry along an edge.
+   */
+  public static areSegmentsCoincident(segA: CurveSegment, segB: CurveSegment): boolean {
+    const dOpp0 = Math.hypot(segA.p0.x - segB.p3.x, segA.p0.y - segB.p3.y);
+    const dOpp1 = Math.hypot(segA.p3.x - segB.p0.x, segA.p3.y - segB.p0.y);
+    const dSame0 = Math.hypot(segA.p0.x - segB.p0.x, segA.p0.y - segB.p0.y);
+    const dSame1 = Math.hypot(segA.p3.x - segB.p3.x, segA.p3.y - segB.p3.y);
+
+    const endpointsMatch = (dOpp0 < 0.35 && dOpp1 < 0.35) || (dSame0 < 0.35 && dSame1 < 0.35);
+    if (!endpointsMatch) return false;
+
+    const midA = this.evalSegment(segA, 0.5);
+    const midB = this.evalSegment(segB, 0.5);
+    return Math.hypot(midA.x - midB.x, midA.y - midB.y) < 0.35;
+  }
+
+  /**
    * Union / Soldar: Combines 2 or more shapes into a single unified outline,
    * preserving exact Bézier curves and minimal node counts.
    */
   public static union(elements: VectorElement[], model: VectorModel): VectorElement | null {
     if (!elements || elements.length === 0) return null;
     if (elements.length === 1) return elements[0];
+
+    // For multi-element unions (N >= 3), PolygonBooleanService performs simultaneous N-way planar union
+    if (elements.length > 2) {
+      const polyResult = PolygonBooleanService.union(elements, model);
+      if (polyResult) return polyResult;
+    }
 
     try {
       let current = elements[0];

@@ -88,10 +88,7 @@ export class PolygonBooleanService {
     const geoms: MultiPolygon[] = elements.map((el) => this.elementToGeom(el)).filter((g) => g.length > 0);
     if (geoms.length === 0) return null;
 
-    let result = geoms[0];
-    for (let i = 1; i < geoms.length; i++) {
-      result = polygonClipping.union(result, geoms[i]);
-    }
+    const result = polygonClipping.union(geoms[0], ...geoms.slice(1));
 
     const id = `union_${Date.now().toString(36)}`;
     return PolygonUtils.multiPolygonToElement(result, id, elements[0].attributes, model);
