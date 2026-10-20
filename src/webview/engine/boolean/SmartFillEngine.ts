@@ -91,18 +91,11 @@ export class SmartFillEngine {
   }
 
   /**
-   * Detects the minimal enclosed region containing point P and returns a new independent filled VectorElement.
+   * Finds the minimal enclosed region containing point P from an already detected list of regions.
    */
-  public static fillRegionAtPoint(
-    pt: Point,
-    elements: VectorElement[],
-    model: VectorModel,
-    options?: SmartFillOptions
-  ): VectorElement | null {
-    const regions = this.detectAllRegions(elements, model);
-    if (regions.length === 0) return null;
+  public static findRegionAtPoint(pt: Point, regions: EnclosedRegion[]): EnclosedRegion | null {
+    if (!regions || regions.length === 0) return null;
 
-    // Find candidate regions containing the click point
     const matchingRegions: EnclosedRegion[] = [];
     for (const region of regions) {
       // Fast AABB pre-check
@@ -124,7 +117,27 @@ export class SmartFillEngine {
 
     // Pick the innermost, minimal area region
     matchingRegions.sort((a, b) => a.area - b.area);
-    const targetRegion = matchingRegions[0];
+    return matchingRegions[0];
+  }
+
+  /**
+   * Detects the minimal enclosed region containing point P and returns a new independent filled VectorElement.
+   */
+  public static fillRegionAtPoint(
+    pt: Point,
+    elements: VectorElement[],
+    model: VectorModel,
+    options?: SmartFillOptions,
+    precomputedRegions?: EnclosedRegion[]
+  ): VectorElement | null {
+    const regions =
+      precomputedRegions && precomputedRegions.length > 0
+        ? precomputedRegions
+        : this.detectAllRegions(elements, model);
+    if (regions.length === 0) return null;
+
+    const targetRegion = this.findRegionAtPoint(pt, regions);
+    if (!targetRegion) return null;
 
     // Convert region ring to fitted vertices and SVG path
     return this.regionToVectorElement(targetRegion, model, options);
@@ -630,13 +643,9 @@ export class SmartFillEngine {
   }
 
   /**
-   * Converts an EnclosedRegion into a fully formed VectorElement with Bézier fitting.
+   * Converts an EnclosedRegion into fitted PathVertex array.
    */
-  private static regionToVectorElement(
-    region: EnclosedRegion,
-    model: VectorModel,
-    options?: SmartFillOptions
-  ): VectorElement {
+  public static regionToVertices(region: EnclosedRegion): PathVertex[] {
     const cleanPairs: Pair[] = [];
     for (let i = 0; i < region.ring.length; i++) {
       const p = region.ring[i];
@@ -667,6 +676,26 @@ export class SmartFillEngine {
       fittedVertices[0].command = 'M';
     }
 
+    return fittedVertices;
+  }
+
+  /**
+   * Compiles the SVG path 'd' string for an enclosed region.
+   */
+  public static compileRegionD(region: EnclosedRegion, model: VectorModel): string {
+    const vertices = this.regionToVertices(region);
+    return model.compilePathD(vertices, true);
+  }
+
+  /**
+   * Converts an EnclosedRegion into a fully formed VectorElement with Bézier fitting.
+   */
+  private static regionToVectorElement(
+    region: EnclosedRegion,
+    model: VectorModel,
+    options?: SmartFillOptions
+  ): VectorElement {
+    const fittedVertices = this.regionToVertices(region);
     const id = `smart_fill_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
     const d = model.compilePathD(fittedVertices, true);
 

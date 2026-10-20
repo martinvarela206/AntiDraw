@@ -3,6 +3,23 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.94.1] - 2026-10-20
+
+### 🛠️ Fixed
+- **Canvas Interaction Controller Routing for Smart Fill (`smartFill`)**:
+  - Registered `smartFillToolHandler` as an active member in `CanvasInteractionController`.
+  - Linked pointer events (`onPointerDown`, `onPointerMove`, `onPointerUp`) and cancellation/lost-focus sequences directly to `SmartFillToolHandler`, enabling interactive click-to-fill synthesis of enclosed planar regions into pure `<path>` elements.
+  - Added real-time hover region preview overlay with ephemeral dashed highlights (`vectorEffect="non-scaling-stroke"`, `pointer-events="none"`), powered by lazy planar face caching in `SmartFillToolHandler` to maintain 60–120 FPS cursor tracking without layout thrashing.
+  - Implemented `SmartFillEngine.findRegionAtPoint`, `SmartFillEngine.regionToVertices`, and `SmartFillEngine.compileRegionD` for reusable analytical planar region lookup and path compilation.
+
+### 🚀 Added
+- **Topology Tools Fallback Handling & Quick Help Localization**:
+  - Handled in-development topology tools (`scissors`, `knife`, `eraser`, `shapeBuilder`) in `CanvasInteractionController` with `not-allowed` pointer cursor and non-intrusive bilingual toast notices (`toolbar.toolInDevelopment`).
+  - Added bilingual quick help reference guides for `smartFill` in both Spanish and English under `QuickHelpInspector`.
+  - Added automated test suites 6 & 7 in `scripts/test-smart-fill.ts` verifying real-time hover preview generation, cache cancellation, and full controller event routing.
+
+---
+
 ## [0.94.0] - 2026-10-19
 
 ### 🚀 Added

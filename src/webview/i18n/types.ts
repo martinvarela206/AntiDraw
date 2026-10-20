@@ -85,6 +85,7 @@ export interface Translations {
     canvas: string;
     drawerCutTooltip: string;
     drawerConstructTooltip: string;
+    toolInDevelopment: string;
   };
 
   // Status Bar

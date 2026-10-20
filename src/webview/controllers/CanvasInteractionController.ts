@@ -11,6 +11,7 @@ import { ShapeToolHandler } from '../tools/ShapeToolHandler.js';
 import { PolylineToolHandler } from '../tools/PolylineToolHandler.js';
 import { PenToolHandler } from '../tools/PenToolHandler.js';
 import { NodeToolHandler } from '../tools/NodeToolHandler.js';
+import { SmartFillToolHandler } from '../tools/SmartFillToolHandler.js';
 import { NodeCatalogService } from '../engine/selection/NodeCatalogService.js';
 import { Toolbar } from '../ui/Toolbar.js';
 import { RulerView } from '../ui/RulerView.js';
@@ -20,6 +21,7 @@ import { ToolSuite } from '../tools/ToolFactory.js';
 import { ToastNotification } from '../ui/ToastNotification.js';
 import { VsCodeBridge } from '../bridge/VsCodeBridge.js';
 import { ToolIcons } from '../icons/ToolIcons.js';
+import { I18nService } from '../i18n/index.js';
 
 export interface CanvasInteractionContext {
   model: VectorModel;
@@ -60,6 +62,7 @@ export class CanvasInteractionController implements CanvasViewDelegate {
   private get polylineToolHandler(): PolylineToolHandler { return this.ctx.tools.polylineToolHandler; }
   private get penToolHandler(): PenToolHandler { return this.ctx.tools.penToolHandler; }
   private get nodeToolHandler(): NodeToolHandler { return this.ctx.tools.nodeToolHandler; }
+  private get smartFillToolHandler(): SmartFillToolHandler { return this.ctx.tools.smartFillToolHandler; }
 
   constructor(private ctx: CanvasInteractionContext) {}
 
@@ -94,7 +97,8 @@ export class CanvasInteractionController implements CanvasViewDelegate {
       this.nodeToolHandler.isDragging ||
       this.shapeToolHandler.shapeStartPt !== null ||
       session.activeHandle !== null ||
-      (toolbar?.activeTool === 'pen' && this.penToolHandler.isDragging)
+      (toolbar?.activeTool === 'pen' && this.penToolHandler.isDragging) ||
+      (toolbar?.activeTool === 'smartFill' && this.smartFillToolHandler.lastDownPt !== null)
     ) {
       this.cancelCurrentAction();
     }
@@ -256,6 +260,15 @@ export class CanvasInteractionController implements CanvasViewDelegate {
         }
       } else if (activeTool === 'pen') {
         if (this.penToolHandler.onPointerDown(e, pt)) return;
+      } else if (activeTool === 'smartFill') {
+        if (this.smartFillToolHandler.onPointerDown(e, pt)) return;
+      } else if (['scissors', 'knife', 'eraser', 'shapeBuilder'].includes(activeTool)) {
+        ToastNotification.show({
+          message: I18nService.t('toolbar.toolInDevelopment') || 'Herramienta en desarrollo activo (Próximamente)',
+          type: 'info',
+          durationMs: 3000,
+        });
+        return;
       } else if (activeTool === 'zoom') {
         const delta = e.altKey ? -0.1 : 0.1;
         this.ctx.getViewportCtrl()?.zoomAtClientPoint(e.clientX, e.clientY, delta);
@@ -268,15 +281,17 @@ export class CanvasInteractionController implements CanvasViewDelegate {
 
   public onPointerMove(e: PointerEvent, pt: Point): void {
     this.safeExecute('pointermove', e, () => {
-      const coordsEl = document.getElementById('status-coords');
-      if (coordsEl) {
-        const vb = this.ctx.model.getViewBoxBounds();
-        const cfg = this.ctx.canvasMgr.rulerConfig;
-        const originX = vb.minX + (cfg.originX || 0);
-        const originY = vb.minY + (cfg.originY || 0);
-        const relX = Math.round((pt.x - originX) / (cfg.scale || 1));
-        const relY = Math.round((pt.y - originY) / (cfg.scale || 1));
-        coordsEl.innerText = `X: ${relX}, Y: ${relY}`;
+      if (typeof document !== 'undefined' && typeof document.getElementById === 'function') {
+        const coordsEl = document.getElementById('status-coords');
+        if (coordsEl) {
+          const vb = this.ctx.model.getViewBoxBounds();
+          const cfg = this.ctx.canvasMgr.rulerConfig;
+          const originX = vb.minX + (cfg.originX || 0);
+          const originY = vb.minY + (cfg.originY || 0);
+          const relX = Math.round((pt.x - originX) / (cfg.scale || 1));
+          const relY = Math.round((pt.y - originY) / (cfg.scale || 1));
+          coordsEl.innerText = `X: ${relX}, Y: ${relY}`;
+        }
       }
 
       const rulerView = this.ctx.getRulerView();
@@ -333,6 +348,12 @@ export class CanvasInteractionController implements CanvasViewDelegate {
       } else if (activeTool === 'pen') {
         canvasView?.setCursor('crosshair');
         this.penToolHandler.onPointerMove(e, pt);
+        return;
+      } else if (activeTool === 'smartFill') {
+        canvasView?.setCursor('crosshair');
+        if (this.smartFillToolHandler.onPointerMove(e, pt)) return;
+      } else if (['scissors', 'knife', 'eraser', 'shapeBuilder'].includes(activeTool)) {
+        canvasView?.setCursor('not-allowed');
         return;
       } else if (session.activeHandle === 'shape') {
         this.shapeToolHandler.onPointerMove(e, pt);
@@ -418,6 +439,12 @@ export class CanvasInteractionController implements CanvasViewDelegate {
       if (activeTool === 'pen') {
         session.isDragging = false;
         if (this.penToolHandler.onPointerUp(e, pt)) return;
+      }
+
+      // Smart Fill Tool Delegation
+      if (activeTool === 'smartFill') {
+        session.isDragging = false;
+        if (this.smartFillToolHandler.onPointerUp(e, pt)) return;
       }
 
       // Shape Tool Delegation

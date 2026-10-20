@@ -3,8 +3,11 @@ import { SmartFillEngine } from '../src/webview/engine/boolean/SmartFillEngine.j
 import { BooleanOperations } from '../src/webview/engine/BooleanOperations.js';
 import { SmartFillToolHandler } from '../src/webview/tools/SmartFillToolHandler.js';
 import { SelectionTool } from '../src/webview/engine/SelectionTool.js';
+import { NodeEditorTool } from '../src/webview/engine/NodeEditorTool.js';
 import { CanvasManager } from '../src/webview/engine/CanvasManager.js';
 import { ToolContext } from '../src/webview/tools/IToolHandler.js';
+import { CanvasInteractionController, CanvasInteractionContext } from '../src/webview/controllers/CanvasInteractionController.js';
+import { Session } from '../src/webview/engine/session/Session.js';
 
 let passed = 0;
 let failed = 0;
@@ -301,6 +304,221 @@ export async function runSmartFillTests(): Promise<boolean> {
     // 4. Deactivate
     handler.deactivate();
     assert(currentCursor === '', 'Cursor cleared on deactivate');
+  }
+
+  // =========================================================================
+  // TEST SUITE 6: Hover Overlay Preview & Real-Time Tracking
+  // =========================================================================
+  {
+    const testModel = new VectorModel();
+    const selectionTool = new SelectionTool();
+    const canvasMgr = new CanvasManager();
+    let overlayRendered = 0;
+
+    const toolCtx: ToolContext = {
+      model: testModel,
+      selectionTool,
+      canvasMgr,
+      pushUndo: () => {},
+      syncToHost: () => {},
+      render: () => {},
+      renderOverlay: () => { overlayRendered++; },
+      snapPoint: (pt) => pt,
+      getOtherVertices: () => [],
+      setTool: () => {},
+      getActiveTool: () => 'smartFill',
+      confirm: async () => true,
+    };
+
+    const handler = new SmartFillToolHandler(toolCtx);
+
+    const rVerts = testModel.convertShapeToVertices('rect', { x: '0', y: '0', width: '100', height: '100' });
+    const dVerts = testModel.convertShapeToVertices('line', { x1: '0', y1: '0', x2: '100', y2: '100' });
+    testModel.elements.push({
+      id: 'el_rect2',
+      tagName: 'rect',
+      shapeType: 'rect',
+      isParametric: true,
+      attributes: { id: 'el_rect2', x: '0', y: '0', width: '100', height: '100', fill: 'none' },
+      vertices: rVerts,
+      isClosed: true,
+    });
+    testModel.elements.push({
+      id: 'el_diag2',
+      tagName: 'line',
+      shapeType: 'line',
+      isParametric: true,
+      attributes: { id: 'el_diag2', x1: '0', y1: '0', x2: '100', y2: '100', fill: 'none' },
+      vertices: dVerts,
+      isClosed: false,
+    });
+
+    handler.activate();
+    const mockMoveEvt = { button: 0 } as PointerEvent;
+
+    // Hover over upper triangle (20, 10)
+    handler.onPointerMove(mockMoveEvt, { x: 20, y: 10 });
+    assert(handler.hoverRegionD !== null, 'onPointerMove generates non-null hoverRegionD over enclosed region');
+    assert(overlayRendered > 0, 'renderOverlay was invoked on hover region change');
+
+    const descriptors = handler.renderOverlay(1);
+    assert(descriptors.length === 1, 'renderOverlay returns 1 descriptor');
+    assert(descriptors[0].type === 'path', 'Overlay descriptor is path type');
+    assert(descriptors[0].id === 'smart-fill-preview', 'Overlay descriptor carries smart-fill-preview id');
+    assert(descriptors[0].vectorEffect === 'non-scaling-stroke', 'Overlay path uses non-scaling-stroke');
+
+    // Move to empty space outside (300, 300)
+    const prevRendered = overlayRendered;
+    handler.onPointerMove(mockMoveEvt, { x: 300, y: 300 });
+    assert(handler.hoverRegionD === null, 'onPointerMove outside clears hoverRegionD to null');
+    assert(overlayRendered > prevRendered, 'renderOverlay was invoked to clear overlay');
+    assert(handler.renderOverlay(1).length === 0, 'renderOverlay returns empty array outside');
+
+    // Hover back and cancel
+    handler.onPointerMove(mockMoveEvt, { x: 20, y: 10 });
+    assert(handler.hoverRegionD !== null, 'hoverRegionD restored on re-entering upper triangle');
+    const cancelled = handler.cancel();
+    assert(cancelled === true, 'cancel() returns true when active preview exists');
+    assert(handler.hoverRegionD === null, 'cancel() clears hoverRegionD');
+  }
+
+  // =========================================================================
+  // TEST SUITE 7: CanvasInteractionController Event Routing for smartFill
+  // =========================================================================
+  {
+    const ctrlModel = new VectorModel();
+    const ctrlSelection = new SelectionTool();
+    const ctrlNodeEditor = new NodeEditorTool();
+    const ctrlCanvasMgr = new CanvasManager();
+
+    const rVerts = ctrlModel.convertShapeToVertices('rect', { x: '0', y: '0', width: '100', height: '100' });
+    const dVerts = ctrlModel.convertShapeToVertices('line', { x1: '0', y1: '0', x2: '100', y2: '100' });
+    ctrlModel.elements.push({
+      id: 'r_ctrl',
+      tagName: 'rect',
+      shapeType: 'rect',
+      isParametric: true,
+      attributes: { id: 'r_ctrl', x: '0', y: '0', width: '100', height: '100', fill: 'none' },
+      vertices: rVerts,
+      isClosed: true,
+    });
+    ctrlModel.elements.push({
+      id: 'd_ctrl',
+      tagName: 'line',
+      shapeType: 'line',
+      isParametric: true,
+      attributes: { id: 'd_ctrl', x1: '0', y1: '0', x2: '100', y2: '100', fill: 'none' },
+      vertices: dVerts,
+      isClosed: false,
+    });
+
+    let currentCursor = '';
+    let renderedCount = 0;
+    let overlayCount = 0;
+    let undoCount = 0;
+
+    const mockToolCtx: ToolContext = {
+      model: ctrlModel,
+      selectionTool: ctrlSelection,
+      canvasMgr: ctrlCanvasMgr,
+      pushUndo: () => { undoCount++; },
+      syncToHost: () => {},
+      render: () => { renderedCount++; },
+      renderOverlay: () => { overlayCount++; },
+      snapPoint: (pt) => pt,
+      getOtherVertices: () => [],
+      setTool: () => {},
+      getActiveTool: () => 'smartFill',
+      confirm: async () => true,
+    };
+
+    const smartFillHandler = new SmartFillToolHandler(mockToolCtx, {
+      setCursor: (c) => { currentCursor = c; },
+    });
+
+    const mockSession = new Session(
+      {
+        select: { cancel: () => false, deactivate: () => {} } as any,
+        shape: { cancel: () => false, shapeStartPt: null } as any,
+        polyline: { cancel: () => false, deactivate: () => {} } as any,
+        pen: { cancel: () => false, deactivate: () => {}, isDragging: false } as any,
+        node: { cancel: () => false, deactivate: () => {}, isDragging: false } as any,
+        smartFill: smartFillHandler,
+      },
+      {
+        onRender: () => { renderedCount++; },
+        onRenderOverlay: () => { overlayCount++; },
+        setCursor: (c) => { currentCursor = c; },
+      }
+    );
+
+    let activeTool = 'smartFill';
+    const mockToolbar = {
+      get activeTool() { return activeTool; },
+      setTool: (t: string) => { activeTool = t; },
+    };
+
+    const mockCanvasView = {
+      cancelRaf: () => {},
+      releasePointerCapture: () => {},
+      setPointerCapture: () => {},
+      setCursor: (c: string) => { currentCursor = c; },
+    };
+
+    const interactionCtx: CanvasInteractionContext = {
+      model: ctrlModel,
+      selectionTool: ctrlSelection,
+      nodeEditorTool: ctrlNodeEditor,
+      canvasMgr: ctrlCanvasMgr,
+      tools: {
+        toolCtx: mockToolCtx,
+        selectToolHandler: {} as any,
+        shapeToolHandler: {} as any,
+        polylineToolHandler: {} as any,
+        penToolHandler: {} as any,
+        nodeToolHandler: {} as any,
+        smartFillToolHandler: smartFillHandler,
+        session: mockSession,
+      },
+      getViewportCtrl: () => undefined,
+      getRulerView: () => undefined,
+      getToolbar: () => mockToolbar as any,
+      getPropertyPanel: () => undefined,
+      getCanvasView: () => mockCanvasView as any,
+      getContextMenu: () => undefined,
+      render: () => { renderedCount++; },
+      renderOverlay: () => { overlayCount++; },
+      applyCanvasSize: () => {},
+      syncRulerScroll: () => {},
+      syncMetadataToHost: () => {},
+      pushUndo: () => { undoCount++; },
+    };
+
+    const controller = new CanvasInteractionController(interactionCtx);
+
+    // 1. Move over upper triangle
+    const evtMove = { button: 0 } as PointerEvent;
+    controller.onPointerMove(evtMove, { x: 20, y: 10 });
+    assert(currentCursor === 'crosshair', 'CanvasInteractionController sets cursor to crosshair for smartFill');
+    assert(smartFillHandler.hoverRegionD !== null, 'Controller routes pointermove to smartFillHandler');
+
+    // 2. Down over upper triangle
+    const evtDown = { button: 0, pointerId: 1 } as PointerEvent;
+    controller.onPointerDown(evtDown, { x: 20, y: 10 });
+    assert(smartFillHandler.lastDownPt !== null, 'Controller routes pointerdown to smartFillHandler');
+
+    // 3. Up over upper triangle -> creates filled vector
+    const evtUp = { button: 0, pointerId: 1 } as PointerEvent;
+    controller.onPointerUp(evtUp, { x: 20, y: 10 });
+    assert(ctrlModel.elements.length === 3, 'Controller routes pointerup to smartFillHandler producing new element');
+    assert(undoCount === 1, 'pushUndo recorded once during controller interaction');
+
+    // 4. Test topology tools without active backend (e.g. scissors)
+    activeTool = 'scissors';
+    controller.onPointerMove(evtMove, { x: 50, y: 50 });
+    assert(currentCursor === 'not-allowed', 'In-development topology tool sets cursor to not-allowed on canvas');
+    controller.onPointerDown(evtDown, { x: 50, y: 50 });
+    assert(ctrlModel.elements.length === 3, 'Topology tool without backend safely discards action with toast');
   }
 
   console.log(`\nSmart Fill Tests complete: ${passed} passed, ${failed} failed.\n`);

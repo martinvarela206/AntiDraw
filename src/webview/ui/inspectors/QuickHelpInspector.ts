@@ -231,6 +231,17 @@ export class QuickHelpInspector {
         { keys: ['Supr / Backspace'], description: 'Elimina la línea de guía seleccionada' },
       ],
     },
+    smartFill: {
+      title: 'Relleno Inteligente',
+      toolId: 'smartFill',
+      icon: ToolIcons.smartFillTool,
+      shortcuts: [
+        { keys: ['Clic'], description: 'Detecta la región cerrada delimitada por trazados superpuestos y genera un nuevo vector <path>' },
+        { keys: ['Hover'], description: 'Previsualiza en tiempo real la región poligonal cerrada que se rellenará' },
+        { keys: ['Selección'], description: 'Prioriza los elementos seleccionados; si no hay selección, evalúa todo el lienzo' },
+        { keys: ['Esc'], description: 'Cancela la previsualización y resetea el estado de interacción' },
+      ],
+    },
   };
 
   private static readonly TOOL_HELP_MAP_EN: Record<string, ToolHelpConfig> = {
@@ -426,6 +437,17 @@ export class QuickHelpInspector {
         { keys: ['Drag corner'], description: 'Sets custom coordinate origin (0,0)' },
         { keys: ['Double click guide'], description: 'Opens inspector to configure position and angle' },
         { keys: ['Del / Backspace'], description: 'Deletes selected guide line' },
+      ],
+    },
+    smartFill: {
+      title: 'Smart Fill Tool',
+      toolId: 'smartFill',
+      icon: ToolIcons.smartFillTool,
+      shortcuts: [
+        { keys: ['Click'], description: 'Detects the enclosed region bounded by overlapping paths and generates a new vector <path>' },
+        { keys: ['Hover'], description: 'Real-time preview of the candidate enclosed region before clicking' },
+        { keys: ['Selection'], description: 'Prioritizes selected elements; falls back to all canvas elements if none selected' },
+        { keys: ['Esc'], description: 'Cancels the active region preview and resets interaction state' },
       ],
     },
   };

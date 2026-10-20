@@ -115,6 +115,7 @@ export async function runToolbarTopologyDrawersTests(): Promise<boolean> {
     createElement: (tag: string) => createMockElement(tag),
     querySelectorAll: (selector: string) => container.querySelectorAll(selector),
     querySelector: (selector: string) => container.querySelector(selector),
+    getElementById: (_id: string) => null,
   };
   const windowListeners: Record<string, Function[]> = {};
   (globalThis as any).window = {

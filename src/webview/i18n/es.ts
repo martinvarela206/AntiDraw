@@ -82,6 +82,7 @@ export const es: Translations = {
     canvas: 'Lienzo y ViewBox',
     drawerCutTooltip: '[Clic largo o botón derecho para alternar grupo de corte]',
     drawerConstructTooltip: '[Clic largo o botón derecho para alternar grupo de construcción]',
+    toolInDevelopment: 'Herramienta en desarrollo activo (Próximamente)',
   },
 
   statusbar: {

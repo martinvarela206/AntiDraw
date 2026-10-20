@@ -82,6 +82,7 @@ export const en: Translations = {
     canvas: 'Canvas & ViewBox',
     drawerCutTooltip: '[Long-click or right-click to switch cutting group]',
     drawerConstructTooltip: '[Long-click or right-click to switch construction group]',
+    toolInDevelopment: 'Tool under active development (Coming Soon)',
   },
 
   statusbar: {
