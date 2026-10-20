@@ -38,7 +38,7 @@ Whether you discovered AntiDraw through GitHub, VS Code Marketplace, or Open VSX
 ---
 
 > [!NOTE]
-> **Project Status: Public Beta (v0.92.0)**  
+> **Project Status: Public Beta (v0.94.2)**  
 > AntiDraw is under active, continuous development. While vector editing, Bézier curves, snapping, and boolean topology are fully functional and stable, you may encounter occasional edge cases.  
 > Found a bug or have a feature request? Please [open an issue on GitHub](https://github.com/martinvarela206/AntiDraw/issues) — your feedback directly shapes upcoming releases!
 

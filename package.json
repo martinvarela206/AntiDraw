@@ -92,7 +92,7 @@
     "bench": "node scripts/run-benchmarks.js",
     "package": "pnpm run build && vsce package --no-dependencies",
     "publish:marketplace": "vsce publish --no-dependencies",
-    "publish:openvsx": "npx -y ovsx publish antidraw-0.93.3.vsix"
+    "publish:openvsx": "npx -y ovsx publish antidraw-0.94.2.vsix"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
