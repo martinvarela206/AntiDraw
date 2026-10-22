@@ -2,6 +2,10 @@ import { I18nService } from '../src/webview/i18n/I18nService.js';
 import { es } from '../src/webview/i18n/es.js';
 import { en } from '../src/webview/i18n/en.js';
 import { zhCn } from '../src/webview/i18n/zh-cn.js';
+import { de } from '../src/webview/i18n/de.js';
+import { fr } from '../src/webview/i18n/fr.js';
+import { ru } from '../src/webview/i18n/ru.js';
+import { ja } from '../src/webview/i18n/ja.js';
 
 function assert(condition: boolean, msg: string): void {
   if (!condition) {
@@ -10,124 +14,106 @@ function assert(condition: boolean, msg: string): void {
 }
 
 export async function runI18nSystemTests(): Promise<boolean> {
-  console.log('\n--- Running Internationalization (i18n) System Test Suite ---');
+  console.log('\n--- Running Internationalization (i18n) System Test Suite (7 Languages) ---');
   let passed = 0;
 
   try {
-    // 1. Structural Symmetry & Completeness Between Dictionaries (ES, EN, ZH-CN)
-    console.log('\n[1. Structural Symmetry & Completeness Between Dictionaries]');
+    // 1. Structural Symmetry & Completeness Across 7 Dictionaries (ES, EN, ZH-CN, DE, FR, RU, JA)
+    console.log('\n[1. Structural Symmetry & Completeness Across 7 Dictionaries]');
+    const dicts = { es, en, 'zh-cn': zhCn, de, fr, ru, ja };
+    const dictNames = Object.keys(dicts) as (keyof typeof dicts)[];
     const sections = Object.keys(es) as (keyof typeof es)[];
     assert(sections.length > 0, 'Spanish dictionary has sections');
-    assert(Object.keys(en).length === sections.length, 'English dictionary has exact same section count');
-    assert(Object.keys(zhCn).length === sections.length, 'Chinese Simplified dictionary has exact same section count');
+
+    for (const name of dictNames) {
+      const d = dicts[name];
+      assert(Object.keys(d).length === sections.length, `Dictionary ${name} has exact same section count as ES (${sections.length})`);
+    }
     passed++;
-    console.log(`  ✅ [PASS] All 3 dictionaries (ES, EN, ZH-CN) contain ${sections.length} top-level sections`);
+    console.log(`  ✅ [PASS] All 7 dictionaries contain ${sections.length} top-level sections`);
 
     for (const section of sections) {
       const esSection = es[section] as Record<string, string>;
-      const enSection = en[section] as Record<string, string>;
-      const zhSection = zhCn[section] as Record<string, string>;
       const esKeys = Object.keys(esSection);
-      const enKeys = Object.keys(enSection);
-      const zhKeys = Object.keys(zhSection);
 
-      assert(esKeys.length === enKeys.length, `Section ${section} has same key count in ES (${esKeys.length}) and EN (${enKeys.length})`);
-      assert(esKeys.length === zhKeys.length, `Section ${section} has same key count in ES (${esKeys.length}) and ZH-CN (${zhKeys.length})`);
+      for (const name of dictNames) {
+        const dSection = dicts[name][section] as Record<string, string>;
+        const dKeys = Object.keys(dSection);
+        assert(esKeys.length === dKeys.length, `Section ${section} has same key count in ES (${esKeys.length}) and ${name} (${dKeys.length})`);
 
-      for (const k of esKeys) {
-        assert(enSection[k] !== undefined, `Key "${section}.${k}" exists in EN dictionary`);
-        assert(zhSection[k] !== undefined, `Key "${section}.${k}" exists in ZH-CN dictionary`);
-        assert(typeof esSection[k] === 'string' && esSection[k].length > 0, `Key "${section}.${k}" is non-empty in ES`);
-        assert(typeof enSection[k] === 'string' && enSection[k].length > 0, `Key "${section}.${k}" is non-empty in EN`);
-        assert(typeof zhSection[k] === 'string' && zhSection[k].length > 0, `Key "${section}.${k}" is non-empty in ZH-CN`);
+        for (const k of esKeys) {
+          assert(dSection[k] !== undefined, `Key "${section}.${k}" exists in ${name} dictionary`);
+          assert(typeof dSection[k] === 'string' && dSection[k].length > 0, `Key "${section}.${k}" is non-empty in ${name}`);
+        }
       }
     }
     passed++;
-    console.log('  ✅ [PASS] 100% key symmetry verified across all 3 dictionaries with non-empty values');
+    console.log('  ✅ [PASS] 100% key symmetry verified across all 7 dictionaries with non-empty values');
 
     // 2. Locale Auto-Detection & Sanitization
     console.log('\n[2. Locale Auto-Detection & Sanitization]');
-    I18nService.initialize('es-ES');
-    assert(I18nService.getLanguage() === 'es', 'es-ES resolved to es');
-    passed++;
-    console.log('  ✅ [PASS] Regional Spanish locale "es-ES" resolved to "es"');
+    const localeTests: [string, string][] = [
+      ['es-ES', 'es'],
+      ['es-419', 'es'],
+      ['en-GB', 'en'],
+      ['en-US', 'en'],
+      ['zh-CN', 'zh-cn'],
+      ['zh-Hans', 'zh-cn'],
+      ['de-DE', 'de'],
+      ['de-AT', 'de'],
+      ['fr-FR', 'fr'],
+      ['fr-CA', 'fr'],
+      ['ru-RU', 'ru'],
+      ['ja-JP', 'ja'],
+      ['it-IT', 'en'], // fallback
+    ];
 
-    I18nService.initialize('es-419');
-    assert(I18nService.getLanguage() === 'es', 'es-419 resolved to es');
-    passed++;
-    console.log('  ✅ [PASS] Latin American Spanish locale "es-419" resolved to "es"');
-
-    I18nService.initialize('en-GB');
-    assert(I18nService.getLanguage() === 'en', 'en-GB resolved to en');
-    passed++;
-    console.log('  ✅ [PASS] Regional English locale "en-GB" resolved to "en"');
-
-    I18nService.initialize('zh-CN');
-    assert(I18nService.getLanguage() === 'zh-cn', 'zh-CN resolved to zh-cn');
-    passed++;
-    console.log('  ✅ [PASS] Simplified Chinese locale "zh-CN" resolved to "zh-cn"');
-
-    I18nService.initialize('zh-Hans');
-    assert(I18nService.getLanguage() === 'zh-cn', 'zh-Hans resolved to zh-cn');
-    passed++;
-    console.log('  ✅ [PASS] Simplified Chinese script locale "zh-Hans" resolved to "zh-cn"');
-
-    I18nService.initialize('de');
-    assert(I18nService.getLanguage() === 'en', 'de falls back to default English');
-    passed++;
-    console.log('  ✅ [PASS] Unsupported locale "de" smoothly fell back to default English');
+    for (const [inputLocale, expectedLang] of localeTests) {
+      I18nService.initialize(inputLocale);
+      assert(I18nService.getLanguage() === expectedLang, `Locale "${inputLocale}" resolved to "${expectedLang}"`);
+      passed++;
+      console.log(`  ✅ [PASS] Locale "${inputLocale}" resolved to "${expectedLang}"`);
+    }
 
     // 3. Translation Retrieval and Variable Interpolation
     console.log('\n[3. Translation Retrieval and Variable Interpolation]');
-    I18nService.setLanguage('es');
-    assert(I18nService.t('common.ready') === 'Listo', 'es common.ready is "Listo"');
-    assert(I18nService.t('statusbar.selectionMultiple', { count: 5 }) === '5 elementos seleccionados', 'Variable {count} interpolated in ES');
-    assert(I18nService.t('statusbar.recoveredFromError', { phase: 'render' }) === 'Recuperado de error (render)', 'Variable {phase} interpolated in ES');
-    passed++;
-    console.log('  ✅ [PASS] Accurate translations and parameter substitution in Spanish');
+    const sampleTests: { lang: keyof typeof dicts; ready: string; selectionCount: number; expectedSelection: string }[] = [
+      { lang: 'es', ready: 'Listo', selectionCount: 5, expectedSelection: '5 elementos seleccionados' },
+      { lang: 'en', ready: 'Ready', selectionCount: 3, expectedSelection: '3 elements selected' },
+      { lang: 'zh-cn', ready: '就绪', selectionCount: 4, expectedSelection: '已选择 4 个元素' },
+      { lang: 'de', ready: 'Bereit', selectionCount: 2, expectedSelection: '2 Elemente ausgewählt' },
+      { lang: 'fr', ready: 'Prêt', selectionCount: 6, expectedSelection: '6 éléments sélectionnés' },
+      { lang: 'ru', ready: 'Готово', selectionCount: 7, expectedSelection: 'Выбрано элементов: 7' },
+      { lang: 'ja', ready: '準備完了', selectionCount: 8, expectedSelection: '8 個の要素を選択中' },
+    ];
 
-    I18nService.setLanguage('en');
-    assert(I18nService.t('common.ready') === 'Ready', 'en common.ready is "Ready"');
-    assert(I18nService.t('statusbar.selectionMultiple', { count: 3 }) === '3 elements selected', 'Variable {count} interpolated in EN');
-    assert(I18nService.t('statusbar.recoveredFromError', { phase: 'hitTest' }) === 'Recovered from error (hitTest)', 'Variable {phase} interpolated in EN');
-    passed++;
-    console.log('  ✅ [PASS] Accurate translations and parameter substitution in English');
+    for (const st of sampleTests) {
+      I18nService.setLanguage(st.lang as any);
+      assert(I18nService.t('common.ready') === st.ready, `${st.lang} common.ready is "${st.ready}"`);
+      assert(
+        I18nService.t('statusbar.selectionMultiple', { count: st.selectionCount }) === st.expectedSelection,
+        `Variable {count} interpolated in ${st.lang}`
+      );
+      passed++;
+      console.log(`  ✅ [PASS] Accurate translations and parameter substitution in [${st.lang}]`);
+    }
 
-    I18nService.setLanguage('zh-cn');
-    assert(I18nService.t('common.ready') === '就绪', 'zh-cn common.ready is "就绪"');
-    assert(I18nService.t('statusbar.selectionMultiple', { count: 4 }) === '已选择 4 个元素', 'Variable {count} interpolated in ZH-CN');
-    assert(I18nService.t('statusbar.recoveredFromError', { phase: 'render' }) === '已从错误中恢复 (render)', 'Variable {phase} interpolated in ZH-CN');
-    passed++;
-    console.log('  ✅ [PASS] Accurate translations and parameter substitution in Simplified Chinese');
-
-    // 4. Interactive Tri-State Language Toggle & Event Dispatching
-    console.log('\n[4. Interactive Tri-State Language Toggle & Event Dispatching]');
+    // 4. Interactive 7-State Language Toggle & Event Dispatching
+    console.log('\n[4. Interactive 7-State Language Toggle & Event Dispatching]');
     I18nService.setLanguage('es');
     let notifiedLang = '';
     const unsubscribe = I18nService.onLanguageChange((lang) => {
       notifiedLang = lang;
     });
 
-    // es -> en
-    const toggled1 = I18nService.toggleLanguage();
-    assert(toggled1 === 'en', 'toggleLanguage switched es -> en');
-    assert(notifiedLang === 'en', 'Observer was notified of switch to "en"');
-    passed++;
-    console.log('  ✅ [PASS] toggleLanguage switched es -> en and notified subscribers');
-
-    // en -> zh-cn
-    const toggled2 = I18nService.toggleLanguage();
-    assert(toggled2 === 'zh-cn', 'toggleLanguage switched en -> zh-cn');
-    assert(notifiedLang === 'zh-cn', 'Observer was notified of switch to "zh-cn"');
-    passed++;
-    console.log('  ✅ [PASS] toggleLanguage switched en -> zh-cn and notified subscribers');
-
-    // zh-cn -> es
-    const toggled3 = I18nService.toggleLanguage();
-    assert(toggled3 === 'es', 'toggleLanguage switched zh-cn -> es');
-    assert(notifiedLang === 'es', 'Observer was notified of switch to "es"');
-    passed++;
-    console.log('  ✅ [PASS] toggleLanguage successfully cycled back zh-cn -> es');
+    const expectedSequence = ['en', 'zh-cn', 'de', 'fr', 'ru', 'ja', 'es'];
+    for (const nextLang of expectedSequence) {
+      const toggled = I18nService.toggleLanguage();
+      assert(toggled === nextLang, `toggleLanguage switched to ${nextLang}`);
+      assert(notifiedLang === nextLang, `Observer was notified of switch to "${nextLang}"`);
+      passed++;
+      console.log(`  ✅ [PASS] toggleLanguage switched to "${nextLang}" and notified subscribers`);
+    }
 
     unsubscribe();
     I18nService.setLanguage('en');

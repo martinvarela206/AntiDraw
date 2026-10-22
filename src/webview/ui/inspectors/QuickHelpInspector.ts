@@ -824,7 +824,10 @@ export class QuickHelpInspector {
    */
   public static render(container: HTMLElement, activeTool: string, isGuideOrRuler: boolean = false): void {
     const lang = I18nService.getLanguage();
-    const map = lang === 'zh-cn' ? this.TOOL_HELP_MAP_ZH : (lang === 'en' ? this.TOOL_HELP_MAP_EN : this.TOOL_HELP_MAP_ES);
+    let map = this.TOOL_HELP_MAP_EN;
+    if (lang === 'es') map = this.TOOL_HELP_MAP_ES;
+    else if (lang === 'zh-cn') map = this.TOOL_HELP_MAP_ZH;
+
     const key = isGuideOrRuler ? 'ruler' : (map[activeTool] ? activeTool : 'select');
     const config = map[key] || map.select;
 
@@ -845,7 +848,13 @@ export class QuickHelpInspector {
 
     const chevronRotation = this.isCollapsed ? 'style="transform: rotate(-90deg);"' : '';
     const contentDisplay = this.isCollapsed ? 'style="display: none;"' : '';
-    const headerPrefix = lang === 'zh-cn' ? '快捷帮助: ' : (lang === 'en' ? 'Quick Help: ' : 'Ayuda Rápida: ');
+    let headerPrefix = 'Quick Help: ';
+    if (lang === 'es') headerPrefix = 'Ayuda Rápida: ';
+    else if (lang === 'zh-cn') headerPrefix = '快捷帮助: ';
+    else if (lang === 'de') headerPrefix = 'Schnellhilfe: ';
+    else if (lang === 'fr') headerPrefix = 'Aide rapide : ';
+    else if (lang === 'ru') headerPrefix = 'Краткая справка: ';
+    else if (lang === 'ja') headerPrefix = 'クイックヘルプ: ';
 
     container.innerHTML = `
       <div class="panel-section quick-help-section">

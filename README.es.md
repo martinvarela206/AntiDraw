@@ -1,4 +1,4 @@
-[ English ](README.md) | [ Español ](README.es.md) | [ 简体中文 ](README.zh-CN.md)
+[ English ](README.md) | [ Español ](README.es.md) | [ 简体中文 ](README.zh-CN.md) | [ Deutsch ](README.de.md) | [ Français ](README.fr.md) | [ Русский ](README.ru.md) | [ 日本語 ](README.ja.md)
 
 # AntiDraw — Editor Vectorial SVG para VS Code y Antigravity
 
@@ -16,7 +16,7 @@
   <a href="https://open-vsx.org/extension/martinvarela206/antidraw"><img src="https://img.shields.io/badge/Open--VSX-Registry-purple?style=flat-square" alt="Open VSX Registry"></a>
   <a href="https://github.com/martinvarela206/AntiDraw"><img src="https://img.shields.io/badge/GitHub-Repository-181717?style=flat-square&logo=github" alt="GitHub Repository"></a>
   <a href="https://github.com/martinvarela206/AntiDraw/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-Source--Available-blue?style=flat-square" alt="Source-Available License"></a>
-  <a href="https://github.com/martinvarela206/AntiDraw"><img src="https://img.shields.io/badge/Status-Beta%20v0.96.0-orange?style=flat-square" alt="Status"></a>
+  <a href="https://github.com/martinvarela206/AntiDraw"><img src="https://img.shields.io/badge/Status-Beta%20v0.97.0-orange?style=flat-square" alt="Status"></a>
 </p>
 
 <p align="center">
@@ -40,7 +40,7 @@ Tanto si descubriste AntiDraw mediante GitHub, VS Code Marketplace o Open VSX, p
 ---
 
 > [!NOTE]
-> **Estado del Proyecto: Beta Pública (v0.96.0)**  
+> **Estado del Proyecto: Beta Pública (v0.97.0)**  
 > AntiDraw se encuentra en desarrollo activo y continuo. Aunque la edición vectorial, curvas Bézier, magnetismo y operaciones booleanas son plenamente funcionales y estables, pueden surgir casos límite ocasionales.  
 > ¿Encontraste un fallo o tienes una sugerencia? Por favor [abre una incidencia en GitHub](https://github.com/martinvarela206/AntiDraw/issues); tus comentarios guían directamente los próximos lanzamientos.
 

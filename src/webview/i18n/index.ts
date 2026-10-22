@@ -2,4 +2,8 @@ export * from './types.js';
 export * from './es.js';
 export * from './en.js';
 export * from './zh-cn.js';
+export * from './de.js';
+export * from './fr.js';
+export * from './ru.js';
+export * from './ja.js';
 export * from './I18nService.js';

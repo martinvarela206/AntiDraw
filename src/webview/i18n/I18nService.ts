@@ -2,6 +2,10 @@ import { Language, Translations } from './types.js';
 import { es } from './es.js';
 import { en } from './en.js';
 import { zhCn } from './zh-cn.js';
+import { de } from './de.js';
+import { fr } from './fr.js';
+import { ru } from './ru.js';
+import { ja } from './ja.js';
 
 type NestedKeyOf<ObjectType extends object> = {
   [Key in keyof ObjectType & (string | number)]: ObjectType[Key] extends object
@@ -16,6 +20,17 @@ export class I18nService {
   private static listeners: Set<(lang: Language) => void> = new Set();
   private static initialized = false;
 
+  private static resolveLocale(localeStr: string): Language {
+    const lower = localeStr.toLowerCase();
+    if (lower.startsWith('es')) return 'es';
+    if (lower.startsWith('zh')) return 'zh-cn';
+    if (lower.startsWith('de')) return 'de';
+    if (lower.startsWith('fr')) return 'fr';
+    if (lower.startsWith('ru')) return 'ru';
+    if (lower.startsWith('ja')) return 'ja';
+    return 'en';
+  }
+
   public static initialize(initialLang?: string): void {
     if (this.initialized && !initialLang) return;
 
@@ -27,16 +42,16 @@ export class I18nService {
       }
     } catch (_) {}
 
-    if (saved === 'es' || saved === 'en' || saved === 'zh-cn') {
-      this.language = saved;
+    const validLanguages: Language[] = ['es', 'en', 'zh-cn', 'de', 'fr', 'ru', 'ja'];
+    if (saved && validLanguages.includes(saved as Language)) {
+      this.language = saved as Language;
       this.initialized = true;
       return;
     }
 
     // 2. Explicit argument (e.g. from VS Code host environment)
     if (initialLang) {
-      const lower = initialLang.toLowerCase();
-      this.language = lower.startsWith('zh') ? 'zh-cn' : (lower.startsWith('es') ? 'es' : 'en');
+      this.language = this.resolveLocale(initialLang);
       this.initialized = true;
       return;
     }
@@ -45,8 +60,7 @@ export class I18nService {
     if (typeof document !== 'undefined' && document.body) {
       const bodyLang = document.body.getAttribute('data-vscode-language');
       if (bodyLang) {
-        const lower = bodyLang.toLowerCase();
-        this.language = lower.startsWith('zh') ? 'zh-cn' : (lower.startsWith('es') ? 'es' : 'en');
+        this.language = this.resolveLocale(bodyLang);
         this.initialized = true;
         return;
       }
@@ -54,8 +68,7 @@ export class I18nService {
 
     // 4. Browser / system navigator language
     if (typeof navigator !== 'undefined' && navigator.language) {
-      const lower = navigator.language.toLowerCase();
-      this.language = lower.startsWith('zh') ? 'zh-cn' : (lower.startsWith('es') ? 'es' : 'en');
+      this.language = this.resolveLocale(navigator.language);
     } else {
       this.language = 'en';
     }
@@ -91,8 +104,10 @@ export class I18nService {
   }
 
   public static toggleLanguage(): Language {
+    const languages: Language[] = ['es', 'en', 'zh-cn', 'de', 'fr', 'ru', 'ja'];
     const current = this.getLanguage();
-    const nextLang: Language = current === 'es' ? 'en' : (current === 'en' ? 'zh-cn' : 'es');
+    const idx = languages.indexOf(current);
+    const nextLang = languages[(idx + 1) % languages.length];
     this.setLanguage(nextLang);
     return nextLang;
   }
@@ -106,9 +121,17 @@ export class I18nService {
 
   public static getDict(): Translations {
     const lang = this.getLanguage();
-    if (lang === 'zh-cn') return zhCn;
-    if (lang === 'es') return es;
-    return en;
+    switch (lang) {
+      case 'es': return es;
+      case 'zh-cn': return zhCn;
+      case 'de': return de;
+      case 'fr': return fr;
+      case 'ru': return ru;
+      case 'ja': return ja;
+      case 'en':
+      default:
+        return en;
+    }
   }
 
   public static t(path: TranslationKey | string, params?: Record<string, string | number>): string {

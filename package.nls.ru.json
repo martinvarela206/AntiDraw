@@ -1,0 +1,6 @@
+{
+  "antidraw.displayName": "AntiDraw - Векторный редактор SVG",
+  "antidraw.description": "Встроенный векторный графический редактор SVG-файлов, вдохновленный CorelDraw и Figma.",
+  "antidraw.editor.displayName": "Редактор SVG AntiDraw",
+  "antidraw.command.openEditor": "Открыть в редакторе SVG AntiDraw"
+}

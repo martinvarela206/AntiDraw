@@ -292,7 +292,13 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
 
     const userLocale = vscode.env.language || 'en';
     const lowerLocale = userLocale.toLowerCase();
-    const langAttr = lowerLocale.startsWith('zh') ? 'zh-cn' : (lowerLocale.startsWith('es') ? 'es' : 'en');
+    let langAttr = 'en';
+    if (lowerLocale.startsWith('es')) langAttr = 'es';
+    else if (lowerLocale.startsWith('zh')) langAttr = 'zh-cn';
+    else if (lowerLocale.startsWith('de')) langAttr = 'de';
+    else if (lowerLocale.startsWith('fr')) langAttr = 'fr';
+    else if (lowerLocale.startsWith('ru')) langAttr = 'ru';
+    else if (lowerLocale.startsWith('ja')) langAttr = 'ja';
     const baseTag = docDir
       ? `<base href="${webview.asWebviewUri(docDir).toString().replace(/\/+$/, '')}/">`
       : '';

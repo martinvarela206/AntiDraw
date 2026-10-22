@@ -30,6 +30,29 @@ export const FlagIcons: Record<Language, string> = {
       <circle cx="7.2" cy="6.6" r="0.65" fill="#FFDE00"/>
     </g>
   </svg>`,
+
+  de: `<svg class="lang-flag" width="18" height="13" viewBox="0 0 18 13" fill="none" xmlns="http://www.w3.org/2000/svg" style="border-radius:2px; flex-shrink:0; box-shadow: 0 0 0 1px rgba(0,0,0,0.2);">
+    <rect width="18" height="4.33" fill="#000000"/>
+    <rect y="4.33" width="18" height="4.34" fill="#DD0000"/>
+    <rect y="8.67" width="18" height="4.33" fill="#FFCE00"/>
+  </svg>`,
+
+  fr: `<svg class="lang-flag" width="18" height="13" viewBox="0 0 18 13" fill="none" xmlns="http://www.w3.org/2000/svg" style="border-radius:2px; flex-shrink:0; box-shadow: 0 0 0 1px rgba(0,0,0,0.2);">
+    <rect width="6" height="13" fill="#002395"/>
+    <rect x="6" width="6" height="13" fill="#FFFFFF"/>
+    <rect x="12" width="6" height="13" fill="#ED2939"/>
+  </svg>`,
+
+  ru: `<svg class="lang-flag" width="18" height="13" viewBox="0 0 18 13" fill="none" xmlns="http://www.w3.org/2000/svg" style="border-radius:2px; flex-shrink:0; box-shadow: 0 0 0 1px rgba(0,0,0,0.2);">
+    <rect width="18" height="4.33" fill="#FFFFFF"/>
+    <rect y="4.33" width="18" height="4.34" fill="#0039A6"/>
+    <rect y="8.67" width="18" height="4.33" fill="#D52B1E"/>
+  </svg>`,
+
+  ja: `<svg class="lang-flag" width="18" height="13" viewBox="0 0 18 13" fill="none" xmlns="http://www.w3.org/2000/svg" style="border-radius:2px; flex-shrink:0; box-shadow: 0 0 0 1px rgba(0,0,0,0.2);">
+    <rect width="18" height="13" fill="#FFFFFF"/>
+    <circle cx="9" cy="6.5" r="3.8" fill="#BC002D"/>
+  </svg>`,
 };
 
 export interface LanguageOption {
@@ -42,6 +65,10 @@ export const SUPPORTED_LANGUAGES: LanguageOption[] = [
   { code: 'es', name: 'Español', localCode: 'ES' },
   { code: 'en', name: 'English', localCode: 'EN' },
   { code: 'zh-cn', name: '简体中文', localCode: 'ZH-CN' },
+  { code: 'de', name: 'Deutsch', localCode: 'DE' },
+  { code: 'fr', name: 'Français', localCode: 'FR' },
+  { code: 'ru', name: 'Русский', localCode: 'RU' },
+  { code: 'ja', name: '日本語', localCode: 'JA' },
 ];
 
 /**

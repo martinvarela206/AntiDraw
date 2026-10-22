@@ -75,11 +75,15 @@ function syncVersion() {
     changes.push(`package.json: version -> "${targetVersion}"`);
   }
 
-  // 2. Synchronize README files (English, Spanish, Simplified Chinese)
+  // 2. Synchronize README files (English, Spanish, Chinese, German, French, Russian, Japanese)
   const readmeFiles = [
     { name: 'README.md', path: README_PATH },
     { name: 'README.es.md', path: path.join(ROOT_DIR, 'README.es.md') },
     { name: 'README.zh-CN.md', path: path.join(ROOT_DIR, 'README.zh-CN.md') },
+    { name: 'README.de.md', path: path.join(ROOT_DIR, 'README.de.md') },
+    { name: 'README.fr.md', path: path.join(ROOT_DIR, 'README.fr.md') },
+    { name: 'README.ru.md', path: path.join(ROOT_DIR, 'README.ru.md') },
+    { name: 'README.ja.md', path: path.join(ROOT_DIR, 'README.ja.md') },
   ];
 
   for (const { name, path: filePath } of readmeFiles) {
@@ -98,6 +102,10 @@ function syncVersion() {
       readme = readme.replace(/> \*\*Project Status: Public Beta \(v[0-9.]+\)\*\*/g, `> **Project Status: Public Beta (v${targetVersion})**`);
       readme = readme.replace(/> \*\*Estado del Proyecto: Beta Pública \(v[0-9.]+\)\*\*/g, `> **Estado del Proyecto: Beta Pública (v${targetVersion})**`);
       readme = readme.replace(/> \*\*项目状态：公开公测版 \(Public Beta v[0-9.]+\)\*\*/g, `> **项目状态：公开公测版 (Public Beta v${targetVersion})**`);
+      readme = readme.replace(/> \*\*Projektstatus: Öffentliche Beta \(v[0-9.]+\)\*\*/g, `> **Projektstatus: Öffentliche Beta (v${targetVersion})**`);
+      readme = readme.replace(/> \*\*État du projet : Bêta publique \(v[0-9.]+\)\*\*/g, `> **État du projet : Bêta publique (v${targetVersion})**`);
+      readme = readme.replace(/> \*\*Статус проекта: Публичная бета \(v[0-9.]+\)\*\*/g, `> **Статус проекта: Публичная бета (v${targetVersion})**`);
+      readme = readme.replace(/> \*\*プロジェクトステータス: パブリックベータ \(v[0-9.]+\)\*\*/g, `> **プロジェクトステータス: パブリックベータ (v${targetVersion})**`);
 
       if (readme !== origReadme) {
         fs.writeFileSync(filePath, readme, 'utf8');

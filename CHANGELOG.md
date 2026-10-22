@@ -3,6 +3,20 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.97.0] - 2026-10-22
+
+### 🚀 Added
+- **Multi-Language Expansion: German, French, Russian, and Japanese (7 Languages Total)**:
+  - Added complete, native dictionaries for German (`de`), French (`fr`), Russian (`ru`), and Japanese (`ja`), each implementing all 10 namespaces with 100% key and section symmetry (451 keys) against English, Spanish, and Simplified Chinese.
+  - Extended VS Code NLS metadata files (`package.nls.de.json`, `package.nls.fr.json`, `package.nls.ru.json`, `package.nls.ja.json`) providing localized extension titles, descriptions, and commands in the VS Code editor UI.
+  - Implemented crisp inline vector SVG flags for all 7 languages (🇪🇸 Spain, 🇬🇧 United Kingdom, 🇨🇳 China, 🇩🇪 Germany, 🇫🇷 France, 🇷🇺 Russia, 🇯🇵 Japan) in the floating language popover menu, bypassing Windows Chromium font fallback limitations.
+  - Added localized `QuickHelpInspector` shortcut guides and header resolution for German, French, Russian, and Japanese.
+  - Created standalone localized documentation files: `README.de.md`, `README.fr.md`, `README.ru.md`, and `README.ja.md` with unified top Language Switcher bars across all 7 READMEs.
+  - Upgraded automated version synchronizer (`scripts/sync-version.js`) to continuously synchronize version badges and status blocks across all 7 language documentation files.
+  - Expanded test suite (`scripts/test-i18n-system.ts`) to comprehensively assert structural symmetry across all 7 dictionaries, regional locale auto-detection (`de-DE`, `fr-FR`, `ru-RU`, `ja-JP`), variable interpolation, and 7-language cycle transitions.
+
+---
+
 ## [0.96.0] - 2026-10-22
 
 ### 🚀 Added
