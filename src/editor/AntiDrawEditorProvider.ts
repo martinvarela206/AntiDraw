@@ -291,7 +291,8 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
     const nonce = getNonce();
 
     const userLocale = vscode.env.language || 'en';
-    const langAttr = userLocale.toLowerCase().startsWith('es') ? 'es' : 'en';
+    const lowerLocale = userLocale.toLowerCase();
+    const langAttr = lowerLocale.startsWith('zh') ? 'zh-cn' : (lowerLocale.startsWith('es') ? 'es' : 'en');
     const baseTag = docDir
       ? `<base href="${webview.asWebviewUri(docDir).toString().replace(/\/+$/, '')}/">`
       : '';

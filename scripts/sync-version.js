@@ -75,29 +75,34 @@ function syncVersion() {
     changes.push(`package.json: version -> "${targetVersion}"`);
   }
 
-  // 2. Synchronize README.md
-  if (fs.existsSync(README_PATH)) {
-    let readme = fs.readFileSync(README_PATH, 'utf8');
-    const origReadme = readme;
+  // 2. Synchronize README files (English, Spanish, Simplified Chinese)
+  const readmeFiles = [
+    { name: 'README.md', path: README_PATH },
+    { name: 'README.es.md', path: path.join(ROOT_DIR, 'README.es.md') },
+    { name: 'README.zh-CN.md', path: path.join(ROOT_DIR, 'README.zh-CN.md') },
+  ];
 
-    // 2.1 Badge: https://img.shields.io/badge/Status-Beta%20v0.95.0-orange?style=flat-square
-    const badgeRegex = /https:\/\/img\.shields\.io\/badge\/Status-Beta%20v[0-9.]+-orange\?style=flat-square/g;
-    const newBadgeUrl = `https://img.shields.io/badge/Status-Beta%20v${targetVersion}-orange?style=flat-square`;
-    if (badgeRegex.test(readme)) {
-      readme = readme.replace(badgeRegex, newBadgeUrl);
-      changes.push(`README.md: status badge updated to v${targetVersion}`);
-    }
+  for (const { name, path: filePath } of readmeFiles) {
+    if (fs.existsSync(filePath)) {
+      let readme = fs.readFileSync(filePath, 'utf8');
+      const origReadme = readme;
 
-    // 2.2 Status block: > **Project Status: Public Beta (v0.94.3)**
-    const statusBlockRegex = /> \*\*Project Status: Public Beta \(v[0-9.]+\)\*\*/g;
-    const newStatusBlock = `> **Project Status: Public Beta (v${targetVersion})**`;
-    if (statusBlockRegex.test(readme)) {
-      readme = readme.replace(statusBlockRegex, newStatusBlock);
-      changes.push(`README.md: project status block updated to v${targetVersion}`);
-    }
+      // 2.1 Badge: https://img.shields.io/badge/Status-Beta%20v...
+      const badgeRegex = /https:\/\/img\.shields\.io\/badge\/Status-Beta%20v[0-9.]+-orange\?style=flat-square/g;
+      const newBadgeUrl = `https://img.shields.io/badge/Status-Beta%20v${targetVersion}-orange?style=flat-square`;
+      if (badgeRegex.test(readme)) {
+        readme = readme.replace(badgeRegex, newBadgeUrl);
+      }
 
-    if (readme !== origReadme) {
-      fs.writeFileSync(README_PATH, readme, 'utf8');
+      // 2.2 Status blocks across languages
+      readme = readme.replace(/> \*\*Project Status: Public Beta \(v[0-9.]+\)\*\*/g, `> **Project Status: Public Beta (v${targetVersion})**`);
+      readme = readme.replace(/> \*\*Estado del Proyecto: Beta Pública \(v[0-9.]+\)\*\*/g, `> **Estado del Proyecto: Beta Pública (v${targetVersion})**`);
+      readme = readme.replace(/> \*\*项目状态：公开公测版 \(Public Beta v[0-9.]+\)\*\*/g, `> **项目状态：公开公测版 (Public Beta v${targetVersion})**`);
+
+      if (readme !== origReadme) {
+        fs.writeFileSync(filePath, readme, 'utf8');
+        changes.push(`${name}: synchronized status and badges to v${targetVersion}`);
+      }
     }
   }
 

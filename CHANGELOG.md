@@ -3,6 +3,21 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.96.0] - 2026-10-22
+
+### 🚀 Added
+- **Simplified Chinese Localization (zh-CN) & Multi-Language Architecture**:
+  - Expanded internationalization system with full Simplified Chinese (`zh-cn`) dictionary implementing all 10 translation namespaces with 100% key and section symmetry against English and Spanish.
+  - Implemented tri-state live language toggle (`ES` ➔ `EN` ➔ `ZH-CN` ➔ `ES`) in status bar without editor reloads or state loss.
+  - Added locale auto-detection for Chinese locales (`zh-CN`, `zh-Hans`, `zh`) with proper fallback mechanics and HTML template attribute propagation (`lang="zh-cn"`).
+  - Implemented comprehensive `TOOL_HELP_MAP_ZH` in `QuickHelpInspector` providing fully localized shortcuts cheatsheets across all 21 vector tools.
+  - Introduced VS Code NLS metadata files (`package.nls.json`, `package.nls.es.json`, `package.nls.zh-cn.json`) and hooked `%antidraw...%` placeholder tokens into `package.json`.
+  - Created complete multi-language documentation (`README.zh-CN.md` and `README.es.md`) featuring a unified top *Language Switcher* bar in all three READMEs.
+  - Upgraded automated version synchronization script (`scripts/sync-version.js`) to keep badges and status blocks synchronized across all three language documentation files.
+  - Expanded test suite (`scripts/test-i18n-system.ts`) validating tripartite key symmetry, non-empty values, Chinese locale auto-detection, variable interpolation, and tri-state cycle transitions.
+
+---
+
 ## [0.95.1] - 2026-10-22
 
 ### 🛠️ Fixed

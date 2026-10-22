@@ -558,12 +558,273 @@ export class QuickHelpInspector {
     },
   };
 
+  private static readonly TOOL_HELP_MAP_ZH: Record<string, ToolHelpConfig> = {
+    select: {
+      title: '选择工具',
+      toolId: 'select',
+      icon: ToolIcons.selectTool,
+      shortcuts: [
+        { keys: ['V'], description: '激活选择工具（从任意工具快速切换）' },
+        { keys: ['Mini-HUD'], description: '定界框上方悬浮胶囊：一键切换 移动、缩放、旋转 模式' },
+        { keys: ['停顿单击'], description: '循环切换模式：缩放 → 旋转 → 自由变形（透视）' },
+        { keys: ['D'], description: '自由变形 / 透视：切换 3x3 单应性四边形控制手柄' },
+        { keys: ['▱ 按钮'], description: '检查器中的专用按钮，切换自由变形' },
+        { keys: ['单击'], description: '选中光标下的元素，或在空白处单击取消选择' },
+        { keys: ['Shift', '单击'], description: '添加到多选或从当前选择中移除' },
+        { keys: ['拖拽'], description: '在画布上移动选中的元素' },
+        { keys: ['Ctrl', '拖拽'], description: '锁定正交方向移动（水平或垂直）' },
+        { keys: ['Alt', '拖拽'], description: '复制选中元素生成克隆副本' },
+        { keys: ['空白处拖拽'], description: '框选：通过弹性矩形框进行区域选择' },
+        { keys: ['Shift', '框选'], description: '累加框选：扩展当前选中集合' },
+        { keys: ['Alt', '框选'], description: '相交模式：选中所有与选框相交的对象' },
+        { keys: ['双击'], description: '切换至节点编辑工具 (A)' },
+        { keys: ['角部手柄'], description: '自由缩放选中的元素或图层组' },
+        { keys: ['Shift', '缩放'], description: '等比缩放，锁定宽高比' },
+        { keys: ['Alt', '缩放'], description: '以中心/原点为基准对称缩放' },
+        { keys: ['拖拽'], description: '移动选中元素，支持吸附到节点、边与参考线' },
+        { keys: ['Shift', '拖拽'], description: '限制仅在水平或垂直轴到位移' },
+        { keys: ['Alt', '空白处拖拽'], description: '相交框选（触摸选择模式）' },
+        { keys: ['Shift', '拖拽手柄'], description: '等比缩放，锁定长宽比' },
+        { keys: ['Alt', '拖拽手柄'], description: '以中心为基准同心对称缩放' },
+        { keys: ['Shift', '拖拽旋转'], description: '强制旋转角度为 15° 的倍数' },
+        { keys: ['Ctrl+C / Ctrl+V'], description: '复制并粘贴（自动位移 15px）' },
+        { keys: ['Ctrl+D'], description: '原地即时复制选中元素' },
+        { keys: ['双击工具图标 (V)'], description: '打开精确数值变换对话框（X/Y 坐标与位移）' },
+        { keys: ['Del / Backspace'], description: '删除选中的元素' },
+      ],
+    },
+    node: {
+      title: '节点编辑',
+      toolId: 'node',
+      icon: ToolIcons.nodeTool,
+      shortcuts: [
+        { keys: ['A'], description: '激活节点编辑工具' },
+        { keys: ['单击节点'], description: '选中顶点并显示贝塞尔控制手柄' },
+        { keys: ['Shift / Ctrl', '单击'], description: '追加多选顶点' },
+        { keys: ['拖拽节点'], description: '移动顶点，吸附至网格、参考线与临近节点' },
+        { keys: ['Shift', '拖拽手柄'], description: '强制手柄角度以 45° 步长对齐' },
+        { keys: ['Ctrl', '拖拽至端点'], description: '闭合连接：将端点重合焊接闭合路径' },
+        { keys: ['Alt', '空白处拖拽'], description: '相交框选顶点' },
+        { keys: ['双击线段'], description: '在曲线精确点击处插入新顶点' },
+        { keys: ['双击节点'], description: '切换节点类型（尖角 ↔ 平滑 ↔ 对称）' },
+        { keys: ['Ctrl', 'J'], description: '合并并焊接重合的选中顶点，消除无效线段' },
+        { keys: ['Mini-HUD'], description: '多顶点选中时 (N ≥ 2) 切换定界框为 移动、缩放 或 旋转' },
+        { keys: ['Del / Backspace'], description: '删除选中的节点并保持路径连续' },
+      ],
+    },
+    pen: {
+      title: '贝塞尔钢笔',
+      toolId: 'pen',
+      icon: ToolIcons.penTool,
+      shortcuts: [
+        { keys: ['单击'], description: '添加尖角顶点（无手柄的锐利锚点）' },
+        { keys: ['单击 + 拖拽'], description: '拉出切线手柄以创建平滑贝塞尔曲线' },
+        { keys: ['Alt', '拖拽手柄'], description: '折断手柄联动关系（转换为非对称角节点）' },
+        { keys: ['单击起点'], description: '闭合轮廓，完成当前路径绘制' },
+        { keys: ['Enter / 双击'], description: '结束绘制，保持开放路径' },
+        { keys: ['Escape'], description: '取消当前正在绘制的路径' },
+      ],
+    },
+    polyline: {
+      title: '折线工具',
+      toolId: 'polyline',
+      icon: ToolIcons.polylineTool,
+      shortcuts: [
+        { keys: ['单击'], description: '添加新顶点，生成纯直线段' },
+        { keys: ['单击起点'], description: '闭合折线，将其转换为多边形' },
+        { keys: ['Enter / 双击'], description: '结束绘制，保留开放折线' },
+        { keys: ['Escape'], description: '取消当前绘制' },
+      ],
+    },
+    line: {
+      title: '直线工具',
+      toolId: 'line',
+      icon: ToolIcons.lineTool,
+      shortcuts: [
+        { keys: ['单击 + 拖拽'], description: '绘制原生 SVG <line> 直线段' },
+        { keys: ['Shift', '拖拽'], description: '锁定角度为 45° 倍数（水平/垂直/对角线）' },
+        { keys: ['空格键 (拖拽中)'], description: '在屏幕上平移整条线的位置而不改变其长度' },
+      ],
+    },
+    rect: {
+      title: '矩形工具',
+      toolId: 'rect',
+      icon: ToolIcons.rectTool,
+      shortcuts: [
+        { keys: ['单击 + 拖拽'], description: '从对角起点自由绘制矩形' },
+        { keys: ['Shift', '拖拽'], description: '锁定 1:1 比例（绘制正方形）' },
+        { keys: ['Alt', '拖拽'], description: '从几何中心向外对称展开绘制' },
+        { keys: ['空格键 (拖拽中)'], description: '平移矩形位置而不改变其实时尺寸' },
+      ],
+    },
+    circle: {
+      title: '圆形工具',
+      toolId: 'circle',
+      icon: ToolIcons.circleTool,
+      shortcuts: [
+        { keys: ['单击 + 拖拽'], description: '绘制原生 SVG <circle> 圆形（固定 1:1）' },
+        { keys: ['Alt', '拖拽'], description: '从圆心向外同心展开绘制' },
+        { keys: ['空格键 (拖拽中)'], description: '平移圆心位置而不改变其半径' },
+      ],
+    },
+    ellipse: {
+      title: '椭圆工具',
+      toolId: 'ellipse',
+      icon: ToolIcons.ellipseTool,
+      shortcuts: [
+        { keys: ['单击 + 拖拽'], description: '从对角起点自由绘制参数化椭圆' },
+        { keys: ['Shift', '拖拽'], description: '锁定 1:1 比例（绘制正圆）' },
+        { keys: ['Alt', '拖拽'], description: '从几何中心向外对称展开绘制' },
+        { keys: ['空格键 (拖拽中)'], description: '平移椭圆位置而不改变其实时尺寸' },
+      ],
+    },
+    polygon: {
+      title: '正多边形',
+      toolId: 'polygon',
+      icon: ToolIcons.polygonTool,
+      shortcuts: [
+        { keys: ['单击 + 拖拽'], description: '根据设定的边数绘制正多边形' },
+        { keys: ['Alt', '拖拽'], description: '从几何中心向外展开绘制多边形' },
+        { keys: ['空格键 (拖拽中)'], description: '平移多边形位置而不改变其尺寸' },
+      ],
+    },
+    star: {
+      title: '参数化星形',
+      toolId: 'star',
+      icon: ToolIcons.starTool,
+      shortcuts: [
+        { keys: ['单击 + 拖拽'], description: '根据配置的角数与内外半径比绘制星形' },
+        { keys: ['Alt', '拖拽'], description: '从几何中心向外展开绘制星形' },
+        { keys: ['空格键 (拖拽中)'], description: '平移星形位置而不改变其尺寸' },
+      ],
+    },
+    stroke: {
+      title: '描边工具',
+      toolId: 'stroke',
+      icon: ToolIcons.strokeTool,
+      shortcuts: [
+        { keys: ['单击矢量图形'], description: '检查并编辑描边粗细、端点样式、拐角与虚线设置' },
+        { keys: ['空白处单击'], description: '取消对当前矢量描边的检查' },
+      ],
+    },
+    addVertex: {
+      title: '添加顶点',
+      toolId: 'addVertex',
+      icon: ToolIcons.addVertexTool,
+      shortcuts: [
+        { keys: ['单击路径'], description: '在保持精确解析曲率的同时插入新节点' },
+      ],
+    },
+    canvas: {
+      title: '画布与 ViewBox',
+      toolId: 'canvas',
+      icon: ToolIcons.canvasTool,
+      shortcuts: [
+        { keys: ['拖拽边框'], description: '交互式调整 SVG ViewBox 视口尺寸' },
+        { keys: ['Shift', '拖拽'], description: '保持纵横比等比缩放画布' },
+        { keys: ['Alt', '拖拽'], description: '以画布中心为基准对称缩放' },
+      ],
+    },
+    zoom: {
+      title: '缩放与平移',
+      toolId: 'zoom',
+      icon: ToolIcons.zoomTool,
+      shortcuts: [
+        { keys: ['单击'], description: '以光标为中心放大视图' },
+        { keys: ['Alt', '单击'], description: '缩小视图' },
+        { keys: ['拖拽'], description: '框选区域快速放大至选框窗口' },
+        { keys: ['空格', '拖拽'], description: '自由平移画布工作区（亦可使用鼠标中键）' },
+        { keys: ['Ctrl', '鼠标滚轮'], description: '连续平滑放大 / 缩小视图' },
+        { keys: ['Shift', '鼠标滚轮'], description: '水平平移画布' },
+        { keys: ['双击工具图标 (Z)'], description: '缩放以适应工作区（适屏显示）' },
+      ],
+    },
+    ruler: {
+      title: '标尺与参考线',
+      toolId: 'ruler',
+      icon: ToolIcons.rulersVisibility,
+      shortcuts: [
+        { keys: ['从标尺拖拽'], description: '创建新的水平或垂直度量参考线' },
+        { keys: ['Ctrl / Shift', '拖拽'], description: '将参考线旋转角度锁定为 15° 的倍数' },
+        { keys: ['双击原点角部'], description: '将坐标原点 (0,0) 重置为 ViewBox 左上角' },
+        { keys: ['从原点角拖拽'], description: '自定义并设定全新的全局坐标原点 (0,0)' },
+        { keys: ['双击参考线'], description: '打开检查器面板以精确定位坐标与旋转角度' },
+        { keys: ['Del / Backspace'], description: '删除选中的参考线' },
+      ],
+    },
+    smartFill: {
+      title: '智能填充',
+      toolId: 'smartFill',
+      icon: ToolIcons.smartFillTool,
+      shortcuts: [
+        { keys: ['F'], description: '激活智能填充工具' },
+        { keys: ['单击'], description: '探测重叠路径封闭区域并生成独立的新矢量 <path>' },
+        { keys: ['Shift', '单击'], description: '连续追加合并相邻封闭区域' },
+        { keys: ['拖拽'], description: '画笔式连续扫掠以累加并合并多个区域' },
+        { keys: ['悬停'], description: '实时预览即将被填充的多边形闭合区域' },
+        { keys: ['Esc'], description: '取消预览并重置交互状态' },
+      ],
+    },
+    scissors: {
+      title: '剪刀工具',
+      toolId: 'scissors',
+      icon: ToolIcons.scissorsTool,
+      shortcuts: [
+        { keys: ['C'], description: '激活剪刀工具' },
+        { keys: ['单击线段'], description: '精确切断路径，将其拆分为两条独立矢量路径' },
+        { keys: ['Esc'], description: '取消剪切操作' },
+      ],
+    },
+    knife: {
+      title: '美工刀',
+      toolId: 'knife',
+      icon: ToolIcons.knifeTool,
+      shortcuts: [
+        { keys: ['K'], description: '激活美工刀工具' },
+        { keys: ['拖拽'], description: '自由划出切割线，分割穿过的所有矢量图形' },
+        { keys: ['Shift', '拖拽'], description: '锁定以强制直线形式切割' },
+        { keys: ['Esc'], description: '取消切割' },
+      ],
+    },
+    eraser: {
+      title: '橡皮擦',
+      toolId: 'eraser',
+      icon: ToolIcons.eraserTool,
+      shortcuts: [
+        { keys: ['Shift', 'E'], description: '激活矢量橡皮擦工具' },
+        { keys: ['拖拽'], description: '擦除并剔除穿过的矢量线段与区域' },
+        { keys: ['Esc'], description: '取消擦除操作' },
+      ],
+    },
+    shapeBuilder: {
+      title: '形状生成器',
+      toolId: 'shapeBuilder',
+      icon: ToolIcons.shapeBuilderTool,
+      shortcuts: [
+        { keys: ['M'], description: '激活形状生成器工具' },
+        { keys: ['拖拽'], description: '划过连接并合并重叠的矢量候选区域为统一几何体' },
+        { keys: ['Alt', '拖拽'], description: '划过减去或删除穿过的候选区域' },
+        { keys: ['Esc'], description: '取消交互' },
+      ],
+    },
+    image: {
+      title: '图像工具',
+      toolId: 'image',
+      icon: ToolIcons.imageTool,
+      shortcuts: [
+        { keys: ['I'], description: '激活图像导入工具' },
+        { keys: ['单击'], description: '打开系统文件选择器以导入 PNG/JPEG/WebP 图片' },
+        { keys: ['拖拽'], description: '在画布上定义插入图像的目标定界框与长宽尺寸' },
+      ],
+    },
+  };
+
   /**
    * Renderiza el componente de ayuda rápida en el contenedor especificado.
    */
   public static render(container: HTMLElement, activeTool: string, isGuideOrRuler: boolean = false): void {
     const lang = I18nService.getLanguage();
-    const map = lang === 'en' ? this.TOOL_HELP_MAP_EN : this.TOOL_HELP_MAP_ES;
+    const map = lang === 'zh-cn' ? this.TOOL_HELP_MAP_ZH : (lang === 'en' ? this.TOOL_HELP_MAP_EN : this.TOOL_HELP_MAP_ES);
     const key = isGuideOrRuler ? 'ruler' : (map[activeTool] ? activeTool : 'select');
     const config = map[key] || map.select;
 
@@ -584,7 +845,7 @@ export class QuickHelpInspector {
 
     const chevronRotation = this.isCollapsed ? 'style="transform: rotate(-90deg);"' : '';
     const contentDisplay = this.isCollapsed ? 'style="display: none;"' : '';
-    const headerPrefix = lang === 'en' ? 'Quick Help: ' : 'Ayuda Rápida: ';
+    const headerPrefix = lang === 'zh-cn' ? '快捷帮助: ' : (lang === 'en' ? 'Quick Help: ' : 'Ayuda Rápida: ');
 
     container.innerHTML = `
       <div class="panel-section quick-help-section">

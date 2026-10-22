@@ -1,6 +1,7 @@
 import { Language, Translations } from './types.js';
 import { es } from './es.js';
 import { en } from './en.js';
+import { zhCn } from './zh-cn.js';
 
 type NestedKeyOf<ObjectType extends object> = {
   [Key in keyof ObjectType & (string | number)]: ObjectType[Key] extends object
@@ -26,7 +27,7 @@ export class I18nService {
       }
     } catch (_) {}
 
-    if (saved === 'es' || saved === 'en') {
+    if (saved === 'es' || saved === 'en' || saved === 'zh-cn') {
       this.language = saved;
       this.initialized = true;
       return;
@@ -34,7 +35,8 @@ export class I18nService {
 
     // 2. Explicit argument (e.g. from VS Code host environment)
     if (initialLang) {
-      this.language = initialLang.toLowerCase().startsWith('es') ? 'es' : 'en';
+      const lower = initialLang.toLowerCase();
+      this.language = lower.startsWith('zh') ? 'zh-cn' : (lower.startsWith('es') ? 'es' : 'en');
       this.initialized = true;
       return;
     }
@@ -43,7 +45,8 @@ export class I18nService {
     if (typeof document !== 'undefined' && document.body) {
       const bodyLang = document.body.getAttribute('data-vscode-language');
       if (bodyLang) {
-        this.language = bodyLang.toLowerCase().startsWith('es') ? 'es' : 'en';
+        const lower = bodyLang.toLowerCase();
+        this.language = lower.startsWith('zh') ? 'zh-cn' : (lower.startsWith('es') ? 'es' : 'en');
         this.initialized = true;
         return;
       }
@@ -51,7 +54,8 @@ export class I18nService {
 
     // 4. Browser / system navigator language
     if (typeof navigator !== 'undefined' && navigator.language) {
-      this.language = navigator.language.toLowerCase().startsWith('es') ? 'es' : 'en';
+      const lower = navigator.language.toLowerCase();
+      this.language = lower.startsWith('zh') ? 'zh-cn' : (lower.startsWith('es') ? 'es' : 'en');
     } else {
       this.language = 'en';
     }
@@ -87,7 +91,8 @@ export class I18nService {
   }
 
   public static toggleLanguage(): Language {
-    const nextLang: Language = this.getLanguage() === 'es' ? 'en' : 'es';
+    const current = this.getLanguage();
+    const nextLang: Language = current === 'es' ? 'en' : (current === 'en' ? 'zh-cn' : 'es');
     this.setLanguage(nextLang);
     return nextLang;
   }
@@ -100,7 +105,10 @@ export class I18nService {
   }
 
   public static getDict(): Translations {
-    return this.getLanguage() === 'es' ? es : en;
+    const lang = this.getLanguage();
+    if (lang === 'zh-cn') return zhCn;
+    if (lang === 'es') return es;
+    return en;
   }
 
   public static t(path: TranslationKey | string, params?: Record<string, string | number>): string {
@@ -112,9 +120,25 @@ export class I18nService {
       if (curr && typeof curr === 'object' && p in curr) {
         curr = curr[p];
       } else {
-        // Fallback to Spanish or English if path missing
+        // Fallback if path missing
         curr = null;
         break;
+      }
+    }
+
+    // Fallback to English if key missing in current dict
+    if (curr === null || typeof curr !== 'string') {
+      let fallbackCurr: any = en;
+      for (const p of parts) {
+        if (fallbackCurr && typeof fallbackCurr === 'object' && p in fallbackCurr) {
+          fallbackCurr = fallbackCurr[p];
+        } else {
+          fallbackCurr = null;
+          break;
+        }
+      }
+      if (fallbackCurr !== null && typeof fallbackCurr === 'string') {
+        curr = fallbackCurr;
       }
     }
 
