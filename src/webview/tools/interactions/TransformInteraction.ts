@@ -10,6 +10,7 @@ import { PivotManager } from './PivotManager.js';
 import { GradientGizmoController } from './GradientGizmoController.js';
 import { SelectionMiniHud } from './SelectionMiniHud.js';
 import { SelectionCursorHelper } from './SelectionCursorHelper.js';
+import { GroupHierarchyService } from '../../engine/selection/GroupHierarchyService.js';
 import type { SelectToolCallbacks } from '../SelectToolHandler.js';
 
 /**
@@ -161,6 +162,10 @@ export class TransformInteraction {
     this.initialElementsMap.clear();
     this.initialAttributesMap.clear();
     selectedEls.forEach((el) => {
+      this.initialAttributesMap.set(el.id, { ...el.attributes });
+    });
+    const leaves = GroupHierarchyService.collectAllLeafElements(selectedEls);
+    leaves.forEach((el) => {
       this.initialAttributesMap.set(el.id, { ...el.attributes });
       if (el.vertices) {
         this.initialElementsMap.set(
@@ -728,7 +733,8 @@ export class TransformInteraction {
           }
         } else {
           // Mode: Move (Mover Puro) - High-visibility magnetic snap targets for vertices and geometric center
-          selectedEls.forEach((el) => {
+          const snapTargets = GroupHierarchyService.collectAllLeafElements(selectedEls);
+          snapTargets.forEach((el) => {
             if (ctx.model.isEllipse(el)) {
               const cx = parseFloat(el.attributes.cx || '0');
               const cy = parseFloat(el.attributes.cy || '0');
@@ -813,7 +819,7 @@ export class TransformInteraction {
     // Ghost Transform Vector
     if (this.ghostTransformMap.size > 0) {
       this.ghostTransformMap.forEach((gVerts, id) => {
-        const el = ctx.model.elements.find((e) => e.id === id);
+        const el = ctx.model.getElementById(id) || ctx.model.elements.find((e) => e.id === id);
         if (el) {
           const isClosed = ctx.model.isElementClosed(el);
           const d = ctx.model.compilePathD(gVerts, isClosed);

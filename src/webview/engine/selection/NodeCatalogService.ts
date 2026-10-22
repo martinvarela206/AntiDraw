@@ -45,6 +45,12 @@ export class NodeCatalogService {
     for (const el of elements) {
       if (excludeSet.has(el.id)) continue;
 
+      // Group Container Recursion
+      if (el.tagName === 'g' && el.children && el.children.length > 0) {
+        pts.push(...this.collectSnappableNodes(el.children, options));
+        continue;
+      }
+
       // 1. Structural Nodes (Topology vertices)
       if (includeStructural && el.vertices && el.vertices.length > 0) {
         for (const v of el.vertices) {

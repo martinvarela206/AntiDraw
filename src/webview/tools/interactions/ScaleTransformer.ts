@@ -232,7 +232,7 @@ export class ScaleTransformer {
     selectedEls: VectorElement[]
   ): void {
     ghostTransformMap.forEach((transformedVerts, id) => {
-      const el = ctx.model.elements.find((e) => e.id === id);
+      const el = ctx.model.getElementById(id) || ctx.model.elements.find((e) => e.id === id);
       if (!el) return;
 
       const isPieOrArc =

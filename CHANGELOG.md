@@ -3,6 +3,21 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.95.0] - 2026-10-22
+
+### 🚀 Added
+- **Native Hierarchical SVG Grouping (`<g>`) & Isolated Stacking Context**:
+  - Re-engineered `object.group` (<kbd>Ctrl</kbd>+<kbd>G</kbd>) and `object.ungroup` (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd>) system commands to create true W3C standard SVG `<g id="group_...">` containers, replacing the prior destructive Boolean combine behavior.
+  - Preserved relative z-order and hierarchy across arbitrary parent/nested tree depths.
+  - Implemented W3C Isolated Stacking Context: group opacity (`group.attributes['opacity']`) is assigned directly to the `<g>` container without multiplying or altering individual child opacities, eliminating unsightly internal seam overlap artifacts.
+  - Propagated opacity smoothly to children upon ungrouping if the container had fractional opacity ($< 1$).
+  - Added full recursive affine transforms: scaling, rotating, translating, skewing, and projective distortion on `<g>` containers proportionally transform all descendant leaf vector vertices and handles.
+  - Built dedicated `GroupInspector` exposing bounding box geometry ($X$, $Y$, $W$, $H$), isolated group opacity (0–100%), compositing blend modes (`mix-blend-mode`), child element telemetry, and an instant ungroup action.
+  - Added `[ Agrupar (Ctrl+G) ]` quick action in `MultiSelectionInspector`.
+  - Added recursive companion metadata (`data-*`) extraction and roundtrip serialization/deserialization for nested `<g>` elements.
+
+---
+
 ## [0.94.3] - 2026-10-20
 
 ### 🛠️ Fixed

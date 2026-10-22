@@ -262,13 +262,13 @@ export function registerSystemCommands(registry: CommandRegistry): void {
 
   registry.register({
     id: 'object.group',
-    label: 'Agrupar (Combinar Contornos)',
+    label: 'Agrupar',
     category: 'object',
     shortcut: 'Ctrl+G',
     isEnabled: (ctx: CommandContext) => (ctx.selectionTool?.selectedElementIds?.size || 0) >= 2,
     execute: (ctx: CommandContext) => {
-      if (ctx.actionDispatcher?.executeBoolean) {
-        ctx.actionDispatcher.executeBoolean('combine');
+      if (ctx.actionDispatcher?.groupSelection) {
+        ctx.actionDispatcher.groupSelection();
         return { success: true };
       }
       return { success: false, error: 'ActionDispatcher no disponible' };
@@ -277,13 +277,20 @@ export function registerSystemCommands(registry: CommandRegistry): void {
 
   registry.register({
     id: 'object.ungroup',
-    label: 'Desagrupar (Fragmentar Contornos)',
+    label: 'Desagrupar',
     category: 'object',
     shortcut: 'Ctrl+Shift+G',
-    isEnabled: (ctx: CommandContext) => (ctx.selectionTool?.selectedElementIds?.size || 0) > 0,
+    isEnabled: (ctx: CommandContext) => {
+      if (!ctx.selectionTool?.selectedElementIds || ctx.selectionTool.selectedElementIds.size === 0) return false;
+      const ids: string[] = Array.from(ctx.selectionTool.selectedElementIds);
+      return ids.some((id: string) => {
+        const el = ctx.model?.getElementById ? ctx.model.getElementById(id) : ctx.model?.elements?.find((e: any) => e.id === id);
+        return el && el.tagName === 'g';
+      });
+    },
     execute: (ctx: CommandContext) => {
-      if (ctx.actionDispatcher?.executeBoolean) {
-        ctx.actionDispatcher.executeBoolean('fragment');
+      if (ctx.actionDispatcher?.ungroupSelection) {
+        ctx.actionDispatcher.ungroupSelection();
         return { success: true };
       }
       return { success: false, error: 'ActionDispatcher no disponible' };

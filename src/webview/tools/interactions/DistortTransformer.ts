@@ -1,6 +1,7 @@
 import { ToolContext } from '../IToolHandler.js';
 import { VectorElement, PathVertex, Point } from '../../engine/VectorModel.js';
 import { BoundingBox } from '../../engine/SelectionTool.js';
+import { GroupHierarchyService } from '../../engine/selection/GroupHierarchyService.js';
 import { ProjectiveHomography, QuadCorners } from '../../engine/geometry/ProjectiveHomography.js';
 
 export interface DistortInitResult {
@@ -66,6 +67,11 @@ export class DistortTransformer {
     const ghostTransformMap = new Map<string, PathVertex[]>();
 
     selectedEls.forEach((el) => {
+      initialAttributesMap.set(el.id, { ...el.attributes });
+    });
+
+    const leaves = GroupHierarchyService.collectAllLeafElements(selectedEls);
+    leaves.forEach((el) => {
       initialAttributesMap.set(el.id, { ...el.attributes });
       if (el.vertices) {
         const vertsCopy = el.vertices.map((v) => ({
@@ -236,7 +242,8 @@ export class DistortTransformer {
 
     ctx.pushUndo();
 
-    selectedEls.forEach((el) => {
+    const targetEls = GroupHierarchyService.collectAllLeafElements(selectedEls);
+    targetEls.forEach((el) => {
       // 1. Preserve pristine pre-distort vertices in companion metadata before first deformation
       if (!el.attributes['data-distort-base'] && el.vertices) {
         const baseSnapshot = {

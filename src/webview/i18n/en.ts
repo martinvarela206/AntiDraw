@@ -134,9 +134,33 @@ export const en: Translations = {
     blend: 'Parametric Blend',
     multiSelection: 'Multiple Selection',
     swatches: 'Global Color Swatches',
+    group: 'Group Container (&lt;g&gt;)',
   },
 
   inspector: {
+    // Group Inspector
+    groupTitle: 'Group Container',
+    groupTag: '&lt;g&gt;',
+    containedElements: '{count} child elements',
+    groupOpacity: 'Group Opacity',
+    groupOpacityHint: 'Layer isolation (Isolated Stacking Context)',
+    ungroup: 'Ungroup',
+    ungroupShortcut: 'Ungroup (Ctrl+Shift+G)',
+    groupShortcut: 'Group (Ctrl+G)',
+    blendMode: 'Blend Mode (mix-blend-mode)',
+    blendModeNormal: 'Normal',
+    blendModeMultiply: 'Multiply',
+    blendModeScreen: 'Screen',
+    blendModeOverlay: 'Overlay',
+    blendModeDarken: 'Darken',
+    blendModeLighten: 'Lighten',
+    blendModeColorDodge: 'Color Dodge',
+    blendModeColorBurn: 'Color Burn',
+    blendModeHardLight: 'Hard Light',
+    blendModeSoftLight: 'Soft Light',
+    blendModeDifference: 'Difference',
+    blendModeExclusion: 'Exclusion',
+
     noSelectionTitle: 'No Selection',
     noSelectionHint: 'Select an object on the canvas to inspect its properties, or click "Canvas" in the status bar to configure canvas & viewBox bounds.',
 

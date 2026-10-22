@@ -1,6 +1,7 @@
 import { ToolContext } from '../IToolHandler.js';
 import { VectorElement, PathVertex, Point } from '../../engine/VectorModel.js';
 import { BoundingBox } from '../../engine/SelectionTool.js';
+import { GroupHierarchyService } from '../../engine/selection/GroupHierarchyService.js';
 
 export interface SkewInitResult {
   initialBox: BoundingBox;
@@ -53,7 +54,8 @@ export class SkewTransformer {
    */
   public static canSkewElements(selectedEls: VectorElement[], ctx: ToolContext): boolean {
     if (selectedEls.length === 0) return false;
-    return !selectedEls.some((el) => ctx.model.isParametricElement(el));
+    const leaves = GroupHierarchyService.collectAllLeafElements(selectedEls);
+    return !leaves.some((el) => ctx.model.isParametricElement(el));
   }
 
   /**
@@ -69,6 +71,11 @@ export class SkewTransformer {
     const ghostTransformMap = new Map<string, PathVertex[]>();
 
     selectedEls.forEach((el) => {
+      initialAttributesMap.set(el.id, { ...el.attributes });
+    });
+
+    const leaves = GroupHierarchyService.collectAllLeafElements(selectedEls);
+    leaves.forEach((el) => {
       initialAttributesMap.set(el.id, { ...el.attributes });
       if (el.vertices) {
         const vertsCopy = el.vertices.map((v) => ({
@@ -258,7 +265,7 @@ export class SkewTransformer {
     selectedEls: VectorElement[]
   ): void {
     ghostTransformMap.forEach((transformedVerts, id) => {
-      const el = ctx.model.elements.find((e) => e.id === id);
+      const el = ctx.model.getElementById(id) || ctx.model.elements.find((e) => e.id === id);
       if (!el) return;
 
       el.vertices = transformedVerts;

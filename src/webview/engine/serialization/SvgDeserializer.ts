@@ -251,18 +251,44 @@ export class SvgDeserializer {
       const usedIds = new Set<string>();
       let elementIdx = 0;
 
-      const parseNode = (node: Element, inherited: Record<string, string>) => {
+      const parseNode = (
+        node: Element,
+        inherited: Record<string, string>,
+        targetList: VectorElement[] = ctx.elements
+      ) => {
         const tag = node.tagName.toLowerCase();
         if (tag === 'g') {
           const gAttrs: Record<string, string> = {};
+          for (let i = 0; i < node.attributes.length; i++) {
+            const attr = node.attributes[i];
+            gAttrs[attr.name] = attr.value;
+          }
           if (node.hasAttribute('style')) gAttrs.style = node.getAttribute('style')!;
           if (node.hasAttribute('transform')) gAttrs.transform = node.getAttribute('transform')!;
           SvgDeserializer.cleanStyleAttr(gAttrs);
           if (gAttrs.transform) {
             gAttrs.transform = SvgDeserializer.normalizeTransform(gAttrs.transform);
           }
+
+          const groupElemId = node.getAttribute('id') || `group_${elementIdx++}_${Date.now().toString(36)}`;
+          if (!gAttrs.id) gAttrs.id = groupElemId;
+          usedIds.add(groupElemId);
+
+          if (companionMetadata?.elements && companionMetadata.elements[groupElemId]) {
+            Object.assign(gAttrs, companionMetadata.elements[groupElemId]);
+          }
+
+          const groupEl: VectorElement = {
+            id: groupElemId,
+            tagName: 'g',
+            attributes: gAttrs,
+            children: [],
+          };
+
           const groupInherited = { ...inherited, ...extractPresentationAttrs(node), ...gAttrs };
-          Array.from(node.children).forEach((ch) => parseNode(ch, groupInherited));
+          Array.from(node.children).forEach((ch) => parseNode(ch, groupInherited, groupEl.children!));
+
+          targetList.push(groupEl);
           return;
         }
 
@@ -352,7 +378,7 @@ export class SvgDeserializer {
           });
 
           textElem.textContent = textLines.join('\n');
-          ctx.elements.push(textElem);
+          targetList.push(textElem);
           return;
         }
 
@@ -428,7 +454,7 @@ export class SvgDeserializer {
             { id: `${textElemId}_v3`, x: tx, y: ty, nodeType: 'sharp', command: 'L' },
           ];
 
-          ctx.elements.push(textElem);
+          targetList.push(textElem);
           return;
         }
 
@@ -718,7 +744,7 @@ export class SvgDeserializer {
             }
           }
 
-          ctx.elements.push(elem);
+          targetList.push(elem);
         }
       };
 

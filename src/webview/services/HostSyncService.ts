@@ -1,5 +1,5 @@
 import { VsCodeBridge } from '../bridge/VsCodeBridge.js';
-import { VectorModel } from '../engine/VectorModel.js';
+import { VectorModel, VectorElement } from '../engine/VectorModel.js';
 import { CanvasManager } from '../engine/CanvasManager.js';
 import { SelectionTool } from '../engine/SelectionTool.js';
 import { HistoryService } from './HistoryService.js';
@@ -78,17 +78,23 @@ export class HostSyncService {
 
   public syncMetadataToHost(): void {
     const elementsMetadata: Record<string, Record<string, string>> = {};
-    for (const el of this.ctx.model.elements) {
-      const elData: Record<string, string> = {};
-      for (const [k, v] of Object.entries(el.attributes)) {
-        if (k.startsWith('data-')) {
-          elData[k] = v;
+    const collectMeta = (list: VectorElement[]) => {
+      for (const el of list) {
+        const elData: Record<string, string> = {};
+        for (const [k, v] of Object.entries(el.attributes)) {
+          if (k.startsWith('data-')) {
+            elData[k] = String(v);
+          }
+        }
+        if (Object.keys(elData).length > 0) {
+          elementsMetadata[el.id] = elData;
+        }
+        if (el.children && el.children.length > 0) {
+          collectMeta(el.children);
         }
       }
-      if (Object.keys(elData).length > 0) {
-        elementsMetadata[el.id] = elData;
-      }
-    }
+    };
+    collectMeta(this.ctx.model.elements);
 
     const viewportCtrl = this.ctx.getViewportCtrl();
 

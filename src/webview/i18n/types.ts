@@ -140,10 +140,34 @@ export interface Translations {
     blend: string;
     multiSelection: string;
     swatches: string;
+    group: string;
   };
 
   // Inspector Fields & Buttons
   inspector: {
+    // Group Inspector
+    groupTitle: string;
+    groupTag: string;
+    containedElements: string;
+    groupOpacity: string;
+    groupOpacityHint: string;
+    ungroup: string;
+    ungroupShortcut: string;
+    groupShortcut: string;
+    blendMode: string;
+    blendModeNormal: string;
+    blendModeMultiply: string;
+    blendModeScreen: string;
+    blendModeOverlay: string;
+    blendModeDarken: string;
+    blendModeLighten: string;
+    blendModeColorDodge: string;
+    blendModeColorBurn: string;
+    blendModeHardLight: string;
+    blendModeSoftLight: string;
+    blendModeDifference: string;
+    blendModeExclusion: string;
+
     // No Selection State
     noSelectionTitle: string;
     noSelectionHint: string;

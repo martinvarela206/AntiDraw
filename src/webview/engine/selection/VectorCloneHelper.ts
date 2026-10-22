@@ -25,6 +25,15 @@ export class VectorCloneHelper {
     model: VectorModel
   ): VectorElement {
     const clone: VectorElement = JSON.parse(JSON.stringify(srcEl));
+
+    if (clone.tagName === 'g' && clone.children && clone.children.length > 0) {
+      const newGroupId = `group_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
+      clone.id = newGroupId;
+      clone.attributes.id = newGroupId;
+      clone.children = clone.children.map((child) => VectorCloneHelper.cloneWithOffset(child, offset, model));
+      return clone;
+    }
+
     const newElId = `el_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
     clone.id = newElId;
     clone.attributes.id = newElId;

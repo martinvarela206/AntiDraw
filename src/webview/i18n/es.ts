@@ -134,9 +134,33 @@ export const es: Translations = {
     blend: 'Fusión Paramétrica (Blend)',
     multiSelection: 'Selección Múltiple',
     swatches: 'Muestras de Color Globales',
+    group: 'Contenedor de Grupo (&lt;g&gt;)',
   },
 
   inspector: {
+    // Group Inspector
+    groupTitle: 'Contenedor de Grupo',
+    groupTag: '&lt;g&gt;',
+    containedElements: '{count} elementos contenidos',
+    groupOpacity: 'Opacidad Grupal',
+    groupOpacityHint: 'Aislamiento de capa (Isolated Stacking Context)',
+    ungroup: 'Desagrupar',
+    ungroupShortcut: 'Desagrupar (Ctrl+Shift+G)',
+    groupShortcut: 'Agrupar (Ctrl+G)',
+    blendMode: 'Modo de Fusión (mix-blend-mode)',
+    blendModeNormal: 'Normal',
+    blendModeMultiply: 'Multiplicar (Multiply)',
+    blendModeScreen: 'Trama (Screen)',
+    blendModeOverlay: 'Superponer (Overlay)',
+    blendModeDarken: 'Oscurecer (Darken)',
+    blendModeLighten: 'Aclarar (Lighten)',
+    blendModeColorDodge: 'Subexponer Color (Color Dodge)',
+    blendModeColorBurn: 'Sobreexponer Color (Color Burn)',
+    blendModeHardLight: 'Luz Fuerte (Hard Light)',
+    blendModeSoftLight: 'Luz Suave (Soft Light)',
+    blendModeDifference: 'Diferencia (Difference)',
+    blendModeExclusion: 'Exclusión (Exclusion)',
+
     noSelectionTitle: 'Sin Selección',
     noSelectionHint: 'Selecciona un objeto en el lienzo para inspeccionar sus propiedades, o haz clic en "Lienzo" en la barra de estado para configurar el lienzo y viewBox.',
 

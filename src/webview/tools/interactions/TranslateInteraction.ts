@@ -6,6 +6,7 @@ import { BaseHelper } from '../../engine/canvas/helpers/index.js';
 import { SnappingEngine, SnapResult } from '../../engine/canvas/SnappingEngine.js';
 import { EdgeSnappingService } from '../../engine/canvas/EdgeSnappingService.js';
 import { VectorCloneHelper } from '../../engine/selection/VectorCloneHelper.js';
+import { GroupHierarchyService } from '../../engine/selection/GroupHierarchyService.js';
 
 /**
  * TranslateInteraction
@@ -332,7 +333,8 @@ export class TranslateInteraction {
     this.initialElementsMap.clear();
     this.isDuplicateMode = false;
     this.isOrthogonal = false;
-    selectedEls.forEach((el) => {
+    const leaves = GroupHierarchyService.collectAllLeafElements(selectedEls);
+    leaves.forEach((el) => {
       if (el.vertices) {
         this.initialElementsMap.set(
           el.id,
@@ -617,7 +619,7 @@ export class TranslateInteraction {
         });
       } else {
         this.initialElementsMap.forEach((origVerts, id) => {
-          const el = ctx.model.elements.find((e) => e.id === id);
+          const el = ctx.model.getElementById(id) || ctx.model.elements.find((e) => e.id === id);
           if (el) {
             el.vertices = origVerts.map((v) => ({
               ...v,

@@ -513,8 +513,8 @@ export class SvgSerializer {
       return res;
     };
 
-    ctx.elements.forEach((el) => {
-      if (!filterContextual(el)) return;
+    const serializeElement = (el: VectorElement, indent: string = '  '): string => {
+      if (!filterContextual(el)) return '';
 
       // HISTORICAL ARCHITECTURE (FIX-19): Guarantee attributes.id strictly reflects model el.id upon serialization
       el.attributes.id = el.id;
@@ -523,22 +523,20 @@ export class SvgSerializer {
         const childrenToSerialize = (el.children || []).filter(filterContextual);
         if (excludeContextual && childrenToSerialize.length === 0 && (el.children || []).length > 0) {
           // All children were contextual, skip the empty group entirely
-          return;
+          return '';
         }
 
-        svg += `  <g${serializeCleanAttrs(el.attributes)}>\n`;
+        let groupSvg = `${indent}<g${serializeCleanAttrs(el.attributes)}>\n`;
         if (childrenToSerialize.length > 0) {
           childrenToSerialize.forEach((child) => {
-            child.attributes.id = child.id;
-            if (child.vertices && child.vertices.length > 0 && child.tagName === 'path') {
-              child.attributes.d = ctx.compilePathD(child.vertices, child.isClosed);
-            }
-            svg += `    <${child.tagName}${serializeCleanAttrs(child.attributes)} />\n`;
+            groupSvg += serializeElement(child, indent + '  ');
           });
         }
-        svg += `  </g>\n`;
-        return;
+        groupSvg += `${indent}</g>\n`;
+        return groupSvg;
       }
+
+      let elSvg = '';
 
       DashCornerAligner.updateFittedDashIfActive(el);
 
@@ -554,7 +552,7 @@ export class SvgSerializer {
       const aboveLayers = stack.strokes.filter((s) => s.position === 'above');
 
       for (const layer of belowLayers) {
-        svg += AppearanceStackManager.compileLayerTags(el, layer);
+        elSvg += AppearanceStackManager.compileLayerTags(el, layer);
       }
 
       const isAutoPromotedShape = ctx.isRect(el) || ctx.isEllipse(el) || el.attributes['data-shape'] === 'star';
@@ -602,19 +600,19 @@ export class SvgSerializer {
             delete cleanAttrs.r;
             delete cleanAttrs['data-node-types'];
 
-            svg += `  <path${serializeCleanAttrs(cleanAttrs)} />\n`;
+            elSvg += `${indent}<path${serializeCleanAttrs(cleanAttrs)} />\n`;
           } else {
             delete cleanAttrs.d;
             delete cleanAttrs['data-node-types'];
             delete cleanAttrs['fill-rule'];
             const isCircle = Math.abs(rx - ry) < 0.5;
             if (isCircle && cleanAttrs.r) {
-              svg += `  <circle${serializeCleanAttrs(cleanAttrs)} />\n`;
+              elSvg += `${indent}<circle${serializeCleanAttrs(cleanAttrs)} />\n`;
             } else {
               delete cleanAttrs.r;
               cleanAttrs.rx = rx.toString();
               cleanAttrs.ry = ry.toString();
-              svg += `  <ellipse${serializeCleanAttrs(cleanAttrs)} />\n`;
+              elSvg += `${indent}<ellipse${serializeCleanAttrs(cleanAttrs)} />\n`;
             }
           }
         } else if (ctx.isRect(el)) {
@@ -643,7 +641,7 @@ export class SvgSerializer {
             }
             delete cleanAttrs.d;
             delete cleanAttrs['data-node-types'];
-            svg += `  <rect${serializeCleanAttrs(cleanAttrs)} />\n`;
+            elSvg += `${indent}<rect${serializeCleanAttrs(cleanAttrs)} />\n`;
           } else {
             const eff = ctx.calculateEffectiveCorners(w, h, corners);
             cleanAttrs.d = ctx.compileRectD(x, y, w, h, eff.tl, eff.tr, eff.br, eff.bl);
@@ -656,7 +654,7 @@ export class SvgSerializer {
             delete cleanAttrs.height;
             delete cleanAttrs.rx;
             delete cleanAttrs.ry;
-            svg += `  <path${serializeCleanAttrs(cleanAttrs)} />\n`;
+            elSvg += `${indent}<path${serializeCleanAttrs(cleanAttrs)} />\n`;
           }
         } else if (cleanAttrs['data-shape'] === 'star') {
           /**
@@ -668,7 +666,7 @@ export class SvgSerializer {
           cleanAttrs['data-shape'] = 'star';
           cleanAttrs['data-parametric'] = 'true';
           delete cleanAttrs['data-node-types'];
-          svg += `  <path${serializeCleanAttrs(cleanAttrs)} />\n`;
+          elSvg += `${indent}<path${serializeCleanAttrs(cleanAttrs)} />\n`;
         } else {
           delete cleanAttrs.d;
           delete cleanAttrs['data-node-types'];
@@ -678,7 +676,7 @@ export class SvgSerializer {
             delete cleanAttrs['data-gradient'];
           }
 
-          svg += `  <${el.tagName}${serializeCleanAttrs(cleanAttrs)} />\n`;
+          elSvg += `${indent}<${el.tagName}${serializeCleanAttrs(cleanAttrs)} />\n`;
         }
       } else {
         if (el.tagName === 'image') {
@@ -716,28 +714,34 @@ export class SvgSerializer {
 
         if (el.tagName === 'text' || el.children || el.textContent) {
           if (el.children && el.children.length > 0) {
-            svg += `  <${el.tagName}${serializeCleanAttrs(el.attributes)}>\n`;
+            elSvg += `${indent}<${el.tagName}${serializeCleanAttrs(el.attributes)}>\n`;
             for (const ch of el.children) {
               if (ch.textContent) {
-                svg += `    <${ch.tagName}${serializeCleanAttrs(ch.attributes)}>${escapeXml(ch.textContent)}</${ch.tagName}>\n`;
+                elSvg += `${indent}  <${ch.tagName}${serializeCleanAttrs(ch.attributes)}>${escapeXml(ch.textContent)}</${ch.tagName}>\n`;
               } else {
-                svg += `    <${ch.tagName}${serializeCleanAttrs(ch.attributes)} />\n`;
+                elSvg += `${indent}  <${ch.tagName}${serializeCleanAttrs(ch.attributes)} />\n`;
               }
             }
-            svg += `  </${el.tagName}>\n`;
+            elSvg += `${indent}</${el.tagName}>\n`;
           } else if (el.textContent) {
-            svg += `  <${el.tagName}${serializeCleanAttrs(el.attributes)}>${escapeXml(el.textContent)}</${el.tagName}>\n`;
+            elSvg += `${indent}<${el.tagName}${serializeCleanAttrs(el.attributes)}>${escapeXml(el.textContent)}</${el.tagName}>\n`;
           } else {
-            svg += `  <${el.tagName}${serializeCleanAttrs(el.attributes)} />\n`;
+            elSvg += `${indent}<${el.tagName}${serializeCleanAttrs(el.attributes)} />\n`;
           }
         } else {
-          svg += `  <${el.tagName}${serializeCleanAttrs(el.attributes)} />\n`;
+          elSvg += `${indent}<${el.tagName}${serializeCleanAttrs(el.attributes)} />\n`;
         }
       }
 
       for (const layer of aboveLayers) {
-        svg += AppearanceStackManager.compileLayerTags(el, layer);
+        elSvg += AppearanceStackManager.compileLayerTags(el, layer);
       }
+
+      return elSvg;
+    };
+
+    ctx.elements.forEach((el) => {
+      svg += serializeElement(el, '  ');
     });
 
     svg += `</svg>`;

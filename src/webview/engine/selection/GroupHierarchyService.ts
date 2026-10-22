@@ -166,4 +166,69 @@ export class GroupHierarchyService {
 
     return chain[0].id;
   }
+
+  /**
+   * Recursively collects all descendant leaf vector elements contained within an element or group.
+   * If the element is a leaf itself, returns [element].
+   */
+  public static collectLeafElements(element: VectorElement): VectorElement[] {
+    if (element.tagName === 'g' && element.children && element.children.length > 0) {
+      const leaves: VectorElement[] = [];
+      for (const child of element.children) {
+        leaves.push(...this.collectLeafElements(child));
+      }
+      return leaves;
+    }
+    return [element];
+  }
+
+  /**
+   * Recursively collects all descendant leaf vector elements for an array of elements or groups.
+   */
+  public static collectAllLeafElements(elements: VectorElement[]): VectorElement[] {
+    const leaves: VectorElement[] = [];
+    for (const el of elements) {
+      leaves.push(...this.collectLeafElements(el));
+    }
+    return leaves;
+  }
+
+  /**
+   * Finds the immediate parent container, parent list, and index of a target element in the element tree.
+   */
+  public static findParent(
+    elements: VectorElement[],
+    targetId: string
+  ): { parent: VectorElement | null; list: VectorElement[]; index: number } | null {
+    for (let i = 0; i < elements.length; i++) {
+      if (elements[i].id === targetId) {
+        return { parent: null, list: elements, index: i };
+      }
+    }
+
+    const search = (
+      parent: VectorElement,
+      list: VectorElement[]
+    ): { parent: VectorElement; list: VectorElement[]; index: number } | null => {
+      for (let i = 0; i < list.length; i++) {
+        if (list[i].id === targetId) {
+          return { parent, list, index: i };
+        }
+        if (list[i].tagName === 'g' && list[i].children && list[i].children!.length > 0) {
+          const res = search(list[i], list[i].children!);
+          if (res) return res;
+        }
+      }
+      return null;
+    };
+
+    for (const el of elements) {
+      if (el.tagName === 'g' && el.children && el.children.length > 0) {
+        const res = search(el, el.children);
+        if (res) return res;
+      }
+    }
+
+    return null;
+  }
 }

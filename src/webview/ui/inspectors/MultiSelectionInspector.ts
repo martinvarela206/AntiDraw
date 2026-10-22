@@ -51,6 +51,11 @@ export class MultiSelectionInspector {
           <span class="prop-label">${I18nService.t('common.nodes')}</span>
           <span style="font-weight:600; color:var(--text-main);">${I18nService.t('inspector.totalNodes', { count: elements.reduce((acc, curr) => acc + (curr.vertices ? curr.vertices.length : 0), 0) })}</span>
         </div>
+        <div class="prop-row" style="margin-top:6px;">
+          <button class="prop-input" id="btn-multi-group" style="cursor:pointer; background:var(--bg-panel-hover); font-weight:600; display:flex; align-items:center; justify-content:center; gap:6px; width:100%;" title="${I18nService.t('inspector.groupShortcut')}">
+            ${ToolIcons.union} ${I18nService.t('inspector.groupShortcut')}
+          </button>
+        </div>
       </div>
 
       <div class="panel-section">
@@ -202,6 +207,13 @@ export class MultiSelectionInspector {
     bindInspectorMouseDown(container, 'btn-prop-bool-exclude', () => callbacks.onBoolean && callbacks.onBoolean('exclude'));
     bindInspectorMouseDown(container, 'btn-prop-bool-combine', () => callbacks.onBoolean && callbacks.onBoolean('combine'));
     bindInspectorMouseDown(container, 'btn-prop-bool-fragment', () => callbacks.onBoolean && callbacks.onBoolean('fragment'));
+
+    const btnMultiGroup = container.querySelector<HTMLButtonElement>('#btn-multi-group');
+    if (btnMultiGroup) {
+      btnMultiGroup.addEventListener('click', () => {
+        if (callbacks.onGroup) callbacks.onGroup();
+      });
+    }
 
     const btnBatchAddFill = container.querySelector<HTMLButtonElement>('#btn-batch-add-fill');
     const btnBatchRemoveFill = container.querySelector<HTMLButtonElement>('#btn-batch-remove-fill');

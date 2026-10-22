@@ -51,6 +51,8 @@ export interface PropertyPanelCallbacks {
   onApplyWarpArc?: (options: any) => void;
   onResetWarp?: () => void;
   onConvertGuideToVector?: () => void;
+  onGroup?: () => void;
+  onUngroup?: () => void;
   syncMetadataToHost?: () => void;
 }
 
@@ -65,6 +67,7 @@ import { PrimitiveInspector } from './inspectors/PrimitiveInspector.js';
 import { ShapeDefaultsInspector } from './inspectors/ShapeDefaultsInspector.js';
 import { NodeInspector } from './inspectors/NodeInspector.js';
 import { MultiSelectionInspector } from './inspectors/MultiSelectionInspector.js';
+import { GroupInspector } from './inspectors/GroupInspector.js';
 import { SwatchPaletteInspector } from './inspectors/SwatchPaletteInspector.js';
 import { StrokeInspector, StrokeInspectorProps } from './inspectors/StrokeInspector.js';
 import { QuickHelpInspector } from './inspectors/QuickHelpInspector.js';
@@ -104,7 +107,7 @@ export class PropertyPanel {
   private callbacks: PropertyPanelCallbacks;
 
   // Track which panel section is currently rendered to avoid full re-builds
-  public currentPanelMode: 'canvas' | 'element' | 'node' | 'pen' | 'polyline' | 'multi' | 'ruler' | 'guide' | 'shape' | 'stroke' | null = null;
+  public currentPanelMode: 'canvas' | 'element' | 'group' | 'node' | 'pen' | 'polyline' | 'multi' | 'ruler' | 'guide' | 'shape' | 'stroke' | null = null;
 
   constructor(
     container: HTMLElement,
@@ -311,8 +314,13 @@ export class PropertyPanel {
           this.renderMultiElementProperties(selectedEls);
         }
       } else if (selectedEls.length === 1) {
-        this.currentPanelMode = 'element';
-        this.renderElementProperties(selectedEls[0]);
+        if (selectedEls[0].tagName === 'g') {
+          this.currentPanelMode = 'group';
+          this.renderGroupProperties(selectedEls[0]);
+        } else {
+          this.currentPanelMode = 'element';
+          this.renderElementProperties(selectedEls[0]);
+        }
       } else {
         this.currentPanelMode = 'multi';
         this.renderMultiElementProperties(selectedEls);
@@ -529,6 +537,18 @@ export class PropertyPanel {
       this.selectionTool,
       this.callbacks,
       () => this.renderMultiElementProperties(elements)
+    );
+  }
+
+  // Render Group (<g>) Properties
+  private renderGroupProperties(group: VectorElement): void {
+    GroupInspector.render(
+      this.inspectorContainer,
+      group,
+      this.model,
+      this.selectionTool,
+      this.callbacks,
+      () => this.renderGroupProperties(group)
     );
   }
 

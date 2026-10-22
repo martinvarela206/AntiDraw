@@ -6,6 +6,7 @@ import { CrashGuard } from './CrashGuard.js';
 import { VectorCloneHelper } from '../engine/selection/VectorCloneHelper.js';
 import { SpineCurveService } from '../engine/stroke/SpineCurveService.js';
 import { StrokeOutlineGenerator } from '../engine/boolean/StrokeOutlineGenerator.js';
+import { GroupHierarchyService } from '../engine/selection/GroupHierarchyService.js';
 
 export interface CanvasActionDispatcherContext {
   model: VectorModel;
@@ -503,6 +504,162 @@ export class CanvasActionDispatcher {
       this.ctx.selectionTool.updatePivotOnTranslate(dx, dy, selectedEls);
     }
 
+    this.ctx.onResetPropertyPanel();
+    this.ctx.onUpdatePropertyPanel(this.ctx.getActiveTool());
+    this.ctx.render();
+    this.ctx.syncToHost();
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Hierarchical Native SVG Grouping (<g>) (Tarea 14 / FEAT-GROUP)
+   *
+   * 1. Preserves Independent Vector Entities:
+   *    Unlike destructive boolean path union/combine, native SVG grouping wraps the selected
+   *    vector elements into a hierarchical <g> container, preserving all original paths, primitives,
+   *    attributes, and parametric metadata intact.
+   *
+   * 2. Isolated Blending Group & Stacking Context:
+   *    Applying opacity or blend modes directly to the <g> container creates an off-screen W3C isolated
+   *    stacking buffer. Children compose opaquely within the group before projecting transparency
+   *    solidarily, eliminating interior seam overlapping artifacts.
+   *
+   * 3. Exact Layer Ordering & Insertion Index Invariance:
+   *    Identifies the highest z-index position among the selected elements within their parent container,
+   *    replaces it in-place with the new <g> element, and transfers the selected elements into `children`
+   *    preserving their relative visual stacking order.
+   */
+  public groupSelection(): void {
+    const selectedIds = Array.from(this.ctx.selectionTool.selectedElementIds);
+    if (selectedIds.length === 0) return;
+
+    const selectedSet = new Set(selectedIds);
+    const selectedEls: VectorElement[] = [];
+
+    // Check if we are inside an active drill-down group context
+    let parentList: VectorElement[] = this.ctx.model.elements;
+    if (this.ctx.selectionTool.activeGroupContextId) {
+      const parentGroup = this.ctx.model.getElementById(this.ctx.selectionTool.activeGroupContextId);
+      if (parentGroup && parentGroup.children) {
+        parentList = parentGroup.children;
+      }
+    }
+
+    parentList.forEach((el) => {
+      if (selectedSet.has(el.id)) {
+        selectedEls.push(el);
+      }
+    });
+
+    // If elements weren't found in current active list, search in root elements
+    if (selectedEls.length === 0) {
+      this.ctx.model.elements.forEach((el) => {
+        if (selectedSet.has(el.id)) {
+          selectedEls.push(el);
+        }
+      });
+      parentList = this.ctx.model.elements;
+    }
+
+    if (selectedEls.length === 0) return;
+
+    this.ctx.pushUndo();
+
+    // Top-most element index in parentList
+    const lastSelectedEl = selectedEls[selectedEls.length - 1];
+    const topIdx = parentList.indexOf(lastSelectedEl);
+
+    const groupId = `group_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
+    const newGroup: VectorElement = {
+      id: groupId,
+      tagName: 'g',
+      attributes: {
+        id: groupId,
+        opacity: '1',
+      },
+      children: [...selectedEls],
+    };
+
+    // Remove selected elements from parentList
+    const filteredList = parentList.filter((el) => !selectedSet.has(el.id));
+    // Determine target insertion index
+    let insertIdx = topIdx - (selectedEls.length - 1);
+    if (insertIdx < 0) insertIdx = 0;
+    if (insertIdx > filteredList.length) insertIdx = filteredList.length;
+
+    filteredList.splice(insertIdx, 0, newGroup);
+
+    // Update parentList in place
+    parentList.length = 0;
+    parentList.push(...filteredList);
+
+    // Select the new group
+    this.ctx.selectionTool.deselectAll();
+    this.ctx.selectionTool.select(groupId, newGroup);
+    this.ctx.selectionTool.activeGroupContextId = null;
+
+    this.ctx.model.rebuildSpatialIndex();
+    this.ctx.onResetPropertyPanel();
+    this.ctx.onUpdatePropertyPanel(this.ctx.getActiveTool());
+    this.ctx.render();
+    this.ctx.syncToHost();
+  }
+
+  /**
+   * ARCHITECTURAL RATIONALE: Native SVG Group Unpacking (<g>) (Tarea 14 / FEAT-GROUP)
+   *
+   * 1. Unpacks immediate children of selected <g> containers back into their parent container level.
+   * 2. Propagates group opacity down to children if the group had fractional opacity (< 1) to avoid sudden visual jumps.
+   * 3. Restores atomic selection of all unpacked children and registers undo snapshot.
+   */
+  public ungroupSelection(): void {
+    const selectedIds = Array.from(this.ctx.selectionTool.selectedElementIds);
+    if (selectedIds.length === 0) return;
+
+    const selectedGroups: VectorElement[] = [];
+    selectedIds.forEach((id) => {
+      const el = this.ctx.model.getElementById(id);
+      if (el && el.tagName === 'g') {
+        selectedGroups.push(el);
+      }
+    });
+
+    if (selectedGroups.length === 0) return;
+
+    this.ctx.pushUndo();
+
+    const newlySelectedIds: string[] = [];
+
+    selectedGroups.forEach((group) => {
+      const parentInfo = GroupHierarchyService.findParent(this.ctx.model.elements, group.id);
+      if (!parentInfo) return;
+
+      const { list, index } = parentInfo;
+      const children = group.children || [];
+
+      // If group had fractional opacity, propagate to children
+      const groupOpacityStr = group.attributes['opacity'];
+      const groupOpacity = groupOpacityStr ? parseFloat(groupOpacityStr) : 1;
+      if (!isNaN(groupOpacity) && groupOpacity < 1) {
+        children.forEach((child) => {
+          const childOpStr = child.attributes['opacity'];
+          const childOp = childOpStr ? parseFloat(childOpStr) : 1;
+          const combinedOp = Math.round(childOp * groupOpacity * 100) / 100;
+          child.attributes['opacity'] = combinedOp.toString();
+        });
+      }
+
+      // Splice group out and insert children in-place
+      list.splice(index, 1, ...children);
+      children.forEach((c) => newlySelectedIds.push(c.id));
+    });
+
+    this.ctx.selectionTool.deselectAll();
+    newlySelectedIds.forEach((id) => {
+      this.ctx.selectionTool.selectedElementIds.add(id);
+    });
+    this.ctx.selectionTool.activeGroupContextId = null;
+
+    this.ctx.model.rebuildSpatialIndex();
     this.ctx.onResetPropertyPanel();
     this.ctx.onUpdatePropertyPanel(this.ctx.getActiveTool());
     this.ctx.render();
