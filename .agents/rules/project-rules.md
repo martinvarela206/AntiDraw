@@ -5,12 +5,13 @@
   - **Patch (`x.y.Z+1`)**: Obligatorio para correcciones de bugs, fixes de UI, ajustes de interacción o refactorizaciones.
   - **Minor (`x.Y+1.0`)**: Obligatorio para nuevas herramientas, nuevos paneles, o capacidades funcionales añadidas.
 - **Sincronización y Commit Simultáneo:** En ese mismo turno, es **ESTRICTAMENTE OBLIGATORIO** ejecutar:
-  1. El incremento de versión en `package.json`.
+  1. El incremento y sincronización multicapa de versión en todos los archivos del proyecto mediante `npm run version:sync` o `npm run version:bump <patch|minor>`:
+     - `package.json` (`version` y `publish:openvsx`).
+     - `README.md` (insignia de estado L17 y bloque de estado del proyecto `Project Status: Public Beta (vX.Y.Z)` L41).
   2. La entrada en `changelog.md` exclusivamente en idioma inglés con fecha y desglose de cambios (`Fixed`, `Added`, etc.).
-  3. La actualización de la insignia de versión en `readme.md`.
-  4. La compilación y empaquetado del artefacto `.vsix` con `pnpm run package`.
-  5. **El Commit Atómico Inmediato:** Realizar el commit en Git con formato convencional (`fix: ...`, `feat: ...`, o `chore(release): bump version to X.Y.Z`).
-- **Prohibición:** Queda terminantemente PROHIBIDO finalizar un turno de trabajo donde se haya modificado código funcional o documentación sin haber ejecutado el commit en Git correspondiente.
+  3. La compilación y empaquetado del artefacto `.vsix` con `pnpm run package`.
+  4. **El Commit Atómico Inmediato:** Realizar el commit en Git con formato convencional (`fix: ...`, `feat: ...`, o `chore(release): bump version to X.Y.Z`).
+- **Prohibición de Turnos Incompletos:** Queda terminantemente PROHIBIDO finalizar un turno de trabajo donde se haya modificado código funcional o documentación sin haber ejecutado el commit en Git y el empaquetado VSIX correspondientes en esa misma ronda de herramientas.
 
 ## 1. Generación Obligatoria de Artefacto VSIX con Cada Commit
 - **Empaquetado Inmediato con Cada Commit:** Cada vez que se culmine una tarea atómica, se actualice la versión en `package.json` y se realice su correspondiente commit, **ES OBLIGATORIO** ejecutar `pnpm run package` para compilar y empaquetar el binario `.vsix` instalable actualizado (ej. `antidraw-X.Y.Z.vsix`).
@@ -39,8 +40,8 @@
 ## 6. Sincronización Pre-Commit Obligatoria de Documentación, README y Changelog
 - **Prohibición de Commits Huérfanos de Documentación:** Antes de ejecutar cualquier commit que incorpore nuevas características, correcciones, mejoras visuales o bumps de versión en el repositorio principal `AntiDraw`, es **ESTRICTAMENTE OBLIGATORIO** haber actualizado previamente todos los documentos relacionados del proyecto:
   1. **`changelog.md`**: Registrar bajo el estándar *Keep a Changelog* la nueva versión, fecha y desglose exhaustivo de cambios (`Added`, `Changed`, `Fixed`, etc.). **Idioma Obligatorio:** El archivo `changelog.md` se debe redactar y mantener **ESTRICTAMENTE EN INGLÉS** para todas las versiones y entradas.
-  2. **`readme.md`**: Actualizar la insignia de versión (ej. `v0.87.0`), las descripciones de nuevas capacidades (ej. i18n bilingüe, barras de herramientas actualizadas), enlaces a marketplaces y tablas de soporte.
-  3. **`package.json`**: Verificar coherencia total entre la versión declarada, scripts y metadatos.
+  2. **`readme.md`**: Actualizar tanto la insignia de versión (`badge` L17) como el bloque de estado del proyecto (`Project Status` L41), las descripciones de nuevas capacidades (ej. i18n bilingüe, barras de herramientas actualizadas), enlaces a marketplaces y tablas de soporte.
+  3. **`package.json`**: Verificar coherencia total entre la versión declarada, scripts (`publish:openvsx` apuntando al `.vsix` actual) y metadatos (utilizar `pnpm run version:sync`).
   4. **Documentación Técnica en `Docs/`**: Toda modificación en herramientas, atajos, parámetros o flujos debe quedar reflejada en `Descripción de las herramientas.md`, `Catálogo de Iconos y Herramientas.md`, guías operativas y `Docs/TODO.md`, completando su propio commit atómico en el sub-repositorio `AntiDraw-Docs` antes o en simultáneo.
   5. **Empaquetado Inmediato**: Finalizado el commit de código y documentación sincronizada, ejecutar sin excepción `pnpm run package` para generar el artefacto VSIX correspondiente.
 

@@ -2,7 +2,7 @@
   "name": "antidraw",
   "displayName": "AntiDraw - SVG Vector Editor",
   "description": "Integrated vector graphics editor for SVG files inspired by CorelDraw and Figma.",
-  "version": "0.95.0",
+  "version": "0.95.1",
   "icon": "icon.png",
   "publisher": "martinvarela206",
   "author": {
@@ -90,9 +90,11 @@
     "compile": "tsc -p . --noEmit",
     "test": "node scripts/run-tests.js",
     "bench": "node scripts/run-benchmarks.js",
+    "version:sync": "node scripts/sync-version.js",
+    "version:bump": "node scripts/sync-version.js",
     "package": "pnpm run build && vsce package --no-dependencies",
     "publish:marketplace": "vsce publish --no-dependencies",
-    "publish:openvsx": "npx -y ovsx publish antidraw-0.94.3.vsix"
+    "publish:openvsx": "npx -y ovsx publish antidraw-0.95.1.vsix"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
