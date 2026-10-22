@@ -15,6 +15,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Created complete multi-language documentation (`README.zh-CN.md` and `README.es.md`) featuring a unified top *Language Switcher* bar in all three READMEs.
   - Upgraded automated version synchronization script (`scripts/sync-version.js`) to keep badges and status blocks synchronized across all three language documentation files.
   - Expanded test suite (`scripts/test-i18n-system.ts`) validating tripartite key symmetry, non-empty values, Chinese locale auto-detection, variable interpolation, and tri-state cycle transitions.
+- **Interactive Floating Language Popover Menu with Crisp SVG Flags**:
+  - Replaced cyclical status bar toggle with a dedicated floating popup menu anchored to the status bar button.
+  - Implemented high-contrast pixel-perfect vector SVG flags for Spain (ES), United Kingdom (EN), and China (ZH-CN).
+  - Displays localized language titles, language code badges, and active checkmarks with capture-phase dismiss lifecycle.
+  - Status bar button reactively displays the active flag, uppercase language code, and an animated chevron indicator.
 
 ---
 

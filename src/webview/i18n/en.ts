@@ -104,6 +104,7 @@ export const en: Translations = {
     rulerCornerTooltip: 'Drag to set (0,0) Origin | Click for Ruler Settings | Double-click to Reset Origin',
     currentTool: 'Tool: {tool}',
     themeToggleTooltip: 'Toggle Dark / Light Theme',
+    languageSelect: 'Select language',
   },
 
   miniHud: {

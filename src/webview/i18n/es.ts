@@ -104,6 +104,7 @@ export const es: Translations = {
     rulerCornerTooltip: 'Arrastrar para fijar origen (0,0) | Clic para ajustes | Doble clic para restablecer',
     currentTool: 'Herramienta: {tool}',
     themeToggleTooltip: 'Alternar Modo Oscuro / Claro',
+    languageSelect: 'Seleccionar idioma',
   },
 
   miniHud: {

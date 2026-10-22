@@ -108,6 +108,7 @@ export interface Translations {
     rulerCornerTooltip: string;
     currentTool: string;
     themeToggleTooltip: string;
+    languageSelect: string;
   };
 
   // Mini HUD (Floating pill)

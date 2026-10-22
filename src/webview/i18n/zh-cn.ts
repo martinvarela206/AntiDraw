@@ -104,6 +104,7 @@ export const zhCn: Translations = {
     rulerCornerTooltip: '拖动以设置 (0,0) 原点 | 点击打开标尺设置 | 双击重置原点',
     currentTool: '当前工具: {tool}',
     themeToggleTooltip: '切换深色/浅色主题',
+    languageSelect: '选择语言',
   },
 
   miniHud: {

@@ -11,6 +11,7 @@ import { DropPosition } from '../engine/layout/LayerReorderService.js';
 import { ToolIcons } from '../icons/ToolIcons.js';
 import { I18nService } from '../i18n/I18nService.js';
 import { ThemeService } from '../services/ThemeService.js';
+import { LanguageMenu } from './LanguageMenu.js';
 
 export interface AppLayoutConfig {
   canvasMgr: CanvasManager;
@@ -269,13 +270,11 @@ export class AppLayoutManager {
       });
     }
 
-    // Language toggle in Status Bar
+    // Language floating menu in Status Bar
     const btnLangToggle = document.getElementById('btn-lang-toggle');
     if (btnLangToggle) {
-      btnLangToggle.addEventListener('click', () => {
-        const nextLang = I18nService.toggleLanguage();
-        btnLangToggle.textContent = nextLang.toUpperCase();
-      });
+      const languageMenu = new LanguageMenu();
+      languageMenu.attach(btnLangToggle);
     }
 
     // Theme toggle in Status Bar
@@ -295,7 +294,6 @@ export class AppLayoutManager {
     });
 
     I18nService.onLanguageChange((lang) => {
-      if (btnLangToggle) btnLangToggle.textContent = lang.toUpperCase();
       if (btnThemeToggle) btnThemeToggle.title = I18nService.t('statusbar.themeToggleTooltip');
       const statusCanvasText = document.getElementById('status-canvas-text');
       if (statusCanvasText) statusCanvasText.textContent = I18nService.t('toolbar.canvas');

@@ -2075,3 +2075,115 @@ button.prop-input.active {
   background: rgba(0, 0, 0, 0.25);
   border-top: 1px solid var(--border-color);
 }
+
+/* LANGUAGE SELECTOR POPUP MENU (FIGMA QUIET CHROME) */
+.lang-popover-menu {
+  position: fixed;
+  z-index: 10000;
+  min-width: 175px;
+  background-color: var(--figma-bg-panel, #25252d);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--figma-border-subtle, rgba(255, 255, 255, 0.12));
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.25);
+  padding: 5px;
+  user-select: none;
+  animation: langMenuPopIn 0.14s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+@keyframes langMenuPopIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.lang-menu-header {
+  padding: 5px 8px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--figma-text-secondary, #999);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--figma-border-subtle, rgba(255, 255, 255, 0.08));
+  margin-bottom: 3px;
+}
+
+.lang-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--figma-text-primary, #eee);
+  font-size: 12px;
+  font-weight: 500;
+  transition: background-color 0.1s ease, color 0.1s ease;
+}
+
+.lang-menu-item:hover {
+  background-color: var(--figma-bg-hover, rgba(255, 255, 255, 0.08));
+  color: #ffffff;
+}
+
+.lang-menu-item.active {
+  background-color: var(--figma-bg-select, rgba(59, 130, 246, 0.18));
+  color: var(--figma-brand, #38bdf8);
+  font-weight: 600;
+}
+
+.lang-menu-flag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.lang-menu-name {
+  flex-grow: 1;
+}
+
+.lang-menu-code {
+  font-size: 10px;
+  opacity: 0.55;
+  font-family: var(--font-mono, monospace);
+  letter-spacing: 0.5px;
+}
+
+.lang-menu-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: var(--figma-brand, #38bdf8);
+  flex-shrink: 0;
+}
+
+#btn-lang-toggle {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  min-height: 22px;
+}
+
+#btn-lang-toggle .status-lang-chevron {
+  transition: transform 0.15s ease;
+  margin-left: 3px;
+  opacity: 0.7;
+}
+
+#btn-lang-toggle.active .status-lang-chevron {
+  transform: rotate(180deg);
+  opacity: 1;
+}
+
