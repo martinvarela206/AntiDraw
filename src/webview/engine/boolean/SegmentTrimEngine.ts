@@ -59,7 +59,77 @@ interface RawSeg {
  *    in the newly synthesized paths.
  */
 export class SegmentTrimEngine {
-  private static readonly EPSILON: number = 0.5;
+  public static readonly EPSILON: number = 1.5;
+
+  /**
+   * Only vector paths and shapes with strokes are trimable.
+   * Non-vector elements (image, text, foreignObject, defs, style, etc.) are strictly excluded.
+   */
+  public static isTrimable(el: VectorElement): boolean {
+    if (!el || !el.tagName) return false;
+    const tag = el.tagName.toLowerCase();
+    return ['path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon'].includes(tag);
+  }
+
+  /**
+   * Finds the set of source element IDs belonging to the connected topological graph
+   * of the deleted subsegments. Any element not connected to this sub-graph remains untouched.
+   */
+  public static findConnectedElementIds(
+    allSubSegments: TrimSubSegment[],
+    deletedSubSegIds: Set<string>
+  ): Set<string> {
+    const deletedSubSegs = allSubSegments.filter((s) => deletedSubSegIds.has(s.id));
+    if (deletedSubSegs.length === 0) return new Set();
+
+    const subSegById = new Map<string, TrimSubSegment>();
+    for (const seg of allSubSegments) {
+      subSegById.set(seg.id, seg);
+    }
+
+    const eps = SegmentTrimEngine.EPSILON;
+    const touches = (s1: TrimSubSegment, s2: TrimSubSegment): boolean => {
+      return (
+        Math.hypot(s1.p1.x - s2.p1.x, s1.p1.y - s2.p1.y) <= eps ||
+        Math.hypot(s1.p1.x - s2.p2.x, s1.p1.y - s2.p2.y) <= eps ||
+        Math.hypot(s1.p2.x - s2.p1.x, s1.p2.y - s2.p1.y) <= eps ||
+        Math.hypot(s1.p2.x - s2.p2.x, s1.p2.y - s2.p2.y) <= eps
+      );
+    };
+
+    const initialElementIds = new Set(deletedSubSegs.map((s) => s.sourceElementId));
+    const visitedSegIds = new Set<string>();
+    const queue: TrimSubSegment[] = [];
+
+    for (const seg of allSubSegments) {
+      if (initialElementIds.has(seg.sourceElementId)) {
+        visitedSegIds.add(seg.id);
+        queue.push(seg);
+      }
+    }
+
+    while (queue.length > 0) {
+      const cur = queue.shift()!;
+      for (const seg of allSubSegments) {
+        if (!visitedSegIds.has(seg.id)) {
+          if (seg.sourceElementId === cur.sourceElementId || touches(seg, cur)) {
+            visitedSegIds.add(seg.id);
+            queue.push(seg);
+          }
+        }
+      }
+    }
+
+    const affectedElementIds = new Set<string>();
+    for (const id of visitedSegIds) {
+      const s = subSegById.get(id);
+      if (s) {
+        affectedElementIds.add(s.sourceElementId);
+      }
+    }
+
+    return affectedElementIds;
+  }
 
   /**
    * Decomposes candidate elements into all atomic sub-segments partitioned by intersection points.
@@ -399,6 +469,8 @@ export class SegmentTrimEngine {
     const raw: RawSeg[] = [];
 
     for (const el of elements) {
+      if (!this.isTrimable(el)) continue;
+
       let vertices = el.vertices;
       if (!vertices || vertices.length === 0) {
         vertices = model.convertShapeToVertices(el.tagName, el.attributes);
@@ -491,7 +563,7 @@ export class SegmentTrimEngine {
         const minYB = Math.min(sB.p1.y, sB.p2.y, sB.h1?.y ?? Infinity, sB.h2?.y ?? Infinity);
         const maxYB = Math.max(sB.p1.y, sB.p2.y, sB.h1?.y ?? -Infinity, sB.h2?.y ?? -Infinity);
 
-        if (maxXA < minXB - 0.1 || minXA > maxXB + 0.1 || maxYA < minYB - 0.1 || minYA > maxYB + 0.1) {
+        if (maxXA < minXB - 1.5 || minXA > maxXB + 1.5 || maxYA < minYB - 1.5 || minYA > maxYB + 1.5) {
           continue;
         }
 
@@ -502,12 +574,81 @@ export class SegmentTrimEngine {
             sA.splits.push(inter.tA);
             sB.splits.push(inter.tB);
           }
+          // Robust T-junction & proximity detection
+          this.checkTJunction(sA, sB);
         } else {
           // Sample-based Bézier intersection
           this.curveIntersection(sA, sB);
         }
       }
     }
+  }
+
+  private static checkTJunction(sA: RawSeg, sB: RawSeg): void {
+    const eps = SegmentTrimEngine.EPSILON;
+
+    const testPointOnSeg = (pt: Point, seg: RawSeg): { t: number; proj: Point } | null => {
+      const dx = seg.p2.x - seg.p1.x;
+      const dy = seg.p2.y - seg.p1.y;
+      const lenSq = dx * dx + dy * dy;
+      if (lenSq < 1e-4) return null;
+
+      const t = ((pt.x - seg.p1.x) * dx + (pt.y - seg.p1.y) * dy) / lenSq;
+      if (t >= 0.01 && t <= 0.99) {
+        const projX = seg.p1.x + t * dx;
+        const projY = seg.p1.y + t * dy;
+        const dist = Math.hypot(pt.x - projX, pt.y - projY);
+        if (dist <= eps) {
+          return { t, proj: { x: projX, y: projY } };
+        }
+      }
+      return null;
+    };
+
+    // Check sB.p1 on sA
+    const resB1 = testPointOnSeg(sB.p1, sA);
+    if (resB1) {
+      sA.splits.push(resB1.t);
+      sB.p1.x = resB1.proj.x;
+      sB.p1.y = resB1.proj.y;
+    }
+    // Check sB.p2 on sA
+    const resB2 = testPointOnSeg(sB.p2, sA);
+    if (resB2) {
+      sA.splits.push(resB2.t);
+      sB.p2.x = resB2.proj.x;
+      sB.p2.y = resB2.proj.y;
+    }
+    // Check sA.p1 on sB
+    const resA1 = testPointOnSeg(sA.p1, sB);
+    if (resA1) {
+      sB.splits.push(resA1.t);
+      sA.p1.x = resA1.proj.x;
+      sA.p1.y = resA1.proj.y;
+    }
+    // Check sA.p2 on sB
+    const resA2 = testPointOnSeg(sA.p2, sB);
+    if (resA2) {
+      sB.splits.push(resA2.t);
+      sA.p2.x = resA2.proj.x;
+      sA.p2.y = resA2.proj.y;
+    }
+
+    // Check endpoint coincidence
+    const snapEndpoints = (pA: Point, pB: Point) => {
+      if (Math.hypot(pA.x - pB.x, pA.y - pB.y) <= eps) {
+        const mx = (pA.x + pB.x) / 2;
+        const my = (pA.y + pB.y) / 2;
+        pA.x = mx;
+        pA.y = my;
+        pB.x = mx;
+        pB.y = my;
+      }
+    };
+    snapEndpoints(sA.p1, sB.p1);
+    snapEndpoints(sA.p1, sB.p2);
+    snapEndpoints(sA.p2, sB.p1);
+    snapEndpoints(sA.p2, sB.p2);
   }
 
   private static lineLineIntersection(
@@ -522,7 +663,7 @@ export class SegmentTrimEngine {
     const ua = ((p4.x - p3.x) * (p1.y - p3.y) - (p4.y - p3.y) * (p1.x - p3.x)) / denom;
     const ub = ((p2.x - p1.x) * (p1.y - p3.y) - (p2.y - p1.y) * (p1.x - p3.x)) / denom;
 
-    if (ua >= -1e-4 && ua <= 1.0001 && ub >= -1e-4 && ub <= 1.0001) {
+    if (ua >= -0.005 && ua <= 1.005 && ub >= -0.005 && ub <= 1.005) {
       return {
         tA: Math.max(0, Math.min(1, ua)),
         tB: Math.max(0, Math.min(1, ub)),

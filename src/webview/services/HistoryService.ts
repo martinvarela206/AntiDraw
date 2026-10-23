@@ -35,10 +35,27 @@ export interface HistoryServiceContext {
 export class HistoryService {
   private undoStack: DocumentState[] = [];
   private redoStack: DocumentState[] = [];
-  private readonly maxHistory: number = 30;
+  public maxHistory: number = 1000;
   private currentRevision: number = 1;
 
   constructor(private ctx: HistoryServiceContext) {}
+
+  public get undoCount(): number {
+    return this.undoStack.length;
+  }
+
+  public get redoCount(): number {
+    return this.redoStack.length;
+  }
+
+  public optimizeHistory(keepCount: number = 100): void {
+    if (this.undoStack.length > keepCount) {
+      this.undoStack = this.undoStack.slice(-keepCount);
+    }
+    if (this.redoStack.length > keepCount) {
+      this.redoStack = this.redoStack.slice(-keepCount);
+    }
+  }
 
   public get canUndo(): boolean {
     return this.undoStack.length > 0;

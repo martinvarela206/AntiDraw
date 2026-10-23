@@ -3,6 +3,25 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.99.1] - 2026-10-23
+
+### 🐛 Fixed
+- **Shape Builder Isolation & Collateral Damage Prevention**:
+  - Filtered candidate elements with `SegmentTrimEngine.isTrimable()`: strictly excludes non-vector elements (`image`, `text`, `defs`, `style`, `g`) to prevent raster images from losing their boundaries or being destroyed.
+  - Connected component scoping via `SegmentTrimEngine.findConnectedElementIds()`: trims and welds ONLY the elements physically connected to the deleted sub-segment graph. Unrelated shapes in the document remain 100% untouched and retain their exact properties and z-order.
+  - In-place z-index replacement: replaces affected elements at their precise position in `model.elements` rather than pushing to the end.
+- **T-Junction & Internal Sub-Stroke Detection**:
+  - Implemented analytical T-junction projection and snapping in `SegmentTrimEngine.checkTJunction()`: detects when an internal branch or line endpoint meets another stroke within 1.5px tolerance, splits the touched stroke cleanly, and unifies incident nodes with valence $k=3$.
+  - Deleting internal branches now preserves continuous closed contours without creating unintended holes or gaps.
+- **Click vs Drag-Sweep Jitter Protection**:
+  - Added a 5px screen drag threshold (`hasExceededDragThreshold`) in `ShapeBuilderToolHandler`: hand jitter during mouse click release no longer accidentally sweeps or deletes adjacent boundary sub-segments.
+- **Deep 1000-Step Undo History**:
+  - Expanded `HistoryService.maxHistory` from 30 to 1000 steps for practically unlimited in-session undo/redo capabilities.
+  - Added `optimizeHistory()` memory management helper and kept file metadata sync to host bounded to 50 snapshots.
+  - Added test suite `scripts/test-shape-builder-isolation-undo.ts` with 100% assertions passed.
+
+---
+
 ## [0.99.0] - 2026-10-23
 
 ### 🚀 Added

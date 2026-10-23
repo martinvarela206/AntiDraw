@@ -34,6 +34,9 @@ export class ShapeBuilderToolHandler implements IToolHandler {
   public hoveredSubSeg: TrimSubSegment | null = null;
   public sweptSubSegIds: Set<string> = new Set();
   public isDragging: boolean = false;
+  public dragStartPoint: Point | null = null;
+  public hasExceededDragThreshold: boolean = false;
+  public initialHitSubSeg: TrimSubSegment | null = null;
 
   constructor(ctx: ToolContext, callbacks?: ShapeBuilderHandlerCallbacks) {
     this.ctx = ctx;
@@ -48,6 +51,9 @@ export class ShapeBuilderToolHandler implements IToolHandler {
 
   public deactivate(): void {
     this.isDragging = false;
+    this.dragStartPoint = null;
+    this.hasExceededDragThreshold = false;
+    this.initialHitSubSeg = null;
     this.hoveredSubSeg = null;
     this.sweptSubSegIds.clear();
     this.cachedSubSegments = [];
@@ -57,6 +63,9 @@ export class ShapeBuilderToolHandler implements IToolHandler {
 
   public invalidate(): void {
     this.isDragging = false;
+    this.dragStartPoint = null;
+    this.hasExceededDragThreshold = false;
+    this.initialHitSubSeg = null;
     this.hoveredSubSeg = null;
     this.sweptSubSegIds.clear();
     this.cachedSubSegments = [];
@@ -66,6 +75,9 @@ export class ShapeBuilderToolHandler implements IToolHandler {
   public cancel(): boolean {
     if (this.isDragging || this.sweptSubSegIds.size > 0 || this.hoveredSubSeg) {
       this.isDragging = false;
+      this.dragStartPoint = null;
+      this.hasExceededDragThreshold = false;
+      this.initialHitSubSeg = null;
       this.sweptSubSegIds.clear();
       this.hoveredSubSeg = null;
       this.ctx.renderOverlay();
@@ -77,9 +89,13 @@ export class ShapeBuilderToolHandler implements IToolHandler {
   public refreshSubSegments(): void {
     const selectedIds = this.ctx.selectionTool.selectedElementIds;
     if (selectedIds && selectedIds.size >= 2) {
-      this.candidateElements = this.ctx.model.elements.filter((el) => selectedIds.has(el.id));
+      this.candidateElements = this.ctx.model.elements.filter(
+        (el) => selectedIds.has(el.id) && SegmentTrimEngine.isTrimable(el)
+      );
     } else {
-      this.candidateElements = this.ctx.model.elements.filter((el) => el.tagName !== 'defs' && el.tagName !== 'style');
+      this.candidateElements = this.ctx.model.elements.filter(
+        (el) => SegmentTrimEngine.isTrimable(el)
+      );
     }
 
     this.cachedSubSegments = SegmentTrimEngine.extractSubSegments(this.candidateElements, this.ctx.model);
@@ -94,6 +110,10 @@ export class ShapeBuilderToolHandler implements IToolHandler {
 
     if (hit) {
       this.isDragging = true;
+      this.dragStartPoint = { ...pt };
+      this.hasExceededDragThreshold = false;
+      this.initialHitSubSeg = hit;
+      this.sweptSubSegIds.clear();
       this.sweptSubSegIds.add(hit.id);
       this.hoveredSubSeg = hit;
       this.ctx.renderOverlay();
@@ -113,8 +133,12 @@ export class ShapeBuilderToolHandler implements IToolHandler {
 
     let needsOverlayUpdate = false;
 
-    if (this.isDragging) {
-      if (hit && !this.sweptSubSegIds.has(hit.id)) {
+    if (this.isDragging && this.dragStartPoint) {
+      const screenDist = Math.hypot(pt.x - this.dragStartPoint.x, pt.y - this.dragStartPoint.y) * z;
+      if (screenDist > 5) {
+        this.hasExceededDragThreshold = true;
+      }
+      if (this.hasExceededDragThreshold && hit && !this.sweptSubSegIds.has(hit.id)) {
         this.sweptSubSegIds.add(hit.id);
         needsOverlayUpdate = true;
       }
@@ -144,6 +168,14 @@ export class ShapeBuilderToolHandler implements IToolHandler {
     }
 
     this.isDragging = false;
+    this.dragStartPoint = null;
+
+    // If drag threshold was not exceeded, treat as a single click on initial hit
+    if (!this.hasExceededDragThreshold && this.initialHitSubSeg) {
+      this.sweptSubSegIds.clear();
+      this.sweptSubSegIds.add(this.initialHitSubSeg.id);
+    }
+
     if (this.sweptSubSegIds.size === 0) {
       this.hoveredSubSeg = null;
       this.ctx.renderOverlay();
@@ -153,16 +185,42 @@ export class ShapeBuilderToolHandler implements IToolHandler {
     // Execute Trim and Topological Welding
     this.ctx.pushUndo();
 
-    const candidateIdSet = new Set(this.candidateElements.map((el) => el.id));
-    const weldedElements = SegmentTrimEngine.trimAndWeld(
+    const affectedElementIds = SegmentTrimEngine.findConnectedElementIds(
       this.cachedSubSegments,
-      this.sweptSubSegIds,
-      this.candidateElements
+      this.sweptSubSegIds
     );
 
-    // Replace candidate elements in model with welded results
-    const remainingElements = this.ctx.model.elements.filter((el) => !candidateIdSet.has(el.id));
-    this.ctx.model.elements = [...remainingElements, ...weldedElements];
+    if (affectedElementIds.size === 0) {
+      this.sweptSubSegIds.clear();
+      this.hoveredSubSeg = null;
+      this.refreshSubSegments();
+      this.ctx.renderOverlay();
+      return true;
+    }
+
+    const affectedElements = this.candidateElements.filter((el) => affectedElementIds.has(el.id));
+    const affectedSubSegs = this.cachedSubSegments.filter((s) => affectedElementIds.has(s.sourceElementId));
+
+    const weldedElements = SegmentTrimEngine.trimAndWeld(
+      affectedSubSegs,
+      this.sweptSubSegIds,
+      affectedElements
+    );
+
+    // In-place replacement of affected elements preserving document z-order and non-affected elements
+    const newElements: VectorElement[] = [];
+    let replaced = false;
+    for (const el of this.ctx.model.elements) {
+      if (affectedElementIds.has(el.id)) {
+        if (!replaced) {
+          newElements.push(...weldedElements);
+          replaced = true;
+        }
+      } else {
+        newElements.push(el);
+      }
+    }
+    this.ctx.model.elements = newElements;
 
     // Select the new elements
     this.ctx.selectionTool.deselectAll();
@@ -173,6 +231,8 @@ export class ShapeBuilderToolHandler implements IToolHandler {
     // Reset interaction state and refresh cache
     this.sweptSubSegIds.clear();
     this.hoveredSubSeg = null;
+    this.initialHitSubSeg = null;
+    this.hasExceededDragThreshold = false;
     this.refreshSubSegments();
 
     this.ctx.render();
