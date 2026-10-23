@@ -59,7 +59,7 @@ interface RawSeg {
  *    in the newly synthesized paths.
  */
 export class SegmentTrimEngine {
-  public static readonly EPSILON: number = 1.5;
+  public static readonly EPSILON: number = 0.05;
 
   /**
    * Only vector paths and shapes with strokes are trimable.
@@ -421,7 +421,10 @@ export class SegmentTrimEngine {
         }
 
         if (chain.length > 0) {
-          synthesizedElements.push(assembleElementFromChain(chain, false));
+          const lastItem = chain[chain.length - 1];
+          const lastEndPt = lastItem.forward ? lastItem.seg.p2 : lastItem.seg.p1;
+          const isCycle = Math.hypot(startNode.pt.x - lastEndPt.x, startNode.pt.y - lastEndPt.y) <= SegmentTrimEngine.EPSILON;
+          synthesizedElements.push(assembleElementFromChain(chain, isCycle));
         }
       }
     }
@@ -563,7 +566,7 @@ export class SegmentTrimEngine {
         const minYB = Math.min(sB.p1.y, sB.p2.y, sB.h1?.y ?? Infinity, sB.h2?.y ?? Infinity);
         const maxYB = Math.max(sB.p1.y, sB.p2.y, sB.h1?.y ?? -Infinity, sB.h2?.y ?? -Infinity);
 
-        if (maxXA < minXB - 1.5 || minXA > maxXB + 1.5 || maxYA < minYB - 1.5 || minYA > maxYB + 1.5) {
+        if (maxXA < minXB - 0.05 || minXA > maxXB + 0.05 || maxYA < minYB - 0.05 || minYA > maxYB + 0.05) {
           continue;
         }
 
@@ -574,81 +577,12 @@ export class SegmentTrimEngine {
             sA.splits.push(inter.tA);
             sB.splits.push(inter.tB);
           }
-          // Robust T-junction & proximity detection
-          this.checkTJunction(sA, sB);
         } else {
           // Sample-based Bézier intersection
           this.curveIntersection(sA, sB);
         }
       }
     }
-  }
-
-  private static checkTJunction(sA: RawSeg, sB: RawSeg): void {
-    const eps = SegmentTrimEngine.EPSILON;
-
-    const testPointOnSeg = (pt: Point, seg: RawSeg): { t: number; proj: Point } | null => {
-      const dx = seg.p2.x - seg.p1.x;
-      const dy = seg.p2.y - seg.p1.y;
-      const lenSq = dx * dx + dy * dy;
-      if (lenSq < 1e-4) return null;
-
-      const t = ((pt.x - seg.p1.x) * dx + (pt.y - seg.p1.y) * dy) / lenSq;
-      if (t >= 0.01 && t <= 0.99) {
-        const projX = seg.p1.x + t * dx;
-        const projY = seg.p1.y + t * dy;
-        const dist = Math.hypot(pt.x - projX, pt.y - projY);
-        if (dist <= eps) {
-          return { t, proj: { x: projX, y: projY } };
-        }
-      }
-      return null;
-    };
-
-    // Check sB.p1 on sA
-    const resB1 = testPointOnSeg(sB.p1, sA);
-    if (resB1) {
-      sA.splits.push(resB1.t);
-      sB.p1.x = resB1.proj.x;
-      sB.p1.y = resB1.proj.y;
-    }
-    // Check sB.p2 on sA
-    const resB2 = testPointOnSeg(sB.p2, sA);
-    if (resB2) {
-      sA.splits.push(resB2.t);
-      sB.p2.x = resB2.proj.x;
-      sB.p2.y = resB2.proj.y;
-    }
-    // Check sA.p1 on sB
-    const resA1 = testPointOnSeg(sA.p1, sB);
-    if (resA1) {
-      sB.splits.push(resA1.t);
-      sA.p1.x = resA1.proj.x;
-      sA.p1.y = resA1.proj.y;
-    }
-    // Check sA.p2 on sB
-    const resA2 = testPointOnSeg(sA.p2, sB);
-    if (resA2) {
-      sB.splits.push(resA2.t);
-      sA.p2.x = resA2.proj.x;
-      sA.p2.y = resA2.proj.y;
-    }
-
-    // Check endpoint coincidence
-    const snapEndpoints = (pA: Point, pB: Point) => {
-      if (Math.hypot(pA.x - pB.x, pA.y - pB.y) <= eps) {
-        const mx = (pA.x + pB.x) / 2;
-        const my = (pA.y + pB.y) / 2;
-        pA.x = mx;
-        pA.y = my;
-        pB.x = mx;
-        pB.y = my;
-      }
-    };
-    snapEndpoints(sA.p1, sB.p1);
-    snapEndpoints(sA.p1, sB.p2);
-    snapEndpoints(sA.p2, sB.p1);
-    snapEndpoints(sA.p2, sB.p2);
   }
 
   private static lineLineIntersection(

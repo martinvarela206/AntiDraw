@@ -182,9 +182,6 @@ export class ShapeBuilderToolHandler implements IToolHandler {
       return true;
     }
 
-    // Execute Trim and Topological Welding
-    this.ctx.pushUndo();
-
     const affectedElementIds = SegmentTrimEngine.findConnectedElementIds(
       this.cachedSubSegments,
       this.sweptSubSegIds
@@ -206,6 +203,9 @@ export class ShapeBuilderToolHandler implements IToolHandler {
       this.sweptSubSegIds,
       affectedElements
     );
+
+    // Commit snapshot to undo stack only upon confirmed transformation
+    this.ctx.pushUndo();
 
     // In-place replacement of affected elements preserving document z-order and non-affected elements
     const newElements: VectorElement[] = [];

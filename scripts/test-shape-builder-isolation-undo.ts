@@ -176,6 +176,61 @@ export async function runShapeBuilderIsolationUndoTests(): Promise<boolean> {
   assert(weldedElements[0].attributes.d.includes('Z'), 'Synthesized element is fully closed with Z (no gap)');
   assert(weldedElements[0].vertices?.length === 5, `Synthesized polygon has 5 vertices (4 corners + 1 welded node), got ${weldedElements[0].vertices?.length}`);
 
+  // Test Crossed Strokes with Phase A Loop Closure (User Image 3: inner triangle loop)
+  // Two crossed strokes forming an inner triangle and outer tails:
+  // Stroke 1: (0, 0) -> (100, 100)
+  // Stroke 2: (100, 0) -> (0, 100)
+  // Stroke 3: (20, 50) -> (80, 50)
+  // These 3 strokes intersect and form an inner triangle between (50, 50), (50, 50), (35, 50), etc.
+  const cross1: VectorElement = {
+    id: 'cr_1',
+    tagName: 'line',
+    attributes: { id: 'cr_1', x1: '0', y1: '0', x2: '100', y2: '100', stroke: '#fff', 'stroke-width': '1' }
+  };
+  const cross2: VectorElement = {
+    id: 'cr_2',
+    tagName: 'line',
+    attributes: { id: 'cr_2', x1: '100', y1: '0', x2: '0', y2: '100', stroke: '#fff', 'stroke-width': '1' }
+  };
+  const cross3: VectorElement = {
+    id: 'cr_3',
+    tagName: 'line',
+    attributes: { id: 'cr_3', x1: '20', y1: '50', x2: '80', y2: '50', stroke: '#fff', 'stroke-width': '1' }
+  };
+  const crossModel = new VectorModel();
+  crossModel.elements = [cross1, cross2, cross3];
+  const crossSubSegs = SegmentTrimEngine.extractSubSegments(crossModel.elements, crossModel);
+  // Find subsegments completely outside the inner triangle and trim them
+  // Keep only segments that form the inner triangle between the 3 intersection points: (50, 50), (50, 50)...
+  // The 3 intersection points:
+  // (0,0)-(100,100) and (100,0)-(0,100) intersect at (50, 50)
+  // (0,0)-(100,100) and y=50 intersect at (50, 50)
+  // (100,0)-(0,100) and y=50 intersect at (50, 50)
+  // Let's use horizontal y=70:
+  // (0,0)-(100,100) and y=70 intersect at (70, 70)
+  // (100,0)-(0,100) and y=70 intersect at (30, 70)
+  // And the two diagonals intersect at (50, 50).
+  // The 3 vertices form a triangle: (50, 50), (70, 70), (30, 70)!
+  const hLine: VectorElement = {
+    id: 'h_line',
+    tagName: 'line',
+    attributes: { id: 'h_line', x1: '0', y1: '70', x2: '100', y2: '70', stroke: '#fff', 'stroke-width': '1' }
+  };
+  crossModel.elements = [cross1, cross2, hLine];
+  const triSubSegs = SegmentTrimEngine.extractSubSegments(crossModel.elements, crossModel);
+  // There are 3 inner segments forming the triangle (50,50)-(70,70), (70,70)-(30,70), (30,70)-(50,50)
+  // and outer tails.
+  const innerSegs = triSubSegs.filter((s) => {
+    const midX = (s.p1.x + s.p2.x) / 2;
+    const midY = (s.p1.y + s.p2.y) / 2;
+    return midY >= 50 && midY <= 70 && midX >= 30 && midX <= 70;
+  });
+  const outerSegs = triSubSegs.filter((s) => !innerSegs.includes(s));
+  assert(innerSegs.length === 3, `Expected 3 inner segments forming triangle, got ${innerSegs.length}`);
+  const trimmedTri = SegmentTrimEngine.trimAndWeld(triSubSegs, new Set(outerSegs.map((s) => s.id)), crossModel.elements);
+  assert(trimmedTri.length === 1, `Trimming outer tails should synthesize 1 closed triangle, got ${trimmedTri.length}`);
+  assert(trimmedTri[0].attributes.d.includes('Z'), 'Synthesized triangle has Z closing command (no gap)');
+
   // ==============================================================================
   // 3. Click vs Drag-Sweep Jitter Protection (Issue 2 Click Protection)
   // ==============================================================================
@@ -234,6 +289,7 @@ export async function runShapeBuilderIsolationUndoTests(): Promise<boolean> {
   assert(undoHistService.maxHistory >= 1000, `maxHistory should be at least 1000, got ${undoHistService.maxHistory}`);
 
   for (let i = 1; i <= 100; i++) {
+    undoHistService.pushUndo();
     undoModel.elements = [
       {
         id: `el_step_${i}`,
@@ -241,7 +297,6 @@ export async function runShapeBuilderIsolationUndoTests(): Promise<boolean> {
         attributes: { id: `el_step_${i}`, x: `${i}`, y: `${i}`, width: '10', height: '10' },
       },
     ];
-    undoHistService.pushUndo();
   }
 
   assert(undoHistService.undoCount === 100, `Undo stack should contain 100 snapshots (not truncated at 30), got ${undoHistService.undoCount}`);
@@ -255,6 +310,17 @@ export async function runShapeBuilderIsolationUndoTests(): Promise<boolean> {
   assert(undosDone === 100, `Should successfully undo all 100 steps back to beginning, got ${undosDone}`);
   assert(!undoHistService.canUndo, 'Undo stack is now at step 0');
   assert(undoHistService.canRedo, 'Redo stack is ready to redo');
+
+  // Verify that redundant non-visual state pushes do not require multiple undo presses
+  undoModel.elements = [{ id: 'shapeA', tagName: 'rect', attributes: { id: 'shapeA', x: '10', y: '10' } }];
+  undoHistService.pushUndo(); // records state before change
+  undoModel.elements = [{ id: 'shapeB', tagName: 'rect', attributes: { id: 'shapeB', x: '20', y: '20' } }];
+  // Redundant push where elements did not change (e.g. selection only or empty click)
+  undoHistService.pushUndo();
+  assert(undoHistService.undoCount <= 2, 'Redundant visually identical push is ignored');
+  // 1 undo immediately produces a visual change back to shapeA
+  undoHistService.undo();
+  assert(undoModel.elements[0].id === 'shapeA', `1 single undo must immediately restore shapeA, got ${undoModel.elements[0].id}`);
 
   console.log('\nShape Builder Isolation, T-Junction & Deep Undo Suite complete: ALL PASSED.');
   return true;
