@@ -535,6 +535,8 @@ export interface Translations {
     title: string;
     version: string;
     lastUpdate: string;
+    headline: string;
+    headlineHighlight: string;
     message: string;
     donateKoFi: string;
     maybeLater: string;

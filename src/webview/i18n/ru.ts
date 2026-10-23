@@ -475,9 +475,11 @@ export const ru: Translations = {
   },
   welcomeModal: {
     title: 'AntiDraw',
-    version: 'Версия {version}',
+    version: 'v{version}',
     lastUpdate: 'Последнее обновление: {date}',
-    message: 'Если вы находите AntiDraw полезным для своих векторных проектов, поддержите дальнейшую разработку пожертвованием.',
+    headline: 'Если это приложение полезно вам,',
+    headlineHighlight: 'поддержка на Ko-fi была бы невероятной!',
+    message: 'Проект создается с душой в свободное время и абсолютно бесплатен. Ваша поддержка помогает развивать его и сохранять активным.',
     donateKoFi: 'Поддержать на Ko-fi',
     maybeLater: 'Может позже',
   },

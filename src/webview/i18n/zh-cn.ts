@@ -521,9 +521,11 @@ export const zhCn: Translations = {
   },
   welcomeModal: {
     title: 'AntiDraw',
-    version: '版本 {version}',
+    version: 'v{version}',
     lastUpdate: '最近更新：{date}',
-    message: '如果您觉得 AntiDraw 对您的矢量设计与工作流程有所帮助，请考虑通过捐赠支持其持续开发。',
+    headline: '如果这款工具对您有所帮助，',
+    headlineHighlight: '在 Ko-fi 上赞助一杯咖啡将意义非凡！',
+    message: '这是我在业余时间倾注心血打造的完全免费工具。您的支持将激励我持续优化，让项目生生不息。',
     donateKoFi: '在 Ko-fi 上赞助',
     maybeLater: '以后再说',
   },

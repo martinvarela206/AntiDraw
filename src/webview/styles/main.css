@@ -1779,156 +1779,270 @@ button.prop-input.active {
   to { transform: scale(1); opacity: 1; }
 }
 
-/* WELCOME & SUPPORT MODAL (FEAT-WelcomeKoFi) */
-.ad-welcome-container {
-  max-width: 440px;
-  padding: 22px 24px;
-  border-radius: 12px;
-  gap: 14px;
-  background: var(--bg-panel);
-  border: 1px solid var(--border-color);
-  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.06);
+/* COSMIC CREATOR SUPPORT MODAL (FEAT-WelcomeKoFi) */
+.ad-welcome-card {
+  position: relative;
+  background: radial-gradient(circle at 50% 0%, #0d1527 0%, #060911 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.8), 0 0 48px rgba(0, 180, 255, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  width: 90%;
+  max-width: 380px;
+  padding: 34px 28px 28px 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  color: #f8fafc;
+  overflow: hidden;
+  animation: adModalScaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
 }
 
-.ad-welcome-header {
+.ad-welcome-vector-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.ad-welcome-bg-svg {
+  width: 100%;
+  height: 100%;
+}
+
+.ad-welcome-close-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
-  gap: 16px;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10;
+  transition: all 0.15s ease;
 }
 
-.ad-welcome-logo-box {
-  width: 52px;
-  height: 52px;
-  flex-shrink: 0;
+.ad-welcome-close-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  transform: scale(1.05);
+}
+
+.ad-welcome-hero {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.ad-welcome-logo-container {
+  width: 92px;
+  height: 92px;
+  margin-bottom: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.ad-welcome-logo-img {
-  width: 52px;
-  height: 52px;
-  border-radius: 12px;
-  box-shadow: 0 4px 16px rgba(0, 102, 255, 0.25);
-  object-fit: cover;
-  display: block;
+.ad-welcome-main-logo {
+  width: 92px;
+  height: 92px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 24px rgba(0, 195, 255, 0.55)) drop-shadow(0 0 8px rgba(139, 92, 246, 0.4));
+  animation: adFloatGlow 3s ease-in-out infinite alternate;
 }
 
-.ad-welcome-logo-fallback {
-  width: 52px;
-  height: 52px;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 4px 16px rgba(0, 102, 255, 0.25);
-}
-
-.ad-welcome-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.ad-welcome-title-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+@keyframes adFloatGlow {
+  0% { transform: translateY(0); filter: drop-shadow(0 0 20px rgba(0, 195, 255, 0.45)); }
+  100% { transform: translateY(-3px); filter: drop-shadow(0 0 30px rgba(0, 220, 255, 0.7)); }
 }
 
 .ad-welcome-title {
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--text-main);
-  margin: 0;
-  line-height: 1.2;
-}
-
-.ad-welcome-version-badge {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--accent-color);
-  background: rgba(0, 102, 255, 0.12);
-  border: 1px solid rgba(0, 102, 255, 0.25);
-  padding: 2px 7px;
-  border-radius: 12px;
-  letter-spacing: 0.02em;
-}
-
-.ad-welcome-date {
-  font-size: 11px;
-  color: var(--text-muted);
-  line-height: 1.3;
-}
-
-.ad-welcome-body {
-  padding: 4px 0;
-}
-
-.ad-welcome-message {
-  font-size: 13px;
-  line-height: 1.55;
-  color: var(--text-main);
-  margin: 0;
-}
-
-.ad-welcome-actions {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  margin: 4px 0 6px 0;
+  line-height: 1.1;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 6px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border-color);
+  justify-content: center;
 }
 
-.ad-welcome-dismiss-btn {
-  padding: 8px 16px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-muted);
-  background: transparent;
-  border: 1px solid var(--border-color);
-  cursor: pointer;
-  transition: all 0.15s ease;
+.ad-welcome-title-anti {
+  color: #ffffff;
 }
 
-.ad-welcome-dismiss-btn:hover {
-  background: var(--bg-panel-hover);
-  color: var(--text-main);
-  border-color: var(--border-color-hover);
+.ad-welcome-title-draw {
+  background: linear-gradient(135deg, #00D2FF 0%, #A855F7 50%, #FF2E93 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
-.ad-welcome-kofi-btn {
-  background: #FF5E5B !important;
-  color: #ffffff !important;
-  display: inline-flex;
+.ad-welcome-version-row {
+  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 8px 16px;
-  border-radius: 6px;
+  gap: 12px;
+  width: 100%;
+  margin: 2px 0 4px 0;
+}
+
+.ad-welcome-divider-line {
+  flex: 1;
+  max-width: 48px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.5), transparent);
+}
+
+.ad-welcome-version-pill {
+  font-size: 11px;
   font-weight: 600;
+  color: #60a5fa;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.ad-welcome-date-text {
+  font-size: 11px;
+  color: #64748b;
+  margin-bottom: 14px;
+}
+
+.ad-welcome-cup-box {
+  position: relative;
+  z-index: 1;
+  margin: 6px 0 10px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ad-welcome-cup-svg {
+  filter: drop-shadow(0 0 12px rgba(0, 229, 255, 0.6)) drop-shadow(0 0 4px rgba(217, 70, 239, 0.4));
+}
+
+.ad-welcome-message-block {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  margin-bottom: 18px;
+}
+
+.ad-welcome-lead {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.35;
+  margin-bottom: 2px;
+}
+
+.ad-welcome-highlight {
+  font-size: 17px;
+  font-weight: 800;
+  background: linear-gradient(90deg, #00E5FF 0%, #D946EF 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  line-height: 1.35;
+  margin-bottom: 10px;
+}
+
+.ad-welcome-body-text {
   font-size: 12px;
+  line-height: 1.6;
+  color: #94a3b8;
+  margin: 0;
+  padding: 0 4px;
+}
+
+.ad-welcome-buttons-col {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.ad-welcome-kofi-pill-btn {
+  width: 100%;
+  height: 48px;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, #FF1B8D 0%, #9B30FF 50%, #00B4D8 100%) !important;
+  color: #ffffff !important;
   border: none;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(255, 94, 91, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 20px;
+  box-shadow: 0 8px 24px rgba(0, 180, 216, 0.35), 0 4px 16px rgba(255, 27, 141, 0.35);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  text-decoration: none;
+}
+
+.ad-welcome-kofi-pill-btn:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 12px 32px rgba(0, 180, 216, 0.5), 0 6px 20px rgba(255, 27, 141, 0.5);
+}
+
+.ad-welcome-kofi-pill-btn:active {
+  transform: translateY(0) scale(0.99);
+}
+
+.ad-welcome-kofi-cup-icon {
+  width: 28px;
+  height: 22px;
+  border-radius: 6px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
+}
+
+.ad-welcome-kofi-text {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+}
+
+.ad-welcome-external-arrow {
+  color: #ffffff;
+  opacity: 0.9;
+  flex-shrink: 0;
+}
+
+.ad-welcome-later-pill-btn {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 8px 28px;
+  border-radius: 9999px;
+  cursor: pointer;
   transition: all 0.15s ease;
 }
 
-.ad-welcome-kofi-btn:hover {
-  background: #e04b48 !important;
+.ad-welcome-later-pill-btn:hover {
+  background: rgba(30, 41, 59, 0.85);
+  border-color: rgba(96, 165, 250, 0.6);
+  color: #ffffff;
   transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(255, 94, 91, 0.5);
-}
-
-.ad-welcome-kofi-btn:active {
-  transform: translateY(0);
-}
-
-.ad-kofi-icon {
-  flex-shrink: 0;
 }
 
 /* Toast Notification System */

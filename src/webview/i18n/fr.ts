@@ -475,9 +475,11 @@ export const fr: Translations = {
   },
   welcomeModal: {
     title: 'AntiDraw',
-    version: 'Version {version}',
+    version: 'v{version}',
     lastUpdate: 'Dernière mise à jour : {date}',
-    message: 'Si vous trouvez AntiDraw utile pour vos projets vectoriels, pensez à soutenir son développement continu par un don.',
+    headline: 'Si cette application vous est utile,',
+    headlineHighlight: 'un don sur Ko-fi serait formidable !',
+    message: "Elle est développée avec passion sur mon temps libre, et reste entièrement gratuite. Votre soutien m'aide à la perfectionner et à faire vivre le proyecto.",
     donateKoFi: 'Soutenir sur Ko-fi',
     maybeLater: 'Peut-être plus tard',
   },

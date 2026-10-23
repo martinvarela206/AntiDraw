@@ -475,9 +475,11 @@ export const ja: Translations = {
   },
   welcomeModal: {
     title: 'AntiDraw',
-    version: 'バージョン {version}',
+    version: 'v{version}',
     lastUpdate: '最終更新日: {date}',
-    message: 'AntiDraw がベクタープロジェクトに役立っている場合は、継続的な開発を支援するために寄付をご検討ください。',
+    headline: 'このアプリが役に立ったら、',
+    headlineHighlight: 'Ko-fi での応援・寄付が大きな力になります！',
+    message: '自由な時間に情熱を注いで開発しており、完全無料です。皆様の温かいご支援が、継続的な改善とプロジェクトの存続につながります。',
     donateKoFi: 'Ko-fi でサポート',
     maybeLater: '後で',
   },

@@ -521,9 +521,11 @@ export const en: Translations = {
   },
   welcomeModal: {
     title: 'AntiDraw',
-    version: 'Version {version}',
+    version: 'v{version}',
     lastUpdate: 'Last updated: {date}',
-    message: 'If you find AntiDraw useful for your vector projects, please consider supporting its continuous development with a donation.',
+    headline: 'If you find this app useful,',
+    headlineHighlight: 'a donation on Ko-fi would be amazing!',
+    message: "It is built with lots of effort in my free time, and it's completely free. Your support helps me keep improving and keeps the project alive.",
     donateKoFi: 'Support on Ko-fi',
     maybeLater: 'Maybe later',
   },
