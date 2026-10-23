@@ -146,8 +146,8 @@ export async function runToolbarTopologyDrawersTests(): Promise<boolean> {
   assert(toolbar.drawerCut !== undefined, 'Drawer A (Partition / Slicing) is defined');
   assert(toolbar.drawerCut.id === 'drawer-cut', 'Drawer A has canonical id "drawer-cut"');
   assert(
-    toolbar.drawerCut.tools.map((t) => t.id).join(',') === 'scissors,knife,eraser',
-    'Drawer A contains exactly Scissors (C), Knife, and Eraser (Shift+E)'
+    toolbar.drawerCut.tools.map((t) => t.id).join(',') === 'scissors,eraser',
+    'Drawer A contains exactly Scissors/Knife (C) and Eraser (Shift+E)'
   );
 
   assert(toolbar.drawerConstruct !== undefined, 'Drawer B (Construction / Synthesis) is defined');
@@ -180,17 +180,17 @@ export async function runToolbarTopologyDrawersTests(): Promise<boolean> {
   assert(changedTool === 'scissors', 'onToolChange callback received "scissors"');
   assert(toolbar.drawerCut.activeChildId === 'scissors', 'Drawer A activeChildId set to "scissors"');
 
-  // Switch to Knife
-  toolbar.setTool('knife');
-  assert(toolbar.activeTool === 'knife', 'Toolbar activeTool is "knife"');
-  assert(toolbar.drawerCut.activeChildId === 'knife', 'Drawer A slot updated to "knife"');
-  const knifeMainBtn = container.querySelector('[data-tool="knife"]');
-  assert(knifeMainBtn !== null, 'Drawer A main button now displays knife as active slot tool');
-
   // Switch to Eraser
   toolbar.setTool('eraser');
   assert(toolbar.activeTool === 'eraser', 'Toolbar activeTool is "eraser"');
   assert(toolbar.drawerCut.activeChildId === 'eraser', 'Drawer A slot updated to "eraser"');
+  const eraserMainBtn = container.querySelector('[data-tool="eraser"]');
+  assert(eraserMainBtn !== null, 'Drawer A main button now displays eraser as active slot tool');
+
+  // Switch back to Scissors
+  toolbar.setTool('scissors');
+  assert(toolbar.activeTool === 'scissors', 'Toolbar activeTool is "scissors"');
+  assert(toolbar.drawerCut.activeChildId === 'scissors', 'Drawer A slot restored to "scissors"');
 
   // -----------------------------------------------------------
   // Test 4: Activating Tools in Drawer B updates Drawer State and Slot
@@ -217,11 +217,10 @@ export async function runToolbarTopologyDrawersTests(): Promise<boolean> {
   assert(flyoutCut !== null, 'Flyout container rendered in DOM when drawer is open');
 
   const scissorsChildBtn = container.querySelector('[data-tool="scissors"]');
-  const knifeChildBtn = container.querySelector('[data-tool="knife"]');
   const eraserChildBtn = container.querySelector('[data-tool="eraser"]');
   assert(
-    scissorsChildBtn !== null && knifeChildBtn !== null && eraserChildBtn !== null,
-    'All 3 sibling tools rendered as clickable buttons inside Drawer A flyout'
+    scissorsChildBtn !== null && eraserChildBtn !== null,
+    'Both sibling tools (Scissors and Eraser) rendered as clickable buttons inside Drawer A flyout'
   );
 
   // Toggle closes flyout
@@ -286,10 +285,10 @@ export async function runToolbarTopologyDrawersTests(): Promise<boolean> {
   (keyController as any).handleKeyDown(createKeyEvt('e', { shiftKey: false }));
   assert(toolbar.activeTool === 'ellipse', 'Key "e" without Shift activates Ellipse tool ("ellipse")');
 
-  // Press 'k' -> activates knife
+  // Press 'k' -> activates scissors (unified scissor-knife tool)
   (keyController as any).handleKeyDown(createKeyEvt('k'));
-  assert(toolbar.activeTool === 'knife', 'Key "k" activates Knife tool ("knife")');
-  assert(toolbar.drawerCut.activeChildId === 'knife', 'Drawer A slot synced to "knife" on key "k"');
+  assert(toolbar.activeTool === 'scissors', 'Key "k" activates unified Scissors/Knife tool ("scissors")');
+  assert(toolbar.drawerCut.activeChildId === 'scissors', 'Drawer A slot synced to "scissors" on key "k"');
 
   // Press 'f' -> activates smartFill
   (keyController as any).handleKeyDown(createKeyEvt('f'));

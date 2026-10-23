@@ -55,11 +55,10 @@ export class Toolbar {
   public readonly drawerCut: DrawerGroupItem = {
     type: 'drawer',
     id: 'drawer-cut',
-    title: 'Corte y Partición (Tijeras C, Cuchilla K, Borrador Shift+E)',
+    title: 'Corte y Partición (Tijeras C, Borrador Shift+E)',
     activeChildId: 'scissors',
     tools: [
       { id: 'scissors', title: 'Scissors Tool (C)', icon: ToolIcons.scissorsTool, shortcut: 'C' },
-      { id: 'knife', title: 'Knife Tool (K)', icon: ToolIcons.knifeTool, shortcut: 'K' },
       { id: 'eraser', title: 'Eraser Tool (Shift+E)', icon: ToolIcons.eraserTool, shortcut: 'Shift+E' },
     ],
   };
@@ -172,8 +171,7 @@ export class Toolbar {
 
     this.drawerCut.title = t('toolbar.drawerCutTooltip');
     this.drawerCut.tools[0].title = t('toolbar.scissors');
-    this.drawerCut.tools[1].title = t('toolbar.knife');
-    this.drawerCut.tools[2].title = t('toolbar.eraser');
+    this.drawerCut.tools[1].title = t('toolbar.eraser');
 
     this.drawerConstruct.title = t('toolbar.drawerConstructTooltip');
     this.drawerConstruct.tools[0].title = t('toolbar.smartFill');

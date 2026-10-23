@@ -3,6 +3,17 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.98.2] - 2026-10-23
+
+### 🔄 Changed
+- **Unified Cut Tool Drawer**:
+  - Reconfigured Topology Drawer A (`drawerCut`) to host strictly 2 primary tools: **Scissors / Knife Tool** (`scissors` with shortcut <kbd>C</kbd>) and **Eraser Tool** (`eraser` with shortcut <kbd>Shift+E</kbd>).
+  - Streamlined toolbar flyout by eliminating the redundant standalone Knife button, routing both <kbd>C</kbd> and <kbd>K</kbd> shortcuts to the unified Scissors/Knife tool.
+  - Synchronized tooltips and documentation across all 7 languages.
+  - Updated automated test suite in `scripts/test-toolbar-topology-drawers.ts` with 100% assertions passed.
+
+---
+
 ## [0.98.1] - 2026-10-23
 
 ### 🚀 Added

@@ -16,7 +16,7 @@
   <a href="https://open-vsx.org/extension/martinvarela206/antidraw"><img src="https://img.shields.io/badge/Open--VSX-Registry-purple?style=flat-square" alt="Open VSX Registry"></a>
   <a href="https://github.com/martinvarela206/AntiDraw"><img src="https://img.shields.io/badge/GitHub-Repository-181717?style=flat-square&logo=github" alt="GitHub Repository"></a>
   <a href="https://github.com/martinvarela206/AntiDraw/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-Source--Available-blue?style=flat-square" alt="Source-Available License"></a>
-  <a href="https://github.com/martinvarela206/AntiDraw"><img src="https://img.shields.io/badge/Status-Beta%20v0.98.1-orange?style=flat-square" alt="Status"></a>
+  <a href="https://github.com/martinvarela206/AntiDraw"><img src="https://img.shields.io/badge/Status-Beta%20v0.98.2-orange?style=flat-square" alt="Status"></a>
 </p>
 
 <p align="center">
@@ -40,7 +40,7 @@
 ---
 
 > [!NOTE]
-> **项目状态：公开公测版 (Public Beta v0.98.1)**  
+> **项目状态：公开公测版 (Public Beta v0.98.2)**  
 > AntiDraw 正处于高频持续迭代开发中。虽然核心矢量编辑、贝塞尔曲线算法、磁吸吸附和布尔运算拓扑已全面完备且稳定，但在复杂极端场景下仍可能遇到边界情况。  
 > 发现 Bug 或有新特性建议？欢迎在 [GitHub Issues 提交反馈](https://github.com/martinvarela206/AntiDraw/issues) —— 您的反馈将直接驱动下一个版本的演进！
 

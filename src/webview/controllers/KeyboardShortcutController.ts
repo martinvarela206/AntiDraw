@@ -138,7 +138,7 @@ export class KeyboardShortcutController {
         if (e.key === 'g' || e.key === 'G') { e.preventDefault(); this.ctx.toolbar.setTool('polygon'); return; }
         if (e.key === 's' || e.key === 'S') { e.preventDefault(); this.ctx.toolbar.setTool('star'); return; }
         if (e.key === 'c' || e.key === 'C') { e.preventDefault(); this.ctx.toolbar.setTool('scissors'); return; }
-        if (e.key === 'k' || e.key === 'K') { e.preventDefault(); this.ctx.toolbar.setTool('knife'); return; }
+        if (e.key === 'k' || e.key === 'K') { e.preventDefault(); this.ctx.toolbar.setTool('scissors'); return; }
         if (e.key === 'f' || e.key === 'F') { e.preventDefault(); this.ctx.toolbar.setTool('smartFill'); return; }
         if (e.key === 'm' || e.key === 'M') { e.preventDefault(); this.ctx.toolbar.setTool('shapeBuilder'); return; }
         if (e.key === 'i' || e.key === 'I') { e.preventDefault(); this.ctx.toolbar.setTool('image'); return; }
