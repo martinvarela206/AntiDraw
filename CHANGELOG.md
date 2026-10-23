@@ -3,6 +3,20 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.99.0] - 2026-10-23
+
+### 🚀 Added
+- **Shape Builder Sub-Stroke Trimming & Topological Graph Welding**:
+  - Implemented analytical `SegmentTrimEngine` partitioning intersecting vector paths into atomic sub-strokes bounded by crossing points.
+  - Interactive `ShapeBuilderToolHandler` with real-time hover highlight in vibrant crimson `#ef4444` and dual click or continuous drag sweep trimming.
+  - Topological valence welding algorithm:
+    - Nodes with valence $k = 2$: automatically merges the 2 incident sub-strokes into a unified continuous vector, fusing disparate source paths and synthesizing closed polygons (e.g. converting 4 intersecting hashtag `#` lines into a closed 4-corner square).
+    - Nodes with valence $k \ge 3$: preserves distinct separate branches meeting at that coordinate without automatic combination.
+  - Connected tool lifecycle in `ToolFactory`, `Session`, and `CanvasInteractionController`.
+  - Added test suite `scripts/test-shape-builder.ts` with 100% assertions passed.
+
+---
+
 ## [0.98.2] - 2026-10-23
 
 ### 🔄 Changed

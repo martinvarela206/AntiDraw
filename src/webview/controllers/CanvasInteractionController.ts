@@ -12,6 +12,7 @@ import { PolylineToolHandler } from '../tools/PolylineToolHandler.js';
 import { PenToolHandler } from '../tools/PenToolHandler.js';
 import { NodeToolHandler } from '../tools/NodeToolHandler.js';
 import { SmartFillToolHandler } from '../tools/SmartFillToolHandler.js';
+import { ShapeBuilderToolHandler } from '../tools/ShapeBuilderToolHandler.js';
 import { NodeCatalogService } from '../engine/selection/NodeCatalogService.js';
 import { Toolbar } from '../ui/Toolbar.js';
 import { RulerView } from '../ui/RulerView.js';
@@ -63,6 +64,7 @@ export class CanvasInteractionController implements CanvasViewDelegate {
   private get penToolHandler(): PenToolHandler { return this.ctx.tools.penToolHandler; }
   private get nodeToolHandler(): NodeToolHandler { return this.ctx.tools.nodeToolHandler; }
   private get smartFillToolHandler(): SmartFillToolHandler { return this.ctx.tools.smartFillToolHandler; }
+  private get shapeBuilderToolHandler(): ShapeBuilderToolHandler { return this.ctx.tools.shapeBuilderToolHandler; }
 
   constructor(private ctx: CanvasInteractionContext) {}
 
@@ -98,7 +100,8 @@ export class CanvasInteractionController implements CanvasViewDelegate {
       this.shapeToolHandler.shapeStartPt !== null ||
       session.activeHandle !== null ||
       (toolbar?.activeTool === 'pen' && this.penToolHandler.isDragging) ||
-      (toolbar?.activeTool === 'smartFill' && this.smartFillToolHandler.lastDownPt !== null)
+      (toolbar?.activeTool === 'smartFill' && this.smartFillToolHandler.lastDownPt !== null) ||
+      (toolbar?.activeTool === 'shapeBuilder' && (this.shapeBuilderToolHandler.isDragging || this.shapeBuilderToolHandler.sweptSubSegIds.size > 0))
     ) {
       this.cancelCurrentAction();
     }
@@ -262,7 +265,9 @@ export class CanvasInteractionController implements CanvasViewDelegate {
         if (this.penToolHandler.onPointerDown(e, pt)) return;
       } else if (activeTool === 'smartFill') {
         if (this.smartFillToolHandler.onPointerDown(e, pt)) return;
-      } else if (['scissors', 'knife', 'eraser', 'shapeBuilder'].includes(activeTool)) {
+      } else if (activeTool === 'shapeBuilder') {
+        if (this.shapeBuilderToolHandler.onPointerDown(e, pt)) return;
+      } else if (['scissors', 'eraser'].includes(activeTool)) {
         ToastNotification.show({
           message: I18nService.t('toolbar.toolInDevelopment') || 'Herramienta en desarrollo activo (Próximamente)',
           type: 'info',
@@ -352,7 +357,10 @@ export class CanvasInteractionController implements CanvasViewDelegate {
       } else if (activeTool === 'smartFill') {
         canvasView?.setCursor('crosshair');
         if (this.smartFillToolHandler.onPointerMove(e, pt)) return;
-      } else if (['scissors', 'knife', 'eraser', 'shapeBuilder'].includes(activeTool)) {
+      } else if (activeTool === 'shapeBuilder') {
+        canvasView?.setCursor('crosshair');
+        if (this.shapeBuilderToolHandler.onPointerMove(e, pt)) return;
+      } else if (['scissors', 'eraser'].includes(activeTool)) {
         canvasView?.setCursor('not-allowed');
         return;
       } else if (session.activeHandle === 'shape') {
@@ -445,6 +453,12 @@ export class CanvasInteractionController implements CanvasViewDelegate {
       if (activeTool === 'smartFill') {
         session.isDragging = false;
         if (this.smartFillToolHandler.onPointerUp(e, pt)) return;
+      }
+
+      // Shape Builder Tool Delegation
+      if (activeTool === 'shapeBuilder') {
+        session.isDragging = false;
+        if (this.shapeBuilderToolHandler.onPointerUp(e, pt)) return;
       }
 
       // Shape Tool Delegation

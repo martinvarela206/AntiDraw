@@ -7,6 +7,7 @@ import { PolylineToolHandler } from '../../tools/PolylineToolHandler.js';
 import { PenToolHandler } from '../../tools/PenToolHandler.js';
 import { NodeToolHandler } from '../../tools/NodeToolHandler.js';
 import { SmartFillToolHandler } from '../../tools/SmartFillToolHandler.js';
+import { ShapeBuilderToolHandler } from '../../tools/ShapeBuilderToolHandler.js';
 import { DocumentState } from '../../core/model/DocumentState.js';
 
 export interface ActiveInteraction {
@@ -63,6 +64,7 @@ export class Session {
   public readonly penHandler: PenToolHandler;
   public readonly nodeHandler: NodeToolHandler;
   public readonly smartFillHandler?: SmartFillToolHandler;
+  public readonly shapeBuilderHandler?: ShapeBuilderToolHandler;
   private readonly handlers: IToolHandler[];
 
   private callbacks: SessionCallbacks;
@@ -75,6 +77,7 @@ export class Session {
       pen: PenToolHandler;
       node: NodeToolHandler;
       smartFill?: SmartFillToolHandler;
+      shapeBuilder?: ShapeBuilderToolHandler;
     },
     callbacks: SessionCallbacks
   ) {
@@ -84,6 +87,7 @@ export class Session {
     this.penHandler = handlers.pen;
     this.nodeHandler = handlers.node;
     this.smartFillHandler = handlers.smartFill;
+    this.shapeBuilderHandler = handlers.shapeBuilder;
     this.handlers = [
       this.selectHandler,
       this.shapeHandler,
@@ -93,6 +97,9 @@ export class Session {
     ];
     if (this.smartFillHandler) {
       this.handlers.push(this.smartFillHandler);
+    }
+    if (this.shapeBuilderHandler) {
+      this.handlers.push(this.shapeBuilderHandler);
     }
     this.callbacks = callbacks;
   }
@@ -121,6 +128,8 @@ export class Session {
         return this.shapeHandler;
       case 'smartFill':
         return this.smartFillHandler || null;
+      case 'shapeBuilder':
+        return this.shapeBuilderHandler || null;
       default:
         return null;
     }
@@ -148,6 +157,9 @@ export class Session {
     }
     if (tool !== 'smartFill') {
       this.smartFillHandler?.deactivate();
+    }
+    if (tool !== 'shapeBuilder') {
+      this.shapeBuilderHandler?.deactivate();
     }
 
     this.activeTool = tool;

@@ -17,6 +17,7 @@ import { PolylineToolHandler } from './PolylineToolHandler.js';
 import { PenToolHandler } from './PenToolHandler.js';
 import { NodeToolHandler } from './NodeToolHandler.js';
 import { SmartFillToolHandler } from './SmartFillToolHandler.js';
+import { ShapeBuilderToolHandler } from './ShapeBuilderToolHandler.js';
 import { Session } from '../engine/session/Session.js';
 import { ConfirmationModal } from '../ui/ConfirmationModal.js';
 
@@ -43,6 +44,7 @@ export interface ToolSuite {
   penToolHandler: PenToolHandler;
   nodeToolHandler: NodeToolHandler;
   smartFillToolHandler: SmartFillToolHandler;
+  shapeBuilderToolHandler: ShapeBuilderToolHandler;
   session: Session;
 }
 
@@ -134,6 +136,10 @@ export class ToolFactory {
       setCursor: (cursor) => ctx.getCanvasView()?.setCursor(cursor),
     });
 
+    const shapeBuilderToolHandler = new ShapeBuilderToolHandler(toolCtx, {
+      setCursor: (cursor) => ctx.getCanvasView()?.setCursor(cursor),
+    });
+
     const session = new Session(
       {
         select: selectToolHandler,
@@ -142,6 +148,7 @@ export class ToolFactory {
         pen: penToolHandler,
         node: nodeToolHandler,
         smartFill: smartFillToolHandler,
+        shapeBuilder: shapeBuilderToolHandler,
       },
       {
         onRender: () => ctx.getWorkspaceLayout().render(),
@@ -163,6 +170,7 @@ export class ToolFactory {
       penToolHandler,
       nodeToolHandler,
       smartFillToolHandler,
+      shapeBuilderToolHandler,
       session,
     };
   }
