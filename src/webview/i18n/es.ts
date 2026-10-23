@@ -519,4 +519,12 @@ export const es: Translations = {
     recommendedBadge: 'Recomendado',
     largeImageWarning: '⚡ Imagen pesada ({size}). Se recomienda optimizar resolución y compresión.',
   },
+  welcomeModal: {
+    title: 'AntiDraw',
+    version: 'Versión {version}',
+    lastUpdate: 'Última actualización: {date}',
+    message: 'Si encuentras útil AntiDraw para tus proyectos vectoriales, por favor considera apoyar su desarrollo continuo con una donación.',
+    donateKoFi: 'Apoyar en Ko-fi',
+    maybeLater: 'Quizás más tarde',
+  },
 };

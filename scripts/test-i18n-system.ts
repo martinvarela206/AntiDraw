@@ -156,6 +156,38 @@ export async function runI18nSystemTests(): Promise<boolean> {
     passed++;
     console.log('  ✅ [PASS] IDE language auto-detection, manual override isolation, and auto revert working flawlessly');
 
+    // 6. Welcome & Support Modal (Ko-fi) Localization
+    console.log('\n[6. Welcome & Support Modal (Ko-fi) Localization]');
+    const welcomeTests: { lang: keyof typeof dicts; donate: string; dismiss: string }[] = [
+      { lang: 'es', donate: 'Apoyar en Ko-fi', dismiss: 'Quizás más tarde' },
+      { lang: 'en', donate: 'Support on Ko-fi', dismiss: 'Maybe later' },
+      { lang: 'zh-cn', donate: '在 Ko-fi 上赞助', dismiss: '以后再说' },
+      { lang: 'de', donate: 'Auf Ko-fi unterstützen', dismiss: 'Vielleicht später' },
+      { lang: 'fr', donate: 'Soutenir sur Ko-fi', dismiss: 'Peut-être plus tard' },
+      { lang: 'ru', donate: 'Поддержать на Ko-fi', dismiss: 'Может позже' },
+      { lang: 'ja', donate: 'Ko-fi でサポート', dismiss: '後で' },
+    ];
+
+    for (const wt of welcomeTests) {
+      I18nService.setLanguage(wt.lang as any);
+      assert(I18nService.t('welcomeModal.donateKoFi') === wt.donate, `Ko-fi button localized in ${wt.lang}`);
+      assert(I18nService.t('welcomeModal.maybeLater') === wt.dismiss, `Dismiss button localized in ${wt.lang}`);
+      assert(
+        I18nService.t('welcomeModal.version', { version: '0.98.0' }).includes('0.98.0'),
+        `Version interpolated in ${wt.lang}`
+      );
+      assert(
+        I18nService.t('welcomeModal.lastUpdate', { date: '2026-10-22' }).includes('2026-10-22'),
+        `Date interpolated in ${wt.lang}`
+      );
+      assert(
+        I18nService.t('welcomeModal.message').length > 20,
+        `Donation appeal message is non-empty and substantive in ${wt.lang}`
+      );
+      passed++;
+      console.log(`  ✅ [PASS] WelcomeModal translations and variable substitution verified in [${wt.lang}]`);
+    }
+
     console.log(`\nI18n System Tests complete: ${passed} passed, 0 failed.\n`);
     return true;
   } catch (err) {

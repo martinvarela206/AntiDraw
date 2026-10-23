@@ -3,6 +3,21 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.98.0] - 2026-10-22
+
+### 🚀 Added
+- **Welcome & Creator Support Modal (Ko-fi)**:
+  - Added an initial welcome and creator support modal (`WelcomeModal`) that gracefully displays upon opening AntiDraw.
+  - Prominently showcases the official AntiDraw logo, current version tag, and last update date.
+  - Includes a warm, multi-language appeal inviting satisfied users to support continuous development with a Ko-fi donation.
+  - Features an interactive **"Support on Ko-fi"** button with the official Ko-fi cup icon that automatically launches the donation page (`https://ko-fi.com/martinvarela206`) via external browser and dismisses the dialog.
+  - Features a ghost **"Maybe later"** dismiss button, with keyboard (<kbd>Escape</kbd>) and backdrop click dismissal.
+  - Fully translated across all 7 supported languages (English, Spanish, Simplified Chinese, German, French, Russian, Japanese) with 100% key symmetry in `welcomeModal` translation namespace.
+  - Added `openExternal` IPC bridge handling in `VsCodeBridge` and `AntiDrawEditorProvider`.
+  - Expanded test suite in `scripts/test-i18n-system.ts` verifying modal translation keys and variable interpolation across all 7 languages.
+
+---
+
 ## [0.97.2] - 2026-10-22
 
 ### 🚀 Added

@@ -472,5 +472,13 @@ export const ja: Translations = {
     "choiceOptimizeBtn": "⚙️ サイズと品質を最適化...",
     "recommendedBadge": "推奨",
     "largeImageWarning": "⚡ 大容量画像 ({size}) です。解像度と圧縮の最適化をお勧めします。"
-  }
+  },
+  welcomeModal: {
+    title: 'AntiDraw',
+    version: 'バージョン {version}',
+    lastUpdate: '最終更新日: {date}',
+    message: 'AntiDraw がベクタープロジェクトに役立っている場合は、継続的な開発を支援するために寄付をご検討ください。',
+    donateKoFi: 'Ko-fi でサポート',
+    maybeLater: '後で',
+  },
 };

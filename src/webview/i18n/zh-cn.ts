@@ -519,4 +519,12 @@ export const zhCn: Translations = {
     recommendedBadge: '推荐',
     largeImageWarning: '⚡ 图像较大 ({size})。建议优化分辨率与压缩率以保证流畅渲染。',
   },
+  welcomeModal: {
+    title: 'AntiDraw',
+    version: '版本 {version}',
+    lastUpdate: '最近更新：{date}',
+    message: '如果您觉得 AntiDraw 对您的矢量设计与工作流程有所帮助，请考虑通过捐赠支持其持续开发。',
+    donateKoFi: '在 Ko-fi 上赞助',
+    maybeLater: '以后再说',
+  },
 };

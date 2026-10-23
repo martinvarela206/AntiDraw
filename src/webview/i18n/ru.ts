@@ -472,5 +472,13 @@ export const ru: Translations = {
     "choiceOptimizeBtn": "⚙️ Оптимизировать размер и качество...",
     "recommendedBadge": "Рекомендуется",
     "largeImageWarning": "⚡ Большое изображение ({size}). Рекомендуется оптимизировать разрешение и сжатие."
-  }
+  },
+  welcomeModal: {
+    title: 'AntiDraw',
+    version: 'Версия {version}',
+    lastUpdate: 'Последнее обновление: {date}',
+    message: 'Если вы находите AntiDraw полезным для своих векторных проектов, поддержите дальнейшую разработку пожертвованием.',
+    donateKoFi: 'Поддержать на Ko-fi',
+    maybeLater: 'Может позже',
+  },
 };

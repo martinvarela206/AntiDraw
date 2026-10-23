@@ -284,6 +284,16 @@ export class VsCodeBridge {
     this.vscodeApi.postMessage({ type: 'showError', message });
   }
 
+  public openExternal(url: string): void {
+    if (this.vscodeApi) {
+      try {
+        this.vscodeApi.postMessage({ type: 'openExternal', url });
+      } catch (err) {
+        console.error('[VsCodeBridge] Failed to post openExternal message:', err);
+      }
+    }
+  }
+
   public getState<T = any>(): T | undefined {
     return this.vscodeApi.getState();
   }

@@ -529,4 +529,14 @@ export interface Translations {
     recommendedBadge: string;
     largeImageWarning: string;
   };
+
+  // Welcome & Support Modal (Startup / Ko-fi)
+  welcomeModal: {
+    title: string;
+    version: string;
+    lastUpdate: string;
+    message: string;
+    donateKoFi: string;
+    maybeLater: string;
+  };
 }

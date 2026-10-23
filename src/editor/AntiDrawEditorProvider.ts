@@ -257,6 +257,16 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
         case 'showError':
           vscode.window.showErrorMessage(message.message);
           break;
+
+        case 'openExternal':
+          if (message.url) {
+            try {
+              vscode.env.openExternal(vscode.Uri.parse(message.url));
+            } catch (err: any) {
+              vscode.window.showErrorMessage(`[AntiDraw] Error al abrir enlace externo: ${err?.message || err}`);
+            }
+          }
+          break;
       }
     });
 
@@ -287,6 +297,10 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
     const styleUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview.css')
     );
+    const iconUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.context.extensionUri, 'icon.png')
+    );
+    const extensionVersion = this.context.extension?.packageJSON?.version || '0.97.2';
 
     const nonce = getNonce();
 
@@ -313,7 +327,7 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
   <title>AntiDraw SVG Vector Editor</title>
   <link rel="stylesheet" href="${styleUri}">
 </head>
-<body data-vscode-language="${userLocale}">
+<body data-vscode-language="${userLocale}" data-extension-version="${extensionVersion}" data-extension-date="2026-10-22" data-icon-uri="${iconUri}">
   <div id="app"></div>
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>

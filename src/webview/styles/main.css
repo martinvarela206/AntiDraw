@@ -1779,6 +1779,158 @@ button.prop-input.active {
   to { transform: scale(1); opacity: 1; }
 }
 
+/* WELCOME & SUPPORT MODAL (FEAT-WelcomeKoFi) */
+.ad-welcome-container {
+  max-width: 440px;
+  padding: 22px 24px;
+  border-radius: 12px;
+  gap: 14px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.ad-welcome-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.ad-welcome-logo-box {
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ad-welcome-logo-img {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 102, 255, 0.25);
+  object-fit: cover;
+  display: block;
+}
+
+.ad-welcome-logo-fallback {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 102, 255, 0.25);
+}
+
+.ad-welcome-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ad-welcome-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ad-welcome-title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-main);
+  margin: 0;
+  line-height: 1.2;
+}
+
+.ad-welcome-version-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-color);
+  background: rgba(0, 102, 255, 0.12);
+  border: 1px solid rgba(0, 102, 255, 0.25);
+  padding: 2px 7px;
+  border-radius: 12px;
+  letter-spacing: 0.02em;
+}
+
+.ad-welcome-date {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+.ad-welcome-body {
+  padding: 4px 0;
+}
+
+.ad-welcome-message {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-main);
+  margin: 0;
+}
+
+.ad-welcome-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+}
+
+.ad-welcome-dismiss-btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ad-welcome-dismiss-btn:hover {
+  background: var(--bg-panel-hover);
+  color: var(--text-main);
+  border-color: var(--border-color-hover);
+}
+
+.ad-welcome-kofi-btn {
+  background: #FF5E5B !important;
+  color: #ffffff !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 12px;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(255, 94, 91, 0.35);
+  transition: all 0.15s ease;
+}
+
+.ad-welcome-kofi-btn:hover {
+  background: #e04b48 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(255, 94, 91, 0.5);
+}
+
+.ad-welcome-kofi-btn:active {
+  transform: translateY(0);
+}
+
+.ad-kofi-icon {
+  flex-shrink: 0;
+}
+
 /* Toast Notification System */
 .ad-toast-container {
   position: fixed;

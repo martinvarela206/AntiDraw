@@ -472,5 +472,13 @@ export const de: Translations = {
     "choiceOptimizeBtn": "⚙️ Größe und Qualität optimieren...",
     "recommendedBadge": "Empfohlen",
     "largeImageWarning": "⚡ Großes Bild ({size}). Optimierung von Auflösung und Kompression empfohlen."
-  }
+  },
+  welcomeModal: {
+    title: 'AntiDraw',
+    version: 'Version {version}',
+    lastUpdate: 'Letzte Aktualisierung: {date}',
+    message: 'Wenn Sie AntiDraw für Ihre Vektorprojekte nützlich finden, unterstützen Sie bitte die kontinuierliche Entwicklung mit einer Spende.',
+    donateKoFi: 'Auf Ko-fi unterstützen',
+    maybeLater: 'Vielleicht später',
+  },
 };

@@ -17,6 +17,7 @@ import { LayerReorderService } from './engine/layout/LayerReorderService.js';
 import { ImageIngestionService } from './services/ImageIngestionService.js';
 import { ThemeService } from './services/ThemeService.js';
 import { I18nService } from './i18n/I18nService.js';
+import { WelcomeModal } from './ui/WelcomeModal.js';
 import './styles/main.css';
 
 /**
@@ -273,6 +274,9 @@ class AntiDrawApp {
 
     // 7. Ready notification to VS Code Host
     this.hostSyncService.notifyReady();
+
+    // 8. Welcome / Support Modal on plugin open
+    WelcomeModal.show();
   }
 }
 
