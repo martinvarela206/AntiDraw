@@ -207,7 +207,7 @@ export class CanvasManager {
   public static readonly ZOOM_FACTOR_IN: number = 1.10;
   public static readonly ZOOM_FACTOR_OUT: number = 0.90;
   public static readonly MIN_ZOOM: number = 0.05;
-  public static readonly MAX_ZOOM: number = 30.0;
+  public static readonly MAX_ZOOM: number = 50.0;
 
   public zoom: number = 1.0;
   public panX: number = 0;

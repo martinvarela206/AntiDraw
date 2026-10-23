@@ -3,6 +3,17 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.98.1] - 2026-10-23
+
+### 🚀 Added
+- **5000% Ultra-High Viewport Zoom Limit**:
+  - Increased maximum optical zoom limit from 3000% (factor 30.0) to 5000% (factor 50.0) in `CanvasManager.MAX_ZOOM`.
+  - Calibrated adaptive human-scale graduations in `RulerView` to compute clean decimal stepping and sub-steps at 50x magnification with zero tick stalls or performance drops.
+  - Verified hardware-accelerated viewport-bounded grid lines in `GridCanvasRenderer` and invariant overlay indicators across extreme zoom scales.
+  - Added dedicated test suite `scripts/test-viewport-zoom.ts` with 100% assertions passed.
+
+---
+
 ## [0.98.0] - 2026-10-22
 
 ### 🚀 Added

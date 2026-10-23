@@ -311,12 +311,12 @@ export class RulerView {
      * Using a fixed world step (e.g. 50 units * zoom) produced extreme pathological rendering:
      * 1. At zoom < 10% (zoom = 0.05), step collapsed to 2.5px with subStep = 0.5px, executing
      *    nearly 4,000 loop iterations, strokes, text draws, and 2,000 canvas matrix rotations per frame.
-     * 2. At zoom 3000% (zoom = 30.0), step expanded to 1500px, leaving the ruler devoid of useful graduations.
+     * 2. At zoom 5000% (zoom = 50.0), step expanded to 2500px, leaving the ruler devoid of useful graduations.
      *
      * Solution:
      * Dynamically compute worldStep such that major visual graduations on screen always remain
      * comfortably spaced between 50px and 120px using standard 1, 2, 5 decimal increments.
-     * Ticks per frame are strictly bounded (< 30 ticks), executing in < 0.02ms across all zoom levels (5% to 3000%).
+     * Ticks per frame are strictly bounded (< 30 ticks), executing in < 0.02ms across all zoom levels (5% to 5000%).
      */
     const targetScreenStep = 80;
     const rawWorldStep = targetScreenStep / (zoom * (cfg.scale || 1));
@@ -341,7 +341,7 @@ export class RulerView {
       tCtx.beginPath();
       if (isMajor) {
         const majorIdx = Math.round((x - startX) / step);
-        const relVal = Math.round(majorIdx * worldStep);
+        const relVal = worldStep < 1 ? Number((majorIdx * worldStep).toFixed(2)) : Math.round(majorIdx * worldStep);
         tCtx.moveTo(x, 0);
         tCtx.lineTo(x, 20);
         tCtx.stroke();
@@ -396,7 +396,7 @@ export class RulerView {
       lCtx.beginPath();
       if (isMajor) {
         const majorIdx = Math.round((y - startY) / step);
-        const relVal = Math.round(majorIdx * worldStep);
+        const relVal = worldStep < 1 ? Number((majorIdx * worldStep).toFixed(2)) : Math.round(majorIdx * worldStep);
         lCtx.moveTo(0, y);
         lCtx.lineTo(20, y);
         lCtx.stroke();

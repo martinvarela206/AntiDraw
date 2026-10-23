@@ -586,7 +586,7 @@ body {
  *    layout reflows on parent scroll areas.
  *
  * 2. Shadow Restraint
- *    At zoom levels > 500% (up to 3000%), the canvas perimeter scales up to 120,000 physical pixels.
+ *    At zoom levels > 500% (up to 5000%), the canvas perimeter scales up to 200,000 physical pixels.
  *    Heavy gaussian blur box-shadows (e.g. 40px blur) force Skia into massive GPU/CPU convolution
  *    passes whenever layout dimensions update. A restrained shadow (4px blur, 16px spread) prevents
  *    GPU texture bandwidth exhaustion while maintaining visual depth.

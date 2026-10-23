@@ -19,9 +19,9 @@ export interface GridRenderOptions {
  *    Previously, grid layers were generated via SVG `<defs><pattern>` elements filled inside an SVG `<rect>`
  *    hosted in `#grid-svg`.
  *    - In Chromium and WebKit, SVG `vector-effect="non-scaling-stroke"` is not supported across pattern tiles.
- *      Consequently, when zooming to 3000% (zoom factor = 30.0), a 0.5px line was magnified into a 15px blurry bar,
- *      and the dash pattern stretched to 60px on / 60px off, causing severe visual distortion.
- *    - Furthermore, at 3000% zoom, the `#grid-svg` element scaled to extreme dimensions (e.g. 28,800px x 22,800px).
+ *      Consequently, when zooming to 5000% (zoom factor = 50.0), a 0.5px line was magnified into a 25px blurry bar,
+ *      and the dash pattern stretched to 100px on / 100px off, causing severe visual distortion.
+ *    - Furthermore, at 5000% zoom, the `#grid-svg` element scaled to extreme dimensions (e.g. 48,000px x 38,000px).
  *      For high-density grids (e.g. spacing: 1px for pixel-precision vector drafting), Chromium attempted to tile
  *      hundreds of millions of pattern cells across a multi-thousand-pixel compositing texture. This exceeded GPU
  *      hardware texture limits (> 16,384px), forcing a catastrophic fallback to Skia CPU software rasterization on
@@ -31,7 +31,7 @@ export interface GridRenderOptions {
  *    - The grid canvas is strictly sized to the visible viewport dimensions (`canvasScrollArea.clientWidth` x
  *      `canvasScrollArea.clientHeight`, scaled by `devicePixelRatio`), exactly mirroring the high-performance design
  *      of `RulerView`.
- *    - Regardless of document size or zoom level (5% to 3000%), the canvas memory footprint never exceeds the visible
+ *    - Regardless of document size or zoom level (5% to 5000%), the canvas memory footprint never exceeds the visible
  *      display resolution (e.g. ~1920x1080).
  *    - Grid lines are projected analytically into screen coordinates and rendered with a constant 1px stroke
  *      (`ctx.lineWidth = 1`) and constant 2px dash (`ctx.setLineDash([2, 2])`). Strokes remain mathematically invariant
@@ -287,8 +287,8 @@ export class GridCanvasRenderer {
          *
          * Problem:
          * Previously, vertical and horizontal lines were drawn from `canvasScreenTop` to `canvasScreenBottom`
-         * and from `canvasScreenLeft` to `canvasScreenRight`. At 3000% zoom (zoom factor = 30), these spans
-         * stretched across +/- 30,000 pixels. With a [2, 2] dash array, Skia had to compute over 15,000 dash
+         * and from `canvasScreenLeft` to `canvasScreenRight`. At 5000% zoom (zoom factor = 50), these spans
+         * stretched across +/- 50,000 pixels. With a [2, 2] dash array, Skia had to compute over 25,000 dash
          * intervals per line before applying 2D context clipping.
          *
          * Solution:

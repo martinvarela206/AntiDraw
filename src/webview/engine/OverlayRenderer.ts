@@ -65,8 +65,8 @@ export class OverlayRenderer {
      *
      * Problem:
      * Previously, a full `<rect>` of dimensions `vb.width x vb.height` with `vector-effect="non-scaling-stroke"`
-     * and `stroke-dasharray="6 3"` was output unconditionally. At zoom > 500% (up to 3000%), the screen perimeter
-     * reaches 120,000 physical pixels, forcing Skia to tessellate over 13,000 individual dash segments on every frame,
+     * and `stroke-dasharray="6 3"` was output unconditionally. At zoom > 500% (up to 5000%), the screen perimeter
+     * reaches 200,000 physical pixels, forcing Skia to tessellate over 20,000 individual dash segments on every frame,
      * even when the artboard boundaries are 95% or 100% offscreen.
      *
      * Solution:
