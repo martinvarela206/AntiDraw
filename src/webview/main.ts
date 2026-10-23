@@ -16,6 +16,7 @@ import { CommandShortcutController } from './controllers/CommandShortcutControll
 import { LayerReorderService } from './engine/layout/LayerReorderService.js';
 import { ImageIngestionService } from './services/ImageIngestionService.js';
 import { ThemeService } from './services/ThemeService.js';
+import { I18nService } from './i18n/I18nService.js';
 import './styles/main.css';
 
 /**
@@ -47,8 +48,12 @@ class AntiDrawApp {
   }
 
   private bootstrap(): void {
-    // 0. Theme initialization (figma-ux-ui)
+    // 0. Theme & I18n initialization (IDE language as default)
     ThemeService.init();
+    const ideLocale = typeof document !== 'undefined'
+      ? document.body?.getAttribute('data-vscode-language')
+      : undefined;
+    I18nService.initialize(ideLocale || undefined);
 
     // 1. Tool suite & interactive session
     this.tools = ToolFactory.createToolSuite({

@@ -101,7 +101,8 @@ export const ja: Translations = {
     "rulerCornerTooltip": "ドラッグで (0,0) 原点を設定 | クリックで設定 | ダブルクリックでリセット",
     "currentTool": "ツール: {tool}",
     "themeToggleTooltip": "ダーク / ライトテーマの切り替え",
-    "languageSelect": "言語を選択"
+    "languageSelect": "言語を選択",
+    "languageAuto": "自動 (IDE: {lang})"
   },
   "miniHud": {
     "move": "移動",

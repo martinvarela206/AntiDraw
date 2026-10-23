@@ -101,7 +101,8 @@ export const ru: Translations = {
     "rulerCornerTooltip": "Перетащите для начала координат (0,0) | Клик для настроек | Двойной клик для сброса",
     "currentTool": "Инструмент: {tool}",
     "themeToggleTooltip": "Переключить темную/светлую тему",
-    "languageSelect": "Выбрать язык"
+    "languageSelect": "Выбрать язык",
+    "languageAuto": "Авто (IDE: {lang})"
   },
   "miniHud": {
     "move": "Перемещение",

@@ -3,6 +3,19 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.97.2] - 2026-10-22
+
+### 🚀 Added
+- **Automatic IDE Language Detection & Dynamic Syncing**:
+  - Configured AntiDraw to automatically default to the host VS Code IDE language (`vscode.env.language`) on first launch and webview bootstrap via `data-vscode-language` and payload synchronization.
+  - Added dedicated **"Auto (IDE: {Language})"** option to the status bar language popover menu with an active checkmark, allowing users to effortlessly switch back to tracking their IDE's language after manual language overrides.
+  - Added localized `statusbar.languageAuto` key across all 7 dictionaries (`Automático (IDE: {lang})`, `Auto (IDE: {lang})`, `自动 (IDE: {lang})`, `Automatisch (IDE: {lang})`, `Automatique (IDE : {lang})`, `Авто (IDE: {lang})`, `自動 (IDE: {lang})`) with full variable interpolation support.
+  - Preserves user manual overrides in `localStorage` when an explicit language is selected, while cleanly purging the override when switching back to Auto IDE mode.
+  - Integrated dynamic locale synchronization in `HostSyncService` whenever the extension host loads or updates SVG documents with locale metadata.
+  - Expanded test suite in `scripts/test-i18n-system.ts` verifying auto-detection, live host synchronization, manual override isolation, and seamless restoration of auto mode.
+
+---
+
 ## [0.97.1] - 2026-10-22
 
 ### 🛠️ Fixed

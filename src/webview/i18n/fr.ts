@@ -101,7 +101,8 @@ export const fr: Translations = {
     "rulerCornerTooltip": "Glisser pour l'origine (0,0) | Clic pour options | Double-clic pour réinitialiser",
     "currentTool": "Outil : {tool}",
     "themeToggleTooltip": "Basculer thème sombre / clair",
-    "languageSelect": "Sélectionner la langue"
+    "languageSelect": "Sélectionner la langue",
+    "languageAuto": "Automatique (IDE : {lang})"
   },
   "miniHud": {
     "move": "Déplacer",

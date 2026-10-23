@@ -105,6 +105,7 @@ export const en: Translations = {
     currentTool: 'Tool: {tool}',
     themeToggleTooltip: 'Toggle Dark / Light Theme',
     languageSelect: 'Select language',
+    languageAuto: 'Auto (IDE: {lang})',
   },
 
   miniHud: {

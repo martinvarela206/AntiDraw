@@ -135,6 +135,7 @@ export class LanguageMenu {
   public updateButton(btn: HTMLElement, lang: Language): void {
     const flagSvg = FlagIcons[lang] || FlagIcons.en;
     const label = lang.toUpperCase();
+    const isAuto = I18nService.isAuto();
 
     btn.innerHTML = `
       <span class="status-btn-flag" style="display:inline-flex; align-items:center; margin-right:4px;">${flagSvg}</span>
@@ -143,7 +144,8 @@ export class LanguageMenu {
         <polyline points="6 9 12 15 18 9"></polyline>
       </svg>
     `;
-    btn.title = I18nService.t('statusbar.languageToggleTooltip');
+    const baseTooltip = I18nService.t('statusbar.languageToggleTooltip');
+    btn.title = isAuto ? `${baseTooltip} (Auto IDE)` : baseTooltip;
   }
 
   public toggle(): void {
@@ -193,16 +195,31 @@ export class LanguageMenu {
 
   private renderItems(): void {
     const currentLang = I18nService.getLanguage();
+    const isAuto = I18nService.isAuto();
+    const ideLang = I18nService.getIdeLanguage();
+    const ideLangName = SUPPORTED_LANGUAGES.find((l) => l.code === ideLang)?.name || ideLang.toUpperCase();
+    const autoLabel = I18nService.t('statusbar.languageAuto', { lang: ideLangName });
+    const autoFlag = FlagIcons[ideLang] || FlagIcons.en;
     const headerTitle = I18nService.t('statusbar.languageSelect');
 
+    const checkSvg = `
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>
+    `;
+
+    const autoItemHtml = `
+      <div class="lang-menu-item ${isAuto ? 'active' : ''}" data-lang="auto" style="border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.08)); margin-bottom: 4px; padding-bottom: 6px;">
+        <span class="lang-menu-flag">${autoFlag}</span>
+        <span class="lang-menu-name" style="font-weight:600;">${autoLabel}</span>
+        <span class="lang-menu-code">AUTO</span>
+        <span class="lang-menu-check" style="${isAuto ? '' : 'visibility:hidden;'}">${checkSvg}</span>
+      </div>
+    `;
+
     const itemsHtml = SUPPORTED_LANGUAGES.map((opt) => {
-      const isSelected = opt.code === currentLang;
+      const isSelected = !isAuto && opt.code === currentLang;
       const flagSvg = FlagIcons[opt.code];
-      const checkSvg = `
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="20 6 9 17 4 12"></polyline>
-        </svg>
-      `;
 
       return `
         <div class="lang-menu-item ${isSelected ? 'active' : ''}" data-lang="${opt.code}">
@@ -217,6 +234,7 @@ export class LanguageMenu {
     this.element.innerHTML = `
       <div class="lang-menu-header">${headerTitle}</div>
       <div class="lang-menu-list" style="display:flex; flex-direction:column; gap:2px;">
+        ${autoItemHtml}
         ${itemsHtml}
       </div>
     `;
@@ -227,9 +245,11 @@ export class LanguageMenu {
       el.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        const langCode = el.getAttribute('data-lang') as Language;
-        if (langCode) {
-          I18nService.setLanguage(langCode);
+        const langCode = el.getAttribute('data-lang');
+        if (langCode === 'auto') {
+          I18nService.setLanguage('auto');
+        } else if (langCode) {
+          I18nService.setLanguage(langCode as Language);
         }
         this.hide();
       });

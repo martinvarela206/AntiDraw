@@ -121,6 +121,41 @@ export async function runI18nSystemTests(): Promise<boolean> {
     passed++;
     console.log('  ✅ [PASS] Unsubscription cleanly detaches observer');
 
+    // 5. IDE Language Auto-Detection & Dynamic Sync
+    console.log('\n[5. IDE Language Auto-Detection & Dynamic Sync]');
+    // Reset to auto with German IDE
+    I18nService.setLanguage('auto');
+    I18nService.initialize('de-DE');
+    assert(I18nService.isAuto() === true, 'Auto mode is active on initialization');
+    assert(I18nService.getIdeLanguage() === 'de', 'IDE language resolved to de');
+    assert(I18nService.getLanguage() === 'de', 'Current language matches IDE language (de)');
+    assert(
+      I18nService.t('statusbar.languageAuto', { lang: 'Deutsch' }) === 'Automatisch (IDE: Deutsch)',
+      'Variable {lang} interpolated properly in statusbar.languageAuto (de)'
+    );
+
+    // Dynamic sync from host when in auto mode
+    I18nService.setIdeLanguage('ja-JP');
+    assert(I18nService.getIdeLanguage() === 'ja', 'IDE language updated to ja');
+    assert(I18nService.getLanguage() === 'ja', 'Current language updated dynamically to ja');
+
+    // User manual override switches out of auto mode
+    I18nService.setLanguage('fr');
+    assert(I18nService.isAuto() === false, 'Manual language selection turns off auto mode');
+    assert(I18nService.getLanguage() === 'fr', 'Current language set to fr');
+
+    // Dynamic sync from host does not overwrite manual override
+    I18nService.setIdeLanguage('ru-RU');
+    assert(I18nService.getIdeLanguage() === 'ru', 'IDE language updated to ru');
+    assert(I18nService.getLanguage() === 'fr', 'Manual language fr was preserved despite IDE language changing');
+
+    // Reverting to auto mode
+    I18nService.setLanguage('auto');
+    assert(I18nService.isAuto() === true, 'Reverted back to auto mode');
+    assert(I18nService.getLanguage() === 'ru', 'Language immediately synchronized to IDE language (ru)');
+    passed++;
+    console.log('  ✅ [PASS] IDE language auto-detection, manual override isolation, and auto revert working flawlessly');
+
     console.log(`\nI18n System Tests complete: ${passed} passed, 0 failed.\n`);
     return true;
   } catch (err) {

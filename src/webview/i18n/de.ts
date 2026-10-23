@@ -101,7 +101,8 @@ export const de: Translations = {
     "rulerCornerTooltip": "Ziehen für (0,0)-Ursprung | Klick für Lineal-Optionen | Doppelklick zum Zurücksetzen",
     "currentTool": "Werkzeug: {tool}",
     "themeToggleTooltip": "Dunkles / Helles Design umschalten",
-    "languageSelect": "Sprache auswählen"
+    "languageSelect": "Sprache auswählen",
+    "languageAuto": "Automatisch (IDE: {lang})"
   },
   "miniHud": {
     "move": "Verschieben",

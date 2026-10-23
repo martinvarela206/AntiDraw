@@ -16,11 +16,14 @@ type NestedKeyOf<ObjectType extends object> = {
 export type TranslationKey = NestedKeyOf<Translations>;
 
 export class I18nService {
-  private static language: Language = 'es';
+  private static language: Language = 'en';
+  private static ideLanguage: Language = 'en';
+  private static isAutoMode: boolean = true;
   private static listeners: Set<(lang: Language) => void> = new Set();
   private static initialized = false;
 
-  private static resolveLocale(localeStr: string): Language {
+  public static resolveLocale(localeStr: string): Language {
+    if (!localeStr) return 'en';
     const lower = localeStr.toLowerCase();
     if (lower.startsWith('es')) return 'es';
     if (lower.startsWith('zh')) return 'zh-cn';
@@ -34,7 +37,21 @@ export class I18nService {
   public static initialize(initialLang?: string): void {
     if (this.initialized && !initialLang) return;
 
-    // 1. Check user preference stored in localStorage
+    // 1. Determine IDE language from argument, DOM injection or navigator
+    if (initialLang) {
+      this.ideLanguage = this.resolveLocale(initialLang);
+    } else if (typeof document !== 'undefined' && document.body) {
+      const bodyLang = document.body.getAttribute('data-vscode-language');
+      if (bodyLang) {
+        this.ideLanguage = this.resolveLocale(bodyLang);
+      } else if (typeof navigator !== 'undefined' && navigator.language) {
+        this.ideLanguage = this.resolveLocale(navigator.language);
+      }
+    } else if (typeof navigator !== 'undefined' && navigator.language) {
+      this.ideLanguage = this.resolveLocale(navigator.language);
+    }
+
+    // 2. Check manual user override in localStorage
     let saved: string | null = null;
     try {
       if (typeof localStorage !== 'undefined') {
@@ -43,37 +60,38 @@ export class I18nService {
     } catch (_) {}
 
     const validLanguages: Language[] = ['es', 'en', 'zh-cn', 'de', 'fr', 'ru', 'ja'];
-    if (saved && validLanguages.includes(saved as Language)) {
+    if (saved && saved !== 'auto' && validLanguages.includes(saved as Language)) {
+      this.isAutoMode = false;
       this.language = saved as Language;
-      this.initialized = true;
-      return;
-    }
-
-    // 2. Explicit argument (e.g. from VS Code host environment)
-    if (initialLang) {
-      this.language = this.resolveLocale(initialLang);
-      this.initialized = true;
-      return;
-    }
-
-    // 3. Document body attribute injected by extension HTML template
-    if (typeof document !== 'undefined' && document.body) {
-      const bodyLang = document.body.getAttribute('data-vscode-language');
-      if (bodyLang) {
-        this.language = this.resolveLocale(bodyLang);
-        this.initialized = true;
-        return;
-      }
-    }
-
-    // 4. Browser / system navigator language
-    if (typeof navigator !== 'undefined' && navigator.language) {
-      this.language = this.resolveLocale(navigator.language);
     } else {
-      this.language = 'en';
+      // Default to IDE's language
+      this.isAutoMode = true;
+      this.language = this.ideLanguage;
     }
 
     this.initialized = true;
+  }
+
+  public static setIdeLanguage(locale: string): void {
+    const resolved = this.resolveLocale(locale);
+    this.ideLanguage = resolved;
+    if (this.isAutoMode) {
+      this.setLanguage('auto', false);
+    }
+  }
+
+  public static getIdeLanguage(): Language {
+    if (!this.initialized) {
+      this.initialize();
+    }
+    return this.ideLanguage;
+  }
+
+  public static isAuto(): boolean {
+    if (!this.initialized) {
+      this.initialize();
+    }
+    return this.isAutoMode;
   }
 
   public static getLanguage(): Language {
@@ -83,20 +101,34 @@ export class I18nService {
     return this.language;
   }
 
-  public static setLanguage(lang: Language): void {
-    if (this.language === lang && this.initialized) return;
-    this.language = lang;
-    this.initialized = true;
-
-    try {
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('antidraw_language', lang);
+  public static setLanguage(lang: Language | 'auto', persist: boolean = true): void {
+    const prevLang = this.language;
+    if (lang === 'auto') {
+      this.isAutoMode = true;
+      this.language = this.ideLanguage;
+      if (persist) {
+        try {
+          if (typeof localStorage !== 'undefined') {
+            localStorage.removeItem('antidraw_language');
+          }
+        } catch (_) {}
       }
-    } catch (_) {}
+    } else {
+      this.isAutoMode = false;
+      this.language = lang;
+      if (persist) {
+        try {
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('antidraw_language', lang);
+          }
+        } catch (_) {}
+      }
+    }
+    this.initialized = true;
 
     this.listeners.forEach((cb) => {
       try {
-        cb(lang);
+        cb(this.language);
       } catch (err) {
         console.error('[I18nService] Error notifying listener:', err);
       }

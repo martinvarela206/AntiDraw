@@ -16,7 +16,7 @@
   <a href="https://open-vsx.org/extension/martinvarela206/antidraw"><img src="https://img.shields.io/badge/Open--VSX-Registry-purple?style=flat-square" alt="Open VSX Registry"></a>
   <a href="https://github.com/martinvarela206/AntiDraw"><img src="https://img.shields.io/badge/GitHub-Repository-181717?style=flat-square&logo=github" alt="GitHub Repository"></a>
   <a href="https://github.com/martinvarela206/AntiDraw/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-Source--Available-blue?style=flat-square" alt="Source-Available License"></a>
-  <a href="https://github.com/martinvarela206/AntiDraw"><img src="https://img.shields.io/badge/Status-Beta%20v0.97.1-orange?style=flat-square" alt="Status"></a>
+  <a href="https://github.com/martinvarela206/AntiDraw"><img src="https://img.shields.io/badge/Status-Beta%20v0.97.2-orange?style=flat-square" alt="Status"></a>
 </p>
 
 <p align="center">
@@ -38,7 +38,7 @@
 ---
 
 > [!NOTE]
-> **État du projet : Bêta publique (v0.97.1)**  
+> **État du projet : Bêta publique (v0.97.2)**  
 > AntiDraw fait l'objet d'un développement actif continu. Bien que le dessin vectoriel, les courbes de Bézier, l'aimantation et les opérations booléennes soient stables, des cas limites peuvent survenir.  
 > Un problème ou une suggestion ? N'hésitez pas à [ouvrir un ticket sur GitHub](https://github.com/martinvarela206/AntiDraw/issues).
 

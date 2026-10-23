@@ -6,6 +6,7 @@ import { HistoryService } from './HistoryService.js';
 import { ViewportController } from '../engine/ViewportController.js';
 import { TopBar } from '../ui/TopBar.js';
 import { DocumentState, DocumentStateFactory } from '../core/model/DocumentState.js';
+import { I18nService } from '../i18n/I18nService.js';
 
 export interface HostSyncContext {
   model: VectorModel;
@@ -181,6 +182,9 @@ export class HostSyncService {
 
   private bindHostEvents(): void {
     this.vscodeBridge.onLoadSvg((payload) => {
+      if (payload.locale) {
+        I18nService.setIdeLanguage(payload.locale);
+      }
       if (payload.metadata) {
         this.ctx.canvasMgr.guides = Array.isArray(payload.metadata.guides) ? payload.metadata.guides : [];
         if (payload.metadata.ruler) {

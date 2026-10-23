@@ -105,6 +105,7 @@ export const zhCn: Translations = {
     currentTool: '当前工具: {tool}',
     themeToggleTooltip: '切换深色/浅色主题',
     languageSelect: '选择语言',
+    languageAuto: '自动 (IDE: {lang})',
   },
 
   miniHud: {
