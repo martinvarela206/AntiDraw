@@ -145,19 +145,19 @@ export class PropertyPanel {
   }
 
   public update(
-    selectedVertex: PathVertex | null = null,
-    activeTool: string = 'select',
-    penNodeType: NodeType = 'symmetric',
-    penVertexCount: number = 0,
-    selectedGuide: GuideLine | null = null,
-    polylineVertexCount: number = 0,
-    gridAlignmentMode: GridAlignmentMode = 'origin',
-    grids: GridConfig[] = [],
-    guides: GuideLine[] = [],
-    selectedNodeCount: number = 1,
-    selectedGuides: GuideLine[] = [],
-    selectedSegmentIdx: number | null = null,
-    selectedVertexIds: string[] = []
+    selectedVertex: PathVertex | null = this.activeVertex,
+    activeTool: string = this.activeTool,
+    penNodeType: NodeType = this.penNodeType,
+    penVertexCount: number = this.penVertexCount,
+    selectedGuide: GuideLine | null = this.activeGuide,
+    polylineVertexCount: number = this.polylineVertexCount,
+    gridAlignmentMode: GridAlignmentMode = this.gridAlignmentMode,
+    grids: GridConfig[] = this.grids,
+    guides: GuideLine[] = this.guides,
+    selectedNodeCount: number = this.selectedNodeCount,
+    selectedGuides: GuideLine[] = this.selectedGuides,
+    selectedSegmentIdx: number | null = this.selectedSegmentIdx,
+    selectedVertexIds: string[] = this.selectedVertexIds
   ): void {
     this.activeVertex = selectedVertex;
     this.selectedNodeCount = selectedNodeCount;
@@ -206,6 +206,11 @@ export class PropertyPanel {
     this.selectedGuides = [];
     this.activeRulerConfig = null;
     this.updateCanvasStatusButton(false);
+  }
+
+  public reRenderCurrentMode(): void {
+    this.lastRenderedVertexId = null;
+    this.renderPanel();
   }
 
   public updateCanvasStatusButton(active: boolean): void {

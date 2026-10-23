@@ -94,7 +94,7 @@ export class AppLayoutManager {
       <div class="right-panel" id="right-panel"></div>
       <div class="status-bar">
         <div class="status-left">
-          <span id="status-tool">Tool: Select</span>
+          <span id="status-tool">${I18nService.t('statusbar.currentTool', { tool: I18nService.t('toolbar.select').replace(/\s*\([^)]*\)$/, '').trim() })}</span>
           <span id="status-coords">X: 0, Y: 0</span>
         </div>
         <div class="status-right">
@@ -317,14 +317,48 @@ export class AppLayoutManager {
       if (rulerCorner) rulerCorner.title = I18nService.t('statusbar.rulerCornerTooltip');
       const statusZoom = document.getElementById('status-zoom');
       if (statusZoom) statusZoom.title = I18nService.t('statusbar.zoomResetTooltip');
+
+      // Unconditionally refresh status-info to active language's ready message if not displaying a temporary error badge
       const statusInfo = document.getElementById('status-info');
-      if (statusInfo && (statusInfo.innerText === 'Ready' || statusInfo.innerText === 'Listo')) {
+      if (statusInfo && !statusInfo.querySelector('svg')) {
         statusInfo.innerText = I18nService.t('common.ready');
       }
-      this.propertyPanel.update();
+
+      // Re-translate current active tool in status-tool
+      const statusTool = document.getElementById('status-tool');
+      if (statusTool) {
+        const activeTool = this.toolbar?.activeTool || 'select';
+        statusTool.innerText = I18nService.t('statusbar.currentTool', {
+          tool: this.getLocalizedToolName(activeTool),
+        });
+      }
+
+      this.propertyPanel.reRenderCurrentMode();
       this.topBar.update();
       this.toolbar.render();
+      this.vectorExplorerPanel?.update();
     });
+  }
+
+  public getLocalizedToolName(tool: string): string {
+    const dictKey = `toolbar.${tool}`;
+    const translated = I18nService.t(dictKey);
+    if (translated && !translated.startsWith('toolbar.')) {
+      return translated.replace(/\s*\([^)]*\)$/, '').trim();
+    }
+    if (tool.toLowerCase() === 'ruler') {
+      return I18nService.t('panels.rulerGuides').split(',')[0].trim();
+    }
+    return tool.charAt(0).toUpperCase() + tool.slice(1);
+  }
+
+  public updateStatusTool(tool: string): void {
+    const statusTool = document.getElementById('status-tool');
+    if (statusTool) {
+      statusTool.innerText = I18nService.t('statusbar.currentTool', {
+        tool: this.getLocalizedToolName(tool),
+      });
+    }
   }
 }
 

@@ -856,12 +856,17 @@ export class QuickHelpInspector {
     else if (lang === 'ru') headerPrefix = 'Краткая справка: ';
     else if (lang === 'ja') headerPrefix = 'クイックヘルプ: ';
 
+    const rawToolTitle = config.toolId ? I18nService.t(`toolbar.${config.toolId}`) : '';
+    const localizedToolTitle = (rawToolTitle && !rawToolTitle.startsWith('toolbar.'))
+      ? rawToolTitle.replace(/\s*\([^)]*\)$/, '').trim()
+      : config.title;
+
     container.innerHTML = `
       <div class="panel-section quick-help-section">
         <div class="panel-title quick-help-header" id="btn-toggle-quick-help" style="cursor: pointer; display: flex; align-items: center; justify-content: space-between; margin-bottom: 0; user-select: none;">
           <div style="display: flex; align-items: center; gap: 6px;">
             <span class="quick-help-tool-icon">${config.icon}</span>
-            <span>${headerPrefix}${config.title}</span>
+            <span>${headerPrefix}${localizedToolTitle}</span>
           </div>
           <svg class="quick-help-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" ${chevronRotation}>
             <polyline points="6 9 12 15 18 9"></polyline>

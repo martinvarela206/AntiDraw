@@ -16,7 +16,7 @@
   <a href="https://open-vsx.org/extension/martinvarela206/antidraw"><img src="https://img.shields.io/badge/Open--VSX-Registry-purple?style=flat-square" alt="Open VSX Registry"></a>
   <a href="https://github.com/martinvarela206/AntiDraw"><img src="https://img.shields.io/badge/GitHub-Repository-181717?style=flat-square&logo=github" alt="GitHub Repository"></a>
   <a href="https://github.com/martinvarela206/AntiDraw/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-Source--Available-blue?style=flat-square" alt="Source-Available License"></a>
-  <a href="https://github.com/martinvarela206/AntiDraw"><img src="https://img.shields.io/badge/Status-Beta%20v0.97.0-orange?style=flat-square" alt="Status"></a>
+  <a href="https://github.com/martinvarela206/AntiDraw"><img src="https://img.shields.io/badge/Status-Beta%20v0.97.1-orange?style=flat-square" alt="Status"></a>
 </p>
 
 <p align="center">
@@ -38,7 +38,7 @@
 ---
 
 > [!NOTE]
-> **プロジェクトステータス: パブリックベータ (v0.97.0)**  
+> **プロジェクトステータス: パブリックベータ (v0.97.1)**  
 > AntiDraw は活発に開発が進められています。ベクター編集、ベジェ曲線、スナップ、ブール演算機能は安定して動作しますが、特殊な境界ケースが発生する場合があります。  
 > ご意見やバグ報告は [GitHub Issues](https://github.com/martinvarela206/AntiDraw/issues) までお気軽にお寄せください。
 

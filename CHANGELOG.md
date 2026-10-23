@@ -3,6 +3,18 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.97.1] - 2026-10-22
+
+### 🛠️ Fixed
+- **Dynamic Status Bar & Inspector Localization Across All 7 Languages**:
+  - Removed restrictive bilingual condition `(statusInfo.innerText === 'Ready' || statusInfo.innerText === 'Listo')` in `AppLayoutManager`, ensuring `status-info` dynamically refreshes to the active language's ready message ("Listo", "Ready", "就绪", "Bereit", "Prêt", "Готово", "準備完了") without getting stuck on a previous language's string.
+  - Dynamically localized `#status-tool` in the status bar using `statusbar.currentTool` (`Tool: {tool}`) and localized tool names across all tools (Selection, Node, Pen, Shapes, Scissors, Smart Fill, Ruler, etc.) both on initial load, tool change, and language toggle.
+  - Added `reRenderCurrentMode()` in `PropertyPanel` and fixed parameterless `update()` defaults to preserve tool and vertex state while forcing complete label retranslation across inspectors upon language switch.
+  - Localized `QuickHelpInspector` header titles using active language dictionary tool names.
+  - Triggered live re-render of `VectorExplorerPanel` on language change.
+
+---
+
 ## [0.97.0] - 2026-10-22
 
 ### 🚀 Added

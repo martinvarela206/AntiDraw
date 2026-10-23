@@ -42,10 +42,13 @@ export class ChromeActionController {
   constructor(private ctx: ChromeActionContext) {}
 
   public onToolChange(tool: ToolType): void {
-    const statusTool = document.getElementById('status-tool');
-    if (statusTool) statusTool.innerText = `Tool: ${tool}`;
-
     const layout = this.ctx.getLayoutMgr();
+    if (layout) {
+      layout.updateStatusTool(tool);
+    } else {
+      const statusTool = document.getElementById('status-tool');
+      if (statusTool) statusTool.innerText = `Tool: ${tool}`;
+    }
     layout?.rulerView.setCornerActive(false);
 
     if (tool !== 'select' && tool !== 'stroke') {
@@ -162,8 +165,7 @@ export class ChromeActionController {
         this.ctx.selectionTool.deselectAll();
         this.ctx.canvasMgr.selectedGuideId = null;
         this.ctx.canvasMgr.activeGuideTransformId = null;
-        const statusTool = document.getElementById('status-tool');
-        if (statusTool) statusTool.innerText = `Tool: Ruler`;
+        layout.updateStatusTool('ruler');
         layout.propertyPanel.showRulerSettings(
           this.ctx.canvasMgr.rulerConfig,
           this.ctx.canvasMgr.gridAlignmentMode,
