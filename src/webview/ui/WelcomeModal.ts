@@ -3,6 +3,7 @@ import { VsCodeBridge } from '../bridge/VsCodeBridge.js';
 import { ANTIDRAW_LOGO_DATA_URI } from './assets/AntiDrawLogo.js';
 
 export const KOFI_URL = 'https://ko-fi.com/martinvarela206';
+export const STORAGE_KEY_WELCOME_DATE = 'antidraw_welcome_last_seen_date';
 
 /**
  * ARCHITECTURAL RATIONALE: WelcomeModal (Cosmic Creator Support Modal)
@@ -15,17 +16,74 @@ export const KOFI_URL = 'https://ko-fi.com/martinvarela206';
  *    Uses embedded ANTIDRAW_LOGO_DATA_URI base64 data to eliminate broken image icons
  *    and ensure zero-latency rendering regardless of webview CSP or filesystem access.
  *
- * 3. 100% Internationalized:
+ * 3. Daily Frequency Control (Once per Calendar Day):
+ *    Persists the calendar date in localStorage ('YYYY-MM-DD'). Displays only on the
+ *    first document open of the day, automatically resetting when the calendar date advances.
+ *
+ * 4. 100% Internationalized:
  *    All titles, version tags, headlines, messages, and button labels are dynamically
  *    localized across English, Spanish, Chinese, German, French, Russian, and Japanese.
  */
 export class WelcomeModal {
   private static activeModal: HTMLElement | null = null;
 
-  public static show(): void {
+  public static getTodayKey(): string {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  private static getStorage(): Storage | null {
+    try {
+      if (typeof localStorage !== 'undefined') return localStorage;
+      if (typeof (globalThis as any).localStorage !== 'undefined') return (globalThis as any).localStorage;
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  public static shouldShowToday(): boolean {
+    try {
+      const storage = this.getStorage();
+      if (!storage) return true;
+      const today = this.getTodayKey();
+      const lastSeen = storage.getItem(STORAGE_KEY_WELCOME_DATE);
+      return lastSeen !== today;
+    } catch {
+      return true;
+    }
+  }
+
+  public static markShownToday(): void {
+    try {
+      const storage = this.getStorage();
+      if (!storage) return;
+      storage.setItem(STORAGE_KEY_WELCOME_DATE, this.getTodayKey());
+    } catch {}
+  }
+
+  public static resetDailyLimit(): void {
+    try {
+      const storage = this.getStorage();
+      if (!storage) return;
+      storage.removeItem(STORAGE_KEY_WELCOME_DATE);
+    } catch {}
+  }
+
+  public static show(force: boolean = false): void {
+    if (!force && !this.shouldShowToday()) {
+      return;
+    }
+
     if (typeof document === 'undefined' || !document.body) {
       return;
     }
+
+    // Record today's display so subsequent SVG opens on the same day remain quiet
+    this.markShownToday();
 
     // Dismiss any existing active modal
     if (this.activeModal) {

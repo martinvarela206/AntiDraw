@@ -6,6 +6,7 @@ import { de } from '../src/webview/i18n/de.js';
 import { fr } from '../src/webview/i18n/fr.js';
 import { ru } from '../src/webview/i18n/ru.js';
 import { ja } from '../src/webview/i18n/ja.js';
+import { WelcomeModal, STORAGE_KEY_WELCOME_DATE } from '../src/webview/ui/WelcomeModal.js';
 
 function assert(condition: boolean, msg: string): void {
   if (!condition) {
@@ -187,6 +188,39 @@ export async function runI18nSystemTests(): Promise<boolean> {
       passed++;
       console.log(`  ✅ [PASS] WelcomeModal translations and variable substitution verified in [${wt.lang}]`);
     }
+
+    // 7. WelcomeModal 24h / Calendar Day Rate-Limiting Control
+    console.log('\n[7. WelcomeModal Daily Frequency (1x per Calendar Day) Control]');
+    const memStore: Record<string, string> = {};
+    const mockStorage = {
+      getItem: (k: string) => (k in memStore ? memStore[k] : null),
+      setItem: (k: string, v: string) => { memStore[k] = String(v); },
+      removeItem: (k: string) => { delete memStore[k]; },
+      clear: () => { Object.keys(memStore).forEach(k => delete memStore[k]); }
+    };
+    (globalThis as any).localStorage = mockStorage;
+
+    WelcomeModal.resetDailyLimit();
+    assert(WelcomeModal.shouldShowToday() === true, 'Welcome modal is permitted when no record exists today');
+
+    WelcomeModal.markShownToday();
+    assert(WelcomeModal.shouldShowToday() === false, 'Welcome modal is suppressed after being shown once today');
+
+    // Simulate opening another SVG on the same day
+    let fakeModalOpened = false;
+    if (WelcomeModal.shouldShowToday()) {
+      fakeModalOpened = true;
+    }
+    assert(fakeModalOpened === false, 'Subsequent SVGs opened on the same day remain quiet (no modal)');
+
+    // Simulate calendar date changing (new day)
+    mockStorage.setItem(STORAGE_KEY_WELCOME_DATE, '2020-01-01');
+    assert(WelcomeModal.shouldShowToday() === true, 'Welcome modal re-activates automatically when the calendar day changes');
+
+    // Clean up
+    WelcomeModal.resetDailyLimit();
+    passed++;
+    console.log('  ✅ [PASS] Daily frequency logic verified: 1x per day, quiet for multiple SVGs, auto-resets on day change');
 
     console.log(`\nI18n System Tests complete: ${passed} passed, 0 failed.\n`);
     return true;
