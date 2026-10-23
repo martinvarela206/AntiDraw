@@ -4,6 +4,10 @@ import { PolygonUtils } from './PolygonUtils.js';
 export interface TrimSubSegment {
   id: string;
   sourceElementId: string;
+  subpathId?: string;
+  isClosedSubpath?: boolean;
+  subpathSeq?: number;
+  subpathTotal?: number;
   p1: Point;
   p2: Point;
   isBezier?: boolean;
@@ -19,6 +23,8 @@ export interface TrimSubSegment {
 
 interface RawSeg {
   sourceElementId: string;
+  subpathId: string;
+  isClosedSubpath: boolean;
   p1: Point;
   p2: Point;
   isBezier?: boolean;
@@ -185,6 +191,8 @@ export class SegmentTrimEngine {
           subSegments.push({
             id: `subseg_${idCounter++}`,
             sourceElementId: raw.sourceElementId,
+            subpathId: raw.subpathId,
+            isClosedSubpath: raw.isClosedSubpath,
             p1: pt0,
             p2: pt1,
             isBezier,
@@ -198,6 +206,21 @@ export class SegmentTrimEngine {
             fill: raw.fill,
           });
         }
+      }
+    }
+
+    // Populate subpathSeq and subpathTotal per subpath
+    const bySubpath = new Map<string, TrimSubSegment[]>();
+    for (const s of subSegments) {
+      if (s.subpathId) {
+        if (!bySubpath.has(s.subpathId)) bySubpath.set(s.subpathId, []);
+        bySubpath.get(s.subpathId)!.push(s);
+      }
+    }
+    for (const list of bySubpath.values()) {
+      for (let i = 0; i < list.length; i++) {
+        list[i].subpathSeq = i;
+        list[i].subpathTotal = list.length;
       }
     }
 
@@ -237,54 +260,6 @@ export class SegmentTrimEngine {
   ): VectorElement[] {
     const remaining = allSubSegments.filter((s) => !deletedIds.has(s.id));
     if (remaining.length === 0) return [];
-
-    // 1. Quantize nodes into spatial clusters
-    interface NodeRecord {
-      id: string;
-      pt: Point;
-      incident: Array<{
-        seg: TrimSubSegment;
-        end: 'p1' | 'p2';
-      }>;
-    }
-
-    const nodes: NodeRecord[] = [];
-
-    const findOrCreateNode = (p: Point): NodeRecord => {
-      for (const node of nodes) {
-        if (Math.hypot(node.pt.x - p.x, node.pt.y - p.y) <= SegmentTrimEngine.EPSILON) {
-          return node;
-        }
-      }
-      const newNode: NodeRecord = {
-        id: `node_${nodes.length + 1}`,
-        pt: { x: p.x, y: p.y },
-        incident: [],
-      };
-      nodes.push(newNode);
-      return newNode;
-    };
-
-    // Populate incidence
-    for (const seg of remaining) {
-      const n1 = findOrCreateNode(seg.p1);
-      const n2 = findOrCreateNode(seg.p2);
-      n1.incident.push({ seg, end: 'p1' });
-      n2.incident.push({ seg, end: 'p2' });
-    }
-
-    // 2. Trace continuous chains
-    // A junction is weldable IF AND ONLY IF its degree k == 2.
-    // If k >= 3 or k == 1, it is a boundary / termination point.
-    const visitedSegs = new Set<string>();
-    const synthesizedElements: VectorElement[] = [];
-
-    // Helper: get the other node of a segment given one of its nodes
-    const getOtherNode = (seg: TrimSubSegment, fromNode: NodeRecord): NodeRecord => {
-      const dist1 = Math.hypot(fromNode.pt.x - seg.p1.x, fromNode.pt.y - seg.p1.y);
-      const targetPt = dist1 <= SegmentTrimEngine.EPSILON ? seg.p2 : seg.p1;
-      return nodes.find((n) => Math.hypot(n.pt.x - targetPt.x, n.pt.y - targetPt.y) <= SegmentTrimEngine.EPSILON) || fromNode;
-    };
 
     // Helper: build path vertex chain from sequence of directed segments
     const assembleElementFromChain = (
@@ -344,7 +319,7 @@ export class SegmentTrimEngine {
       // If closed, remove duplicate coincident terminal vertex and set closed flag
       if (isClosed && vertices.length >= 3) {
         const lastV = vertices[vertices.length - 1];
-        if (Math.hypot(lastV.x - vertices[0].x, lastV.y - vertices[0].y) <= SegmentTrimEngine.EPSILON) {
+        if (Math.hypot(lastV.x - vertices[0].x, lastV.y - vertices[0].y) <= Math.max(SegmentTrimEngine.EPSILON, 0.1)) {
           vertices.pop();
         }
       }
@@ -388,77 +363,279 @@ export class SegmentTrimEngine {
       };
     };
 
-    // Phase A: Trace chains starting from non-degree-2 nodes (degree 1 or degree >= 3)
-    const terminalNodes = nodes.filter((n) => n.incident.length !== 2 && n.incident.length > 0);
+    const eps = SegmentTrimEngine.EPSILON;
 
-    for (const startNode of terminalNodes) {
-      for (const inc of startNode.incident) {
-        if (visitedSegs.has(inc.seg.id)) continue;
+    // Spatial node registry for remaining subsegments to evaluate junction valence
+    interface NodeInfo {
+      pt: Point;
+      segs: Array<{ seg: TrimSubSegment; end: 'p1' | 'p2' }>;
+    }
+    const nodes: NodeInfo[] = [];
+    const getNodeAt = (p: Point): NodeInfo => {
+      for (const n of nodes) {
+        if (Math.hypot(n.pt.x - p.x, n.pt.y - p.y) <= eps) return n;
+      }
+      const n: NodeInfo = { pt: p, segs: [] };
+      nodes.push(n);
+      return n;
+    };
 
-        const chain: Array<{ seg: TrimSubSegment; forward: boolean }> = [];
-        let curSeg = inc.seg;
-        let curFromNode = startNode;
+    for (const s of remaining) {
+      getNodeAt(s.p1).segs.push({ seg: s, end: 'p1' });
+      getNodeAt(s.p2).segs.push({ seg: s, end: 'p2' });
+    }
 
-        while (curSeg && !visitedSegs.has(curSeg.id)) {
-          visitedSegs.add(curSeg.id);
-          const isForward = Math.hypot(curFromNode.pt.x - curSeg.p1.x, curFromNode.pt.y - curSeg.p1.y) <= SegmentTrimEngine.EPSILON;
-          chain.push({ seg: curSeg, forward: isForward });
+    // Check if an intermediate connection point P is a branch barrier
+    const isBarrier = (p: Point, sourceElementId: string): boolean => {
+      const node = getNodeAt(p);
+      const k = node.segs.length;
+      if (k === 2 || k === 4) return false;
+      // If k == 3 or k >= 5 and subsegments from other elements converge here, it's an ambiguous branch barrier
+      const hasOtherElements = node.segs.some((item) => item.seg.sourceElementId !== sourceElementId);
+      return hasOtherElements;
+    };
 
-          const nextNode = getOtherNode(curSeg, curFromNode);
-          if (nextNode.incident.length === 2) {
-            // Find the other incident segment at this degree-2 node
-            const otherInc = nextNode.incident.find((item) => item.seg.id !== curSeg.id);
-            if (otherInc && !visitedSegs.has(otherInc.seg.id)) {
-              curSeg = otherInc.seg;
-              curFromNode = nextNode;
-            } else {
-              break;
-            }
+    // 1. Group remaining subsegments by subpathId to form natural continuous chains
+    const subsegsBySubpath = new Map<string, TrimSubSegment[]>();
+    const unassigned: TrimSubSegment[] = [];
+
+    for (const s of remaining) {
+      if (s.subpathId !== undefined) {
+        if (!subsegsBySubpath.has(s.subpathId)) {
+          subsegsBySubpath.set(s.subpathId, []);
+        }
+        subsegsBySubpath.get(s.subpathId)!.push(s);
+      } else {
+        unassigned.push(s);
+      }
+    }
+
+    interface ChainRecord {
+      id: string;
+      items: Array<{ seg: TrimSubSegment; forward: boolean }>;
+      pStart: Point;
+      pEnd: Point;
+      isClosed: boolean;
+      sourceElementId: string;
+    }
+
+    const naturalChains: ChainRecord[] = [];
+    let chainCounter = 1;
+
+    for (const [subpathId, list] of subsegsBySubpath.entries()) {
+      list.sort((a, b) => (a.subpathSeq ?? 0) - (b.subpathSeq ?? 0));
+      const isClosedSubpath = list[0]?.isClosedSubpath ?? false;
+      const total = list[0]?.subpathTotal ?? list.length;
+      const remainingSeqs = new Set(list.map((s) => s.subpathSeq ?? 0));
+
+      // If it was closed and NO subsegments were deleted, check for branch barriers
+      let hasBarrierInFullLoop = false;
+      if (isClosedSubpath && list.length === total) {
+        for (const s of list) {
+          if (isBarrier(s.p1, s.sourceElementId) || isBarrier(s.p2, s.sourceElementId)) {
+            hasBarrierInFullLoop = true;
+            break;
+          }
+        }
+        if (!hasBarrierInFullLoop) {
+          naturalChains.push({
+            id: `chain_${chainCounter++}`,
+            items: list.map((s) => ({ seg: s, forward: true })),
+            pStart: list[0].p1,
+            pEnd: list[list.length - 1].p2,
+            isClosed: true,
+            sourceElementId: list[0].sourceElementId,
+          });
+          continue;
+        }
+      }
+
+      const canConnectToNext = (curSeg: TrimSubSegment, nextSeq: number): boolean => {
+        if (!remainingSeqs.has(nextSeq)) return false;
+        if (isBarrier(curSeg.p2, curSeg.sourceElementId)) return false;
+        return true;
+      };
+
+      // Otherwise, trace open continuous runs along this subpath
+      const visitedSeqs = new Set<number>();
+      for (const seg of list) {
+        const seq = seg.subpathSeq ?? 0;
+        if (visitedSeqs.has(seq)) continue;
+
+        // Find start of run
+        let startSeq = seq;
+        if (isClosedSubpath) {
+          while (true) {
+            const prevSeq = (startSeq - 1 + total) % total;
+            if (!remainingSeqs.has(prevSeq) || visitedSeqs.has(prevSeq)) break;
+            const prevSeg = list.find((s) => (s.subpathSeq ?? 0) === prevSeq);
+            if (!prevSeg || !canConnectToNext(prevSeg, startSeq)) break;
+            startSeq = prevSeq;
+            if (startSeq === seq) break;
+          }
+        } else {
+          while (startSeq > 0) {
+            const prevSeq = startSeq - 1;
+            if (!remainingSeqs.has(prevSeq)) break;
+            const prevSeg = list.find((s) => (s.subpathSeq ?? 0) === prevSeq);
+            if (!prevSeg || !canConnectToNext(prevSeg, startSeq)) break;
+            startSeq = prevSeq;
+          }
+        }
+
+        const run: TrimSubSegment[] = [];
+        let curSeq = startSeq;
+        while (remainingSeqs.has(curSeq) && !visitedSeqs.has(curSeq)) {
+          visitedSeqs.add(curSeq);
+          const curSeg = list.find((s) => (s.subpathSeq ?? 0) === curSeq);
+          if (curSeg) {
+            run.push(curSeg);
+            const nextSeq = isClosedSubpath ? (curSeq + 1) % total : curSeq + 1;
+            if (!canConnectToNext(curSeg, nextSeq)) break;
+            if (isClosedSubpath && nextSeq === startSeq) break;
+            curSeq = nextSeq;
           } else {
-            // Reached another terminal node (degree 1 or >= 3); terminate path without merger
             break;
           }
         }
 
-        if (chain.length > 0) {
-          const lastItem = chain[chain.length - 1];
-          const lastEndPt = lastItem.forward ? lastItem.seg.p2 : lastItem.seg.p1;
-          const isCycle = Math.hypot(startNode.pt.x - lastEndPt.x, startNode.pt.y - lastEndPt.y) <= SegmentTrimEngine.EPSILON;
-          synthesizedElements.push(assembleElementFromChain(chain, isCycle));
+        if (run.length > 0) {
+          const isLoop = isClosedSubpath && run.length === total && !hasBarrierInFullLoop;
+          naturalChains.push({
+            id: `chain_${chainCounter++}`,
+            items: run.map((s) => ({ seg: s, forward: true })),
+            pStart: run[0].p1,
+            pEnd: run[run.length - 1].p2,
+            isClosed: isLoop,
+            sourceElementId: run[0].sourceElementId,
+          });
         }
       }
     }
 
-    // Phase B: Trace closed cycles (all remaining unvisited segments must have degree 2 at both ends)
-    for (const seg of remaining) {
-      if (visitedSegs.has(seg.id)) continue;
+    // For any unassigned subsegments (fallback): each is a single-segment chain
+    for (const u of unassigned) {
+      naturalChains.push({
+        id: `chain_${chainCounter++}`,
+        items: [{ seg: u, forward: true }],
+        pStart: u.p1,
+        pEnd: u.p2,
+        isClosed: false,
+        sourceElementId: u.sourceElementId,
+      });
+    }
 
-      const chain: Array<{ seg: TrimSubSegment; forward: boolean }> = [];
-      let curSeg: TrimSubSegment | null = seg;
-      let curFromNode = findOrCreateNode(seg.p1);
+    // 2. Separate closed cycles from open chains
+    const closedChains = naturalChains.filter((c) => c.isClosed);
+    let openChains = naturalChains.filter((c) => !c.isClosed);
 
-      while (curSeg && !visitedSegs.has(curSeg.id)) {
-        visitedSegs.add(curSeg.id);
-        const isForward = Math.hypot(curFromNode.pt.x - curSeg.p1.x, curFromNode.pt.y - curSeg.p1.y) <= SegmentTrimEngine.EPSILON;
-        chain.push({ seg: curSeg, forward: isForward });
+    // 3. Topological welding of open chains at degree-2 cut endpoints
+    let changed = true;
+    while (changed && openChains.length > 0) {
+      changed = false;
 
-        const nextNode = getOtherNode(curSeg, curFromNode);
-        if (nextNode.incident.length === 2) {
-          const otherInc = nextNode.incident.find((item) => item.seg.id !== curSeg!.id);
-          if (otherInc && !visitedSegs.has(otherInc.seg.id)) {
-            curSeg = otherInc.seg;
-            curFromNode = nextNode;
-          } else {
+      interface EndpointRef {
+        chainIdx: number;
+        end: 'start' | 'end';
+        pt: Point;
+      }
+
+      const clusters: EndpointRef[][] = [];
+      const findCluster = (p: Point) => {
+        for (const cl of clusters) {
+          if (Math.hypot(cl[0].pt.x - p.x, cl[0].pt.y - p.y) <= eps) {
+            return cl;
+          }
+        }
+        return null;
+      };
+
+      for (let cIdx = 0; cIdx < openChains.length; cIdx++) {
+        const c = openChains[cIdx];
+        // start endpoint
+        let clStart = findCluster(c.pStart);
+        if (!clStart) {
+          clStart = [];
+          clusters.push(clStart);
+        }
+        clStart.push({ chainIdx: cIdx, end: 'start', pt: c.pStart });
+
+        // end endpoint
+        let clEnd = findCluster(c.pEnd);
+        if (!clEnd) {
+          clEnd = [];
+          clusters.push(clEnd);
+        }
+        clEnd.push({ chainIdx: cIdx, end: 'end', pt: c.pEnd });
+      }
+
+      for (const cl of clusters) {
+        if (cl.length === 2) {
+          const refA = cl[0];
+          const refB = cl[1];
+
+          // If both ends belong to the SAME chain: it formed a closed cycle!
+          if (refA.chainIdx === refB.chainIdx) {
+            const ch = openChains[refA.chainIdx];
+            ch.isClosed = true;
+            closedChains.push(ch);
+            openChains.splice(refA.chainIdx, 1);
+            changed = true;
             break;
           }
-        } else {
+
+          // Merge chain B into chain A
+          const idxA = Math.min(refA.chainIdx, refB.chainIdx);
+          const idxB = Math.max(refA.chainIdx, refB.chainIdx);
+          const rA = refA.chainIdx === idxA ? refA : refB;
+          const rB = refA.chainIdx === idxB ? refA : refB;
+
+          const chainA = openChains[idxA];
+          const chainB = openChains[idxB];
+
+          let itemsB = [...chainB.items];
+          const pStartB = chainB.pStart;
+          const pEndB = chainB.pEnd;
+
+          if (rA.end === 'end' && rB.end === 'start') {
+            chainA.items.push(...itemsB);
+            chainA.pEnd = pEndB;
+          } else if (rA.end === 'end' && rB.end === 'end') {
+            itemsB.reverse();
+            itemsB = itemsB.map((item) => ({ seg: item.seg, forward: !item.forward }));
+            chainA.items.push(...itemsB);
+            chainA.pEnd = pStartB;
+          } else if (rA.end === 'start' && rB.end === 'end') {
+            chainA.items.unshift(...itemsB);
+            chainA.pStart = pStartB;
+          } else if (rA.end === 'start' && rB.end === 'start') {
+            itemsB.reverse();
+            itemsB = itemsB.map((item) => ({ seg: item.seg, forward: !item.forward }));
+            chainA.items.unshift(...itemsB);
+            chainA.pStart = pEndB;
+          }
+
+          openChains.splice(idxB, 1);
+          changed = true;
           break;
         }
       }
+    }
 
-      if (chain.length > 0) {
-        synthesizedElements.push(assembleElementFromChain(chain, true));
+    // Check if any open chain has coincident start and end
+    for (let i = openChains.length - 1; i >= 0; i--) {
+      const ch = openChains[i];
+      if (Math.hypot(ch.pStart.x - ch.pEnd.x, ch.pStart.y - ch.pEnd.y) <= eps) {
+        ch.isClosed = true;
+        closedChains.push(ch);
+        openChains.splice(i, 1);
       }
+    }
+
+    // 4. Assemble synthesized VectorElements
+    const synthesizedElements: VectorElement[] = [];
+    for (const c of [...closedChains, ...openChains]) {
+      synthesizedElements.push(assembleElementFromChain(c.items, c.isClosed));
     }
 
     return synthesizedElements;
@@ -501,8 +678,11 @@ export class SegmentTrimEngine {
       }
       if (cur.length > 0) subpaths.push(cur);
 
-      for (const sp of subpaths) {
+      for (let spIdx = 0; spIdx < subpaths.length; spIdx++) {
+        const sp = subpaths[spIdx];
         if (sp.length < 2) continue;
+        const subpathId = `${el.id}_sp_${spIdx}`;
+        const isClosedSubpath = isClosed;
 
         const count = isClosed && sp.length >= 3 ? sp.length : sp.length - 1;
         for (let i = 0; i < count; i++) {
@@ -514,6 +694,8 @@ export class SegmentTrimEngine {
             const h2 = vB.handleIn ? { x: vB.handleIn.x, y: vB.handleIn.y } : { x: vB.x, y: vB.y };
             raw.push({
               sourceElementId: el.id,
+              subpathId,
+              isClosedSubpath,
               p1: { x: vA.x, y: vA.y },
               p2: { x: vB.x, y: vB.y },
               isBezier: true,
@@ -530,6 +712,8 @@ export class SegmentTrimEngine {
           } else {
             raw.push({
               sourceElementId: el.id,
+              subpathId,
+              isClosedSubpath,
               p1: { x: vA.x, y: vA.y },
               p2: { x: vB.x, y: vB.y },
               stroke,

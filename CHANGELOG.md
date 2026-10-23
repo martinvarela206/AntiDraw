@@ -3,6 +3,20 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.99.2] - 2026-10-23
+
+### 🐛 Fixed
+- **Shape Builder Tool Paralysis after Undo (<kbd>Ctrl+Z</kbd>)**:
+  - Connected `HistoryService.onHistoryApplied` callback through `CoreServiceRegistry` directly to `shapeBuilderToolHandler.invalidate()`, clearing stale hovered states, swept segments, and cached subsegment IDs when restoring document state.
+  - Added dynamic fallback in `ShapeBuilderToolHandler.refreshSubSegments()`: if `selectedElementIds` contains stale IDs from undone/synthetic elements, it automatically falls back to all trimable vector elements in `model.elements`.
+  - Subsegments can now be trimmed, undone, and re-trimmed immediately without having to switch tools or click outside to deselect.
+- **Continuous Open Path Synthesis on Self-Intersecting Polygons (`sample_test.svg`)**:
+  - Resolved graph fragmentation ("comportamiento aberrante") where deleting a single subsegment from a self-intersecting polygon shattered it into 11-12 disconnected `<path>` fragments and erased its fills.
+  - Implemented subpath-aware sequential run tracing in `SegmentTrimEngine.trimAndWeld()`: preserves the natural winding order of original subpaths across intact 4-way crossings ($k = 4$) while respecting true branch barriers ($k \ge 3$) when different elements meet.
+  - Trimming 1 subsegment from a 10-vertex self-intersecting polygon now synthesizes exactly 1 continuous open path containing all remaining 21 subsegments.
+
+---
+
 ## [0.99.1] - 2026-10-23
 
 ### 🐛 Fixed

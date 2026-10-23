@@ -70,6 +70,17 @@ export class ShapeBuilderToolHandler implements IToolHandler {
     this.sweptSubSegIds.clear();
     this.cachedSubSegments = [];
     this.candidateElements = [];
+    this.ctx.renderOverlay();
+  }
+
+  public isCacheStale(): boolean {
+    if (this.cachedSubSegments.length === 0) return true;
+    for (const el of this.candidateElements) {
+      if (!this.ctx.model.elements.some((m) => m.id === el.id)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   public cancel(): boolean {
@@ -88,16 +99,23 @@ export class ShapeBuilderToolHandler implements IToolHandler {
 
   public refreshSubSegments(): void {
     const selectedIds = this.ctx.selectionTool.selectedElementIds;
+    let candidates: VectorElement[] = [];
+
     if (selectedIds && selectedIds.size >= 2) {
-      this.candidateElements = this.ctx.model.elements.filter(
+      candidates = this.ctx.model.elements.filter(
         (el) => selectedIds.has(el.id) && SegmentTrimEngine.isTrimable(el)
       );
-    } else {
-      this.candidateElements = this.ctx.model.elements.filter(
+    }
+
+    // If selection yielded fewer than 2 elements (e.g. after undo, or single selection),
+    // fall back to all trimable elements in the current model
+    if (candidates.length < 2) {
+      candidates = this.ctx.model.elements.filter(
         (el) => SegmentTrimEngine.isTrimable(el)
       );
     }
 
+    this.candidateElements = candidates;
     this.cachedSubSegments = SegmentTrimEngine.extractSubSegments(this.candidateElements, this.ctx.model);
   }
 
@@ -124,7 +142,7 @@ export class ShapeBuilderToolHandler implements IToolHandler {
   }
 
   public onPointerMove(e: PointerEvent, pt: Point): boolean {
-    if (this.cachedSubSegments.length === 0) {
+    if (this.cachedSubSegments.length === 0 || this.isCacheStale()) {
       this.refreshSubSegments();
     }
 

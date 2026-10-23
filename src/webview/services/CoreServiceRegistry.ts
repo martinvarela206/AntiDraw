@@ -54,6 +54,12 @@ export class CoreServiceRegistry {
       syncToHost: () => ctx.getHostSyncService().syncToHost(),
       syncMetadataToHost: () => ctx.getHostSyncService().syncMetadataToHost(),
       onResetPropertyPanel: () => ctx.getLayoutMgr()?.propertyPanel.resetPanelMode(),
+      onHistoryApplied: () => {
+        const tools = ctx.getTools();
+        tools?.shapeBuilderToolHandler?.invalidate();
+        tools?.smartFillToolHandler?.invalidateCache();
+        workspaceLayout?.renderOverlay();
+      },
     });
 
     const clipboardService = new ClipboardService({

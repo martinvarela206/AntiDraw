@@ -11,6 +11,7 @@ export interface HistoryServiceContext {
   render: () => void;
   syncToHost: () => void;
   syncMetadataToHost?: () => void;
+  onHistoryApplied?: () => void;
 }
 
 /**
@@ -218,6 +219,7 @@ export class HistoryService {
     this.ctx.render();
     this.ctx.syncToHost();
     this.ctx.syncMetadataToHost?.();
+    this.ctx.onHistoryApplied?.();
   }
 
   public loadFromMetadata(metadata: { undoStack?: unknown; redoStack?: unknown }): void {

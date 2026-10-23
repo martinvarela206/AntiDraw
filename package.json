@@ -2,7 +2,7 @@
   "name": "antidraw",
   "displayName": "%antidraw.displayName%",
   "description": "%antidraw.description%",
-  "version": "0.99.1",
+  "version": "0.99.2",
   "icon": "icon.png",
   "publisher": "martinvarela206",
   "author": {

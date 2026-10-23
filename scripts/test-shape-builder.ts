@@ -177,7 +177,59 @@ export async function runShapeBuilderTests(): Promise<boolean> {
   assert(undoPushed === true, `pushUndo was called on pointerUp`);
   assert(hostSynced === true, `syncToHost was called on pointerUp`);
   assert(handler.isDragging === false, `Drag ended on pointerUp`);
-  assert(model.elements.length > 0, `Model elements updated after trim`);
+  // --------------------------------------------------------------------------
+  // Suite 5: Undo Cache Invalidation & Seamless Re-trimming
+  // --------------------------------------------------------------------------
+  console.log('\n[5. Undo Cache Invalidation & Immediate Re-trimming]');
+  // Simulate Undo: model is restored to original hashtagElements
+  model.elements = [...hashtagElements];
+  // CoreServiceRegistry or HistoryService calls handler.invalidate() on undo
+  handler.invalidate();
+  assert(handler.cachedSubSegments.length === 0, `invalidate() clears cached subsegments immediately`);
+
+  // Move pointer again WITHOUT switching tools: handler must dynamically re-extract fresh subsegments
+  const moveAfterUndo = handler.onPointerMove(fakeMoveEvt, { x: 15, y: 30 });
+  assert(moveAfterUndo === true, `Pointer move after undo succeeds without tool switching`);
+  assert(handler.cachedSubSegments.length === 12, `Subsegments automatically refreshed after undo (got 12)`);
+  assert(handler.hoveredSubSeg !== null, `Hover detected on restored element`);
+  assert(handler.hoveredSubSeg?.sourceElementId === 'l1', `Restored element correctly identified`);
+
+  // Trim subsegment again
+  handler.onPointerDown(fakeDownEvt, { x: 15, y: 30 });
+  handler.onPointerUp(fakeUpEvt, { x: 15, y: 30 });
+  assert(model.elements.length > 0, `Subsegment trimmed successfully after undo without tool switching`);
+
+  // --------------------------------------------------------------------------
+  // Suite 6: Self-Intersecting Polygon Single Continuous Path Synthesis (sample_test.svg)
+  // --------------------------------------------------------------------------
+  console.log('\n[6. Self-Intersecting Polygon Trim Synthesis (sample_test.svg)]');
+  const samplePoly: VectorElement = {
+    id: 'el_mvl4e2jj_64km',
+    tagName: 'polygon',
+    attributes: {
+      fill: '#6366f1',
+      stroke: '#ffffff',
+      'stroke-width': '1',
+      points: '87.5,33.5 99.5,64 137.5,52 116.5,41.5 126.5,67 104.5,75.5 84,68.5 105.5,42.5 121.5,84.5 97,88.5',
+    },
+  };
+  const polySubsegs = SegmentTrimEngine.extractSubSegments([samplePoly], model);
+  assert(polySubsegs.length === 22, `Extracts 22 subsegments partitioned by self-intersections, got ${polySubsegs.length}`);
+
+  // Trim subsegment 9 (between (126.5, 67) and (116.33, 70.93))
+  const targetSubseg = polySubsegs.find(
+    (s) =>
+      (Math.hypot(s.p1.x - 126.5, s.p1.y - 67) < 0.1 && Math.hypot(s.p2.x - 116.33, s.p2.y - 70.93) < 0.1) ||
+      (Math.hypot(s.p2.x - 126.5, s.p2.y - 67) < 0.1 && Math.hypot(s.p1.x - 116.33, s.p1.y - 70.93) < 0.1)
+  );
+  assert(targetSubseg !== undefined, `Target subsegment found for deletion`);
+
+  const trimmedPoly = SegmentTrimEngine.trimAndWeld(polySubsegs, new Set([targetSubseg!.id]), [samplePoly]);
+  assert(trimmedPoly.length === 1, `Trimming 1 subsegment from self-intersecting polygon synthesizes exactly 1 continuous path (NOT shattered into 11 fragments), got ${trimmedPoly.length}`);
+  const synthPath = trimmedPoly[0];
+  assert(synthPath.tagName === 'path', `Synthesized element is a <path>`);
+  assert(synthPath.vertices !== undefined && synthPath.vertices.length === 22, `Path contains all remaining 21 subsegments (22 vertices), got ${synthPath.vertices?.length}`);
+  assert(!synthPath.attributes?.d?.includes('Z'), `Path is an open path without Z closing`);
 
   console.log('\nShape Builder (Segment Trim & Topological Welding) Suite complete: ALL PASSED.');
   return true;
