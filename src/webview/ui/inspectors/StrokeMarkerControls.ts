@@ -78,28 +78,27 @@ export class StrokeMarkerControls {
     const isCustomMarkerColor = markerColor && markerColor !== 'context-stroke';
     const markerColorDisplay = isCustomMarkerColor ? markerColor : (stroke === 'none' || stroke === 'currentColor' ? '#000000' : stroke);
 
-    const isEs = I18nService.getLanguage() === 'es';
     const renderMarkerOptions = (current: string, isMid: boolean = false) => `
-      <option value="none" ${current === 'none' ? 'selected' : ''}>${isEs ? 'Ninguno' : 'None'}</option>
-      <optgroup label="${isEs ? 'Flechas' : 'Arrows'}">
-        <option value="arrow-open" ${current === 'arrow-open' ? 'selected' : ''}>${isEs ? 'Flecha Abierta (V)' : 'Open Arrow (V)'}</option>
-        <option value="arrow-filled" ${current === 'arrow-filled' ? 'selected' : ''}>${isEs ? 'Flecha Rellena (Triángulo)' : 'Filled Arrow (Triangle)'}</option>
-        <option value="arrow-stealth" ${current === 'arrow-stealth' ? 'selected' : ''}>${isEs ? 'Flecha Furtiva (Stealth)' : 'Stealth Arrow'}</option>
-        <option value="arrow-triangle-wide" ${current === 'arrow-triangle-wide' ? 'selected' : ''}>${isEs ? 'Flecha Ancha (Wide)' : 'Wide Arrow'}</option>
-        <option value="arrow-concave" ${current === 'arrow-concave' ? 'selected' : ''}>${isEs ? 'Flecha Cóncava (Concave)' : 'Concave Arrow'}</option>
+      <option value="none" ${current === 'none' ? 'selected' : ''}>${I18nService.t('common.none')}</option>
+      <optgroup label="${I18nService.t('inspector.markerArrows')}">
+        <option value="arrow-open" ${current === 'arrow-open' ? 'selected' : ''}>${I18nService.t('inspector.markerArrowOpen')}</option>
+        <option value="arrow-filled" ${current === 'arrow-filled' ? 'selected' : ''}>${I18nService.t('inspector.markerArrowFilled')}</option>
+        <option value="arrow-stealth" ${current === 'arrow-stealth' ? 'selected' : ''}>${I18nService.t('inspector.markerArrowStealth')}</option>
+        <option value="arrow-triangle-wide" ${current === 'arrow-triangle-wide' ? 'selected' : ''}>${I18nService.t('inspector.markerArrowWide')}</option>
+        <option value="arrow-concave" ${current === 'arrow-concave' ? 'selected' : ''}>${I18nService.t('inspector.markerArrowConcave')}</option>
       </optgroup>
-      <optgroup label="${isEs ? 'Geometría' : 'Geometry'}">
-        <option value="circle-dot" ${current === 'circle-dot' ? 'selected' : ''}>${isEs ? 'Punto Sólido (Dot)' : 'Solid Circle (Dot)'}</option>
-        <option value="circle-open" ${current === 'circle-open' ? 'selected' : ''}>${isEs ? 'Círculo Hueco' : 'Open Circle'}</option>
-        <option value="diamond" ${current === 'diamond' ? 'selected' : ''}>${isEs ? 'Rombo (Diamond)' : 'Diamond'}</option>
-        <option value="square-block" ${current === 'square-block' ? 'selected' : ''}>${isEs ? 'Cuadrado Sólido' : 'Solid Square'}</option>
-        <option value="square-open" ${current === 'square-open' ? 'selected' : ''}>${isEs ? 'Cuadrado Hueco' : 'Open Square'}</option>
+      <optgroup label="${I18nService.t('inspector.markerGeometry')}">
+        <option value="circle-dot" ${current === 'circle-dot' ? 'selected' : ''}>${I18nService.t('inspector.markerCircleDot')}</option>
+        <option value="circle-open" ${current === 'circle-open' ? 'selected' : ''}>${I18nService.t('inspector.markerCircleOpen')}</option>
+        <option value="diamond" ${current === 'diamond' ? 'selected' : ''}>${I18nService.t('inspector.markerDiamond')}</option>
+        <option value="square-block" ${current === 'square-block' ? 'selected' : ''}>${I18nService.t('inspector.markerSquareBlock')}</option>
+        <option value="square-open" ${current === 'square-open' ? 'selected' : ''}>${I18nService.t('inspector.markerSquareOpen')}</option>
       </optgroup>
       ${!isMid ? `
-      <optgroup label="${isEs ? 'Cotas y Remates' : 'Caps & Terminals'}">
-        <option value="bar-cap" ${current === 'bar-cap' ? 'selected' : ''}>${isEs ? 'Barra Remate en T' : 'T-Bar Cap'}</option>
-        <option value="slash" ${current === 'slash' ? 'selected' : ''}>${isEs ? 'Barra Inclinada (Slash)' : 'Slash'}</option>
-        <option value="bracket" ${current === 'bracket' ? 'selected' : ''}>${isEs ? 'Corchete Delimitador' : 'Bracket'}</option>
+      <optgroup label="${I18nService.t('inspector.markerCaps')}">
+        <option value="bar-cap" ${current === 'bar-cap' ? 'selected' : ''}>${I18nService.t('inspector.markerBarCap')}</option>
+        <option value="slash" ${current === 'slash' ? 'selected' : ''}>${I18nService.t('inspector.markerSlash')}</option>
+        <option value="bracket" ${current === 'bracket' ? 'selected' : ''}>${I18nService.t('inspector.markerBracket')}</option>
       </optgroup>
       ` : ''}
     `;
@@ -146,17 +145,17 @@ export class StrokeMarkerControls {
       </div>
       <div class="prop-row">
         <span class="prop-label">Mkr Layer</span>
-        <select class="prop-input" id="el-marker-layer" style="cursor:pointer;" title="Orden de dibujo (paint-order): Sobre el trazo o Debajo del trazo">
-          <option value="over" ${markerLayer === 'over' ? 'selected' : ''}>Sobre el trazo (Over)</option>
-          <option value="under" ${markerLayer === 'under' ? 'selected' : ''}>Debajo del trazo (Under)</option>
+        <select class="prop-input" id="el-marker-layer" style="cursor:pointer;" title="${I18nService.t('inspector.markerPaintOrderTooltip')}">
+          <option value="over" ${markerLayer === 'over' ? 'selected' : ''}>${I18nService.t('inspector.markerLayerOver')}</option>
+          <option value="under" ${markerLayer === 'under' ? 'selected' : ''}>${I18nService.t('inspector.markerLayerUnder')}</option>
         </select>
       </div>
       <div class="prop-row">
         <span class="prop-label">Mkr Color</span>
         <div class="color-picker-row">
-          <button type="button" class="color-swatch" id="el-marker-color" style="background-color: ${markerColorDisplay};" title="Color del marcador"></button>
-          <input type="text" class="prop-input" id="el-marker-color-hex" value="${isCustomMarkerColor ? markerColor : 'Auto (trazo)'}" placeholder="Auto (trazo)" title="Color del marcador: escribe un código hexadecimal o usa el botón ⟲ para volver al color del trazo" />
-          <button class="prop-input" id="btn-reset-marker-color" style="width:26px; height:24px; padding:0; display:flex; align-items:center; justify-content:center; cursor:pointer;" title="Restablecer color al trazo (context-stroke)">⟲</button>
+          <button type="button" class="color-swatch" id="el-marker-color" style="background-color: ${markerColorDisplay};" title="${I18nService.t('inspector.markerColorTooltip')}"></button>
+          <input type="text" class="prop-input" id="el-marker-color-hex" value="${isCustomMarkerColor ? markerColor : I18nService.t('inspector.markerAutoPlaceholder')}" placeholder="${I18nService.t('inspector.markerAutoPlaceholder')}" title="${I18nService.t('inspector.markerColorTooltip')}" />
+          <button class="prop-input" id="btn-reset-marker-color" style="width:26px; height:24px; padding:0; display:flex; align-items:center; justify-content:center; cursor:pointer;" title="${I18nService.t('inspector.markerResetColorTooltip')}">⟲</button>
         </div>
       </div>
     `;

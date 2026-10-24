@@ -3,6 +3,19 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.99.3] - 2026-10-23
+
+### 🐛 Fixed
+- **Universal Internationalization & Localization across all 7 Supported Languages**:
+  - **QuickHelp Inspector Native Coverage**: Added complete localized shortcut cheat sheets for German (`de`), French (`fr`), Russian (`ru`), and Japanese (`ja`) alongside English, Spanish, and Simplified Chinese across all 20 vector tools in `src/webview/ui/inspectors/quickHelp/`.
+  - **Eliminated Binary Fallbacks**: Eradicated hardcoded `isEs ? '...' : '...'` ternaries across `PropertyPanel.ts`, `CanvasInspector.ts`, and `StrokeMarkerControls.ts`, routing all UI strings through `I18nService.t()` keys.
+  - **Shape Defaults & Creation Shortcuts**: Replaced hardcoded English labels and modifiers in `ShapeDefaultsInspector.ts` with dedicated `shapeDefaults` i18n keys.
+  - **Modal Dialogs Localization**: Internationalized `TransformNumericModal` and `ExportModal` dialogs with full multilingual support for dimensions, multipliers, resolution calculations, and buttons.
+  - **Rulers, Guides, & Secondary Stroke Layers**: Localized ruler origin/scale inputs, guide inspector batch metrics, and multi-stroke layer control tooltips in `RulerGuideInspector.ts` and `StrokeLayersControls.ts`.
+  - **100% Dictionary Symmetry**: Verified structural and key count parity across all 7 language dictionaries (`es.ts`, `en.ts`, `zh-cn.ts`, `de.ts`, `fr.ts`, `ru.ts`, `ja.ts`) passing all 41 automated test suites.
+
+---
+
 ## [0.99.2] - 2026-10-23
 
 ### 🐛 Fixed

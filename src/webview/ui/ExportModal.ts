@@ -8,6 +8,7 @@ import {
   ExportTarget,
   ExportResult,
 } from '../engine/export/AssetExporter.js';
+import { I18nService } from '../i18n/index.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Interactive Multi-Scale Asset Export Modal (ExportModal)
@@ -50,7 +51,7 @@ export class ExportModal {
           <polyline points="7 10 12 15 17 10"></polyline>
           <line x1="12" y1="15" x2="12" y2="3"></line>
         </svg>
-        <span>Exportar Recursos (Asset Export)</span>
+        <span>${I18nService.t('exportModal.title')}</span>
       `;
       container.appendChild(titleEl);
 
@@ -63,14 +64,16 @@ export class ExportModal {
 
       // 1. Target Domain
       const targetGroup = document.createElement('div');
+      const selLabel = I18nService.t('exportModal.selectionTarget').replace('{count}', String(hasSelection ? selectionTool!.selectedElementIds.size : 0));
+      const noSelTitle = I18nService.t('exportModal.noSelectionTooltip');
       targetGroup.innerHTML = `
-        <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 6px;">Ámbito de Exportación</label>
+        <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 6px;">${I18nService.t('exportModal.targetDomain')}</label>
         <div style="display: flex; gap: 8px;">
-          <button type="button" class="btn ${currentTarget === 'selection' ? 'active' : ''}" id="ad-exp-target-sel" style="flex: 1; padding: 6px 10px; font-size: 12px;" ${!hasSelection ? 'disabled title="No hay elementos seleccionados"' : ''}>
-            Selección (${hasSelection ? selectionTool!.selectedElementIds.size : 0})
+          <button type="button" class="btn ${currentTarget === 'selection' ? 'active' : ''}" id="ad-exp-target-sel" style="flex: 1; padding: 6px 10px; font-size: 12px;" ${!hasSelection ? `disabled title="${noSelTitle}"` : ''}>
+            ${selLabel}
           </button>
           <button type="button" class="btn ${currentTarget === 'artboard' ? 'active' : ''}" id="ad-exp-target-art" style="flex: 1; padding: 6px 10px; font-size: 12px;">
-            Mesa Completa (Artboard)
+            ${I18nService.t('exportModal.artboardTarget')}
           </button>
         </div>
       `;
@@ -79,11 +82,11 @@ export class ExportModal {
       // 2. Format Selection
       const formatGroup = document.createElement('div');
       formatGroup.innerHTML = `
-        <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 6px;">Formato</label>
+        <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 6px;">${I18nService.t('exportModal.format')}</label>
         <div style="display: flex; gap: 8px;">
-          <button type="button" class="btn active" id="ad-exp-fmt-png" style="flex: 1; padding: 6px 10px; font-size: 12px;">PNG (Alfa)</button>
-          <button type="button" class="btn" id="ad-exp-fmt-webp" style="flex: 1; padding: 6px 10px; font-size: 12px;">WebP</button>
-          <button type="button" class="btn" id="ad-exp-fmt-svg" style="flex: 1; padding: 6px 10px; font-size: 12px;">SVG (Vector)</button>
+          <button type="button" class="btn active" id="ad-exp-fmt-png" style="flex: 1; padding: 6px 10px; font-size: 12px;">${I18nService.t('exportModal.pngAlpha')}</button>
+          <button type="button" class="btn" id="ad-exp-fmt-webp" style="flex: 1; padding: 6px 10px; font-size: 12px;">${I18nService.t('exportModal.webp')}</button>
+          <button type="button" class="btn" id="ad-exp-fmt-svg" style="flex: 1; padding: 6px 10px; font-size: 12px;">${I18nService.t('exportModal.svgVector')}</button>
         </div>
       `;
       formEl.appendChild(formatGroup);
@@ -92,10 +95,10 @@ export class ExportModal {
       const scaleGroup = document.createElement('div');
       scaleGroup.id = 'ad-exp-scale-container';
       scaleGroup.innerHTML = `
-        <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 6px;">Factor de Escala</label>
+        <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 6px;">${I18nService.t('exportModal.scaleFactor')}</label>
         <div style="display: flex; gap: 8px;">
           <button type="button" class="btn" id="ad-exp-scale-1" style="flex: 1; padding: 6px 8px; font-size: 12px;">1x</button>
-          <button type="button" class="btn active" id="ad-exp-scale-2" style="flex: 1; padding: 6px 8px; font-size: 12px;">2x (@retina)</button>
+          <button type="button" class="btn active" id="ad-exp-scale-2" style="flex: 1; padding: 6px 8px; font-size: 12px;">${I18nService.t('exportModal.scaleRetina')}</button>
           <button type="button" class="btn" id="ad-exp-scale-3" style="flex: 1; padding: 6px 8px; font-size: 12px;">3x</button>
           <button type="button" class="btn" id="ad-exp-scale-4" style="flex: 1; padding: 6px 8px; font-size: 12px;">4x</button>
         </div>
@@ -106,11 +109,11 @@ export class ExportModal {
       const previewGroup = document.createElement('div');
       previewGroup.innerHTML = `
         <div style="margin-bottom: 8px;">
-          <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 4px;">Nombre de Archivo</label>
+          <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 4px;">${I18nService.t('exportModal.filenameLabel')}</label>
           <input type="text" id="ad-exp-filename" class="ad-input" value="asset" style="width: 100%; box-sizing: border-box; padding: 6px 8px; font-size: 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 4px;" />
         </div>
         <div id="ad-exp-dim-preview" style="font-size: 11px; color: var(--text-muted); background: rgba(0,0,0,0.25); padding: 8px 12px; border-radius: 4px; border-left: 3px solid var(--accent-color);">
-          Calculando resolución...
+          ${I18nService.t('exportModal.calculating')}
         </div>
       `;
       formEl.appendChild(previewGroup);
@@ -128,12 +131,12 @@ export class ExportModal {
       const cancelBtn = document.createElement('button');
       cancelBtn.type = 'button';
       cancelBtn.className = 'btn';
-      cancelBtn.textContent = 'Cancelar';
+      cancelBtn.textContent = I18nService.t('exportModal.cancel');
 
       const exportBtn = document.createElement('button');
       exportBtn.type = 'button';
       exportBtn.className = 'btn btn-primary';
-      exportBtn.textContent = 'Exportar y Descargar';
+      exportBtn.textContent = I18nService.t('exportModal.exportDownload');
 
       actionsEl.appendChild(cancelBtn);
       actionsEl.appendChild(exportBtn);
@@ -157,9 +160,14 @@ export class ExportModal {
           filenameInput.value = prep.defaultName;
         }
 
-        const scaleLabel = currentFormat === 'svg' ? 'Vectorial' : `@${calcScale}x`;
+        const scaleLabel = currentFormat === 'svg' ? 'Vector' : `@${calcScale}x`;
         if (previewEl) {
-          previewEl.innerHTML = `<strong>Resolución de Salida:</strong> ${finalW} × ${finalH} px (${scaleLabel}) &bull; Formato: <strong>.${currentFormat.toUpperCase()}</strong>`;
+          const resText = I18nService.t('exportModal.outputResolution')
+            .replace('{w}', String(finalW))
+            .replace('{h}', String(finalH))
+            .replace('{scale}', scaleLabel)
+            .replace('{fmt}', currentFormat.toUpperCase());
+          previewEl.innerHTML = resText;
         }
 
         const scaleContainer = container.querySelector('#ad-exp-scale-container') as HTMLElement;

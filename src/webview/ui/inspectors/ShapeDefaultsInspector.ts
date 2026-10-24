@@ -1,5 +1,6 @@
 import { ShapeToolConfig } from '../../engine/CanvasManager.js';
 import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
+import { I18nService } from '../../i18n/index.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Dedicated Shape Tool Defaults Inspector (ShapeDefaultsInspector)
@@ -20,35 +21,32 @@ export class ShapeDefaultsInspector {
     shapeConfig: ShapeToolConfig,
     callbacks: PropertyPanelCallbacks
   ): void {
-    const toolName =
-      activeTool === 'rect' ? 'Rectangle' :
-      activeTool === 'circle' ? 'Circle' :
-      activeTool === 'ellipse' ? 'Ellipse' :
-      activeTool === 'line' ? 'Line' :
-      activeTool === 'polygon' ? 'Polygon' :
-      'Star';
+    const rawToolTitle = I18nService.t(`toolbar.${activeTool}`);
+    const toolTitle = (rawToolTitle && !rawToolTitle.startsWith('toolbar.'))
+      ? rawToolTitle.replace(/\s*\([^)]*\)$/, '').trim()
+      : activeTool;
 
     const showAspectRatios = activeTool !== 'line' && activeTool !== 'circle';
 
     container.innerHTML = `
       <div class="panel-section">
-        <div class="panel-title">${toolName} Tool Settings</div>
+        <div class="panel-title">${I18nService.t('shapeDefaults.toolSettings', { tool: toolTitle })}</div>
         
         ${showAspectRatios ? `
         <div class="prop-row">
-          <span class="prop-label">Proportion (Alt)</span>
+          <span class="prop-label">${I18nService.t('shapeDefaults.proportionAlt')}</span>
           <select class="prop-input" id="shape-aspect-preset" style="cursor:pointer;">
-            <option value="4:3" ${shapeConfig.aspectRatioW === 4 && shapeConfig.aspectRatioH === 3 ? 'selected' : ''}>4:3 (Standard)</option>
-            <option value="16:9" ${shapeConfig.aspectRatioW === 16 && shapeConfig.aspectRatioH === 9 ? 'selected' : ''}>16:9 (Widescreen)</option>
-            <option value="1:1" ${shapeConfig.aspectRatioW === 1 && shapeConfig.aspectRatioH === 1 ? 'selected' : ''}>1:1 (Square)</option>
-            <option value="3:2" ${shapeConfig.aspectRatioW === 3 && shapeConfig.aspectRatioH === 2 ? 'selected' : ''}>3:2 (Photo)</option>
-            <option value="2:1" ${shapeConfig.aspectRatioW === 2 && shapeConfig.aspectRatioH === 1 ? 'selected' : ''}>2:1 (Panoramic)</option>
-            <option value="custom" ${!['4:3', '16:9', '1:1', '3:2', '2:1'].includes(`${shapeConfig.aspectRatioW}:${shapeConfig.aspectRatioH}`) ? 'selected' : ''}>Custom</option>
+            <option value="4:3" ${shapeConfig.aspectRatioW === 4 && shapeConfig.aspectRatioH === 3 ? 'selected' : ''}>${I18nService.t('shapeDefaults.standard43')}</option>
+            <option value="16:9" ${shapeConfig.aspectRatioW === 16 && shapeConfig.aspectRatioH === 9 ? 'selected' : ''}>${I18nService.t('shapeDefaults.widescreen169')}</option>
+            <option value="1:1" ${shapeConfig.aspectRatioW === 1 && shapeConfig.aspectRatioH === 1 ? 'selected' : ''}>${I18nService.t('shapeDefaults.square11')}</option>
+            <option value="3:2" ${shapeConfig.aspectRatioW === 3 && shapeConfig.aspectRatioH === 2 ? 'selected' : ''}>${I18nService.t('shapeDefaults.photo32')}</option>
+            <option value="2:1" ${shapeConfig.aspectRatioW === 2 && shapeConfig.aspectRatioH === 1 ? 'selected' : ''}>${I18nService.t('shapeDefaults.panoramic21')}</option>
+            <option value="custom" ${!['4:3', '16:9', '1:1', '3:2', '2:1'].includes(`${shapeConfig.aspectRatioW}:${shapeConfig.aspectRatioH}`) ? 'selected' : ''}>${I18nService.t('shapeDefaults.custom')}</option>
           </select>
         </div>
 
         <div class="prop-row">
-          <span class="prop-label">Ratio W : H</span>
+          <span class="prop-label">${I18nService.t('shapeDefaults.ratioWH')}</span>
           <div style="display:flex; gap:6px; width:130px; align-items:center;">
             <input type="number" class="prop-input" id="shape-ratio-w" value="${shapeConfig.aspectRatioW}" min="1" step="1" style="width:55px; text-align:center;" />
             <span style="font-weight:bold; color:var(--text-muted);">:</span>
@@ -59,46 +57,46 @@ export class ShapeDefaultsInspector {
 
         ${activeTool === 'star' ? `
           <div class="prop-row">
-            <span class="prop-label">Star Points</span>
+            <span class="prop-label">${I18nService.t('shapeDefaults.starPoints')}</span>
             <input type="number" class="prop-input" id="star-points" value="${shapeConfig.starPoints}" min="3" max="32" step="1" />
           </div>
           <div class="prop-row">
-            <span class="prop-label">Inner Ratio</span>
+            <span class="prop-label">${I18nService.t('shapeDefaults.innerRatio')}</span>
             <input type="number" class="prop-input" id="star-inner-ratio" value="${shapeConfig.starInnerRatio}" min="0.1" max="0.9" step="0.05" />
           </div>
         ` : ''}
 
         ${activeTool === 'polygon' ? `
           <div class="prop-row">
-            <span class="prop-label">Sides</span>
+            <span class="prop-label">${I18nService.t('shapeDefaults.sides')}</span>
             <input type="number" class="prop-input" id="polygon-sides" value="${shapeConfig.polygonSides || 5}" min="3" max="32" step="1" />
           </div>
         ` : ''}
 
         ${activeTool === 'rect' ? `
           <div class="prop-row">
-            <span class="prop-label">Corner Radius</span>
+            <span class="prop-label">${I18nService.t('shapeDefaults.cornerRadius')}</span>
             <input type="number" class="prop-input" id="rect-corner-radius" value="${shapeConfig.rectCornerRadius}" min="0" step="1" />
           </div>
         ` : ''}
       </div>
 
       <div class="panel-section">
-        <div class="panel-title">Creation Shortcuts</div>
+        <div class="panel-title">${I18nService.t('shapeDefaults.creationShortcuts')}</div>
         <div style="font-size:11px; color:var(--text-muted); line-height:1.6;">
           ${activeTool === 'line' ? `
-            • <b>Drag</b>: Draw straight line between points<br/>
-            • <b>Shift + Drag</b>: Constrain to 45° angular intervals
+            ${I18nService.t('shapeDefaults.lineDrag')}<br/>
+            ${I18nService.t('shapeDefaults.lineShiftDrag')}
           ` : activeTool === 'circle' ? `
-            • <b>Drag</b>: Free size circle from corner<br/>
-            • <b>Shift + Drag</b>: Expand circle outward from center
+            ${I18nService.t('shapeDefaults.circleDrag')}<br/>
+            ${I18nService.t('shapeDefaults.circleShiftDrag')}
           ` : `
-            • <b>Drag</b>: Free size from corner<br/>
-            • <b>Shift + Drag</b>: Expand from center<br/>
-            • <b>Ctrl + Drag</b>: 1:1 Aspect Ratio (Square/Regular)<br/>
-            • <b>Alt + Drag</b>: Fixed Aspect Ratio (${shapeConfig.aspectRatioW}:${shapeConfig.aspectRatioH})<br/>
-            • <b>Ctrl + Shift</b>: 1:1 Ratio from center<br/>
-            • <b>Alt + Shift</b>: Fixed ratio (${shapeConfig.aspectRatioW}:${shapeConfig.aspectRatioH}) from center
+            ${I18nService.t('shapeDefaults.shapeDrag')}<br/>
+            ${I18nService.t('shapeDefaults.shapeShiftDrag')}<br/>
+            ${I18nService.t('shapeDefaults.shapeCtrlDrag')}<br/>
+            ${I18nService.t('shapeDefaults.shapeAltDrag', { w: shapeConfig.aspectRatioW, h: shapeConfig.aspectRatioH })}<br/>
+            ${I18nService.t('shapeDefaults.shapeCtrlShift')}<br/>
+            ${I18nService.t('shapeDefaults.shapeAltShift', { w: shapeConfig.aspectRatioW, h: shapeConfig.aspectRatioH })}
           `}
         </div>
       </div>

@@ -71,8 +71,6 @@ export class CanvasInspector {
     );
     const selectedPresetId = matchedPreset ? matchedPreset.id : 'custom';
 
-    const isEs = I18nService.getLanguage() === 'es';
-
     container.innerHTML = `
       <div class="panel-section">
         <div class="panel-title">${I18nService.t('panels.canvasProps')}</div>
@@ -109,18 +107,18 @@ export class CanvasInspector {
         </div>
         <div class="prop-row">
           <span class="prop-label">Raw</span>
-          <input type="text" class="prop-input" id="canvas-viewbox" value="${canvas.viewBox}" title="${isEs ? 'Formato: minX minY width height' : 'Format: minX minY width height'}" />
+          <input type="text" class="prop-input" id="canvas-viewbox" value="${canvas.viewBox}" title="${I18nService.t('inspector.canvasFormatRawTooltip')}" />
         </div>
         <div class="prop-row">
-          <span class="prop-label" title="${isEs ? 'preserveAspectRatio: Ajuste de relación de aspecto del viewBox' : 'preserveAspectRatio: ViewBox aspect ratio alignment'}">Aspect</span>
+          <span class="prop-label" title="${I18nService.t('inspector.canvasPreserveAspectTooltip')}">Aspect</span>
           <select class="prop-input" id="canvas-preserve-aspect" style="cursor:pointer;">
-            <option value="none" ${canvas.preserveAspectRatio === 'none' ? 'selected' : ''}>none (${isEs ? 'Deformar' : 'Distort'})</option>
-            <option value="xMidYMid meet" ${!canvas.preserveAspectRatio || canvas.preserveAspectRatio === 'xMidYMid meet' ? 'selected' : ''}>xMidYMid meet (${isEs ? 'Contener centrado' : 'Contain center'})</option>
-            <option value="xMinYMin meet" ${canvas.preserveAspectRatio === 'xMinYMin meet' ? 'selected' : ''}>xMinYMin meet (${isEs ? 'Contener arriba-izq' : 'Contain top-left'})</option>
-            <option value="xMaxYMax meet" ${canvas.preserveAspectRatio === 'xMaxYMax meet' ? 'selected' : ''}>xMaxYMax meet (${isEs ? 'Contener abajo-der' : 'Contain bottom-right'})</option>
-            <option value="xMidYMid slice" ${canvas.preserveAspectRatio === 'xMidYMid slice' ? 'selected' : ''}>xMidYMid slice (${isEs ? 'Cubrir centrado' : 'Cover center'})</option>
-            <option value="xMinYMin slice" ${canvas.preserveAspectRatio === 'xMinYMin slice' ? 'selected' : ''}>xMinYMin slice (${isEs ? 'Cubrir arriba-izq' : 'Cover top-left'})</option>
-            <option value="xMaxYMax slice" ${canvas.preserveAspectRatio === 'xMaxYMax slice' ? 'selected' : ''}>xMaxYMax slice (${isEs ? 'Cubrir abajo-der' : 'Cover bottom-right'})</option>
+            <option value="none" ${canvas.preserveAspectRatio === 'none' ? 'selected' : ''}>${I18nService.t('inspector.canvasAspectNone')}</option>
+            <option value="xMidYMid meet" ${!canvas.preserveAspectRatio || canvas.preserveAspectRatio === 'xMidYMid meet' ? 'selected' : ''}>${I18nService.t('inspector.canvasAspectMidMeet')}</option>
+            <option value="xMinYMin meet" ${canvas.preserveAspectRatio === 'xMinYMin meet' ? 'selected' : ''}>${I18nService.t('inspector.canvasAspectMinMeet')}</option>
+            <option value="xMaxYMax meet" ${canvas.preserveAspectRatio === 'xMaxYMax meet' ? 'selected' : ''}>${I18nService.t('inspector.canvasAspectMaxMeet')}</option>
+            <option value="xMidYMid slice" ${canvas.preserveAspectRatio === 'xMidYMid slice' ? 'selected' : ''}>${I18nService.t('inspector.canvasAspectMidSlice')}</option>
+            <option value="xMinYMin slice" ${canvas.preserveAspectRatio === 'xMinYMin slice' ? 'selected' : ''}>${I18nService.t('inspector.canvasAspectMinSlice')}</option>
+            <option value="xMaxYMax slice" ${canvas.preserveAspectRatio === 'xMaxYMax slice' ? 'selected' : ''}>${I18nService.t('inspector.canvasAspectMaxSlice')}</option>
           </select>
         </div>
       </div>
@@ -128,11 +126,11 @@ export class CanvasInspector {
       <div class="panel-section">
         <div class="panel-title">${I18nService.t('panels.currentColorView')}</div>
         <div class="prop-row">
-          <span class="prop-label" title="${isEs ? 'Color con el que se visualiza currentColor en el lienzo' : 'Preview color for currentColor on the canvas'}">${I18nService.t('common.color')}</span>
+          <span class="prop-label" title="${I18nService.t('inspector.canvasCurrentColorTooltip')}">${I18nService.t('common.color')}</span>
           <div class="color-picker-row" style="display:flex; gap:4px; align-items:center;">
             <button type="button" class="color-swatch" id="canvas-currentcolor-color" style="background-color: ${canvas.currentColor || '#000000'};" title="${I18nService.t('common.color')}"></button>
             <input type="text" class="prop-input" id="canvas-currentcolor-hex" value="${canvas.currentColor || '#000000'}" style="flex:1;" />
-            <button class="prop-input" id="btn-reset-canvas-currentcolor" style="width:26px; height:24px; padding:0; display:flex; align-items:center; justify-content:center; cursor:pointer;" title="${isEs ? 'Restablecer a negro (#000000)' : 'Reset preview color to black (#000000)'}">⟲</button>
+            <button class="prop-input" id="btn-reset-canvas-currentcolor" style="width:26px; height:24px; padding:0; display:flex; align-items:center; justify-content:center; cursor:pointer;" title="${I18nService.t('inspector.canvasResetColorTooltip')}">⟲</button>
           </div>
         </div>
       </div>
@@ -177,8 +175,8 @@ export class CanvasInspector {
           <span class="prop-label">${I18nService.t('common.color')}</span>
           <div class="color-picker-row">
             <button type="button" class="color-swatch" id="canvas-bg-color" style="background-color: ${canvas.backgroundColor && canvas.backgroundColor.startsWith('#') ? canvas.backgroundColor : '#ffffff'};" title="${I18nService.t('common.color')}"></button>
-            <input type="text" class="prop-input" id="canvas-bg-hex" value="${canvas.backgroundColor || 'none'}" placeholder="${isEs ? 'none o #hex' : 'none or #hex'}" style="flex:1;" />
-            <button class="prop-input ${canvas.backgroundColor === 'none' || !canvas.backgroundColor ? 'active' : ''}" id="btn-canvas-bg-none" style="cursor:pointer; width:auto; padding:2px 6px; font-size:10px; font-weight:600;" title="${isEs ? 'Quitar color de fondo (transparente)' : 'Remove background color (transparent)'}">${isEs ? 'Sin fondo' : 'No background'}</button>
+            <input type="text" class="prop-input" id="canvas-bg-hex" value="${canvas.backgroundColor || 'none'}" placeholder="${I18nService.t('inspector.canvasBgPlaceholder')}" style="flex:1;" />
+            <button class="prop-input ${canvas.backgroundColor === 'none' || !canvas.backgroundColor ? 'active' : ''}" id="btn-canvas-bg-none" style="cursor:pointer; width:auto; padding:2px 6px; font-size:10px; font-weight:600;" title="${I18nService.t('inspector.canvasNoBgTooltip')}">${I18nService.t('inspector.canvasNoBg')}</button>
           </div>
         </div>
       </div>

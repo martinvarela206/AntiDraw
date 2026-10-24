@@ -1,5 +1,9 @@
 import { ToolIcons } from '../../icons/ToolIcons.js';
 import { I18nService } from '../../i18n/index.js';
+import { TOOL_HELP_MAP_DE } from './quickHelp/quickHelpDe.js';
+import { TOOL_HELP_MAP_FR } from './quickHelp/quickHelpFr.js';
+import { TOOL_HELP_MAP_RU } from './quickHelp/quickHelpRu.js';
+import { TOOL_HELP_MAP_JA } from './quickHelp/quickHelpJa.js';
 
 export interface ShortcutItem {
   keys: string[];
@@ -827,6 +831,10 @@ export class QuickHelpInspector {
     let map = this.TOOL_HELP_MAP_EN;
     if (lang === 'es') map = this.TOOL_HELP_MAP_ES;
     else if (lang === 'zh-cn') map = this.TOOL_HELP_MAP_ZH;
+    else if (lang === 'de') map = TOOL_HELP_MAP_DE;
+    else if (lang === 'fr') map = TOOL_HELP_MAP_FR;
+    else if (lang === 'ru') map = TOOL_HELP_MAP_RU;
+    else if (lang === 'ja') map = TOOL_HELP_MAP_JA;
 
     const key = isGuideOrRuler ? 'ruler' : (map[activeTool] ? activeTool : 'select');
     const config = map[key] || map.select;

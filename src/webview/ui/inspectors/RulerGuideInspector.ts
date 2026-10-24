@@ -33,25 +33,25 @@ export class RulerGuideInspector {
       <div class="panel-section">
         <div class="panel-title">${I18nService.t('inspector.rulerOrigin')}</div>
         <div class="prop-row">
-          <span class="prop-label">Origin X</span>
+          <span class="prop-label">${I18nService.t('inspector.rulerOriginX')}</span>
           <input type="number" class="prop-input" id="ruler-origin-x" value="${config.originX || 0}" />
           <span class="prop-label" style="width:20px; text-align:right;">Y</span>
           <input type="number" class="prop-input" id="ruler-origin-y" value="${config.originY || 0}" />
         </div>
         <div class="prop-row" style="margin-top: 8px;">
-          <span class="prop-label" style="width:70px;">Align Horiz</span>
+          <span class="prop-label" style="width:70px;">${I18nService.t('inspector.rulerAlignHoriz')}</span>
           <div class="button-group" style="flex:1;">
-            <button class="tool-btn" id="ruler-align-left" title="Origin at Left of ViewBox (X=0)">${ToolIcons.alignLeft}</button>
-            <button class="tool-btn" id="ruler-align-center-h" title="Origin at Horizontal Center of ViewBox">${ToolIcons.alignCenter}</button>
-            <button class="tool-btn" id="ruler-align-right" title="Origin at Right of ViewBox">${ToolIcons.alignRight}</button>
+            <button class="tool-btn" id="ruler-align-left" title="${I18nService.t('inspector.rulerAlignLeftTooltip')}">${ToolIcons.alignLeft}</button>
+            <button class="tool-btn" id="ruler-align-center-h" title="${I18nService.t('inspector.rulerAlignCenterHTooltip')}">${ToolIcons.alignCenter}</button>
+            <button class="tool-btn" id="ruler-align-right" title="${I18nService.t('inspector.rulerAlignRightTooltip')}">${ToolIcons.alignRight}</button>
           </div>
         </div>
         <div class="prop-row" style="margin-top: 4px;">
-          <span class="prop-label" style="width:70px;">Align Vert</span>
+          <span class="prop-label" style="width:70px;">${I18nService.t('inspector.rulerAlignVert')}</span>
           <div class="button-group" style="flex:1;">
-            <button class="tool-btn" id="ruler-align-top" title="Origin at Top of ViewBox (Y=0)">${ToolIcons.alignTop}</button>
-            <button class="tool-btn" id="ruler-align-center-v" title="Origin at Vertical Center of ViewBox">${ToolIcons.alignMiddle}</button>
-            <button class="tool-btn" id="ruler-align-bottom" title="Origin at Bottom of ViewBox">${ToolIcons.alignBottom}</button>
+            <button class="tool-btn" id="ruler-align-top" title="${I18nService.t('inspector.rulerAlignTopTooltip')}">${ToolIcons.alignTop}</button>
+            <button class="tool-btn" id="ruler-align-center-v" title="${I18nService.t('inspector.rulerAlignCenterVTooltip')}">${ToolIcons.alignMiddle}</button>
+            <button class="tool-btn" id="ruler-align-bottom" title="${I18nService.t('inspector.rulerAlignBottomTooltip')}">${ToolIcons.alignBottom}</button>
           </div>
         </div>
       </div>
@@ -59,20 +59,20 @@ export class RulerGuideInspector {
       <div class="panel-section">
         <div class="panel-title">${I18nService.t('inspector.rulerScale')}</div>
         <div class="prop-row">
-          <span class="prop-label">Units</span>
+          <span class="prop-label">${I18nService.t('inspector.rulerUnits')}</span>
           <select class="prop-input" id="ruler-unit" style="cursor:pointer;">
-            <option value="px" ${config.unit === 'px' ? 'selected' : ''}>Pixels (px)</option>
-            <option value="mm" ${config.unit === 'mm' ? 'selected' : ''}>Millimeters (mm)</option>
-            <option value="cm" ${config.unit === 'cm' ? 'selected' : ''}>Centimeters (cm)</option>
-            <option value="in" ${config.unit === 'in' ? 'selected' : ''}>Inches (in)</option>
+            <option value="px" ${config.unit === 'px' ? 'selected' : ''}>${I18nService.t('inspector.rulerUnitPixels')}</option>
+            <option value="mm" ${config.unit === 'mm' ? 'selected' : ''}>${I18nService.t('inspector.rulerUnitMm')}</option>
+            <option value="cm" ${config.unit === 'cm' ? 'selected' : ''}>${I18nService.t('inspector.rulerUnitCm')}</option>
+            <option value="in" ${config.unit === 'in' ? 'selected' : ''}>${I18nService.t('inspector.rulerUnitIn')}</option>
           </select>
         </div>
         <div class="prop-row">
-          <span class="prop-label">Scale (px/u)</span>
+          <span class="prop-label">${I18nService.t('inspector.rulerScaleUnits')}</span>
           <input type="number" class="prop-input" id="ruler-scale" value="${config.scale}" min="0.1" step="0.1" />
         </div>
         <div class="prop-row">
-          <span class="prop-label">Major Step</span>
+          <span class="prop-label">${I18nService.t('inspector.rulerMajorStep')}</span>
           <input type="number" class="prop-input" id="ruler-step" value="${config.step || 50}" min="10" step="10" />
         </div>
       </div>
@@ -379,11 +379,11 @@ export class RulerGuideInspector {
     const currentColor = singleGuide ? (singleGuide.color || '#00f0ff') : (guides[0].color || '#00f0ff');
     const allLocked = guides.every((g) => g.locked);
 
-    let title = 'Guía de Regla';
+    let title = I18nService.t('inspector.guide');
     if (singleGuide) {
-      title = singleGuide.orientation === 'vertical' ? 'Guía Vertical' : singleGuide.orientation === 'horizontal' ? 'Guía Horizontal' : 'Guía Inclinada';
+      title = singleGuide.orientation === 'vertical' ? I18nService.t('inspector.guideVertical') : singleGuide.orientation === 'horizontal' ? I18nService.t('inspector.guideHorizontal') : I18nService.t('inspector.guideAngled');
     } else {
-      title = `Guías Seleccionadas (${guides.length})`;
+      title = `${I18nService.t('inspector.guidesSelected')} (${guides.length})`;
     }
 
     let typeDesc = '';
@@ -401,7 +401,7 @@ export class RulerGuideInspector {
       <div class="panel-section">
         <div class="panel-title">${title}</div>
         <div class="prop-row">
-          <span class="prop-label">Tipo</span>
+          <span class="prop-label">${I18nService.t('inspector.guideTypeLabel')}</span>
           <span style="font-weight:600; color:var(--text-main); text-transform:capitalize;">${typeDesc}</span>
         </div>
 
@@ -409,7 +409,7 @@ export class RulerGuideInspector {
           <div class="prop-row">
             <span class="prop-label">X</span>
             <input type="number" step="any" class="prop-input" id="guide-pos-x" value="${valX}" />
-            ${verticalGuides.length > 1 ? `<span style="font-size:10px; color:var(--text-muted); margin-left:4px;">(Bloque ${verticalGuides.length})</span>` : ''}
+            ${verticalGuides.length > 1 ? `<span style="font-size:10px; color:var(--text-muted); margin-left:4px;">(${I18nService.t('inspector.guideBatchLabel').replace('{count}', String(verticalGuides.length))})</span>` : ''}
           </div>
         ` : ''}
 
@@ -417,17 +417,17 @@ export class RulerGuideInspector {
           <div class="prop-row">
             <span class="prop-label">Y</span>
             <input type="number" step="any" class="prop-input" id="guide-pos-y" value="${valY}" />
-            ${horizontalGuides.length > 1 ? `<span style="font-size:10px; color:var(--text-muted); margin-left:4px;">(Bloque ${horizontalGuides.length})</span>` : ''}
+            ${horizontalGuides.length > 1 ? `<span style="font-size:10px; color:var(--text-muted); margin-left:4px;">(${I18nService.t('inspector.guideBatchLabel').replace('{count}', String(horizontalGuides.length))})</span>` : ''}
           </div>
         ` : ''}
 
         ${(hasAngled || singleGuide) ? `
           <div class="prop-row">
-            <span class="prop-label">Ángulo (°)</span>
+            <span class="prop-label">${I18nService.t('inspector.guideAngleLabel')}</span>
             <input type="number" class="prop-input" id="guide-angle" value="${valAngle}" step="1" />
           </div>
           <div class="prop-row">
-            <span class="prop-label">Pivote X</span>
+            <span class="prop-label">${I18nService.t('inspector.guidePivotX')}</span>
             <input type="number" class="prop-input" id="guide-pivot-x" value="${valPivotX}" />
             <span class="prop-label" style="width:20px; text-align:right;">Y</span>
             <input type="number" class="prop-input" id="guide-pivot-y" value="${valPivotY}" />

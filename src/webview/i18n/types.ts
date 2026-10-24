@@ -460,6 +460,88 @@ export interface Translations {
     denseGridWarningBody: string;
     continueVisualOnly: string;
     undoConversion: string;
+
+    // Pen & Polyline Tool Inspector
+    penToolTitle: string;
+    verticesCount: string;
+    penNextNodeType: string;
+    penModeAppliedHint: string;
+    pathActions: string;
+    finishPath: string;
+    closeLoop: string;
+    penShortcutsTitle: string;
+    penShortcutsBody: string;
+    polylineToolTitle: string;
+    polylineFinishOpen: string;
+    polylineClosePolygon: string;
+    polylineInstructionsTitle: string;
+    polylineInstructionsBody: string;
+
+    // Canvas Inspector
+    canvasFormatRawTooltip: string;
+    canvasPreserveAspectTooltip: string;
+    canvasAspectNone: string;
+    canvasAspectMidMeet: string;
+    canvasAspectMinMeet: string;
+    canvasAspectMaxMeet: string;
+    canvasAspectMidSlice: string;
+    canvasAspectMinSlice: string;
+    canvasAspectMaxSlice: string;
+    canvasCurrentColorTooltip: string;
+    canvasResetColorTooltip: string;
+    canvasBgPlaceholder: string;
+    canvasNoBg: string;
+    canvasNoBgTooltip: string;
+
+    // Stroke Markers & Secondary Layers
+    markerArrows: string;
+    markerArrowOpen: string;
+    markerArrowFilled: string;
+    markerArrowStealth: string;
+    markerArrowWide: string;
+    markerArrowConcave: string;
+    markerGeometry: string;
+    markerCircleDot: string;
+    markerCircleOpen: string;
+    markerDiamond: string;
+    markerSquareBlock: string;
+    markerSquareOpen: string;
+    markerCaps: string;
+    markerBarCap: string;
+    markerSlash: string;
+    markerBracket: string;
+    markerPaintOrderTooltip: string;
+    markerColorTooltip: string;
+    markerAutoPlaceholder: string;
+    markerResetColorTooltip: string;
+    markerLayerOver: string;
+    markerLayerUnder: string;
+    strokeSecondaryColorTooltip: string;
+    strokeSecondaryWidthTooltip: string;
+    strokeDashPlaceholder: string;
+    strokeDashesLabel: string;
+
+    // Rulers & Guides Inspector
+    rulerOriginX: string;
+    rulerAlignHoriz: string;
+    rulerAlignVert: string;
+    rulerUnits: string;
+    rulerScaleUnits: string;
+    rulerMajorStep: string;
+    rulerUnitPixels: string;
+    rulerUnitMm: string;
+    rulerUnitCm: string;
+    rulerUnitIn: string;
+    rulerAlignLeftTooltip: string;
+    rulerAlignCenterHTooltip: string;
+    rulerAlignRightTooltip: string;
+    rulerAlignTopTooltip: string;
+    rulerAlignCenterVTooltip: string;
+    rulerAlignBottomTooltip: string;
+    guideTypeLabel: string;
+    guideAngleLabel: string;
+    guidePivotX: string;
+    guideBatchLabel: string;
   };
 
   // Quick Help
@@ -540,5 +622,68 @@ export interface Translations {
     message: string;
     donateKoFi: string;
     maybeLater: string;
+  };
+
+  // Shape Creation Defaults & Shortcuts
+  shapeDefaults: {
+    toolSettings: string;
+    proportionAlt: string;
+    ratioWH: string;
+    starPoints: string;
+    innerRatio: string;
+    sides: string;
+    cornerRadius: string;
+    standard43: string;
+    widescreen169: string;
+    square11: string;
+    photo32: string;
+    panoramic21: string;
+    custom: string;
+    creationShortcuts: string;
+    lineDrag: string;
+    lineShiftDrag: string;
+    circleDrag: string;
+    circleShiftDrag: string;
+    shapeDrag: string;
+    shapeShiftDrag: string;
+    shapeCtrlDrag: string;
+    shapeAltDrag: string;
+    shapeCtrlShift: string;
+    shapeAltShift: string;
+  };
+
+  // Numeric Transformation Modal
+  transformNumeric: {
+    title: string;
+    noSelectionMsg: string;
+    gotIt: string;
+    singleSelected: string;
+    multipleSelected: string;
+    sizeDetails: string;
+    relativeDisplacement: string;
+    absolutePosition: string;
+    createDuplicate: string;
+    cancel: string;
+    apply: string;
+  };
+
+  // Asset Export Modal
+  exportModal: {
+    title: string;
+    targetDomain: string;
+    selectionTarget: string;
+    artboardTarget: string;
+    noSelectionTooltip: string;
+    format: string;
+    pngAlpha: string;
+    webp: string;
+    svgVector: string;
+    scaleFactor: string;
+    scaleRetina: string;
+    filenameLabel: string;
+    calculating: string;
+    outputResolution: string;
+    cancel: string;
+    exportDownload: string;
   };
 }

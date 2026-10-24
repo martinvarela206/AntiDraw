@@ -11,6 +11,8 @@
  *    and input auto-focus.
  */
 
+import { I18nService } from '../i18n/index.js';
+
 export interface TransformNumericOptions {
   currentBox: { x: number; y: number; width: number; height: number } | null;
   selectedCount: number;
@@ -45,7 +47,7 @@ export class TransformNumericModal {
         <line x1="2" y1="12" x2="22" y2="12"></line>
         <line x1="12" y1="2" x2="12" y2="22"></line>
       </svg>
-      <span>Transformación Numérica</span>
+      <span>${I18nService.t('transformNumeric.title')}</span>
     `;
 
     container.appendChild(titleEl);
@@ -53,15 +55,14 @@ export class TransformNumericModal {
     if (options.selectedCount === 0 || !options.currentBox) {
       const emptyMsg = document.createElement('div');
       emptyMsg.className = 'ad-modal-message';
-      emptyMsg.textContent =
-        'No hay ningún elemento seleccionado actualmente en el lienzo. Seleccione uno o más vectores para transformar sus coordenadas de forma numérica.';
+      emptyMsg.textContent = I18nService.t('transformNumeric.noSelectionMsg');
 
       const actionsEl = document.createElement('div');
       actionsEl.className = 'ad-modal-actions';
 
       const closeBtn = document.createElement('button');
       closeBtn.className = 'ad-modal-btn ad-modal-btn-confirm accent';
-      closeBtn.textContent = 'Entendido (Esc)';
+      closeBtn.textContent = I18nService.t('transformNumeric.gotIt');
 
       actionsEl.appendChild(closeBtn);
       container.appendChild(emptyMsg);
@@ -100,12 +101,16 @@ export class TransformNumericModal {
 
     const countLabel =
       options.selectedCount === 1
-        ? '1 elemento seleccionado'
-        : `${options.selectedCount} elementos seleccionados`;
+        ? I18nService.t('transformNumeric.singleSelected')
+        : I18nService.t('transformNumeric.multipleSelected', { count: options.selectedCount });
 
     const subDetails = document.createElement('div');
     subDetails.className = 'ad-modal-details';
-    subDetails.textContent = `${countLabel} · Tamaño: ${Math.round(box.width)} × ${Math.round(box.height)} px`;
+    subDetails.textContent = I18nService.t('transformNumeric.sizeDetails', {
+      count: countLabel,
+      w: Math.round(box.width),
+      h: Math.round(box.height),
+    });
     container.appendChild(subDetails);
 
     // Form content
@@ -117,7 +122,7 @@ export class TransformNumericModal {
 
     formEl.innerHTML = `
       <div style="display:flex; flex-direction:column; gap:6px;">
-        <span style="font-size:11px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">Desplazamiento Relativo</span>
+        <span style="font-size:11px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">${I18nService.t('transformNumeric.relativeDisplacement')}</span>
         <div style="display:flex; gap:8px;">
           <div style="flex:1; display:flex; align-items:center; background:rgba(0,0,0,0.2); border:1px solid var(--border-color); border-radius:4px; padding:2px 8px;">
             <span style="font-size:11px; color:var(--text-muted); font-weight:600; width:20px;">ΔX</span>
@@ -133,7 +138,7 @@ export class TransformNumericModal {
       </div>
 
       <div style="display:flex; flex-direction:column; gap:6px; margin-top:2px;">
-        <span style="font-size:11px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">Posición Absoluta</span>
+        <span style="font-size:11px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">${I18nService.t('transformNumeric.absolutePosition')}</span>
         <div style="display:flex; gap:8px;">
           <div style="flex:1; display:flex; align-items:center; background:rgba(0,0,0,0.2); border:1px solid var(--border-color); border-radius:4px; padding:2px 8px;">
             <span style="font-size:11px; color:var(--text-muted); font-weight:600; width:20px;">X</span>
@@ -150,7 +155,7 @@ export class TransformNumericModal {
 
       <label style="display:flex; align-items:center; gap:8px; font-size:11px; color:var(--text-main); cursor:pointer; margin-top:4px; user-select:none;">
         <input type="checkbox" id="modal-transform-duplicate" style="accent-color:var(--accent-color); cursor:pointer;" />
-        <span>Crear duplicado (Conservar original)</span>
+        <span>${I18nService.t('transformNumeric.createDuplicate')}</span>
       </label>
     `;
 
@@ -161,11 +166,11 @@ export class TransformNumericModal {
 
     const cancelBtn = document.createElement('button');
     cancelBtn.className = 'ad-modal-btn ad-modal-btn-cancel';
-    cancelBtn.textContent = 'Cancelar (Esc)';
+    cancelBtn.textContent = I18nService.t('transformNumeric.cancel');
 
     const applyBtn = document.createElement('button');
     applyBtn.className = 'ad-modal-btn ad-modal-btn-confirm accent';
-    applyBtn.textContent = 'Aplicar (Enter)';
+    applyBtn.textContent = I18nService.t('transformNumeric.apply');
 
     actionsEl.appendChild(cancelBtn);
     actionsEl.appendChild(applyBtn);

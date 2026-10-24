@@ -16,7 +16,7 @@
   <a href="https://open-vsx.org/extension/martinvarela206/antidraw"><img src="https://img.shields.io/badge/Open--VSX-Registry-purple?style=flat-square" alt="Open VSX Registry"></a>
   <a href="https://github.com/martinvarela206/AntiDraw"><img src="https://img.shields.io/badge/GitHub-Repository-181717?style=flat-square&logo=github" alt="GitHub Repository"></a>
   <a href="https://github.com/martinvarela206/AntiDraw/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-Source--Available-blue?style=flat-square" alt="Source-Available License"></a>
-  <a href="https://github.com/martinvarela206/AntiDraw"><img src="https://img.shields.io/badge/Status-Beta%20v0.99.1-orange?style=flat-square" alt="Status"></a>
+  <a href="https://github.com/martinvarela206/AntiDraw"><img src="https://img.shields.io/badge/Status-Beta%20v0.99.3-orange?style=flat-square" alt="Status"></a>
 </p>
 
 <p align="center">
@@ -38,7 +38,7 @@
 ---
 
 > [!NOTE]
-> **Статус проекта: Публичная бета (v0.99.1)**  
+> **Статус проекта: Публичная бета (v0.99.3)**  
 > AntiDraw активно развивается. Хотя векторные преобразования, кривые Безье, привязка и булевы операции полностью работоспособны, могут встречаться крайние случаи.  
 > Нашли ошибку? Пожалуйста, [создайте Issue на GitHub](https://github.com/martinvarela206/AntiDraw/issues).
 

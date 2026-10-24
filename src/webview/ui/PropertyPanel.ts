@@ -401,18 +401,17 @@ export class PropertyPanel {
 
   // Render Pen Tool options & next-node-type configuration
   private renderPenProperties(): void {
-    const isEs = I18nService.getLanguage() === 'es';
     this.inspectorContainer.innerHTML = `
       <div class="panel-section">
-        <div class="panel-title">${isEs ? 'Herramienta Pluma Bézier (P)' : 'Bézier Curve Tool (P)'}</div>
+        <div class="panel-title">${I18nService.t('inspector.penToolTitle')}</div>
         <div class="prop-row">
           <span class="prop-label">${I18nService.t('common.nodes')}</span>
-          <span style="font-weight:600; color:var(--text-main);">${this.penVertexCount} ${isEs ? 'vértices' : 'vertices'}</span>
+          <span style="font-weight:600; color:var(--text-main);">${I18nService.t('inspector.verticesCount', { count: this.penVertexCount })}</span>
         </div>
       </div>
 
       <div class="panel-section">
-        <div class="panel-title">${isEs ? 'Tipo de Nodo Siguiente' : 'Next Node Type'}</div>
+        <div class="panel-title">${I18nService.t('inspector.penNextNodeType')}</div>
         <div class="prop-row" style="justify-content: flex-start; gap: 8px;">
           <button class="btn-icon ${this.penNodeType === 'sharp' ? 'active' : ''}" id="btn-pen-sharp" title="${I18nService.t('inspector.nodeSharp')}">
             ${ToolIcons.nodeSharp}
@@ -428,26 +427,26 @@ export class PropertyPanel {
           </button>
         </div>
         <div style="font-size:11px; color:var(--text-muted); margin-top:8px; line-height:1.4;">
-          ${isEs ? 'El modo seleccionado se aplicará a los nuevos nodos trazados.' : 'Selected mode will apply to new nodes drawn.'}
+          ${I18nService.t('inspector.penModeAppliedHint')}
         </div>
       </div>
 
       <div class="panel-section">
-        <div class="panel-title">${isEs ? 'Acciones de Trazado' : 'Path Actions'}</div>
+        <div class="panel-title">${I18nService.t('inspector.pathActions')}</div>
         <div class="prop-row" style="flex-direction:column; gap:6px;">
           <button class="prop-input" id="btn-finish-path" style="cursor:pointer; background:var(--accent-color); color:#fff; text-align:center; font-weight:600; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
-            ${ToolIcons.check} ${isEs ? 'Finalizar Trazado (Enter)' : 'Finish Path (Enter)'}
+            ${ToolIcons.check} ${I18nService.t('inspector.finishPath')}
           </button>
           <button class="prop-input" id="btn-close-path" style="cursor:pointer; background:var(--bg-panel-hover); text-align:center;">
-            ⟳ ${isEs ? 'Cerrar y Finalizar Bucle' : 'Close & Finish Loop'}
+            ⟳ ${I18nService.t('inspector.closeLoop')}
           </button>
         </div>
       </div>
 
       <div class="panel-section">
-        <div class="panel-title">${isEs ? 'Atajos de Teclado' : 'Shortcuts'}</div>
+        <div class="panel-title">${I18nService.t('inspector.penShortcutsTitle')}</div>
         <div style="font-size:11px; color:var(--text-muted); line-height:1.5;">
-          ${isEs ? '• <b>Clic</b>: Añadir nodo<br/>• <b>Arrastrar</b>: Tiradores Bézier (mantener <b>Alt</b> para quebrar)<br/>• <b>Shift + Clic en nodo</b>: Eliminar nodo<br/>• <b>Ctrl + Arrastrar nodo</b>: Mover nodo<br/>• <b>Enter / Doble Clic</b>: Finalizar trazado<br/>• <b>Escape</b>: Cancelar trazado' : '• <b>Click</b>: Add node<br/>• <b>Drag</b>: Pull Bézier handles (Hold <b>Alt</b> to break handle)<br/>• <b>Shift + Click node</b>: Delete node<br/>• <b>Ctrl + Drag node</b>: Move node<br/>• <b>Enter / DblClick</b>: Finish path<br/>• <b>Escape</b>: Cancel drawing'}
+          ${I18nService.t('inspector.penShortcutsBody')}
         </div>
       </div>
     `;
@@ -482,35 +481,34 @@ export class PropertyPanel {
 
   // Render Polyline Tool Properties & Actions
   private renderPolylineProperties(): void {
-    const isEs = I18nService.getLanguage() === 'es';
     const hasEnoughVerts = this.polylineVertexCount >= 2;
     const canClose = this.polylineVertexCount >= 3;
 
     this.inspectorContainer.innerHTML = `
       <div class="panel-section">
-        <div class="panel-title">${isEs ? 'Herramienta Polilínea (Y)' : 'Polyline Tool (Y)'}</div>
+        <div class="panel-title">${I18nService.t('inspector.polylineToolTitle')}</div>
         <div class="prop-row">
-          <span class="prop-label">${isEs ? 'Vértices' : 'Vertices'}</span>
+          <span class="prop-label">${I18nService.t('common.nodes')}</span>
           <span style="font-weight:600; color:var(--text-main);">${this.polylineVertexCount} pts</span>
         </div>
       </div>
 
       <div class="panel-section">
-        <div class="panel-title">${isEs ? 'Acciones de Trazado' : 'Path Actions'}</div>
+        <div class="panel-title">${I18nService.t('inspector.pathActions')}</div>
         <div class="prop-row" style="flex-direction:column; gap:8px; align-items:stretch;">
           <button class="prop-input" id="btn-finish-polyline" ${!hasEnoughVerts ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : 'style="cursor:pointer; background:var(--bg-active); text-align:center;"'}>
-            ${isEs ? 'Finalizar Trazo Abierto (Enter / Doble Clic)' : 'Finish Open Path (Enter / DblClick)'}
+            ${I18nService.t('inspector.polylineFinishOpen')}
           </button>
           <button class="prop-input" id="btn-close-polyline" ${!canClose ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : 'style="cursor:pointer; background:var(--accent); color:#ffffff; text-align:center;"'}>
-            ${isEs ? 'Cerrar Polígono (Z / Clic en Inicio)' : 'Close Polygon (Z / Click on Start)'}
+            ${I18nService.t('inspector.polylineClosePolygon')}
           </button>
         </div>
       </div>
 
       <div class="panel-section">
-        <div class="panel-title">${isEs ? 'Instrucciones de Trazado' : 'Drawing Instructions'}</div>
+        <div class="panel-title">${I18nService.t('inspector.polylineInstructionsTitle')}</div>
         <div style="font-size:11px; color:var(--text-muted); line-height:1.6;">
-          ${isEs ? '• <b>Clic</b>: Colocar vértice recto puro (L)<br/>• <b>Clic en inicio</b>: Cerrar figura (Z)<br/>• <b>Enter / Doble Clic</b>: Finalizar trazo abierto<br/>• <b>Escape</b>: Cancelar trazado en curso<br/>• <b>Snap Activo</b>: Imantado a Grilla, Guías y Nodos' : '• <b>Click</b>: Place straight vertex (L)<br/>• <b>Click on start</b>: Close shape (Z)<br/>• <b>Enter / Double Click</b>: Finish open path<br/>• <b>Escape</b>: Cancel current drawing<br/>• <b>Active Snapping</b>: Snaps to Grid, Guides, and Nodes'}
+          ${I18nService.t('inspector.polylineInstructionsBody')}
         </div>
       </div>
     `;

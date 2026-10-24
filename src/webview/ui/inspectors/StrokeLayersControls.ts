@@ -52,18 +52,18 @@ export class StrokeLayersControls {
 
                 <div style="display:flex; gap:4px; align-items:center;">
                   <!-- Color -->
-                  <button type="button" class="color-swatch input-layer-color" data-layer-id="${l.id}" style="width:24px; height:24px; background-color: ${l.stroke.startsWith('#') ? l.stroke : '#000000'};" title="Color del trazo secundario"></button>
+                  <button type="button" class="color-swatch input-layer-color" data-layer-id="${l.id}" style="width:24px; height:24px; background-color: ${l.stroke.startsWith('#') ? l.stroke : '#000000'};" title="${I18nService.t('inspector.strokeSecondaryColorTooltip')}"></button>
                   <input type="text" class="prop-input input-layer-hex" data-layer-id="${l.id}" value="${l.stroke}" style="flex:1; font-size:10.5px;" />
                   <!-- Width -->
                   <div style="display:flex; align-items:center; gap:2px; width:60px;">
-                    <input type="number" class="prop-input input-layer-width" data-layer-id="${l.id}" value="${l.strokeWidth}" min="0.5" step="0.5" style="width:45px; font-size:10.5px;" title="Grosor en px" />
+                    <input type="number" class="prop-input input-layer-width" data-layer-id="${l.id}" value="${l.strokeWidth}" min="0.5" step="0.5" style="width:45px; font-size:10.5px;" title="${I18nService.t('inspector.strokeSecondaryWidthTooltip')}" />
                     <span style="font-size:10px; color:var(--text-muted);">px</span>
                   </div>
                 </div>
 
                 <div style="display:flex; gap:4px; align-items:center;">
-                  <span style="font-size:10px; color:var(--text-muted); width:45px;">Guiones:</span>
-                  <input type="text" class="prop-input input-layer-dash" data-layer-id="${l.id}" value="${l.strokeDash || ''}" placeholder="e.g. 4 2 (opcional)" style="flex:1; font-size:10.5px;" />
+                  <span style="font-size:10px; color:var(--text-muted); width:45px;">${I18nService.t('inspector.strokeDashesLabel')}</span>
+                  <input type="text" class="prop-input input-layer-dash" data-layer-id="${l.id}" value="${l.strokeDash || ''}" placeholder="${I18nService.t('inspector.strokeDashPlaceholder')}" style="flex:1; font-size:10.5px;" />
                 </div>
               </div>
             `).join('')}
