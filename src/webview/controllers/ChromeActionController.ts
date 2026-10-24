@@ -13,6 +13,7 @@ import { CanvasView } from '../engine/canvas/CanvasView.js';
 import { AppLayoutManager } from '../ui/AppLayoutManager.js';
 import { VectorModel } from '../engine/VectorModel.js';
 import { TransformNumericModal } from '../ui/TransformNumericModal.js';
+import { ExportModal } from '../ui/ExportModal.js';
 
 export interface ChromeActionContext {
   model: VectorModel;
@@ -143,6 +144,9 @@ export class ChromeActionController {
         if (type === 'angular') this.ctx.canvasMgr.snapAngular = !this.ctx.canvasMgr.snapAngular;
         this.ctx.getLayoutMgr()?.topBar.update();
         this.ctx.hostSyncService().syncMetadataToHost();
+      },
+      onExportSvg: () => {
+        ExportModal.show(this.ctx.model, this.ctx.selectionTool, 'svg');
       },
     };
   }

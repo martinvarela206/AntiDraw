@@ -2,7 +2,7 @@
   "name": "antidraw",
   "displayName": "%antidraw.displayName%",
   "description": "%antidraw.description%",
-  "version": "0.101.1",
+  "version": "0.102.0",
   "icon": "icon.png",
   "publisher": "martinvarela206",
   "author": {
@@ -60,11 +60,22 @@
     "Other"
   ],
   "activationEvents": [
+    "onCustomEditor:antidraw.projectEditor",
     "onCustomEditor:antidraw.svgEditor"
   ],
   "main": "./dist/extension.js",
   "contributes": {
     "customEditors": [
+      {
+        "viewType": "antidraw.projectEditor",
+        "displayName": "%antidraw.projectEditor.displayName%",
+        "selector": [
+          {
+            "filenamePattern": "*.adrw"
+          }
+        ],
+        "priority": "default"
+      },
       {
         "viewType": "antidraw.svgEditor",
         "displayName": "%antidraw.editor.displayName%",
@@ -94,7 +105,7 @@
     "version:bump": "node scripts/sync-version.js",
     "package": "pnpm run build && vsce package --no-dependencies",
     "publish:marketplace": "vsce publish --no-dependencies",
-    "publish:openvsx": "npx -y ovsx publish antidraw-0.101.1.vsix"
+    "publish:openvsx": "npx -y ovsx publish antidraw-0.102.0.vsix"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

@@ -2,5 +2,6 @@
   "antidraw.displayName": "AntiDraw - Éditeur vectoriel SVG",
   "antidraw.description": "Éditeur graphique vectoriel intégré pour fichiers SVG inspiré de CorelDraw et Figma.",
   "antidraw.editor.displayName": "Éditeur SVG AntiDraw",
+  "antidraw.projectEditor.displayName": "Éditeur de Projets AntiDraw (.adrw)",
   "antidraw.command.openEditor": "Ouvrir avec l'Éditeur SVG AntiDraw"
 }

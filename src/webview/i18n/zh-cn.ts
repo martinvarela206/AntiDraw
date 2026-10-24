@@ -59,6 +59,7 @@ export const zhCn: Translations = {
     snapEdge: '对齐到轮廓与边缘',
     snapViewBox: '对齐到画布边界',
     snapAngular: '角度吸附 (15° 步长约束)',
+    exportSvg: '导出 SVG (从 .adrw 提取)',
   },
 
   toolbar: {

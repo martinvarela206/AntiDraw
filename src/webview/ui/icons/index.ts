@@ -31,6 +31,7 @@ import DiceSvg from '../../assets/icons/dice.svg';
 import EllipseToolSvg from '../../assets/icons/ellipse_tool.svg';
 import EraserToolSvg from '../../assets/icons/eraser_tool.svg';
 import ExcludeSvg from '../../assets/icons/exclude.svg';
+import ExportSvg from '../../assets/icons/export.svg';
 import EyeSvg from '../../assets/icons/eye.svg';
 import EyeOffSvg from '../../assets/icons/eye_off.svg';
 import FlipHorizontalSvg from '../../assets/icons/flip_horizontal.svg';
@@ -111,6 +112,7 @@ export const ICONS = {
   ellipseTool: EllipseToolSvg,
   eraserTool: EraserToolSvg,
   exclude: ExcludeSvg,
+  export: ExportSvg,
   eye: EyeSvg,
   eyeOff: EyeOffSvg,
   flipHorizontal: FlipHorizontalSvg,

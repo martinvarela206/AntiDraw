@@ -9,6 +9,7 @@ import {
   ExportResult,
 } from '../engine/export/AssetExporter.js';
 import { I18nService } from '../i18n/index.js';
+import { VsCodeBridge } from '../bridge/VsCodeBridge.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Interactive Multi-Scale Asset Export Modal (ExportModal)
@@ -22,7 +23,8 @@ export class ExportModal {
 
   public static show(
     model: VectorModel,
-    selectionTool?: SelectionTool
+    selectionTool?: SelectionTool,
+    initialFormat: ExportFormat = 'png'
   ): Promise<ExportResult | null> {
     return new Promise((resolve) => {
       if (this.activeModal) {
@@ -32,7 +34,7 @@ export class ExportModal {
 
       const hasSelection = !!(selectionTool && selectionTool.selectedElementIds.size > 0);
       let currentTarget: ExportTarget = hasSelection ? 'selection' : 'artboard';
-      let currentFormat: ExportFormat = 'png';
+      let currentFormat: ExportFormat = initialFormat;
       let currentScale: ExportScale = 2;
 
       const backdrop = document.createElement('div');
@@ -84,9 +86,9 @@ export class ExportModal {
       formatGroup.innerHTML = `
         <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 6px;">${I18nService.t('exportModal.format')}</label>
         <div style="display: flex; gap: 8px;">
-          <button type="button" class="btn active" id="ad-exp-fmt-png" style="flex: 1; padding: 6px 10px; font-size: 12px;">${I18nService.t('exportModal.pngAlpha')}</button>
-          <button type="button" class="btn" id="ad-exp-fmt-webp" style="flex: 1; padding: 6px 10px; font-size: 12px;">${I18nService.t('exportModal.webp')}</button>
-          <button type="button" class="btn" id="ad-exp-fmt-svg" style="flex: 1; padding: 6px 10px; font-size: 12px;">${I18nService.t('exportModal.svgVector')}</button>
+          <button type="button" class="btn ${currentFormat === 'png' ? 'active' : ''}" id="ad-exp-fmt-png" style="flex: 1; padding: 6px 10px; font-size: 12px;">${I18nService.t('exportModal.pngAlpha')}</button>
+          <button type="button" class="btn ${currentFormat === 'webp' ? 'active' : ''}" id="ad-exp-fmt-webp" style="flex: 1; padding: 6px 10px; font-size: 12px;">${I18nService.t('exportModal.webp')}</button>
+          <button type="button" class="btn ${currentFormat === 'svg' ? 'active' : ''}" id="ad-exp-fmt-svg" style="flex: 1; padding: 6px 10px; font-size: 12px;">${I18nService.t('exportModal.svgVector')}</button>
         </div>
       `;
       formEl.appendChild(formatGroup);
@@ -196,7 +198,7 @@ export class ExportModal {
         currentTarget = id === 'ad-exp-target-sel' ? 'selection' : 'artboard';
       });
 
-      bindBtnGroup(['ad-exp-fmt-png', 'ad-exp-fmt-webp', 'ad-exp-fmt-svg'], 'ad-exp-fmt-png', (id) => {
+      bindBtnGroup(['ad-exp-fmt-png', 'ad-exp-fmt-webp', 'ad-exp-fmt-svg'], `ad-exp-fmt-${currentFormat}`, (id) => {
         if (id === 'ad-exp-fmt-png') currentFormat = 'png';
         else if (id === 'ad-exp-fmt-webp') currentFormat = 'webp';
         else currentFormat = 'svg';
@@ -241,6 +243,13 @@ export class ExportModal {
         const selIds = selectionTool ? selectionTool.selectedElementIds : undefined;
         const result = await AssetExporter.exportAsset(model, config, selIds);
         AssetExporter.triggerDownload(result);
+
+        if (config.format === 'svg') {
+          try {
+            const svgContent = await result.blob.text();
+            VsCodeBridge.getInstance().exportFile(result.filename, svgContent, 'svg');
+          } catch (_e) {}
+        }
 
         cleanup();
         resolve(result);

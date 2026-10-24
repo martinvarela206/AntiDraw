@@ -15,6 +15,7 @@ export interface TopBarCallbacks {
   onToggleGuides: () => void;
   onToggleLockGuides?: () => void;
   onToggleSnap: (type: 'pixel' | 'grid' | 'guide' | 'vertex' | 'nodes' | 'edges' | 'viewbox' | 'angular') => void;
+  onExportSvg?: () => void;
 }
 
 export class TopBar {
@@ -102,6 +103,13 @@ export class TopBar {
         <button class="btn-icon ${this.canvasMgr.snapToEdges ? 'active' : ''}" id="btn-snap-edges" title="${t('topbar.snapEdge')}">${ToolIcons.snapEdge}</button>
         <button class="btn-icon ${this.canvasMgr.snapAngular ? 'active' : ''}" id="btn-snap-angular" title="${t('topbar.snapAngular')}">${ToolIcons.snapAngular}</button>
       </div>
+
+      <div class="top-bar-divider"></div>
+
+      <!-- Export SVG Action -->
+      <div class="top-bar-group">
+        <button class="btn-icon" id="btn-export-svg" title="${t('topbar.exportSvg')}">${ToolIcons.export}</button>
+      </div>
     `;
 
     // Bind event listeners
@@ -135,6 +143,7 @@ export class TopBar {
     this.bindClick('btn-snap-nodes', () => this.callbacks.onToggleSnap('nodes'));
     this.bindClick('btn-snap-edges', () => this.callbacks.onToggleSnap('edges'));
     this.bindClick('btn-snap-angular', () => this.callbacks.onToggleSnap('angular'));
+    this.bindClick('btn-export-svg', () => this.callbacks.onExportSvg?.());
   }
 
   private bindClick(id: string, fn: () => void): void {

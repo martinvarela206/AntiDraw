@@ -61,6 +61,7 @@ export interface Translations {
     snapEdge: string;
     snapViewBox: string;
     snapAngular: string;
+    exportSvg: string;
   };
 
   // Toolbar

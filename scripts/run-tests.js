@@ -74,8 +74,9 @@ async function main() {
   const ok41 = await runSuite(path.join(__dirname, 'test-shape-builder-isolation-undo.ts'), 'runShapeBuilderIsolationUndoTests');
   const ok42 = await runSuite(path.join(__dirname, 'test-eraser-tool.ts'), 'runEraserToolTests');
   const ok43 = await runSuite(path.join(__dirname, 'test-scissor-knife-tool.ts'), 'runScissorKnifeToolTests');
+  const ok44 = await runSuite(path.join(__dirname, 'test-adrw-container.ts'), 'runAdrwContainerTests');
 
-  const results = [ok1, ok2, ok3, ok4, ok5, ok6, ok7, ok8, ok9, ok10, ok11, ok12, ok13, ok14, ok15, ok16, ok17, ok18, ok19, ok20, ok21, ok22, ok23, ok24, ok25, ok26, ok27, ok28, ok29, ok30, ok31, ok32, ok33, ok34, ok35, ok36, ok37, ok38, ok39, ok40, ok41, ok42, ok43];
+  const results = [ok1, ok2, ok3, ok4, ok5, ok6, ok7, ok8, ok9, ok10, ok11, ok12, ok13, ok14, ok15, ok16, ok17, ok18, ok19, ok20, ok21, ok22, ok23, ok24, ok25, ok26, ok27, ok28, ok29, ok30, ok31, ok32, ok33, ok34, ok35, ok36, ok37, ok38, ok39, ok40, ok41, ok42, ok43, ok44];
   results.forEach((r, i) => {
     if (!r) console.error(`❌ Suite ok${i + 1} returned false!`);
   });

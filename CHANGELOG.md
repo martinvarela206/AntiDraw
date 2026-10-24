@@ -3,6 +3,23 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.102.0] - 2026-10-24
+
+### 🚀 Added
+- **Native Project Container (`.adrw`) & Infinite Canvas Artboards**:
+  - **`AdrwProjectService`**: Engineered native project container format (`.adrw`) bundling infinite canvas viewport configurations, multi-artboard definitions (`ArtboardDef`), companion metadata, and W3C SVG vector definitions into an atomic JSON project architecture.
+  - **Inkscape Multi-Page Ingestion (`<inkscape:page>`)**: Automatically parses Inkscape multi-page markup (`<inkscape:page x="..." y="..." width="..." height="..." inkscape:label="..."/>`) on SVG load, seamlessly mapping pages into native Artboards while maintaining exact coordinates, dimensions, and custom labels.
+  - **Lossless W3C Multi-Artboard SVG Extraction**: Integrated pure, standards-compliant W3C SVG extraction (`extractArtboardSvg`, `extractAllArtboards`) stripping proprietary `data-*` attributes and editor metadata, generating production-ready vector graphics with tailored viewBox dimensions for each artboard.
+  - **TopBar SVG Export Action**: Added dedicated `#btn-export-svg` action button in the Top toolbar enabling instant extraction and export of clean SVGs directly from the active project container.
+  - **Non-Destructive SVG Ingestion & Dual Custom Editor Integration**:
+    - Registered `antidraw.projectEditor` (`*.adrw`) with `priority: "default"` for instant one-click opening.
+    - Maintained `antidraw.svgEditor` (`*.svg`) with `priority: "option"` via Right-Click -> "Open With".
+    - When an `.svg` is opened, AntiDraw automatically generates/links a companion `.adrw` project container; all canvas edits are saved exclusively into the `.adrw` container, preserving the original `.svg` untouched from destructive writes.
+  - **7-Language Localization Parity**: Synchronized `topbar.exportSvg` and `package.nls.*.json` project editor titles across English, Spanish, Simplified Chinese, German, French, Russian, and Japanese.
+  - **Automated Test Suite (`test-adrw-container.ts`)**: Added Suite 44 validating container instantiation, Inkscape multi-page ingestion, auto-healing deserialization, and multi-artboard W3C SVG extraction (100% pass across all 44 test suites).
+
+---
+
 ## [0.101.1] - 2026-10-24
 
 ### 🎨 Fixed & Improved

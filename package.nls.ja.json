@@ -2,5 +2,6 @@
   "antidraw.displayName": "AntiDraw - SVG ベクターグラフィックエディタ",
   "antidraw.description": "CorelDraw と Figma に着想を得た、VS Code 統合型 SVG ベクターエディタ。",
   "antidraw.editor.displayName": "AntiDraw SVG エディタ",
+  "antidraw.projectEditor.displayName": "AntiDraw プロジェクトエディター (.adrw)",
   "antidraw.command.openEditor": "AntiDraw SVG エディタで開く"
 }

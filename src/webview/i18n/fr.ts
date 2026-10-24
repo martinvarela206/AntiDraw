@@ -57,7 +57,8 @@ export const fr: Translations = {
     "snapNode": "Aligner sur les nœuds et sommets",
     "snapEdge": "Aligner sur les contours et arêtes",
     "snapViewBox": "Aligner sur les limites ViewBox",
-    "snapAngular": "Contrainte angulaire (Pas de 15°)"
+    "snapAngular": "Contrainte angulaire (Pas de 15°)",
+    "exportSvg": "Exporter SVG (extraire du .adrw)",
   },
   "toolbar": {
     "select": "Outil Sélection (V)",

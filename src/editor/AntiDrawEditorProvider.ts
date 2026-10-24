@@ -1,11 +1,13 @@
 import * as vscode from 'vscode';
+import { AdrwProjectService, AdrwContainer } from '../webview/engine/project/AdrwContainer.js';
 
 export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
   public static readonly viewType = 'antidraw.svgEditor';
+  public static readonly projectEditorViewType = 'antidraw.projectEditor';
 
   public static register(context: vscode.ExtensionContext): vscode.Disposable {
     const provider = new AntiDrawEditorProvider(context);
-    const providerRegistration = vscode.window.registerCustomEditorProvider(
+    const svgRegistration = vscode.window.registerCustomEditorProvider(
       AntiDrawEditorProvider.viewType,
       provider,
       {
@@ -15,7 +17,17 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
         supportsMultipleEditorsPerDocument: false,
       }
     );
-    return providerRegistration;
+    const projectRegistration = vscode.window.registerCustomEditorProvider(
+      AntiDrawEditorProvider.projectEditorViewType,
+      provider,
+      {
+        webviewOptions: {
+          retainContextWhenHidden: true,
+        },
+        supportsMultipleEditorsPerDocument: false,
+      }
+    );
+    return vscode.Disposable.from(svgRegistration, projectRegistration);
   }
 
   constructor(private readonly context: vscode.ExtensionContext) {}
@@ -26,6 +38,12 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
     _token: vscode.CancellationToken
   ): Promise<void> {
     const docDir = vscode.Uri.joinPath(document.uri, '..');
+    const isAdrwDocument = document.uri.path.toLowerCase().endsWith('.adrw');
+    const baseFileName = document.uri.path.split('/').pop() || (isAdrwDocument ? 'untitled.adrw' : 'untitled.svg');
+    const adrwUri = isAdrwDocument
+      ? document.uri
+      : document.uri.with({ path: document.uri.path.replace(/\.svg$/i, '.adrw') });
+
     webviewPanel.webview.options = {
       enableScripts: true,
       localResourceRoots: [
@@ -40,6 +58,7 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
     webviewPanel.webview.html = this.getHtmlForWebview(webviewPanel.webview, docDir);
 
     let pendingWebviewEdits = 0;
+    let container: AdrwContainer;
 
     // Helper to get sidecar JSON URI for an SVG document
     const getSidecarUri = (svgUri: vscode.Uri): vscode.Uri => {
@@ -58,37 +77,45 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
       }
     };
 
-    const writeSidecarMetadata = async (metadata: any): Promise<void> => {
+    // Initialize or load container
+    if (isAdrwDocument) {
+      container = AdrwProjectService.parseContainer(document.getText(), baseFileName);
+    } else {
+      // SVG opened: check if companion .adrw already exists
       try {
-        const sidecarUri = getSidecarUri(document.uri);
-        const jsonString = JSON.stringify(metadata, null, 2);
-        const data = new TextEncoder().encode(jsonString);
-        await vscode.workspace.fs.writeFile(sidecarUri, data);
-      } catch (err: any) {
-        vscode.window.showErrorMessage(`Failed to save metadata: ${err?.message || err}`);
+        const adrwBytes = await vscode.workspace.fs.readFile(adrwUri);
+        const adrwText = new TextDecoder('utf-8').decode(adrwBytes);
+        container = AdrwProjectService.parseContainer(adrwText, baseFileName);
+      } catch (_e) {
+        // Generate new .adrw container from SVG
+        const sidecarMeta = await readSidecarMetadata();
+        container = AdrwProjectService.createFromSvg(document.getText(), baseFileName, sidecarMeta);
+        const serialized = AdrwProjectService.serializeContainer(container);
+        await vscode.workspace.fs.writeFile(adrwUri, new TextEncoder().encode(serialized));
+        vscode.window.showInformationMessage(
+          `[AntiDraw] Contenedor .adrw generado (${adrwUri.path.split('/').pop()}). Los cambios se guardan exclusivamente en el contenedor .adrw; el SVG original permanece protegido.`
+        );
       }
-    };
+    }
+
+    let lastSavedText: string = isAdrwDocument ? document.getText() : AdrwProjectService.serializeContainer(container);
 
     // Send initial content and metadata when webview notifies it is ready or on load
     const updateWebview = async () => {
       if (pendingWebviewEdits === 0) {
-        const metadata = await readSidecarMetadata();
-        const baseFileName = document.uri.path.split('/').pop() || 'untitled.svg';
         const docDirWebviewUri = webviewPanel.webview.asWebviewUri(docDir).toString().replace(/\/+$/, '');
         webviewPanel.webview.postMessage({
           type: 'loadSvg',
-          text: document.getText(),
-          metadata: metadata || null,
+          text: container.svgContent,
+          metadata: container.companionMetadata || null,
           locale: vscode.env.language,
-          documentUri: document.uri.toString(),
+          documentUri: isAdrwDocument ? document.uri.toString() : adrwUri.toString(),
           documentDirUri: docDir.toString(),
           documentDirWebviewUri: docDirWebviewUri,
           fileName: baseFileName,
         });
       }
     };
-
-    let lastSavedSvgText: string = document.getText();
 
     // Receive messages from the webview
     webviewPanel.webview.onDidReceiveMessage(async (message) => {
@@ -98,7 +125,7 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
           break;
 
         case 'updateDocument': {
-          if (message.text !== undefined && message.text !== document.getText()) {
+          if (message.text !== undefined) {
             if (
               typeof message.text !== 'string' ||
               message.text.trim().length < 20 ||
@@ -109,23 +136,68 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
               break;
             }
 
-            pendingWebviewEdits++;
-            lastSavedSvgText = message.text;
-            const edit = new vscode.WorkspaceEdit();
-            const fullRange = new vscode.Range(
-              document.positionAt(0),
-              document.positionAt(document.getText().length)
-            );
-            edit.replace(document.uri, fullRange, message.text);
-            await vscode.workspace.applyEdit(edit);
-            setTimeout(() => { pendingWebviewEdits = Math.max(0, pendingWebviewEdits - 1); }, 150);
+            container.svgContent = message.text;
+            container.metadata.modified = Date.now();
+            const serialized = AdrwProjectService.serializeContainer(container);
+
+            if (isAdrwDocument) {
+              if (serialized !== document.getText()) {
+                pendingWebviewEdits++;
+                lastSavedText = serialized;
+                const edit = new vscode.WorkspaceEdit();
+                const fullRange = new vscode.Range(
+                  document.positionAt(0),
+                  document.positionAt(document.getText().length)
+                );
+                edit.replace(document.uri, fullRange, serialized);
+                await vscode.workspace.applyEdit(edit);
+                setTimeout(() => { pendingWebviewEdits = Math.max(0, pendingWebviewEdits - 1); }, 150);
+              }
+            } else {
+              // Direct writes to companion .adrw, SVG is untouched
+              lastSavedText = serialized;
+              await vscode.workspace.fs.writeFile(adrwUri, new TextEncoder().encode(serialized));
+            }
           }
           break;
         }
 
         case 'updateMetadata': {
           if (message.metadata !== undefined) {
-            await writeSidecarMetadata(message.metadata);
+            container.companionMetadata = message.metadata;
+            container.metadata.modified = Date.now();
+            const serialized = AdrwProjectService.serializeContainer(container);
+
+            if (isAdrwDocument) {
+              if (serialized !== document.getText()) {
+                pendingWebviewEdits++;
+                lastSavedText = serialized;
+                const edit = new vscode.WorkspaceEdit();
+                const fullRange = new vscode.Range(
+                  document.positionAt(0),
+                  document.positionAt(document.getText().length)
+                );
+                edit.replace(document.uri, fullRange, serialized);
+                await vscode.workspace.applyEdit(edit);
+                setTimeout(() => { pendingWebviewEdits = Math.max(0, pendingWebviewEdits - 1); }, 150);
+              }
+            } else {
+              lastSavedText = serialized;
+              await vscode.workspace.fs.writeFile(adrwUri, new TextEncoder().encode(serialized));
+            }
+          }
+          break;
+        }
+
+        case 'exportFile': {
+          try {
+            const { filename, content } = message;
+            const targetFileName = filename || (baseFileName.replace(/\.(adrw|svg)$/i, '') + '.svg');
+            const targetUri = vscode.Uri.joinPath(docDir, targetFileName);
+            await vscode.workspace.fs.writeFile(targetUri, new TextEncoder().encode(content));
+            vscode.window.showInformationMessage(`[AntiDraw] Archivo SVG exportado con éxito: ${targetFileName}`);
+          } catch (err: any) {
+            vscode.window.showErrorMessage(`[AntiDraw] Error al exportar archivo SVG: ${err?.message || err}`);
           }
           break;
         }
@@ -275,8 +347,11 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
     const changeDocumentSubscription = vscode.workspace.onDidChangeTextDocument(
       (e) => {
         if (e.document.uri.toString() === document.uri.toString()) {
-          if (pendingWebviewEdits === 0 && e.document.getText() !== lastSavedSvgText) {
-            lastSavedSvgText = e.document.getText();
+          if (pendingWebviewEdits === 0 && e.document.getText() !== lastSavedText) {
+            lastSavedText = e.document.getText();
+            if (isAdrwDocument) {
+              container = AdrwProjectService.parseContainer(lastSavedText, baseFileName);
+            }
             updateWebview();
           }
         }

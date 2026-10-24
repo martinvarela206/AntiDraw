@@ -57,7 +57,8 @@ export const ru: Translations = {
     "snapNode": "Привязка к узлам и вершинам",
     "snapEdge": "Привязка к контурам и ребрам",
     "snapViewBox": "Привязка к границам холста ViewBox",
-    "snapAngular": "Угловая фиксация (шаг 15°)"
+    "snapAngular": "Угловая фиксация (шаг 15°)",
+    "exportSvg": "Экспорт SVG (извлечь из .adrw)",
   },
   "toolbar": {
     "select": "Инструмент выбора (V)",

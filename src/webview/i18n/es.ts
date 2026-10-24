@@ -59,6 +59,7 @@ export const es: Translations = {
     snapEdge: 'Ajuste a Contornos y Aristas',
     snapViewBox: 'Ajuste a Límites de ViewBox',
     snapAngular: 'Ajuste Angular (Constrain 15°)',
+    exportSvg: 'Exportar SVG (extraer de .adrw)',
   },
 
   toolbar: {

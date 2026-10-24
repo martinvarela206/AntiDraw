@@ -57,7 +57,8 @@ export const de: Translations = {
     "snapNode": "An Knoten & Eckpunkten einrasten",
     "snapEdge": "An Konturen & Kanten einrasten",
     "snapViewBox": "An ViewBox-Grenzen einrasten",
-    "snapAngular": "Winkeleinrastung (15°-Schritte)"
+    "snapAngular": "Winkeleinrastung (15°-Schritte)",
+    "exportSvg": "SVG exportieren (aus .adrw extrahieren)",
   },
   "toolbar": {
     "select": "Auswahlwerkzeug (V)",

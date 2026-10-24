@@ -57,7 +57,8 @@ export const ja: Translations = {
     "snapNode": "ノードと頂点にスナップ",
     "snapEdge": "輪郭とエッジにスナップ",
     "snapViewBox": "ViewBox境界にスナップ",
-    "snapAngular": "角度スナップ (15°刻み)"
+    "snapAngular": "角度スナップ (15°刻み)",
+    "exportSvg": "SVGエクスポート (.adrwから抽出)",
   },
   "toolbar": {
     "select": "選択ツール (V)",

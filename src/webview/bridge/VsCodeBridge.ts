@@ -276,6 +276,15 @@ export class VsCodeBridge {
     });
   }
 
+  public exportFile(filename: string, content: string, format: string): void {
+    this.vscodeApi.postMessage({
+      type: 'exportFile',
+      filename,
+      content,
+      format,
+    });
+  }
+
   public showInfo(message: string): void {
     this.vscodeApi.postMessage({ type: 'showInfo', message });
   }

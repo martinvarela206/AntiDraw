@@ -9,13 +9,14 @@ export function activate(context: vscode.ExtensionContext) {
     (uri?: vscode.Uri) => {
       const targetUri = uri || vscode.window.activeTextEditor?.document.uri;
       if (targetUri) {
+        const isAdrw = targetUri.path.toLowerCase().endsWith('.adrw');
         vscode.commands.executeCommand(
           'vscode.openWith',
           targetUri,
-          AntiDrawEditorProvider.viewType
+          isAdrw ? AntiDrawEditorProvider.projectEditorViewType : AntiDrawEditorProvider.viewType
         );
       } else {
-        vscode.window.showErrorMessage('No SVG file selected to open with AntiDraw Editor.');
+        vscode.window.showErrorMessage('No SVG or .adrw file selected to open with AntiDraw Editor.');
       }
     }
   );
