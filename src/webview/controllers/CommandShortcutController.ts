@@ -100,6 +100,7 @@ export class CommandShortcutController {
       penToolHandler: ctx.tools.penToolHandler,
       polylineToolHandler: ctx.tools.polylineToolHandler,
       eraserToolHandler: ctx.tools.eraserToolHandler,
+      scissorKnifeToolHandler: ctx.tools.scissorKnifeToolHandler,
       isDragging: () => ctx.tools.session.isDragging,
       activeHandle: () => ctx.tools.session.activeHandle,
       copySelection: () => ctx.clipboardService.copy(),

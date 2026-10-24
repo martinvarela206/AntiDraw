@@ -16,7 +16,7 @@
   <a href="https://open-vsx.org/extension/martinvarela206/antidraw"><img src="https://img.shields.io/badge/Open--VSX-Registry-purple?style=flat-square" alt="Open VSX Registry"></a>
   <a href="https://github.com/martinvarela206/AntiDraw"><img src="https://img.shields.io/badge/GitHub-Repository-181717?style=flat-square&logo=github" alt="GitHub Repository"></a>
   <a href="https://github.com/martinvarela206/AntiDraw/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-Source--Available-blue?style=flat-square" alt="Source-Available License"></a>
-  <a href="https://github.com/martinvarela206/AntiDraw"><img src="https://img.shields.io/badge/Status-Beta%20v0.100.0-orange?style=flat-square" alt="Status"></a>
+  <a href="https://github.com/martinvarela206/AntiDraw"><img src="https://img.shields.io/badge/Status-Beta%20v0.101.0-orange?style=flat-square" alt="Status"></a>
 </p>
 
 <p align="center">
@@ -40,7 +40,7 @@ Egal ob Sie AntiDraw über GitHub, den Visual Studio Code Marketplace oder Open 
 ---
 
 > [!NOTE]
-> **Projektstatus: Öffentliche Beta (v0.100.0)**  
+> **Projektstatus: Öffentliche Beta (v0.101.0)**  
 > AntiDraw befindet sich in aktiver, kontinuierlicher Weiterentwicklung. Während Vektor-Transformationen, Bézier-Kurven, Einrasten und boolesche Topologie-Werkzeuge stabil funktionieren, können gelegentlich Randfälle auftreten.  
 > Fehler gefunden oder Funktionswunsch? Bitte [eröffnen Sie ein GitHub Issue](https://github.com/martinvarela206/AntiDraw/issues) – Ihr Feedback gestaltet die kommenden Versionen maßgeblich mit!
 

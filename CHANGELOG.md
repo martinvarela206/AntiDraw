@@ -3,6 +3,21 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.101.0] - 2026-10-24
+
+### 🚀 Added
+- **Unified Vector Scissors & Knife Tool (`scissors` / <kbd>C</kbd>, <kbd>K</kbd>)**:
+  - **ScissorKnifeEngine**: Implemented analytical straight bisecting cuts and continuous freeform curve carving with zero-gap planar half-space partitioning (`polygonClipping.intersection` across complementary bounding polygons), preserving 100% geometric area and exact seam coordinates.
+  - **Mode 1 (Scissors / 2 Clicks)**: Allows users to click on an initial edge/node to project an elastic guideline, then click on a second boundary or point to sever closed vectors cleanly in two, or split open paths at intersection nodes.
+  - **Mode 2 (Knife / Freehand Drag)**: Real-time freeform carving through shapes with live high-contrast trail rendering and automatic shape partitioning upon gesture release.
+  - **Curve Smoothing (Douglas-Peucker & Schneider Bézier Fitting)**: Integrated curve smoothing slider (0% to 100%) in `ScissorInspector` to eliminate digitizer noise and reduce node counts on freehand cuts.
+  - **Closed-Loop Cookie-Cutter Carving**: Drawing a closed loop inside a shape extracts an interior cutout piece while preserving the outer frame.
+  - **Dedicated Scissor Inspector (`ScissorInspector.ts`)**: Real-time mode toggle (`Auto`, `2 Clicks`, `Drag`), smoothing slider with synced numeric input, and interactive shortcut hints.
+  - **7-Language Localization Symmetry**: Complete `scissorInspector` translations across English, Spanish, Simplified Chinese, German, French, Russian, and Japanese.
+  - **Automated Test Suite (`test-scissor-knife-tool.ts`)**: 6 comprehensive test suites covering Douglas-Peucker simplification, planar bisecting cuts, curved slicing, open-path splitting, cookie-cutter loops, and tool handler lifecycle (all 43 test suites passing at 100%).
+
+---
+
 ## [0.100.0] - 2026-10-24
 
 ### 🚀 Added

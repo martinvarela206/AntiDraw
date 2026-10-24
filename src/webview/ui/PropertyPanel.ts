@@ -55,6 +55,7 @@ export interface PropertyPanelCallbacks {
   onUngroup?: () => void;
   syncMetadataToHost?: () => void;
   getEraserHandler?: () => import('../tools/EraserToolHandler.js').EraserToolHandler | undefined;
+  getScissorHandler?: () => import('../tools/ScissorKnifeToolHandler.js').ScissorKnifeToolHandler | undefined;
 }
 
 export { ViewBoxPreset, VIEWBOX_PRESETS } from './inspectors/CanvasInspector.js';
@@ -70,6 +71,7 @@ import { NodeInspector } from './inspectors/NodeInspector.js';
 import { MultiSelectionInspector } from './inspectors/MultiSelectionInspector.js';
 import { GroupInspector } from './inspectors/GroupInspector.js';
 import { EraserInspector } from './inspectors/EraserInspector.js';
+import { ScissorInspector } from './inspectors/ScissorInspector.js';
 import { SwatchPaletteInspector } from './inspectors/SwatchPaletteInspector.js';
 import { StrokeInspector, StrokeInspectorProps } from './inspectors/StrokeInspector.js';
 import { QuickHelpInspector } from './inspectors/QuickHelpInspector.js';
@@ -109,7 +111,7 @@ export class PropertyPanel {
   private callbacks: PropertyPanelCallbacks;
 
   // Track which panel section is currently rendered to avoid full re-builds
-  public currentPanelMode: 'canvas' | 'element' | 'group' | 'node' | 'pen' | 'polyline' | 'multi' | 'ruler' | 'guide' | 'shape' | 'stroke' | 'eraser' | null = null;
+  public currentPanelMode: 'canvas' | 'element' | 'group' | 'node' | 'pen' | 'polyline' | 'multi' | 'ruler' | 'guide' | 'shape' | 'stroke' | 'eraser' | 'scissors' | null = null;
 
   constructor(
     container: HTMLElement,
@@ -368,6 +370,10 @@ export class PropertyPanel {
       this.updateCanvasStatusButton(false);
       this.currentPanelMode = 'eraser';
       this.renderEraserProperties();
+    } else if (this.activeTool === 'scissors') {
+      this.updateCanvasStatusButton(false);
+      this.currentPanelMode = 'scissors';
+      this.renderScissorProperties();
     } else {
       // 6. Base State: Canvas Properties ONLY IF explicitly activated
       if (this.currentPanelMode === 'canvas') {
@@ -547,6 +553,18 @@ export class PropertyPanel {
       });
     }
   }
+
+  // Render properties when scissor/knife tool is active
+  private renderScissorProperties(): void {
+    this.ensureContainers();
+    const handler = this.callbacks.getScissorHandler?.();
+    if (handler) {
+      ScissorInspector.render(this.inspectorContainer, handler, () => {
+        this.callbacks.onRenderOverlay?.();
+      });
+    }
+  }
+
 
 
   // Render properties when multiple elements are selected

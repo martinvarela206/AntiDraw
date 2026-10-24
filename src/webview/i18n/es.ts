@@ -675,5 +675,19 @@ export const es: Translations = {
     shortcutAlt: "Preservar trazo como nuevo vector",
     scopeHint: "Borra sobre la selección activa (o sobre todos los vectores si no hay selección).",
   },
+  scissorInspector: {
+    title: "Propiedades de Tijeras / Cuchilla",
+    mode: "Modo de Corte",
+    modeAuto: "Auto",
+    modeTwoClicks: "2 Clics",
+    modeFreehand: "Arrastre",
+    smoothing: "Suavizado",
+    shortcutsTitle: "Guía de Uso y Atajos",
+    mode1Hint: "Clic en borde inicial → Guía elástica → Clic en borde final para partir.",
+    mode2Hint: "Arrastre libre a través de la forma para cortar a mano alzada.",
+    cancelHint: "Cancelar corte en curso.",
+    scopeHint: "Corta la selección activa (o cualquier forma intersecada si no hay selección).",
+  },
 };
+
 

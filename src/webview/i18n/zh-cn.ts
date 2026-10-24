@@ -675,5 +675,19 @@ export const zhCn: Translations = {
     shortcutAlt: "保留轨迹为独立矢量",
     scopeHint: "仅对当前选中元素生效（若未选中任何元素则作用于所有矢量）。",
   },
+  scissorInspector: {
+    title: "剪刀 / 美工刀属性",
+    mode: "切割模式",
+    modeAuto: "自动",
+    modeTwoClicks: "两点切割",
+    modeFreehand: "自由划割",
+    smoothing: "曲线平滑度",
+    shortcutsTitle: "操作指引与快捷键",
+    mode1Hint: "点击起始边缘 → 弹性参考线 → 点击结束边缘完成切分。",
+    mode2Hint: "按住鼠标穿越形状进行手绘轨迹切割。",
+    cancelHint: "取消当前切割操作。",
+    scopeHint: "切割当前选中元素（未选中时切割穿越的所有形状）。",
+  },
 };
+
 

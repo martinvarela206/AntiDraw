@@ -629,5 +629,19 @@ export const fr: Translations = {
     "shortcutAlt": "Conserver le tracé comme nouveau vecteur",
     "scopeHint": "Efface sur la sélection active (ou sur tous les vecteurs si rien n'est sélectionné).",
   },
+  "scissorInspector": {
+    "title": "Propriétés Ciseaux & Cutter",
+    "mode": "Mode de découpe",
+    "modeAuto": "Auto",
+    "modeTwoClicks": "2 Clics",
+    "modeFreehand": "Tracé libre",
+    "smoothing": "Lissage",
+    "shortcutsTitle": "Guide & Raccourcis",
+    "mode1Hint": "Clic sur bord initial → Guide élastique → Clic sur bord final pour scinder.",
+    "mode2Hint": "Glisser à travers la forme pour couper le long de la courbe dessinée.",
+    "cancelHint": "Annuler la découpe en cours.",
+    "scopeHint": "Coupe la sélection active (ou toutes les formes traversées si rien n'est sélectionné).",
+  },
 };
+
 

@@ -675,5 +675,19 @@ export const en: Translations = {
     shortcutAlt: "Preserve swath as new vector",
     scopeHint: "Erases from active selection (or all vectors if nothing is selected).",
   },
+  scissorInspector: {
+    title: "Scissors / Knife Properties",
+    mode: "Cut Mode",
+    modeAuto: "Auto",
+    modeTwoClicks: "2 Clicks",
+    modeFreehand: "Drag",
+    smoothing: "Smoothing",
+    shortcutsTitle: "Usage Guide & Shortcuts",
+    mode1Hint: "Click starting edge → Elastic guide → Click ending edge to split.",
+    mode2Hint: "Freehand drag across the shape to cut along the drawn stroke.",
+    cancelHint: "Cancel active cut gesture.",
+    scopeHint: "Cuts active selection (or any intersected shapes if nothing is selected).",
+  },
 };
+
 

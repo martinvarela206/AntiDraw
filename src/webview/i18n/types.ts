@@ -699,5 +699,21 @@ export interface Translations {
     shortcutAlt: string;
     scopeHint: string;
   };
+
+  // Scissor Inspector
+  scissorInspector: {
+    title: string;
+    mode: string;
+    modeAuto: string;
+    modeTwoClicks: string;
+    modeFreehand: string;
+    smoothing: string;
+    shortcutsTitle: string;
+    mode1Hint: string;
+    mode2Hint: string;
+    cancelHint: string;
+    scopeHint: string;
+  };
 }
+
 

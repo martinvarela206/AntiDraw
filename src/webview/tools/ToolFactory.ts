@@ -19,6 +19,7 @@ import { NodeToolHandler } from './NodeToolHandler.js';
 import { SmartFillToolHandler } from './SmartFillToolHandler.js';
 import { ShapeBuilderToolHandler } from './ShapeBuilderToolHandler.js';
 import { EraserToolHandler } from './EraserToolHandler.js';
+import { ScissorKnifeToolHandler } from './ScissorKnifeToolHandler.js';
 import { Session } from '../engine/session/Session.js';
 import { ConfirmationModal } from '../ui/ConfirmationModal.js';
 
@@ -47,6 +48,7 @@ export interface ToolSuite {
   smartFillToolHandler: SmartFillToolHandler;
   shapeBuilderToolHandler: ShapeBuilderToolHandler;
   eraserToolHandler: EraserToolHandler;
+  scissorKnifeToolHandler: ScissorKnifeToolHandler;
   session: Session;
 }
 
@@ -152,6 +154,16 @@ export class ToolFactory {
       },
     });
 
+    const scissorKnifeToolHandler = new ScissorKnifeToolHandler(toolCtx, {
+      setCursor: (cursor) => ctx.getCanvasView()?.setCursor(cursor),
+      onConfigChanged: () => {
+        const propPanel = ctx.getPropertyPanel();
+        if (propPanel && ctx.getToolbar()?.activeTool === 'scissors') {
+          propPanel.update();
+        }
+      },
+    });
+
     const session = new Session(
       {
         select: selectToolHandler,
@@ -162,6 +174,7 @@ export class ToolFactory {
         smartFill: smartFillToolHandler,
         shapeBuilder: shapeBuilderToolHandler,
         eraser: eraserToolHandler,
+        scissorKnife: scissorKnifeToolHandler,
       },
       {
         onRender: () => ctx.getWorkspaceLayout().render(),
@@ -185,6 +198,7 @@ export class ToolFactory {
       smartFillToolHandler,
       shapeBuilderToolHandler,
       eraserToolHandler,
+      scissorKnifeToolHandler,
       session,
     };
   }

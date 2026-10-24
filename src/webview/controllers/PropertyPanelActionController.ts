@@ -59,6 +59,7 @@ export class PropertyPanelActionController {
         host.syncToHost();
       },
       getEraserHandler: () => tools.eraserToolHandler,
+      getScissorHandler: () => tools.scissorKnifeToolHandler,
       syncMetadataToHost: () => host.syncMetadataToHost(),
       onNodeTypeChange: (type: NodeType) => tools.nodeToolHandler.handleNodeTypeChange(type),
       onSplitNode: () => tools.nodeToolHandler.handleSplitNode(),

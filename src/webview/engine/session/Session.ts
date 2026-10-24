@@ -9,6 +9,7 @@ import { NodeToolHandler } from '../../tools/NodeToolHandler.js';
 import { SmartFillToolHandler } from '../../tools/SmartFillToolHandler.js';
 import { ShapeBuilderToolHandler } from '../../tools/ShapeBuilderToolHandler.js';
 import { EraserToolHandler } from '../../tools/EraserToolHandler.js';
+import { ScissorKnifeToolHandler } from '../../tools/ScissorKnifeToolHandler.js';
 import { DocumentState } from '../../core/model/DocumentState.js';
 
 export interface ActiveInteraction {
@@ -67,6 +68,7 @@ export class Session {
   public readonly smartFillHandler?: SmartFillToolHandler;
   public readonly shapeBuilderHandler?: ShapeBuilderToolHandler;
   public readonly eraserHandler?: EraserToolHandler;
+  public readonly scissorKnifeHandler?: ScissorKnifeToolHandler;
   private readonly handlers: IToolHandler[];
 
   private callbacks: SessionCallbacks;
@@ -81,6 +83,7 @@ export class Session {
       smartFill?: SmartFillToolHandler;
       shapeBuilder?: ShapeBuilderToolHandler;
       eraser?: EraserToolHandler;
+      scissorKnife?: ScissorKnifeToolHandler;
     },
     callbacks: SessionCallbacks
   ) {
@@ -92,6 +95,7 @@ export class Session {
     this.smartFillHandler = handlers.smartFill;
     this.shapeBuilderHandler = handlers.shapeBuilder;
     this.eraserHandler = handlers.eraser;
+    this.scissorKnifeHandler = handlers.scissorKnife;
     this.handlers = [
       this.selectHandler,
       this.shapeHandler,
@@ -107,6 +111,9 @@ export class Session {
     }
     if (this.eraserHandler) {
       this.handlers.push(this.eraserHandler);
+    }
+    if (this.scissorKnifeHandler) {
+      this.handlers.push(this.scissorKnifeHandler);
     }
     this.callbacks = callbacks;
   }

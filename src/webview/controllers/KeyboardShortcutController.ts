@@ -26,6 +26,7 @@ export interface KeyboardControllerContext {
   penToolHandler: PenToolHandler;
   polylineToolHandler: PolylineToolHandler;
   eraserToolHandler?: import('../tools/EraserToolHandler.js').EraserToolHandler;
+  scissorKnifeToolHandler?: import('../tools/ScissorKnifeToolHandler.js').ScissorKnifeToolHandler;
   isDragging: () => boolean;
   activeHandle: () => 'origin-drag' | 'guide-create' | 'shape' | null;
   copySelection: () => void;
@@ -107,6 +108,11 @@ export class KeyboardShortcutController {
     }
 
     if (this.ctx.toolbar.activeTool === 'eraser' && this.ctx.eraserToolHandler?.onKeyDown(e)) {
+      e.preventDefault();
+      return;
+    }
+
+    if (this.ctx.toolbar.activeTool === 'scissors' && this.ctx.scissorKnifeToolHandler?.onKeyDown(e)) {
       e.preventDefault();
       return;
     }

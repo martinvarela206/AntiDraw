@@ -629,5 +629,19 @@ export const de: Translations = {
     "shortcutAlt": "Pfad als neuen Vektor behalten",
     "scopeHint": "Löscht aus der aktiven Auswahl (oder allen Vektoren, falls nichts gewählt ist).",
   },
+  "scissorInspector": {
+    "title": "Scheren- & Messer-Eigenschaften",
+    "mode": "Schnittmodus",
+    "modeAuto": "Auto",
+    "modeTwoClicks": "2 Klicks",
+    "modeFreehand": "Freihand",
+    "smoothing": "Glättung",
+    "shortcutsTitle": "Anleitung & Tastenkürzel",
+    "mode1Hint": "Klick auf Startkante → Elastische Linie → Klick auf Endkante zum Teilen.",
+    "mode2Hint": "Freihand über die Form ziehen, um entlang des Pfads zu schneiden.",
+    "cancelHint": "Laufenden Schnitt abbrechen.",
+    "scopeHint": "Schneidet aktive Auswahl (oder alle geschnittenen Formen, wenn nichts ausgewählt ist).",
+  },
 };
+
 

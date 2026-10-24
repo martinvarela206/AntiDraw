@@ -478,6 +478,9 @@ export async function runSmartFillTests(): Promise<boolean> {
         penToolHandler: {} as any,
         nodeToolHandler: {} as any,
         smartFillToolHandler: smartFillHandler,
+        shapeBuilderToolHandler: {} as any,
+        eraserToolHandler: {} as any,
+        scissorKnifeToolHandler: {} as any,
         session: mockSession,
       },
       getViewportCtrl: () => undefined,
@@ -512,13 +515,6 @@ export async function runSmartFillTests(): Promise<boolean> {
     controller.onPointerUp(evtUp, { x: 20, y: 10 });
     assert(ctrlModel.elements.length === 3, 'Controller routes pointerup to smartFillHandler producing new element');
     assert(undoCount === 1, 'pushUndo recorded once during controller interaction');
-
-    // 4. Test topology tools without active backend (e.g. scissors)
-    activeTool = 'scissors';
-    controller.onPointerMove(evtMove, { x: 50, y: 50 });
-    assert(currentCursor === 'not-allowed', 'In-development topology tool sets cursor to not-allowed on canvas');
-    controller.onPointerDown(evtDown, { x: 50, y: 50 });
-    assert(ctrlModel.elements.length === 3, 'Topology tool without backend safely discards action with toast');
   }
 
   // =========================================================================

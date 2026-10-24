@@ -629,5 +629,19 @@ export const ja: Translations = {
     "shortcutAlt": "削った軌跡を新規ベクターとして保持",
     "scopeHint": "選択中の要素から消去します（未選択時はすべてのベクターが対象）。",
   },
+  "scissorInspector": {
+    "title": "ハサミ・ナイフのプロパティ",
+    "mode": "切断モード",
+    "modeAuto": "自動",
+    "modeTwoClicks": "2点切断",
+    "modeFreehand": "ドラッグ切断",
+    "smoothing": "カーブのスムージング",
+    "shortcutsTitle": "操作ガイドとショートカット",
+    "mode1Hint": "開始エッジをクリック → 伸縮ガイド線 → 終了エッジをクリックして分割。",
+    "mode2Hint": "図形を横切るようにドラッグしてフリーハンド軌跡で切断。",
+    "cancelHint": "現在の切断操作をキャンセル。",
+    "scopeHint": "選択中の要素を切断します（未選択時は交差するすべての図形が対象）。",
+  },
 };
+
 
