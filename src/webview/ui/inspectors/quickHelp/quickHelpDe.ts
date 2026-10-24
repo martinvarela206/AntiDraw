@@ -235,7 +235,9 @@ export const TOOL_HELP_MAP_DE: Record<string, ToolHelpConfig> = {
     icon: ToolIcons.eraserTool,
     shortcuts: [
       { keys: ['Umschalt', 'E'], description: 'Aktiviert den Vektor-Radiergummi' },
-      { keys: ['Ziehen'], description: 'Löscht durchtrennte Vektorsektoren entlang des Strichpfads' },
+      { keys: ['Ziehen'], description: 'Subtrahiert und teilt durchtrennte Vektorformen' },
+      { keys: ['Alt'], description: 'Behält Radierpfad als neuen Vektor' },
+      { keys: ['[', ']'], description: 'Verringert oder vergrößert Durchmesser' },
       { keys: ['Esc'], description: 'Bricht Löschvorgang ab' },
     ],
   },

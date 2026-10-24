@@ -8,6 +8,7 @@ import { PenToolHandler } from '../../tools/PenToolHandler.js';
 import { NodeToolHandler } from '../../tools/NodeToolHandler.js';
 import { SmartFillToolHandler } from '../../tools/SmartFillToolHandler.js';
 import { ShapeBuilderToolHandler } from '../../tools/ShapeBuilderToolHandler.js';
+import { EraserToolHandler } from '../../tools/EraserToolHandler.js';
 import { DocumentState } from '../../core/model/DocumentState.js';
 
 export interface ActiveInteraction {
@@ -65,6 +66,7 @@ export class Session {
   public readonly nodeHandler: NodeToolHandler;
   public readonly smartFillHandler?: SmartFillToolHandler;
   public readonly shapeBuilderHandler?: ShapeBuilderToolHandler;
+  public readonly eraserHandler?: EraserToolHandler;
   private readonly handlers: IToolHandler[];
 
   private callbacks: SessionCallbacks;
@@ -78,6 +80,7 @@ export class Session {
       node: NodeToolHandler;
       smartFill?: SmartFillToolHandler;
       shapeBuilder?: ShapeBuilderToolHandler;
+      eraser?: EraserToolHandler;
     },
     callbacks: SessionCallbacks
   ) {
@@ -88,6 +91,7 @@ export class Session {
     this.nodeHandler = handlers.node;
     this.smartFillHandler = handlers.smartFill;
     this.shapeBuilderHandler = handlers.shapeBuilder;
+    this.eraserHandler = handlers.eraser;
     this.handlers = [
       this.selectHandler,
       this.shapeHandler,
@@ -100,6 +104,9 @@ export class Session {
     }
     if (this.shapeBuilderHandler) {
       this.handlers.push(this.shapeBuilderHandler);
+    }
+    if (this.eraserHandler) {
+      this.handlers.push(this.eraserHandler);
     }
     this.callbacks = callbacks;
   }
@@ -130,6 +137,8 @@ export class Session {
         return this.smartFillHandler || null;
       case 'shapeBuilder':
         return this.shapeBuilderHandler || null;
+      case 'eraser':
+        return this.eraserHandler || null;
       default:
         return null;
     }
@@ -160,6 +169,9 @@ export class Session {
     }
     if (tool !== 'shapeBuilder') {
       this.shapeBuilderHandler?.deactivate();
+    }
+    if (tool !== 'eraser') {
+      this.eraserHandler?.deactivate();
     }
 
     this.activeTool = tool;
@@ -266,6 +278,16 @@ export class Session {
       }
     } catch (e) {
       console.error('[Session] Error during smartFillHandler.cancel():', e);
+    }
+
+    try {
+      if (this.activeTool === 'eraser' && this.eraserHandler?.cancel()) {
+        this.activeHandle = null;
+        this.isDragging = false;
+        handled = true;
+      }
+    } catch (e) {
+      console.error('[Session] Error during eraserHandler.cancel():', e);
     }
 
     // 2. Guide creation drag

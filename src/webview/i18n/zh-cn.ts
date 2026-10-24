@@ -664,4 +664,16 @@ export const zhCn: Translations = {
     cancel: "取消",
     exportDownload: "导出并下载",
   },
+  eraserInspector: {
+    title: "橡皮擦属性",
+    shape: "笔头形状",
+    circle: "圆形",
+    square: "正方形",
+    size: "直径大小",
+    shortcutsTitle: "快捷键与模式",
+    shortcutResize: "缩小 / 放大直径",
+    shortcutAlt: "保留轨迹为独立矢量",
+    scopeHint: "仅对当前选中元素生效（若未选中任何元素则作用于所有矢量）。",
+  },
 };
+

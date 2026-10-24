@@ -618,4 +618,16 @@ export const de: Translations = {
     "cancel": "Abbrechen",
     "exportDownload": "Exportieren & Herunterladen",
   },
+  "eraserInspector": {
+    "title": "Radiergummi-Eigenschaften",
+    "shape": "Spitzenform",
+    "circle": "Kreis",
+    "square": "Quadrat",
+    "size": "Durchmesser",
+    "shortcutsTitle": "Tastenkürzel & Modi",
+    "shortcutResize": "Durchmesser verkleinern / vergrößern",
+    "shortcutAlt": "Pfad als neuen Vektor behalten",
+    "scopeHint": "Löscht aus der aktiven Auswahl (oder allen Vektoren, falls nichts gewählt ist).",
+  },
 };
+

@@ -235,7 +235,9 @@ export const TOOL_HELP_MAP_RU: Record<string, ToolHelpConfig> = {
     icon: ToolIcons.eraserTool,
     shortcuts: [
       { keys: ['Shift', 'E'], description: 'Активирует векторный ластик' },
-      { keys: ['Тянуть'], description: 'Стирает и удаляет пересекаемые векторные сегменты' },
+      { keys: ['Тянуть'], description: 'Вычитает и разделяет пересекаемые векторные фигуры' },
+      { keys: ['Alt'], description: 'Сохраняет стёртую траекторию как новый вектор' },
+      { keys: ['[', ']'], description: 'Уменьшить или увеличить диаметр ластика' },
       { keys: ['Esc'], description: 'Отменяет стирание' },
     ],
   },

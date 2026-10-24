@@ -664,4 +664,16 @@ export const en: Translations = {
     cancel: "Cancel",
     exportDownload: "Export & Download",
   },
+  eraserInspector: {
+    title: "Eraser Properties",
+    shape: "Tip Shape",
+    circle: "Circle",
+    square: "Square",
+    size: "Diameter",
+    shortcutsTitle: "Shortcuts & Modes",
+    shortcutResize: "Decrease / Increase diameter",
+    shortcutAlt: "Preserve swath as new vector",
+    scopeHint: "Erases from active selection (or all vectors if nothing is selected).",
+  },
 };
+

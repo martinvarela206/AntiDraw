@@ -235,7 +235,9 @@ export const TOOL_HELP_MAP_JA: Record<string, ToolHelpConfig> = {
     icon: ToolIcons.eraserTool,
     shortcuts: [
       { keys: ['Shift', 'E'], description: 'ベクター消しゴムツールをアクティブ化' },
-      { keys: ['ドラッグ'], description: 'ドラッグした軌跡に交差するベクターセグメントを消去' },
+      { keys: ['ドラッグ'], description: '通過したベクター形状を減算・分割' },
+      { keys: ['Alt'], description: '削った軌跡を新規ベクターとして保持' },
+      { keys: ['[', ']'], description: '消しゴムの直径を縮小 / 拡大' },
       { keys: ['Esc'], description: '消去操作をキャンセル' },
     ],
   },

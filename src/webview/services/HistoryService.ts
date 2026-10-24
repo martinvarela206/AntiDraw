@@ -112,7 +112,7 @@ export class HistoryService {
     for (let i = 0; i < s1.guides.length; i++) {
       const g1 = s1.guides[i];
       const g2 = s2.guides[i];
-      if (g1.id !== g2.id || g1.pos !== g2.pos || g1.axis !== g2.axis || g1.angle !== g2.angle) {
+      if (g1.id !== g2.id || g1.position !== g2.position || g1.orientation !== g2.orientation || g1.angle !== g2.angle) {
         return false;
       }
     }

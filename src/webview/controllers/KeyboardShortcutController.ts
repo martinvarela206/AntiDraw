@@ -25,6 +25,7 @@ export interface KeyboardControllerContext {
   shapeToolHandler: ShapeToolHandler;
   penToolHandler: PenToolHandler;
   polylineToolHandler: PolylineToolHandler;
+  eraserToolHandler?: import('../tools/EraserToolHandler.js').EraserToolHandler;
   isDragging: () => boolean;
   activeHandle: () => 'origin-drag' | 'guide-create' | 'shape' | null;
   copySelection: () => void;
@@ -82,6 +83,9 @@ export class KeyboardShortcutController {
         return;
       }
     }
+    if (this.ctx.toolbar.activeTool === 'eraser') {
+      this.ctx.eraserToolHandler?.onKeyUp(e);
+    }
   }
 
   private handleKeyDown(e: KeyboardEvent): void {
@@ -98,6 +102,11 @@ export class KeyboardShortcutController {
     }
 
     if (this.ctx.toolbar.activeTool === 'node' && this.ctx.nodeToolHandler.onKeyDown(e)) {
+      e.preventDefault();
+      return;
+    }
+
+    if (this.ctx.toolbar.activeTool === 'eraser' && this.ctx.eraserToolHandler?.onKeyDown(e)) {
       e.preventDefault();
       return;
     }

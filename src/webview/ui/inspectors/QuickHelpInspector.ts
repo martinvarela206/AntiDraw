@@ -274,7 +274,9 @@ export class QuickHelpInspector {
       icon: ToolIcons.eraserTool,
       shortcuts: [
         { keys: ['Shift', 'E'], description: 'Activa la herramienta Borrador vectorial' },
-        { keys: ['Arrastre'], description: 'Elimina segmentos vectoriales atravesados' },
+        { keys: ['Arrastre'], description: 'Sustrae y particiona formas vectoriales atravesadas' },
+        { keys: ['Alt'], description: 'Preserva la huella sustraída como nuevo vector' },
+        { keys: ['[', ']'], description: 'Disminuye o aumenta el diámetro del borrador' },
         { keys: ['Esc'], description: 'Cancela la operación de borrado' },
       ],
     },
@@ -535,7 +537,9 @@ export class QuickHelpInspector {
       icon: ToolIcons.eraserTool,
       shortcuts: [
         { keys: ['Shift', 'E'], description: 'Activates Vector Eraser Tool' },
-        { keys: ['Drag'], description: 'Erases intersected vector segments along stroke path' },
+        { keys: ['Drag'], description: 'Subtracts and partitions sliced vector shapes' },
+        { keys: ['Alt'], description: 'Preserves erased swath as a new independent vector' },
+        { keys: ['[', ']'], description: 'Decreases or increases eraser diameter' },
         { keys: ['Esc'], description: 'Cancels eraser interaction' },
       ],
     },
@@ -796,7 +800,9 @@ export class QuickHelpInspector {
       icon: ToolIcons.eraserTool,
       shortcuts: [
         { keys: ['Shift', 'E'], description: '激活矢量橡皮擦工具' },
-        { keys: ['拖拽'], description: '擦除并剔除穿过的矢量线段与区域' },
+        { keys: ['拖拽'], description: '连续减去并分割穿过的矢量形状' },
+        { keys: ['Alt'], description: '将擦除的轨迹保留为独立新矢量' },
+        { keys: ['[', ']'], description: '缩小或放大橡皮擦直径' },
         { keys: ['Esc'], description: '取消擦除操作' },
       ],
     },

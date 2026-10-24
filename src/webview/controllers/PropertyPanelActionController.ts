@@ -58,6 +58,7 @@ export class PropertyPanelActionController {
         s.workspaceLayout.render();
         host.syncToHost();
       },
+      getEraserHandler: () => tools.eraserToolHandler,
       syncMetadataToHost: () => host.syncMetadataToHost(),
       onNodeTypeChange: (type: NodeType) => tools.nodeToolHandler.handleNodeTypeChange(type),
       onSplitNode: () => tools.nodeToolHandler.handleSplitNode(),

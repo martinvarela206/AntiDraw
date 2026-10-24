@@ -618,4 +618,16 @@ export const ja: Translations = {
     "cancel": "キャンセル",
     "exportDownload": "書き出してダウンロード",
   },
+  "eraserInspector": {
+    "title": "消しゴムのプロパティ",
+    "shape": "先端の形状",
+    "circle": "円形",
+    "square": "正方形",
+    "size": "直径サイズ",
+    "shortcutsTitle": "ショートカットと操作モード",
+    "shortcutResize": "直径を縮小 / 拡大",
+    "shortcutAlt": "削った軌跡を新規ベクターとして保持",
+    "scopeHint": "選択中の要素から消去します（未選択時はすべてのベクターが対象）。",
+  },
 };
+

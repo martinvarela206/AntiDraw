@@ -54,6 +54,7 @@ export interface PropertyPanelCallbacks {
   onGroup?: () => void;
   onUngroup?: () => void;
   syncMetadataToHost?: () => void;
+  getEraserHandler?: () => import('../tools/EraserToolHandler.js').EraserToolHandler | undefined;
 }
 
 export { ViewBoxPreset, VIEWBOX_PRESETS } from './inspectors/CanvasInspector.js';
@@ -68,6 +69,7 @@ import { ShapeDefaultsInspector } from './inspectors/ShapeDefaultsInspector.js';
 import { NodeInspector } from './inspectors/NodeInspector.js';
 import { MultiSelectionInspector } from './inspectors/MultiSelectionInspector.js';
 import { GroupInspector } from './inspectors/GroupInspector.js';
+import { EraserInspector } from './inspectors/EraserInspector.js';
 import { SwatchPaletteInspector } from './inspectors/SwatchPaletteInspector.js';
 import { StrokeInspector, StrokeInspectorProps } from './inspectors/StrokeInspector.js';
 import { QuickHelpInspector } from './inspectors/QuickHelpInspector.js';
@@ -107,7 +109,7 @@ export class PropertyPanel {
   private callbacks: PropertyPanelCallbacks;
 
   // Track which panel section is currently rendered to avoid full re-builds
-  public currentPanelMode: 'canvas' | 'element' | 'group' | 'node' | 'pen' | 'polyline' | 'multi' | 'ruler' | 'guide' | 'shape' | 'stroke' | null = null;
+  public currentPanelMode: 'canvas' | 'element' | 'group' | 'node' | 'pen' | 'polyline' | 'multi' | 'ruler' | 'guide' | 'shape' | 'stroke' | 'eraser' | null = null;
 
   constructor(
     container: HTMLElement,
@@ -362,6 +364,10 @@ export class PropertyPanel {
       // 5. Active Shape Tool Creation Settings (No vectors selected)
       this.currentPanelMode = 'shape';
       this.renderShapeToolProperties();
+    } else if (this.activeTool === 'eraser') {
+      this.updateCanvasStatusButton(false);
+      this.currentPanelMode = 'eraser';
+      this.renderEraserProperties();
     } else {
       // 6. Base State: Canvas Properties ONLY IF explicitly activated
       if (this.currentPanelMode === 'canvas') {
@@ -530,6 +536,18 @@ export class PropertyPanel {
       this.callbacks
     );
   }
+
+  // Render properties when eraser tool is active
+  private renderEraserProperties(): void {
+    this.ensureContainers();
+    const handler = this.callbacks.getEraserHandler?.();
+    if (handler) {
+      EraserInspector.render(this.inspectorContainer, handler, () => {
+        this.callbacks.onRenderOverlay?.();
+      });
+    }
+  }
+
 
   // Render properties when multiple elements are selected
   private renderMultiElementProperties(elements: VectorElement[]): void {

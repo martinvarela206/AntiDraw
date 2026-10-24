@@ -3,6 +3,20 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.100.0] - 2026-10-24
+
+### 🚀 Added
+- **Vector Eraser Tool (`eraser` / <kbd>Shift</kbd>+<kbd>E</kbd>) with Continuous Boolean Subtraction & Auto-Partitioning**:
+  - **EraserEngine**: Implemented analytical constructive area subtraction (`polygonClipping.difference`) along swept continuous swaths.
+  - **Dynamic Brush Tip Footprints**: Configurable brush tip shapes (**Circle** capsule and **Square** convex hull) with real-time size regulation (2px to 150px) via inspector slider or bracket hotkeys (<kbd>[</kbd> to decrease, <kbd>]</kbd> to increase diameter).
+  - **Automatic Multi-Polygon Partitioning**: When the eraser slices through a closed vector from boundary to boundary, the engine automatically splits the shape into $N \ge 2$ independent closed `<path>` elements, preserving z-index stacking order, fills, strokes, gradients, and filters.
+  - **Alt Swath Preservation**: Holding <kbd>Alt</kbd> during erasing synthesizes the erased path swath directly into the document as a new independent vector graphic.
+  - **Dedicated Eraser Inspector (`EraserInspector.ts`)**: Integrated property panel controls for tip shape, size slider, and shortcut tips.
+  - **Universal Multilingual Coverage**: Full localization across all 7 supported languages (`es`, `en`, `zh-cn`, `de`, `fr`, `ru`, `ja`) in both the property inspector and `QuickHelpInspector`.
+  - **Comprehensive Automated Test Suite (`test-eraser-tool.ts`)**: 5 new test suites validating circular/square footprint generation, in-place subtraction, multi-part partitioning, Alt preservation, and pointer workflows (42/42 test suites passing at 100%).
+
+---
+
 ## [0.99.3] - 2026-10-23
 
 ### 🐛 Fixed

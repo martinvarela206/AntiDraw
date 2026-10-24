@@ -18,6 +18,7 @@ import { PenToolHandler } from './PenToolHandler.js';
 import { NodeToolHandler } from './NodeToolHandler.js';
 import { SmartFillToolHandler } from './SmartFillToolHandler.js';
 import { ShapeBuilderToolHandler } from './ShapeBuilderToolHandler.js';
+import { EraserToolHandler } from './EraserToolHandler.js';
 import { Session } from '../engine/session/Session.js';
 import { ConfirmationModal } from '../ui/ConfirmationModal.js';
 
@@ -45,6 +46,7 @@ export interface ToolSuite {
   nodeToolHandler: NodeToolHandler;
   smartFillToolHandler: SmartFillToolHandler;
   shapeBuilderToolHandler: ShapeBuilderToolHandler;
+  eraserToolHandler: EraserToolHandler;
   session: Session;
 }
 
@@ -140,6 +142,16 @@ export class ToolFactory {
       setCursor: (cursor) => ctx.getCanvasView()?.setCursor(cursor),
     });
 
+    const eraserToolHandler = new EraserToolHandler(toolCtx, {
+      setCursor: (cursor) => ctx.getCanvasView()?.setCursor(cursor),
+      onConfigChanged: () => {
+        const propPanel = ctx.getPropertyPanel();
+        if (propPanel && ctx.getToolbar()?.activeTool === 'eraser') {
+          propPanel.update();
+        }
+      },
+    });
+
     const session = new Session(
       {
         select: selectToolHandler,
@@ -149,6 +161,7 @@ export class ToolFactory {
         node: nodeToolHandler,
         smartFill: smartFillToolHandler,
         shapeBuilder: shapeBuilderToolHandler,
+        eraser: eraserToolHandler,
       },
       {
         onRender: () => ctx.getWorkspaceLayout().render(),
@@ -171,6 +184,7 @@ export class ToolFactory {
       nodeToolHandler,
       smartFillToolHandler,
       shapeBuilderToolHandler,
+      eraserToolHandler,
       session,
     };
   }

@@ -235,7 +235,9 @@ export const TOOL_HELP_MAP_FR: Record<string, ToolHelpConfig> = {
     icon: ToolIcons.eraserTool,
     shortcuts: [
       { keys: ['Maj', 'E'], description: 'Active l’outil Gomme vectorielle' },
-      { keys: ['Glisser'], description: 'Efface les segments vectoriels traversés' },
+      { keys: ['Glisser'], description: 'Soustrait et partitionne les formes traversées' },
+      { keys: ['Alt'], description: 'Conserve le tracé effacé comme nouveau vecteur' },
+      { keys: ['[', ']'], description: 'Diminue ou augmente le diamètre' },
       { keys: ['Échap'], description: 'Annule l’effacement' },
     ],
   },

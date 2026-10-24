@@ -65,6 +65,7 @@ export class CanvasInteractionController implements CanvasViewDelegate {
   private get nodeToolHandler(): NodeToolHandler { return this.ctx.tools.nodeToolHandler; }
   private get smartFillToolHandler(): SmartFillToolHandler { return this.ctx.tools.smartFillToolHandler; }
   private get shapeBuilderToolHandler(): ShapeBuilderToolHandler { return this.ctx.tools.shapeBuilderToolHandler; }
+  private get eraserToolHandler(): import('../tools/EraserToolHandler.js').EraserToolHandler { return this.ctx.tools.eraserToolHandler; }
 
   constructor(private ctx: CanvasInteractionContext) {}
 
@@ -101,7 +102,8 @@ export class CanvasInteractionController implements CanvasViewDelegate {
       session.activeHandle !== null ||
       (toolbar?.activeTool === 'pen' && this.penToolHandler.isDragging) ||
       (toolbar?.activeTool === 'smartFill' && this.smartFillToolHandler.lastDownPt !== null) ||
-      (toolbar?.activeTool === 'shapeBuilder' && (this.shapeBuilderToolHandler.isDragging || this.shapeBuilderToolHandler.sweptSubSegIds.size > 0))
+      (toolbar?.activeTool === 'shapeBuilder' && (this.shapeBuilderToolHandler.isDragging || this.shapeBuilderToolHandler.sweptSubSegIds.size > 0)) ||
+      (toolbar?.activeTool === 'eraser' && (this.eraserToolHandler.isDragging || this.eraserToolHandler.trajectoryPoints.length > 0))
     ) {
       this.cancelCurrentAction();
     }
@@ -267,7 +269,9 @@ export class CanvasInteractionController implements CanvasViewDelegate {
         if (this.smartFillToolHandler.onPointerDown(e, pt)) return;
       } else if (activeTool === 'shapeBuilder') {
         if (this.shapeBuilderToolHandler.onPointerDown(e, pt)) return;
-      } else if (['scissors', 'eraser'].includes(activeTool)) {
+      } else if (activeTool === 'eraser') {
+        if (this.eraserToolHandler.onPointerDown(e, pt)) return;
+      } else if (['scissors'].includes(activeTool)) {
         ToastNotification.show({
           message: I18nService.t('toolbar.toolInDevelopment') || 'Herramienta en desarrollo activo (Próximamente)',
           type: 'info',
@@ -360,7 +364,10 @@ export class CanvasInteractionController implements CanvasViewDelegate {
       } else if (activeTool === 'shapeBuilder') {
         canvasView?.setCursor('crosshair');
         if (this.shapeBuilderToolHandler.onPointerMove(e, pt)) return;
-      } else if (['scissors', 'eraser'].includes(activeTool)) {
+      } else if (activeTool === 'eraser') {
+        canvasView?.setCursor('none');
+        if (this.eraserToolHandler.onPointerMove(e, pt)) return;
+      } else if (['scissors'].includes(activeTool)) {
         canvasView?.setCursor('not-allowed');
         return;
       } else if (session.activeHandle === 'shape') {
@@ -459,6 +466,12 @@ export class CanvasInteractionController implements CanvasViewDelegate {
       if (activeTool === 'shapeBuilder') {
         session.isDragging = false;
         if (this.shapeBuilderToolHandler.onPointerUp(e, pt)) return;
+      }
+
+      // Eraser Tool Delegation
+      if (activeTool === 'eraser') {
+        session.isDragging = false;
+        if (this.eraserToolHandler.onPointerUp(e, pt)) return;
       }
 
       // Shape Tool Delegation

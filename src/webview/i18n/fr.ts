@@ -618,4 +618,16 @@ export const fr: Translations = {
     "cancel": "Annuler",
     "exportDownload": "Exporter et télécharger",
   },
+  "eraserInspector": {
+    "title": "Propriétés de la Gomme",
+    "shape": "Forme d'embout",
+    "circle": "Cercle",
+    "square": "Carré",
+    "size": "Diamètre",
+    "shortcutsTitle": "Raccourcis & Modes",
+    "shortcutResize": "Diminuer / Augmenter diamètre",
+    "shortcutAlt": "Conserver le tracé comme nouveau vecteur",
+    "scopeHint": "Efface sur la sélection active (ou sur tous les vecteurs si rien n'est sélectionné).",
+  },
 };
+

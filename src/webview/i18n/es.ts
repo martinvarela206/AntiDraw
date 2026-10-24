@@ -664,4 +664,16 @@ export const es: Translations = {
     cancel: "Cancelar",
     exportDownload: "Exportar y Descargar",
   },
+  eraserInspector: {
+    title: "Propiedades del Borrador",
+    shape: "Forma de Punta",
+    circle: "Círculo",
+    square: "Cuadrado",
+    size: "Diámetro",
+    shortcutsTitle: "Atajos y Modos",
+    shortcutResize: "Disminuir / Aumentar diámetro",
+    shortcutAlt: "Preservar trazo como nuevo vector",
+    scopeHint: "Borra sobre la selección activa (o sobre todos los vectores si no hay selección).",
+  },
 };
+

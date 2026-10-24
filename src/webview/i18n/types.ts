@@ -686,4 +686,18 @@ export interface Translations {
     cancel: string;
     exportDownload: string;
   };
+
+  // Eraser Inspector
+  eraserInspector: {
+    title: string;
+    shape: string;
+    circle: string;
+    square: string;
+    size: string;
+    shortcutsTitle: string;
+    shortcutResize: string;
+    shortcutAlt: string;
+    scopeHint: string;
+  };
 }
+
