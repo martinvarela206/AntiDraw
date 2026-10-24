@@ -52,4 +52,12 @@
 
 ## 8. Idioma Exclusivo en Inglés para el Changelog (`changelog.md`)
 - **Redacción Obligatoria en Inglés:** Toda entrada, descripción de versión, título de sección (`Added`, `Changed`, `Fixed`, `Deprecated`, `Removed`) y viñeta explicativa en `changelog.md` debe redactarse **exclusivamente en idioma inglés**, siguiendo el estándar internacional *Keep a Changelog*.
-- **Prohibición de Entradas en Español en Changelog:** Queda terminantemente prohibido incorporar entradas, títulos o explicaciones en español en `changelog.md`. Todo registro histórico y nuevas versiones deben mantenerse en inglés técnico de alta precisión.
+- **Prohibición de Entradas en Español en Changelog:** Queda terminantemente prohibido incorporar entradas, títulos o explicaciones en español en `changelog.md`. Todo registro histórico y nuevas versiones deben mantenerse en inglés técnico de alta precisión.
+
+## 9. Gobernanza de la Tríada de TODOs y Privacidad Estricta
+- **Ubicación Exclusiva en `Docs/`**: Queda prohibido crear archivos `TODO.md` sueltos en la raíz o subdirectorios de código. El backlog reside exclusivamente en la carpeta de documentación (`Docs/`).
+- **Tríada Cardinal de Tareas**:
+  1. **`Docs/TODO.md`**: Backlog activo con única y exclusivamente las tareas pendientes de implementar.
+  2. **`Docs/TODO-Historico.md`**: Registro permanente de tareas culminadas y validadas con su versión/commit.
+  3. **`Docs/TODO-temporal.md`**: Bloc de notas rápido e informal del usuario para ideas preliminares.
+- **PROHIBICIÓN ESTRICTA DE LECTURA:** El agente tiene terminantemente prohibido abrir, leer (`view_file`), buscar (`grep_search`), procesar o modificar `TODO-temporal.md`. Es un espacio privado de ideación del usuario.
