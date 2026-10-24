@@ -3,6 +3,16 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.101.1] - 2026-10-24
+
+### 🎨 Fixed & Improved
+- **WCAG AAA Light Theme Contrast & Accessible Disabled State Visibility**:
+  - **Luminance Token Calibration**: Elevated `--figma-text-secondary` in `[data-theme="light"]` from `#555555` to `#2d2d2d`, achieving strict **WCAG AAA** contrast ratios ($\ge 7:1$) on both panel backgrounds (`#ffffff`) and input elements (`#f5f5f5`).
+  - **Tertiary & Muted Hierarchy**: Calibrated `--figma-text-tertiary` to `#545454` ($\ge 7:1$ on `#ffffff`) and `--figma-text-dim` to `#767676` ($\ge 4.5:1$).
+  - **Accessible Inactive UI Elements**: Updated `.tool-btn:disabled` opacity from `0.35` to `0.52` with explicit `--figma-text-tertiary` coloring to eliminate washed-out controls while maintaining clear tactile deactivation.
+
+---
+
 ## [0.101.0] - 2026-10-24
 
 ### 🚀 Added

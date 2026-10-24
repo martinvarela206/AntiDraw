@@ -63,11 +63,11 @@
   --figma-border-strong: rgba(0, 0, 0, 0.16);
   --figma-border-focus: #0d99ff;
 
-  /* Texto & Luminancia */
+  /* Texto & Luminancia (WCAG AAA Compliant) */
   --figma-text-primary: #000000;
-  --figma-text-secondary: #555555;
-  --figma-text-tertiary: #888888;
-  --figma-text-dim: #bbbbbb;
+  --figma-text-secondary: #2d2d2d;
+  --figma-text-tertiary: #545454;
+  --figma-text-dim: #767676;
 
   /* Marca & Semántica */
   --figma-brand: #0d99ff;
@@ -263,7 +263,8 @@ body {
 }
 
 .tool-btn:disabled {
-  opacity: 0.35;
+  opacity: 0.52;
+  color: var(--figma-text-tertiary);
   cursor: not-allowed !important;
   pointer-events: none;
 }
