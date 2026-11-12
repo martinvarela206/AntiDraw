@@ -57,6 +57,29 @@ export class SvgSanitizer {
   ]);
 
   /**
+   * Neutralizes DOCTYPE declarations and internal/external XML entities
+   * to protect against XML Entity Expansion (Billion Laughs / DoS) and XXE attacks.
+   */
+  public static stripDoctypeAndEntities(xml: string): { sanitizedXml: string; strippedCount: number } {
+    if (!xml || typeof xml !== 'string') return { sanitizedXml: '', strippedCount: 0 };
+    let strippedCount = 0;
+
+    // Match <!DOCTYPE ... [ ... ]> or <!DOCTYPE ... >
+    let sanitized = xml.replace(/<!DOCTYPE\s+[^>[\]]*(?:\[[\s\S]*?\])?\s*>/gi, () => {
+      strippedCount++;
+      return '<!-- [AntiDraw: Sanitized DOCTYPE] -->';
+    });
+
+    // Neutralize any standalone or stray <!ENTITY ...> declarations
+    sanitized = sanitized.replace(/<!ENTITY\s+[\s\S]*?>/gi, () => {
+      strippedCount++;
+      return '<!-- [AntiDraw: Sanitized ENTITY] -->';
+    });
+
+    return { sanitizedXml: sanitized, strippedCount };
+  }
+
+  /**
    * Sanitizes an XML/SVG Document instance in place.
    * Compatible with browser DOMParser documents and LinkeDOM / xmldom documents.
    */
@@ -67,17 +90,43 @@ export class SvgSanitizer {
       neutralizedStylesCount: 0,
     };
 
-    if (!doc || !doc.documentElement) {
+    if (!doc) {
       return result;
     }
 
-    // Traverse all elements starting from documentElement
-    this.sanitizeNodeRecursive(doc.documentElement, result);
+    if (doc.doctype) {
+      try {
+        doc.doctype.remove();
+        result.removedElementsCount++;
+      } catch {
+        // Ignore if doctype cannot be removed
+      }
+    }
+
+    if (!doc.documentElement) {
+      return result;
+    }
+
+    // Traverse all elements starting from documentElement with depth limit
+    this.sanitizeNodeRecursive(doc.documentElement, result, 0, 64);
 
     return result;
   }
 
-  private static sanitizeNodeRecursive(element: Element, result: SanitizationResult): void {
+  private static sanitizeNodeRecursive(
+    element: Element,
+    result: SanitizationResult,
+    depth: number = 0,
+    maxDepth: number = 64
+  ): void {
+    if (depth > maxDepth) {
+      console.warn(
+        `[AntiDraw:SvgSanitizer] Profundidad máxima (${maxDepth}) alcanzada en <${element.tagName}>. Truncando recursión.`
+      );
+      element.remove();
+      result.removedElementsCount++;
+      return;
+    }
     // 1. Check if the element itself is disallowed
     const tagName = (element.tagName || '').toLowerCase().replace(/^.*:/, '');
     if (this.DISALLOWED_ELEMENT_TAGS.has(tagName)) {
@@ -132,7 +181,7 @@ export class SvgSanitizer {
     // 4. Recurse down children safely (copying children list to handle live mutations)
     const children = Array.from(element.children);
     for (const child of children) {
-      this.sanitizeNodeRecursive(child, result);
+      this.sanitizeNodeRecursive(child, result, depth + 1, maxDepth);
     }
   }
 

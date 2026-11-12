@@ -77,6 +77,14 @@ export class HostSaveValidator {
       };
     }
 
+    // Bloqueo de entidades externas y DOCTYPE maliciosos (mitigación anti-XXE)
+    if (/\b(?:SYSTEM|PUBLIC)\s+["'][^"']+["']/i.test(trimmed) || /<!ENTITY\b/i.test(trimmed)) {
+      return {
+        isValid: false,
+        error: 'Declaración XML DOCTYPE o entidad externa (XXE) detectada. Guardado bloqueado por seguridad.',
+      };
+    }
+
     // Detección de atributos geométricos corruptos (NaN, Infinity, undefined, [object Object])
     const geomCorruptMatch = trimmed.match(HostSaveValidator.GEOM_ATTR_CORRUPT_REGEX);
     if (geomCorruptMatch) {

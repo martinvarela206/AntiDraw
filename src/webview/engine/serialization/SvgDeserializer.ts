@@ -55,8 +55,14 @@ export class SvgDeserializer {
     }
 
     try {
+      // Strip DOCTYPE declarations and external XML entities (anti-XXE & anti-Billion-Laughs DoS)
+      const { sanitizedXml, strippedCount } = SvgSanitizer.stripDoctypeAndEntities(svgText);
+      if (strippedCount > 0) {
+        console.info(`[AntiDraw:SvgDeserializer] ${strippedCount} declaración(es) DOCTYPE o entidades XML neutralizadas.`);
+      }
+
       const parser = new DOMParser();
-      const doc = parser.parseFromString(svgText, 'image/svg+xml');
+      const doc = parser.parseFromString(sanitizedXml, 'image/svg+xml');
       const parserError = doc.querySelector('parsererror');
       if (parserError) {
         console.warn('[AntiDraw:SvgDeserializer] XML parser error detectado al procesar SVG');
@@ -153,7 +159,8 @@ export class SvgDeserializer {
         clone.querySelectorAll('[id^="ad-grad-"]').forEach((g) => g.remove());
 
         // Remove all comment nodes associated with AntiDraw template blocks or orphaned markers
-        const removeOrphanComments = (parent: Node) => {
+        const removeOrphanComments = (parent: Node, depth: number = 0) => {
+          if (depth > 32) return;
           const nodes = Array.from(parent.childNodes);
           for (const node of nodes) {
             if (node.nodeType === 8 /* Node.COMMENT_NODE */) {
@@ -171,11 +178,11 @@ export class SvgDeserializer {
                 node.remove();
               }
             } else if (node.hasChildNodes()) {
-              removeOrphanComments(node);
+              removeOrphanComments(node, depth + 1);
             }
           }
         };
-        removeOrphanComments(clone);
+        removeOrphanComments(clone, 0);
 
         // If no functional child elements remain in clone, defs had only standard AntiDraw resources
         if (clone.children.length === 0) {
@@ -263,8 +270,17 @@ export class SvgDeserializer {
       const parseNode = (
         node: Element,
         inherited: Record<string, string>,
-        targetList: VectorElement[] = ctx.elements
+        targetList: VectorElement[] = ctx.elements,
+        depth: number = 0,
+        maxDepth: number = 64
       ) => {
+        if (depth > maxDepth) {
+          console.warn(
+            `[AntiDraw:SvgDeserializer] Profundidad máxima (${maxDepth}) alcanzada en nodo <${node.tagName}>. Truncando recursión.`
+          );
+          return;
+        }
+
         const tag = node.tagName.toLowerCase();
         if (tag === 'g') {
           const gAttrs: Record<string, string> = {};
@@ -295,7 +311,9 @@ export class SvgDeserializer {
           };
 
           const groupInherited = { ...inherited, ...extractPresentationAttrs(node), ...gAttrs };
-          Array.from(node.children).forEach((ch) => parseNode(ch, groupInherited, groupEl.children!));
+          Array.from(node.children).forEach((ch) =>
+            parseNode(ch, groupInherited, groupEl.children!, depth + 1, maxDepth)
+          );
 
           targetList.push(groupEl);
           return;
@@ -757,7 +775,9 @@ export class SvgDeserializer {
         }
       };
 
-      Array.from(svgEl.children).forEach((child) => parseNode(child, rootInheritedAttrs));
+      Array.from(svgEl.children).forEach((child) =>
+        parseNode(child, rootInheritedAttrs, ctx.elements, 0, 64)
+      );
     } catch (e) {
       console.error('Failed to parse SVG string', e);
       ctx.createDefaultCanvas();

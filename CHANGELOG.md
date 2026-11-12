@@ -3,6 +3,17 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.4] - 2026-11-12
+
+### 🛡️ Security & Hardening
+- **XML Parser Hardening, Recursion Depth Limits & Anti-XXE/DoS Protection**:
+  - **Anti-XXE & DoS Protection (`SvgSanitizer.stripDoctypeAndEntities`)**: Strips and neutralizes XML `<!DOCTYPE ...>` and `<!ENTITY ...>` declarations, preventing XML External Entity (XXE) attacks, local file disclosures, and quadratic/Billion Laughs entity expansion denial-of-service vulnerabilities.
+  - **Recursion Depth Limiter**: Enforced maximum DOM traversal recursion limits (`maxDepth = 64`) across `SvgDeserializer.parseNode` and `SvgSanitizer.sanitizeNodeRecursive`, guarding the webview runtime against stack overflow attacks caused by adversarial deeply nested group hierarchies.
+  - **Host Persistence Defense**: Added defense-in-depth checks inside `HostSaveValidator` rejecting any file containing external `SYSTEM`/`PUBLIC` entities or unstripped DOCTYPEs from disk persistence.
+  - **Automated Test Coverage**: Added test suite `test-xml-parser-hardening.ts` (Suite 48) covering 13 assertions verifying DOCTYPE neutralization, recursion truncation, and anti-XXE rejection.
+
+---
+
 ## [0.103.3] - 2026-11-12
 
 ### 🛡️ Security & Integrity
