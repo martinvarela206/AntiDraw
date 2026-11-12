@@ -3,6 +3,17 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.20] - 2026-11-12
+
+### ⚙️ Build Infrastructure & Runtime Target Alignment
+- **Dynamic Derivation of esbuild Compilation Targets from `engines.vscode` (`vscode-target-resolver.js`)**:
+  - **Single Source of Truth**: Created `scripts/vscode-target-resolver.js` to dynamically map the minimum version defined in `package.json` -> `engines.vscode` (`^1.80.0`) to the exact Electron milestone, Node.js runtime (`node16`), and embedded Chromium version (`chrome108`).
+  - **Extension & Webview Target Alignment**: Updated `esbuild.js` to enforce explicit target constraints for both contexts (`target: [targets.nodeTarget]` for extension host, `target: [targets.chromeTarget]` for webview), eliminating syntax incompatibility and execution panics on older supported VS Code installations.
+  - **Comprehensive Milestone Mapping**: Configured table of VS Code milestones spanning v1.75 to v1.95+ with fallback defense against malformed engine strings.
+  - **Automated Test Coverage**: Added test suite `test-build-target-alignment.ts` (Suite 63) verifying 6 assertions covering milestone mapping, engine parsing, fallback safety, and target application in `esbuild.js`.
+
+---
+
 ## [0.103.19] - 2026-11-12
 
 ### ⚡ Performance & Webview Memory Optimization

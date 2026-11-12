@@ -1,9 +1,15 @@
 const esbuild = require('esbuild');
 const { syncIcons } = require('./scripts/sync-icons.js');
+const { resolveVsCodeTargets } = require('./scripts/vscode-target-resolver.js');
 const isWatch = process.argv.includes('--watch');
 
 async function main() {
   syncIcons();
+  const targets = resolveVsCodeTargets();
+  console.log(
+    `[AntiDraw:Build] Derived targets from engines.vscode (${targets.rawEngineString}): Node ${targets.nodeTarget} (Electron ${targets.electronVersion}), Webview ${targets.chromeTarget}`
+  );
+
   const extensionCtx = await esbuild.context({
     entryPoints: ['src/extension.ts'],
     bundle: true,
@@ -11,6 +17,7 @@ async function main() {
     minify: false,
     sourcemap: true,
     platform: 'node',
+    target: [targets.nodeTarget],
     outfile: 'dist/extension.js',
     external: ['vscode'],
     logLevel: 'info',
@@ -23,6 +30,7 @@ async function main() {
     minify: false,
     sourcemap: true,
     platform: 'browser',
+    target: [targets.chromeTarget],
     outfile: 'dist/webview.js',
     logLevel: 'info',
     loader: {
