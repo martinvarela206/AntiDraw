@@ -243,4 +243,88 @@ export class DocumentStateFactory {
   public static isDirty(current: DocumentState, saved: DocumentState): boolean {
     return current !== saved && current.revision !== saved.revision;
   }
+
+  public static freezeElement(el: VectorElement): VectorElement {
+    return Object.freeze({
+      ...el,
+      attributes: Object.freeze({ ...el.attributes }),
+      vertices: el.vertices
+        ? el.vertices.map((v) =>
+            Object.freeze({
+              ...v,
+              handleIn: v.handleIn ? Object.freeze({ ...v.handleIn }) : undefined,
+              handleOut: v.handleOut ? Object.freeze({ ...v.handleOut }) : undefined,
+            })
+          )
+        : undefined,
+    }) as VectorElement;
+  }
+
+  public static areElementsIdentical(e1: VectorElement, e2: VectorElement): boolean {
+    if (e1 === e2) return true;
+    if (e1.id !== e2.id || e1.tagName !== e2.tagName || e1.shapeType !== e2.shapeType) return false;
+    const k1 = Object.keys(e1.attributes);
+    const k2 = Object.keys(e2.attributes);
+    if (k1.length !== k2.length) return false;
+    for (const k of k1) {
+      if (e1.attributes[k] !== e2.attributes[k]) return false;
+    }
+    const v1Len = e1.vertices?.length || 0;
+    const v2Len = e2.vertices?.length || 0;
+    if (v1Len !== v2Len) return false;
+    if (e1.vertices && e2.vertices) {
+      for (let i = 0; i < v1Len; i++) {
+        const v1 = e1.vertices[i];
+        const v2 = e2.vertices[i];
+        if (v1.x !== v2.x || v1.y !== v2.y || v1.command !== v2.command || (v1 as any).nodeType !== (v2 as any).nodeType) return false;
+        if (v1.handleIn?.x !== v2.handleIn?.x || v1.handleIn?.y !== v2.handleIn?.y) return false;
+        if (v1.handleOut?.x !== v2.handleOut?.x || v1.handleOut?.y !== v2.handleOut?.y) return false;
+      }
+    }
+    return true;
+  }
+
+  public static createWithSharing(init: DocumentStateInit, previousState?: DocumentState): DocumentState {
+    if (!previousState || !previousState.elements || previousState.elements.length === 0) {
+      return DocumentStateFactory.create(init);
+    }
+
+    const prevMap = new Map<string, VectorElement>();
+    for (const el of previousState.elements) {
+      prevMap.set(el.id, el);
+    }
+
+    const sharedElements = (init.elements || []).map((el) => {
+      const prevEl = prevMap.get(el.id);
+      if (prevEl && DocumentStateFactory.areElementsIdentical(prevEl, el)) {
+        return prevEl; // Structural sharing: reuse unmodified reference
+      }
+      return DocumentStateFactory.freezeElement(el);
+    });
+
+    const elementPivotsMap: ReadonlyMap<string, Point> =
+      init.elementPivots instanceof Map
+        ? new Map(init.elementPivots)
+        : Array.isArray(init.elementPivots)
+        ? new Map(init.elementPivots)
+        : new Map();
+
+    const selectionSet: ReadonlySet<string> =
+      init.selection instanceof Set
+        ? new Set(init.selection)
+        : Array.isArray(init.selection)
+        ? new Set(init.selection)
+        : new Set();
+
+    return Object.freeze({
+      revision: init.revision ?? (previousState.revision + 1),
+      canvas: Object.freeze({ ...init.canvas }),
+      elements: Object.freeze(sharedElements),
+      guides: Object.freeze(init.guides ? [...init.guides] : []),
+      customPivot: init.customPivot ? { ...init.customPivot } : null,
+      elementPivots: elementPivotsMap,
+      selection: selectionSet,
+      scene: init.scene || previousState.scene,
+    });
+  }
 }

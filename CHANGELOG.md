@@ -3,6 +3,17 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.8] - 2026-11-12
+
+### ⚡ Performance & State Management
+- **Structural Sharing & Transactional Patch Engine (DocumentPatchEngine)**:
+  - **Structural Sharing in DocumentState**: Implemented `DocumentState.createWithSharing()` and `freezeElement()`, maintaining object reference identity for unmodified elements and only allocating newly modified nodes, slashing GC pressure.
+  - **Transactional Patches (DocumentPatchEngine)**: Added `DocumentPatchEngine` providing forward (`patches`) and inverse (`inversePatches`) operational deltas following RFC 6902-style operations (`add`, `remove`, `replace`) without full tree deep cloning.
+  - **HistoryService Integration**: Upgraded `HistoryService` to record incremental delta patches alongside structural snapshots, facilitating high-frequency undo/redo operations with lightweight memory footprints.
+  - **Automated Test Coverage**: Added test suite `test-document-patch-immutability.ts` (Suite 52) verifying 20 assertions covering structural reference preservation, bi-directional delta generation, patch replay, and undo stack integration.
+
+---
+
 ## [0.103.7] - 2026-11-12
 
 ### 🏛️ Architecture & Migration Alignment

@@ -2,6 +2,7 @@ import { VectorModel, Point } from '../engine/VectorModel.js';
 import { SelectionTool } from '../engine/SelectionTool.js';
 import { CanvasManager } from '../engine/CanvasManager.js';
 import { DocumentState, DocumentStateFactory } from '../core/model/DocumentState.js';
+import { DocumentPatchEngine, TransactionalPatch } from '../core/model/DocumentPatch.js';
 
 export interface HistoryServiceContext {
   model: VectorModel;
@@ -36,6 +37,7 @@ export interface HistoryServiceContext {
 export class HistoryService {
   private undoStack: DocumentState[] = [];
   private redoStack: DocumentState[] = [];
+  private patchLog: TransactionalPatch[] = [];
   public maxHistory: number = 1000;
   private currentRevision: number = 1;
 
@@ -49,12 +51,23 @@ export class HistoryService {
     return this.redoStack.length;
   }
 
+  public get patchCount(): number {
+    return this.patchLog.length;
+  }
+
+  public getLatestPatch(): TransactionalPatch | null {
+    return this.patchLog.length > 0 ? this.patchLog[this.patchLog.length - 1] : null;
+  }
+
   public optimizeHistory(keepCount: number = 100): void {
     if (this.undoStack.length > keepCount) {
       this.undoStack = this.undoStack.slice(-keepCount);
     }
     if (this.redoStack.length > keepCount) {
       this.redoStack = this.redoStack.slice(-keepCount);
+    }
+    if (this.patchLog.length > keepCount) {
+      this.patchLog = this.patchLog.slice(-keepCount);
     }
   }
 
@@ -89,15 +102,19 @@ export class HistoryService {
   }
 
   public createSnapshot(): DocumentState {
-    return DocumentStateFactory.create({
-      revision: this.currentRevision++,
-      canvas: this.ctx.model.canvas,
-      elements: this.ctx.model.elements,
-      guides: this.ctx.canvasMgr.guides,
-      elementPivots: this.ctx.selectionTool.elementPivots,
-      customPivot: this.ctx.selectionTool.customPivot,
-      selection: this.ctx.selectionTool.selectedElementIds,
-    });
+    const lastSnapshot = this.undoStack.length > 0 ? this.undoStack[this.undoStack.length - 1] : undefined;
+    return DocumentStateFactory.createWithSharing(
+      {
+        revision: this.currentRevision++,
+        canvas: this.ctx.model.canvas,
+        elements: this.ctx.model.elements,
+        guides: this.ctx.canvasMgr.guides,
+        elementPivots: this.ctx.selectionTool.elementPivots,
+        customPivot: this.ctx.selectionTool.customPivot,
+        selection: this.ctx.selectionTool.selectedElementIds,
+      },
+      lastSnapshot
+    );
   }
 
   public isVisuallyIdentical(s1: DocumentState, s2: DocumentState): boolean {
@@ -120,6 +137,7 @@ export class HistoryService {
     for (let i = 0; i < s1.elements.length; i++) {
       const e1 = s1.elements[i];
       const e2 = s2.elements[i];
+      if (e1 === e2) continue; // Fast reference equality via structural sharing
       if (e1.id !== e2.id || e1.tagName !== e2.tagName) return false;
       const k1 = Object.keys(e1.attributes);
       const k2 = Object.keys(e2.attributes);
@@ -143,20 +161,29 @@ export class HistoryService {
     return true;
   }
 
-  public pushUndo(): void {
+  public pushUndo(description: string = 'User Action'): TransactionalPatch | null {
+    const prevSnapshot = this.undoStack.length > 0 ? this.undoStack[this.undoStack.length - 1] : undefined;
     const snapshot = this.createSnapshot();
     // Do not push redundant snapshots that produce zero visual changes
-    if (
-      this.undoStack.length > 0 &&
-      this.isVisuallyIdentical(this.undoStack[this.undoStack.length - 1], snapshot)
-    ) {
-      return;
+    if (prevSnapshot && this.isVisuallyIdentical(prevSnapshot, snapshot)) {
+      return null;
     }
+
+    let patch: TransactionalPatch | null = null;
+    if (prevSnapshot) {
+      patch = DocumentPatchEngine.createDiff(prevSnapshot, snapshot, description);
+      this.patchLog.push(patch);
+      if (this.patchLog.length > this.maxHistory) {
+        this.patchLog.shift();
+      }
+    }
+
     this.undoStack.push(snapshot);
     if (this.undoStack.length > this.maxHistory) {
       this.undoStack.shift();
     }
     this.redoStack = [];
+    return patch;
   }
 
   public undo(): boolean {
