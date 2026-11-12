@@ -3,6 +3,18 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.17] - 2026-11-12
+
+### 🎯 SVG Fidelity & Sidecar Integrity
+- **Standardized Sidecar Versioning & Cryptographic Integrity (`.svg.json` & `SidecarIntegrityService`)**:
+  - **Single Extension Standardization**: Unified companion metadata storage to `.svg.json` (resolving inconsistencies between `.json` and `.svg.json`) with seamless backward-compatible ingestion of legacy `.json` sidecars.
+  - **Cryptographic SVG Hashing (SHA-256)**: Implemented deterministic SVG normalization and hashing in `SidecarIntegrityService.computeSvgHash`. Detects if an SVG document was modified externally (Illustrator, Inkscape, Figma, text editors).
+  - **Safe Desynchronization Defense**: Discards obsolete companion element coordinates when cryptographic hashes diverge, preventing stale metadata injection and falling back safely to native W3C markup parsing and geometric shape re-detection.
+  - **Versioned Envelope Schema (`schemaVersion: 1`)**: Standardized sidecar envelope holding `schemaVersion`, `svgHash`, and clean persistent `metadata`.
+  - **Automated Test Coverage**: Added test suite `test-sidecar-integrity.ts` (Suite 60) verifying 7 assertions covering hashing, versioning, desynchronization detection, legacy fallback, and atomic persistence.
+
+---
+
 ## [0.103.16] - 2026-11-12
 
 ### 🔌 VS Code Integration & Git Sanitation

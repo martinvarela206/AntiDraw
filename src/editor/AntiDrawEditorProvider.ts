@@ -5,6 +5,7 @@ import { HostSaveValidator } from '../shared/validation/HostSaveValidator.js';
 import { AtomicFileWriter } from './AtomicFileWriter.js';
 import { AntiDrawCustomDocument } from './AntiDrawCustomDocument.js';
 import { SessionStateStorage, VolatileSessionState } from './SessionStateStorage.js';
+import { SidecarIntegrityService } from './SidecarIntegrityService.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Native CustomEditorProvider Lifecycle with Hot Exit & Git-Clean Session Storage
@@ -72,21 +73,43 @@ export class AntiDrawEditorProvider implements vscode.CustomEditorProvider<AntiD
    * Helper to resolve the companion sidecar JSON URI for an SVG document.
    */
   public getSidecarUri(svgUri: vscode.Uri): vscode.Uri {
-    const jsonPath = svgUri.path.replace(/\.svg$/i, '.json');
-    return svgUri.with({ path: jsonPath });
+    return SidecarIntegrityService.getSidecarUri(svgUri);
   }
 
   /**
-   * Reads companion sidecar metadata if available on disk, stripping any historical volatile keys.
+   * Reads companion sidecar metadata if available on disk, validating cryptographic hash against SVG content.
    */
-  public async readSidecarMetadata(svgUri: vscode.Uri): Promise<any> {
+  public async readSidecarMetadata(svgUri: vscode.Uri, svgContent?: string): Promise<any> {
     try {
-      const sidecarUri = this.getSidecarUri(svgUri);
-      const data = await vscode.workspace.fs.readFile(sidecarUri);
+      const canonicalUri = SidecarIntegrityService.getSidecarUri(svgUri);
+      let data: Uint8Array | null = null;
+
+      try {
+        data = await vscode.workspace.fs.readFile(canonicalUri);
+      } catch (_e) {
+        // Fallback to legacy .json if .svg.json is not yet created
+        try {
+          const legacyUri = SidecarIntegrityService.getLegacySidecarUri(svgUri);
+          data = await vscode.workspace.fs.readFile(legacyUri);
+        } catch (_legacyErr) {
+          return null;
+        }
+      }
+
+      if (!data) return null;
       const text = new TextDecoder('utf-8').decode(data);
-      const raw = JSON.parse(text);
-      const { persistent } = SessionStateStorage.splitMetadata(raw);
-      return persistent;
+      const result = SidecarIntegrityService.unpackageSidecar(text, svgContent || '');
+
+      if (!result.isValid) return null;
+
+      if (result.isDesynchronized) {
+        vscode.window.showWarningMessage(
+          `[AntiDraw] El archivo SVG (${svgUri.path.split('/').pop()}) fue modificado externamente (hash desincronizado). Se omitieron los metadatos desfasados del sidecar para evitar inconsistencias geométricas.`
+        );
+        return null;
+      }
+
+      return result.metadata;
     } catch (_e) {
       return null;
     }
@@ -165,7 +188,7 @@ export class AntiDrawEditorProvider implements vscode.CustomEditorProvider<AntiD
         // Generate new .adrw container from SVG
         const svgBytes = await vscode.workspace.fs.readFile(uri);
         const svgText = new TextDecoder('utf-8').decode(svgBytes);
-        const sidecarMeta = await this.readSidecarMetadata(uri);
+        const sidecarMeta = await this.readSidecarMetadata(uri, svgText);
         container = AdrwProjectService.createFromSvg(svgText, baseFileName, sidecarMeta);
         const serialized = AdrwProjectService.serializeContainer(container);
         await AtomicFileWriter.write(vscode.workspace.fs, adrwUri, new TextEncoder().encode(serialized));
@@ -450,10 +473,14 @@ export class AntiDrawEditorProvider implements vscode.CustomEditorProvider<AntiD
     const targetUri = document.isAdrw ? document.uri : document.adrwUri;
     await AtomicFileWriter.write(vscode.workspace.fs, targetUri, new TextEncoder().encode(serialized));
 
-    // For SVG documents: also synchronize clean companion sidecar JSON if companionMetadata exists
+    // For SVG documents: also synchronize clean companion sidecar JSON (.svg.json) with hash
     if (!document.isAdrw && document.container.companionMetadata) {
-      const sidecarUri = this.getSidecarUri(document.uri);
-      const sidecarText = JSON.stringify(document.container.companionMetadata, null, 2);
+      const sidecarUri = SidecarIntegrityService.getSidecarUri(document.uri);
+      const payload = SidecarIntegrityService.packageSidecar(
+        document.container.svgContent,
+        document.container.companionMetadata
+      );
+      const sidecarText = JSON.stringify(payload, null, 2);
       await AtomicFileWriter.write(vscode.workspace.fs, sidecarUri, new TextEncoder().encode(sidecarText));
     }
 

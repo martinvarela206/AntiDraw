@@ -256,7 +256,7 @@ export async function runCustomDocumentLifecycleTests(): Promise<boolean> {
 
   await test('saveCustomDocument for SVG documents writes clean sidecar JSON without volatile Git noise', async () => {
     const svgUri = Uri.file('/test-workspace/drawing.svg') as any;
-    const sidecarUri = Uri.file('/test-workspace/drawing.json') as any;
+    const sidecarUri = Uri.file('/test-workspace/drawing.svg.json') as any;
 
     const mockContext = createMockContext();
     const provider = new AntiDrawEditorProvider(mockContext);
@@ -288,16 +288,19 @@ export async function runCustomDocumentLifecycleTests(): Promise<boolean> {
 
     assert(mockFsStorage.has(sidecarUri.path), 'Sidecar JSON was written to fs');
     const sidecarBytes = mockFsStorage.get(sidecarUri.path)!;
-    const sidecarJson = JSON.parse(new TextDecoder('utf-8').decode(sidecarBytes));
+    const sidecarEnvelope = JSON.parse(new TextDecoder('utf-8').decode(sidecarBytes));
+
+    assert.equal(sidecarEnvelope.schemaVersion, 1);
+    const meta = sidecarEnvelope.metadata || sidecarEnvelope;
 
     // Verify ZERO volatile keys in sidecar JSON!
-    assert.equal(sidecarJson.zoom, undefined, 'No zoom in on-disk sidecar');
-    assert.equal(sidecarJson.cameraOffset, undefined, 'No cameraOffset in on-disk sidecar');
-    assert.equal(sidecarJson.undoStack, undefined, 'No undoStack in on-disk sidecar');
+    assert.equal(meta.zoom, undefined, 'No zoom in on-disk sidecar');
+    assert.equal(meta.cameraOffset, undefined, 'No cameraOffset in on-disk sidecar');
+    assert.equal(meta.undoStack, undefined, 'No undoStack in on-disk sidecar');
 
     // Verify persistent properties are intact
-    assert.deepEqual(sidecarJson.guides, [{ axis: 'x', pos: 100 }]);
-    assert.deepEqual(sidecarJson.elements, { rect_1: { 'data-shape': 'rect' } });
+    assert.deepEqual(meta.guides, [{ axis: 'x', pos: 100 }]);
+    assert.deepEqual(meta.elements, { rect_1: { 'data-shape': 'rect' } });
   });
 
   console.log(`\nResults: ${passed} passed, 0 failed.`);
