@@ -3,5 +3,6 @@
   "antidraw.description": "Встроенный векторный графический редактор SVG-файлов, вдохновленный CorelDraw и Figma.",
   "antidraw.editor.displayName": "Редактор SVG AntiDraw",
   "antidraw.projectEditor.displayName": "Редактор проектов AntiDraw (.adrw)",
-  "antidraw.command.openEditor": "Открыть в редакторе SVG AntiDraw"
+  "antidraw.command.openEditor": "Открыть в редакторе SVG AntiDraw",
+  "antidraw.untrustedWorkspaces.description": "AntiDraw безопасно визуализирует и редактирует файлы SVG и .adrw со строгой санитарной обработкой с нулевым доверием в ограниченном режиме."
 }

@@ -406,7 +406,7 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   ${baseTag}
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} data: blob:; style-src 'unsafe-inline' ${webview.cspSource}; script-src 'nonce-${nonce}'; font-src ${webview.cspSource} https://fonts.gstatic.com;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} data: blob:; style-src 'unsafe-inline' ${webview.cspSource}; script-src 'nonce-${nonce}'; font-src ${webview.cspSource} https://fonts.gstatic.com; connect-src 'none'; object-src 'none'; form-action 'none';">
   <title>AntiDraw SVG Vector Editor</title>
   <link rel="stylesheet" href="${styleUri}">
 </head>

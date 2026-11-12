@@ -3,5 +3,6 @@
   "antidraw.description": "灵感源自 CorelDraw 与 Figma 的 VS Code 原生集成 SVG 矢量图形编辑器。",
   "antidraw.editor.displayName": "AntiDraw SVG 编辑器",
   "antidraw.projectEditor.displayName": "AntiDraw 项目编辑器 (.adrw)",
-  "antidraw.command.openEditor": "使用 AntiDraw SVG 编辑器打开"
+  "antidraw.command.openEditor": "使用 AntiDraw SVG 编辑器打开",
+  "antidraw.untrustedWorkspaces.description": "AntiDraw 在受限模式下通过严格的零信任净化安全地查看和编辑 SVG 及 .adrw 文件。"
 }

@@ -2,7 +2,7 @@
   "name": "antidraw",
   "displayName": "%antidraw.displayName%",
   "description": "%antidraw.description%",
-  "version": "0.103.1",
+  "version": "0.103.2",
   "icon": "icon.png",
   "publisher": "martinvarela206",
   "author": {
@@ -59,6 +59,12 @@
     "Visualization",
     "Other"
   ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true,
+      "description": "%antidraw.untrustedWorkspaces.description%"
+    }
+  },
   "activationEvents": [
     "onCustomEditor:antidraw.projectEditor",
     "onCustomEditor:antidraw.svgEditor"
@@ -105,7 +111,7 @@
     "version:bump": "node scripts/sync-version.js",
     "package": "pnpm run build && vsce package --no-dependencies",
     "publish:marketplace": "vsce publish --no-dependencies",
-    "publish:openvsx": "npx -y ovsx publish antidraw-0.103.1.vsix"
+    "publish:openvsx": "npx -y ovsx publish antidraw-0.103.2.vsix"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

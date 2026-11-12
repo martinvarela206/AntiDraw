@@ -3,5 +3,6 @@
   "antidraw.description": "Integrated vector graphics editor for SVG files inspired by CorelDraw and Figma.",
   "antidraw.editor.displayName": "AntiDraw SVG Editor",
   "antidraw.projectEditor.displayName": "AntiDraw Project Editor (.adrw)",
-  "antidraw.command.openEditor": "Open with AntiDraw SVG Editor"
+  "antidraw.command.openEditor": "Open with AntiDraw SVG Editor",
+  "antidraw.untrustedWorkspaces.description": "AntiDraw visualizes and edits SVG and .adrw files safely with strict zero-trust sanitization in Restricted Mode."
 }
