@@ -3,6 +3,17 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.3] - 2026-11-12
+
+### 🛡️ Security & Integrity
+- **Strict Host Save Validation (`HostSaveValidator`) & Atomic Disk Write (`AtomicFileWriter`)**:
+  - **Geometric Numerical Integrity**: Enforced strict pre-save validation guarding against corrupt tokens (`NaN`, `Infinity`, `-Infinity`, `undefined`, `[object Object]`) inside geometric attributes (`d`, `points`, `transform`, coordinates, dimensions).
+  - **Catastrophic Loss & Wipeout Protection**: Added automated checks comparing incoming geometric node counts against previous file state, blocking sudden 100% wipeouts or anomalous drops (>85% node loss) caused by serialization errors or IPC glitches.
+  - **Atomic File Replacement**: Implemented `AtomicFileWriter` using temporary file creation and atomic replacement (`fs.rename` with overwrite) with automatic cleanup on failure, guaranteeing zero file truncation or corrupted files on disk during power outages or process interrupts.
+  - **Automated Test Coverage**: Added test suite `test-host-save-validator.ts` (Suite 47) verifying 20 assertions covering edge cases, attribute corruption, node drops, and atomic write rollback.
+
+---
+
 ## [0.103.2] - 2026-11-12
 
 ### 🛡️ Security & Hardening

@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
 import { AdrwProjectService, AdrwContainer } from '../webview/engine/project/AdrwContainer.js';
 import { IpcValidator } from '../shared/ipc/IpcContracts.js';
+import { HostSaveValidator } from '../shared/validation/HostSaveValidator.js';
+import { AtomicFileWriter } from './AtomicFileWriter.js';
 
 export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
   public static readonly viewType = 'antidraw.svgEditor';
@@ -133,13 +135,9 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
 
         case 'updateDocument': {
           if (message.text !== undefined) {
-            if (
-              typeof message.text !== 'string' ||
-              message.text.trim().length < 20 ||
-              !message.text.toLowerCase().includes('<svg') ||
-              !message.text.toLowerCase().includes('</svg>')
-            ) {
-              vscode.window.showErrorMessage('[AntiDraw] SafeSave: Se rechazó la sobreescritura del archivo con un SVG inválido o truncado.');
+            const validation = HostSaveValidator.validateSvgIntegrity(message.text, container.svgContent);
+            if (!validation.isValid) {
+              vscode.window.showErrorMessage(`[AntiDraw] SafeSave: ${validation.error}`);
               break;
             }
 
@@ -161,9 +159,9 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
                 setTimeout(() => { pendingWebviewEdits = Math.max(0, pendingWebviewEdits - 1); }, 150);
               }
             } else {
-              // Direct writes to companion .adrw, SVG is untouched
+              // Direct atomic writes to companion .adrw, SVG is untouched
               lastSavedText = serialized;
-              await vscode.workspace.fs.writeFile(adrwUri, new TextEncoder().encode(serialized));
+              await AtomicFileWriter.write(vscode.workspace.fs, adrwUri, new TextEncoder().encode(serialized));
             }
           }
           break;
@@ -190,7 +188,7 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
               }
             } else {
               lastSavedText = serialized;
-              await vscode.workspace.fs.writeFile(adrwUri, new TextEncoder().encode(serialized));
+              await AtomicFileWriter.write(vscode.workspace.fs, adrwUri, new TextEncoder().encode(serialized));
             }
           }
           break;
@@ -200,8 +198,15 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
           try {
             const { filename, content } = message;
             const targetFileName = filename || (baseFileName.replace(/\.(adrw|svg)$/i, '') + '.svg');
+            if (targetFileName.toLowerCase().endsWith('.svg')) {
+              const validation = HostSaveValidator.validateSvgIntegrity(content, undefined, { allowEmpty: true });
+              if (!validation.isValid) {
+                vscode.window.showErrorMessage(`[AntiDraw] SafeSave: Exportación rechazada: ${validation.error}`);
+                break;
+              }
+            }
             const targetUri = vscode.Uri.joinPath(docDir, targetFileName);
-            await vscode.workspace.fs.writeFile(targetUri, new TextEncoder().encode(content));
+            await AtomicFileWriter.write(vscode.workspace.fs, targetUri, new TextEncoder().encode(content));
             vscode.window.showInformationMessage(`[AntiDraw] Archivo SVG exportado con éxito: ${targetFileName}`);
           } catch (err: any) {
             vscode.window.showErrorMessage(`[AntiDraw] Error al exportar archivo SVG: ${err?.message || err}`);
