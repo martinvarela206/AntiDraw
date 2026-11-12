@@ -5,19 +5,34 @@
  * Envoltorio de contención que captura cualquier excepción inesperada en el ciclo
  * de interacción o ejecución de comandos, ejecuta el rollback correspondiente
  * y notifica al usuario sin permitir que la sesión del Webview se rompa o se congele.
+ * 
+ * Inversión de dependencias: Desacoplado de VsCodeBridge (L4) mediante el puerto INotifier.
  */
 
-import { VsCodeBridge } from '../../bridge/VsCodeBridge.js';
+import { INotifier } from './INotifier.js';
 
 export type FallbackCallback = (error: unknown) => void;
 
 export class CrashGuard {
+  private static defaultNotifier: INotifier | null = null;
+
+  constructor(private readonly notifier: INotifier | null = null) {}
+
   /**
-   * Ejecuta una acción síncrona dentro de una barrera de protección.
-   * Si la tarea lanza una excepción, se ejecuta el rollback, se notifica el fallo
-   * y se retorna null sin propagar el crash al runtime de la ventana.
+   * Configura el notificador global por defecto (ej. conectado en CoreServiceRegistry).
    */
-  public static runSafe<T>(
+  public static setNotifier(notifier: INotifier | null): void {
+    CrashGuard.defaultNotifier = notifier;
+  }
+
+  public static getNotifier(): INotifier | null {
+    return CrashGuard.defaultNotifier;
+  }
+
+  /**
+   * Ejecuta una acción síncrona dentro de una barrera de protección de instancia.
+   */
+  public runSafe<T>(
     actionName: string,
     task: () => T,
     fallback?: FallbackCallback
@@ -31,9 +46,9 @@ export class CrashGuard {
   }
 
   /**
-   * Ejecuta una acción asíncrona dentro de una barrera de protección.
+   * Ejecuta una acción asíncrona dentro de una barrera de protección de instancia.
    */
-  public static async runSafeAsync<T>(
+  public async runSafeAsync<T>(
     actionName: string,
     task: () => Promise<T>,
     fallback?: FallbackCallback
@@ -47,12 +62,63 @@ export class CrashGuard {
   }
 
   /**
-   * Procesa de forma centralizada la excepción capturada.
+   * Ejecuta una acción síncrona dentro de una barrera estática.
    */
-  private static handleException(
+  public static runSafe<T>(
+    actionName: string,
+    task: () => T,
+    fallback?: FallbackCallback
+  ): T | null {
+    try {
+      return task();
+    } catch (error) {
+      CrashGuard.handleStaticException(actionName, error, fallback);
+      return null;
+    }
+  }
+
+  /**
+   * Ejecuta una acción asíncrona dentro de una barrera estática.
+   */
+  public static async runSafeAsync<T>(
+    actionName: string,
+    task: () => Promise<T>,
+    fallback?: FallbackCallback
+  ): Promise<T | null> {
+    try {
+      return await task();
+    } catch (error) {
+      CrashGuard.handleStaticException(actionName, error, fallback);
+      return null;
+    }
+  }
+
+  private handleException(
     actionName: string,
     error: unknown,
     fallback?: FallbackCallback
+  ): void {
+    CrashGuard.dispatchException(
+      actionName,
+      error,
+      fallback,
+      this.notifier || CrashGuard.defaultNotifier
+    );
+  }
+
+  private static handleStaticException(
+    actionName: string,
+    error: unknown,
+    fallback?: FallbackCallback
+  ): void {
+    CrashGuard.dispatchException(actionName, error, fallback, CrashGuard.defaultNotifier);
+  }
+
+  private static dispatchException(
+    actionName: string,
+    error: unknown,
+    fallback?: FallbackCallback,
+    notifier?: INotifier | null
   ): void {
     const errorMsg = error instanceof Error ? error.message : String(error);
     console.error(`[AntiDraw CrashGuard] Error controlado en '${actionName}':`, error);
@@ -69,11 +135,13 @@ export class CrashGuard {
     }
 
     try {
-      VsCodeBridge.getInstance().showInfo(
-        `AntiDraw contuvo un error en '${actionName}': ${errorMsg}. Tu trabajo no se ha perdido.`
-      );
+      if (notifier) {
+        notifier.showInfo(
+          `AntiDraw contuvo un error en '${actionName}': ${errorMsg}. Tu trabajo no se ha perdido.`
+        );
+      }
     } catch {
-      // Ignorar fallo de notificación si el puente no está inicializado
+      // Ignorar fallo si el notificador falla
     }
   }
 }

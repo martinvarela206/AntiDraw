@@ -3,6 +3,17 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.5] - 2026-11-12
+
+### 🏛️ Architecture & Refactoring
+- **Layer 3 / Layer 4 Inversion of Control in CrashGuard (`INotifier` Port)**:
+  - **Strict Layer Decoupling**: Completely severed the compile-time dependency of Layer 3 (`CrashGuard`) on Layer 4 (`VsCodeBridge`) by defining the `INotifier` port (`showInfo`, `showError`, `showWarning`).
+  - **Constructor & Static Port Injection**: Refactored `CrashGuard` (both in `engine/guard` and `services`) to accept any `INotifier` via constructor and static setters, enabling headless testability and execution without browser or VS Code host dependencies.
+  - **Composition Root Binding**: Bound `VsCodeBridge.getInstance()` at the application composition root in `CoreServiceRegistry.ts`.
+  - **Automated Test Coverage**: Added test suite `test-crashguard-inversion.ts` (Suite 49) verifying 15 assertions of synchronous/asynchronous fault containment and history rollback with mock notifiers.
+
+---
+
 ## [0.103.4] - 2026-11-12
 
 ### 🛡️ Security & Hardening

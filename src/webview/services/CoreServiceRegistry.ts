@@ -13,6 +13,8 @@ import { ToolSuite } from '../tools/ToolFactory.js';
 import { OverlayRenderer } from '../engine/OverlayRenderer.js';
 import { SvgDomRenderer } from '../engine/canvas/SvgDomRenderer.js';
 import { CrashGuard } from './CrashGuard.js';
+import { CrashGuard as EngineCrashGuard } from '../engine/guard/CrashGuard.js';
+import { VsCodeBridge } from '../bridge/VsCodeBridge.js';
 
 export interface CoreServiceContext {
   model: VectorModel;
@@ -75,9 +77,12 @@ export class CoreServiceRegistry {
       onUpdatePropertyPanel: () => ctx.getLayoutMgr()?.propertyPanel.update(null, 'select'),
     });
 
+    const bridge = VsCodeBridge.getInstance();
+    EngineCrashGuard.setNotifier(bridge);
     const crashGuard = new CrashGuard({
       historyService,
       render: () => workspaceLayout.render(),
+      notifier: bridge,
     });
 
     const actionDispatcher = new CanvasActionDispatcher({

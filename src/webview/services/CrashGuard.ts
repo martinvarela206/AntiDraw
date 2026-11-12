@@ -1,9 +1,10 @@
 import { HistoryService } from './HistoryService.js';
-import { VsCodeBridge } from '../bridge/VsCodeBridge.js';
+import type { INotifier } from '../engine/guard/INotifier.js';
 
 export interface CrashGuardContext {
   historyService: HistoryService;
   render: () => void;
+  notifier?: INotifier;
   reportStatusError?: (msg: string) => void;
 }
 
@@ -20,9 +21,8 @@ export interface CrashGuardContext {
  *    operations. If an unhandled exception or geometric degeneracy occurs, it rolls back
  *    to the pre-operation snapshot in O(1).
  *
- * 3. Graceful User Notification:
- *    Emits a controlled warning to VS Code and the status bar while keeping the document
- *    interactive and ready to save.
+ * 3. Inverted Notification Port:
+ *    Decoupled from VsCodeBridge via INotifier port injection, keeping L3 independent of L4.
  */
 export class CrashGuard {
   constructor(private ctx: CrashGuardContext) {}
@@ -40,9 +40,11 @@ export class CrashGuard {
       this.ctx.historyService.applyState(fallback);
       this.ctx.render();
 
-      VsCodeBridge.getInstance().showError(
-        `AntiDraw: Se recuperó el lienzo tras un fallo en '${operationName}': ${errMsg}`
-      );
+      if (this.ctx.notifier) {
+        this.ctx.notifier.showError(
+          `AntiDraw: Se recuperó el lienzo tras un fallo en '${operationName}': ${errMsg}`
+        );
+      }
       this.ctx.reportStatusError?.(`Error en ${operationName} (revertido)`);
       return null;
     }
