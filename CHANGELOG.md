@@ -3,6 +3,18 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.15] - 2026-11-12
+
+### 🔌 VS Code Integration & Document Lifecycle
+- **Native CustomDocument Lifecycle & Hot Exit Support (`AntiDrawCustomDocument` & `AntiDrawEditorProvider`)**:
+  - **Native Document Abstraction (`AntiDrawCustomDocument`)**: Transitioned from legacy `CustomTextEditorProvider` (reliant on synthetic text buffer replacements) to native `vscode.CustomEditorProvider<AntiDrawCustomDocument>`.
+  - **Hot Exit & Crash Recovery (`backupCustomDocument` & `backupId`)**: Implemented full `backupCustomDocument` writing current in-memory container state to VS Code's backup destination. Seamlessly restores uncommitted drafts on startup via `openCustomDocument` when `openContext.backupId` is detected.
+  - **Revert & External Synchronization (`revertCustomDocument`)**: Implemented `revertCustomDocument` to discard transient edits, reload committed state from disk, and broadcast `loadSvg` reload events to all registered webview panels.
+  - **Accurate Dirty State Coordination (`onDidChangeCustomDocument`)**: Coordinated `CustomDocumentContentChangeEvent` emissions with webview edit messages (`updateDocument`, `updateMetadata`), giving VS Code precise control over editor dirty state, auto-save, and save confirmation dialogues.
+  - **Automated Test Coverage**: Added test suite `test-custom-document-lifecycle.ts` (Suite 59) verifying 7 assertions covering custom document lifecycle, Hot Exit restoration, atomic saving, revert, and backup deletion callbacks.
+
+---
+
 ## [0.103.14] - 2026-11-12
 
 ### 🎯 SVG Fidelity & Zero Corruption W3C

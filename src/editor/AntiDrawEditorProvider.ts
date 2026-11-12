@@ -3,10 +3,37 @@ import { AdrwProjectService, AdrwContainer } from '../webview/engine/project/Adr
 import { IpcValidator } from '../shared/ipc/IpcContracts.js';
 import { HostSaveValidator } from '../shared/validation/HostSaveValidator.js';
 import { AtomicFileWriter } from './AtomicFileWriter.js';
+import { AntiDrawCustomDocument } from './AntiDrawCustomDocument.js';
 
-export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
+/**
+ * ARCHITECTURAL RATIONALE: Native CustomEditorProvider Lifecycle with Hot Exit & Dirty State Governance
+ *
+ * 1. Native CustomEditorProvider Contract:
+ *    Migrated from CustomTextEditorProvider (which relied on synthetic WorkspaceEdit text buffer replacements)
+ *    to vscode.CustomEditorProvider<AntiDrawCustomDocument>. This provides first-class custom document
+ *    lifecycle management, eliminating race conditions, serialization churn, and document position calculation bugs.
+ *
+ * 2. Hot Exit & Crash Recovery (backupCustomDocument & openCustomDocument from backupId):
+ *    Full implementation of `backupCustomDocument` writing current in-memory project snapshots to the VS Code
+ *    backup directory. On startup or window reload, `openCustomDocument` detects `openContext.backupId` and
+ *    restores unsaved work with zero data loss.
+ *
+ * 3. Revert & External Sync Coordination (revertCustomDocument):
+ *    Implements `revertCustomDocument` to discard transient dirty state, reload the committed disk version,
+ *    and broadcast clean `loadSvg` synchronization messages to all connected webview panels.
+ *
+ * 4. Dirty State Governance (onDidChangeCustomDocument):
+ *    Emits `CustomDocumentContentChangeEvent` whenever the webview dispatches `updateDocument` or `updateMetadata`,
+ *    allowing VS Code to accurately display dirty status (the tab dot indicator) and govern save/auto-save timing.
+ */
+export class AntiDrawEditorProvider implements vscode.CustomEditorProvider<AntiDrawCustomDocument> {
   public static readonly viewType = 'antidraw.svgEditor';
   public static readonly projectEditorViewType = 'antidraw.projectEditor';
+
+  private readonly _onDidChangeCustomDocument = new vscode.EventEmitter<
+    vscode.CustomDocumentContentChangeEvent<AntiDrawCustomDocument>
+  >();
+  public readonly onDidChangeCustomDocument = this._onDidChangeCustomDocument.event;
 
   public static register(context: vscode.ExtensionContext): vscode.Disposable {
     const provider = new AntiDrawEditorProvider(context);
@@ -35,54 +62,69 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
 
   constructor(private readonly context: vscode.ExtensionContext) {}
 
-  public async resolveCustomTextEditor(
-    document: vscode.TextDocument,
-    webviewPanel: vscode.WebviewPanel,
+  /**
+   * Helper to resolve the companion sidecar JSON URI for an SVG document.
+   */
+  public getSidecarUri(svgUri: vscode.Uri): vscode.Uri {
+    const jsonPath = svgUri.path.replace(/\.svg$/i, '.json');
+    return svgUri.with({ path: jsonPath });
+  }
+
+  /**
+   * Reads companion sidecar metadata if available on disk.
+   */
+  public async readSidecarMetadata(svgUri: vscode.Uri): Promise<any> {
+    try {
+      const sidecarUri = this.getSidecarUri(svgUri);
+      const data = await vscode.workspace.fs.readFile(sidecarUri);
+      const text = new TextDecoder('utf-8').decode(data);
+      return JSON.parse(text);
+    } catch (_e) {
+      return null;
+    }
+  }
+
+  /**
+   * Opens or creates an AntiDrawCustomDocument for a given resource URI.
+   * Handles Hot Exit restoration when backupId is present.
+   */
+  public async openCustomDocument(
+    uri: vscode.Uri,
+    openContext: vscode.CustomDocumentOpenContext,
     _token: vscode.CancellationToken
-  ): Promise<void> {
-    const docDir = vscode.Uri.joinPath(document.uri, '..');
-    const isAdrwDocument = document.uri.path.toLowerCase().endsWith('.adrw');
-    const baseFileName = document.uri.path.split('/').pop() || (isAdrwDocument ? 'untitled.adrw' : 'untitled.svg');
+  ): Promise<AntiDrawCustomDocument> {
+    const docDir = vscode.Uri.joinPath(uri, '..');
+    const isAdrwDocument = uri.path.toLowerCase().endsWith('.adrw');
+    const baseFileName = uri.path.split('/').pop() || (isAdrwDocument ? 'untitled.adrw' : 'untitled.svg');
     const adrwUri = isAdrwDocument
-      ? document.uri
-      : document.uri.with({ path: document.uri.path.replace(/\.svg$/i, '.adrw') });
+      ? uri
+      : uri.with({ path: uri.path.replace(/\.svg$/i, '.adrw') });
 
-    webviewPanel.webview.options = {
-      enableScripts: true,
-      localResourceRoots: [
-        this.context.extensionUri,
-        vscode.Uri.joinPath(this.context.extensionUri, 'dist'),
-        vscode.Uri.joinPath(this.context.extensionUri, 'media'),
-        docDir,
-        ...(vscode.workspace.workspaceFolders?.map((f) => f.uri) || []),
-      ],
-    };
-
-    webviewPanel.webview.html = this.getHtmlForWebview(webviewPanel.webview, docDir);
-
-    let pendingWebviewEdits = 0;
     let container: AdrwContainer;
 
-    // Helper to get sidecar JSON URI for an SVG document
-    const getSidecarUri = (svgUri: vscode.Uri): vscode.Uri => {
-      const jsonPath = svgUri.path.replace(/\.svg$/i, '.json');
-      return svgUri.with({ path: jsonPath });
-    };
-
-    const readSidecarMetadata = async (): Promise<any> => {
+    // 1. Hot Exit Recovery: Restore uncommitted draft from backup if provided
+    if (openContext.backupId) {
       try {
-        const sidecarUri = getSidecarUri(document.uri);
-        const data = await vscode.workspace.fs.readFile(sidecarUri);
-        const text = new TextDecoder('utf-8').decode(data);
-        return JSON.parse(text);
-      } catch (_e) {
-        return null;
+        const backupUri = vscode.Uri.parse(openContext.backupId);
+        const backupData = await vscode.workspace.fs.readFile(backupUri);
+        const backupText = new TextDecoder('utf-8').decode(backupData);
+        container = AdrwProjectService.parseContainer(backupText, baseFileName);
+        vscode.window.showInformationMessage(
+          `[AntiDraw] Restaurado documento no guardado desde copia de seguridad Hot Exit (${baseFileName}).`
+        );
+        const doc = new AntiDrawCustomDocument(uri, container, isAdrwDocument, baseFileName, adrwUri, docDir);
+        doc.setDirty(true);
+        return doc;
+      } catch (err) {
+        console.warn('[AntiDraw] Falló la restauración de backup Hot Exit, cargando desde archivo de origen:', err);
       }
-    };
+    }
 
-    // Initialize or load container
+    // 2. Normal Document Loading
     if (isAdrwDocument) {
-      container = AdrwProjectService.parseContainer(document.getText(), baseFileName);
+      const data = await vscode.workspace.fs.readFile(uri);
+      const text = new TextDecoder('utf-8').decode(data);
+      container = AdrwProjectService.parseContainer(text, baseFileName);
     } else {
       // SVG opened: check if companion .adrw already exists
       try {
@@ -91,33 +133,56 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
         container = AdrwProjectService.parseContainer(adrwText, baseFileName);
       } catch (_e) {
         // Generate new .adrw container from SVG
-        const sidecarMeta = await readSidecarMetadata();
-        container = AdrwProjectService.createFromSvg(document.getText(), baseFileName, sidecarMeta);
+        const svgBytes = await vscode.workspace.fs.readFile(uri);
+        const svgText = new TextDecoder('utf-8').decode(svgBytes);
+        const sidecarMeta = await this.readSidecarMetadata(uri);
+        container = AdrwProjectService.createFromSvg(svgText, baseFileName, sidecarMeta);
         const serialized = AdrwProjectService.serializeContainer(container);
-        await vscode.workspace.fs.writeFile(adrwUri, new TextEncoder().encode(serialized));
+        await AtomicFileWriter.write(vscode.workspace.fs, adrwUri, new TextEncoder().encode(serialized));
         vscode.window.showInformationMessage(
           `[AntiDraw] Contenedor .adrw generado (${adrwUri.path.split('/').pop()}). Los cambios se guardan exclusivamente en el contenedor .adrw; el SVG original permanece protegido.`
         );
       }
     }
 
-    let lastSavedText: string = isAdrwDocument ? document.getText() : AdrwProjectService.serializeContainer(container);
+    return new AntiDrawCustomDocument(uri, container, isAdrwDocument, baseFileName, adrwUri, docDir);
+  }
 
-    // Send initial content and metadata when webview notifies it is ready or on load
-    const updateWebview = async () => {
-      if (pendingWebviewEdits === 0) {
-        const docDirWebviewUri = webviewPanel.webview.asWebviewUri(docDir).toString().replace(/\/+$/, '');
-        webviewPanel.webview.postMessage({
-          type: 'loadSvg',
-          text: container.svgContent,
-          metadata: container.companionMetadata || null,
-          locale: vscode.env.language,
-          documentUri: isAdrwDocument ? document.uri.toString() : adrwUri.toString(),
-          documentDirUri: docDir.toString(),
-          documentDirWebviewUri: docDirWebviewUri,
-          fileName: baseFileName,
-        });
-      }
+  /**
+   * Resolves the webview panel for the custom document.
+   */
+  public async resolveCustomEditor(
+    document: AntiDrawCustomDocument,
+    webviewPanel: vscode.WebviewPanel,
+    _token: vscode.CancellationToken
+  ): Promise<void> {
+    document.registerPanel(webviewPanel);
+
+    webviewPanel.webview.options = {
+      enableScripts: true,
+      localResourceRoots: [
+        this.context.extensionUri,
+        vscode.Uri.joinPath(this.context.extensionUri, 'dist'),
+        vscode.Uri.joinPath(this.context.extensionUri, 'media'),
+        document.docDir,
+        ...(vscode.workspace.workspaceFolders?.map((f) => f.uri) || []),
+      ],
+    };
+
+    webviewPanel.webview.html = this.getHtmlForWebview(webviewPanel.webview, document.docDir);
+
+    const updateWebview = () => {
+      const docDirWebviewUri = webviewPanel.webview.asWebviewUri(document.docDir).toString().replace(/\/+$/, '');
+      webviewPanel.webview.postMessage({
+        type: 'loadSvg',
+        text: document.container.svgContent,
+        metadata: document.container.companionMetadata || null,
+        locale: vscode.env.language,
+        documentUri: document.isAdrw ? document.uri.toString() : document.adrwUri.toString(),
+        documentDirUri: document.docDir.toString(),
+        documentDirWebviewUri: docDirWebviewUri,
+        fileName: document.baseFileName,
+      });
     };
 
     // Receive messages from the webview with strict schema validation
@@ -130,66 +195,31 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
       const message = validation.message;
       switch (message.type) {
         case 'ready':
-          await updateWebview();
+          updateWebview();
           break;
 
         case 'updateDocument': {
           if (message.text !== undefined) {
-            const validation = HostSaveValidator.validateSvgIntegrity(message.text, container.svgContent);
+            const validation = HostSaveValidator.validateSvgIntegrity(message.text, document.container.svgContent);
             if (!validation.isValid) {
               vscode.window.showErrorMessage(`[AntiDraw] SafeSave: ${validation.error}`);
               break;
             }
 
-            container.svgContent = message.text;
-            container.metadata.modified = Date.now();
-            const serialized = AdrwProjectService.serializeContainer(container);
-
-            if (isAdrwDocument) {
-              if (serialized !== document.getText()) {
-                pendingWebviewEdits++;
-                lastSavedText = serialized;
-                const edit = new vscode.WorkspaceEdit();
-                const fullRange = new vscode.Range(
-                  document.positionAt(0),
-                  document.positionAt(document.getText().length)
-                );
-                edit.replace(document.uri, fullRange, serialized);
-                await vscode.workspace.applyEdit(edit);
-                setTimeout(() => { pendingWebviewEdits = Math.max(0, pendingWebviewEdits - 1); }, 150);
-              }
-            } else {
-              // Direct atomic writes to companion .adrw, SVG is untouched
-              lastSavedText = serialized;
-              await AtomicFileWriter.write(vscode.workspace.fs, adrwUri, new TextEncoder().encode(serialized));
-            }
+            document.container.svgContent = message.text;
+            document.container.metadata.modified = Date.now();
+            document.setDirty(true);
+            this._onDidChangeCustomDocument.fire({ document });
           }
           break;
         }
 
         case 'updateMetadata': {
           if (message.metadata !== undefined) {
-            container.companionMetadata = message.metadata;
-            container.metadata.modified = Date.now();
-            const serialized = AdrwProjectService.serializeContainer(container);
-
-            if (isAdrwDocument) {
-              if (serialized !== document.getText()) {
-                pendingWebviewEdits++;
-                lastSavedText = serialized;
-                const edit = new vscode.WorkspaceEdit();
-                const fullRange = new vscode.Range(
-                  document.positionAt(0),
-                  document.positionAt(document.getText().length)
-                );
-                edit.replace(document.uri, fullRange, serialized);
-                await vscode.workspace.applyEdit(edit);
-                setTimeout(() => { pendingWebviewEdits = Math.max(0, pendingWebviewEdits - 1); }, 150);
-              }
-            } else {
-              lastSavedText = serialized;
-              await AtomicFileWriter.write(vscode.workspace.fs, adrwUri, new TextEncoder().encode(serialized));
-            }
+            document.container.companionMetadata = message.metadata;
+            document.container.metadata.modified = Date.now();
+            document.setDirty(true);
+            this._onDidChangeCustomDocument.fire({ document });
           }
           break;
         }
@@ -197,7 +227,7 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
         case 'exportFile': {
           try {
             const { filename, content } = message;
-            const targetFileName = filename || (baseFileName.replace(/\.(adrw|svg)$/i, '') + '.svg');
+            const targetFileName = filename || (document.baseFileName.replace(/\.(adrw|svg)$/i, '') + '.svg');
             if (targetFileName.toLowerCase().endsWith('.svg')) {
               const validation = HostSaveValidator.validateSvgIntegrity(content, undefined, { allowEmpty: true });
               if (!validation.isValid) {
@@ -205,7 +235,7 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
                 break;
               }
             }
-            const targetUri = vscode.Uri.joinPath(docDir, targetFileName);
+            const targetUri = vscode.Uri.joinPath(document.docDir, targetFileName);
             await AtomicFileWriter.write(vscode.workspace.fs, targetUri, new TextEncoder().encode(content));
             vscode.window.showInformationMessage(`[AntiDraw] Archivo SVG exportado con éxito: ${targetFileName}`);
           } catch (err: any) {
@@ -217,11 +247,11 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
         case 'saveLinkedImage': {
           try {
             const { imageId, extension, base64Data, requestId } = message;
-            const baseFileName = (document.uri.path.split('/').pop() || 'drawing.svg').replace(/\.svg$/i, '');
+            const cleanBase = document.baseFileName.replace(/\.(adrw|svg)$/i, '');
             const cleanExt = (extension || 'png').replace(/^\./, '').toLowerCase();
             const cleanId = (imageId || Date.now().toString()).replace(/[^a-zA-Z0-9_-]/g, '_');
-            const targetFileName = `${baseFileName}_${cleanId}_img.${cleanExt}`;
-            const targetUri = vscode.Uri.joinPath(docDir, targetFileName);
+            const targetFileName = `${cleanBase}_${cleanId}_img.${cleanExt}`;
+            const targetUri = vscode.Uri.joinPath(document.docDir, targetFileName);
 
             const rawBase64 = (base64Data || '').replace(/^data:[^;]+;base64,/, '');
             const buffer = Buffer.from(rawBase64, 'base64');
@@ -355,27 +385,82 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
       }
     });
 
-    // Listen to document changes from external edits only
-    const changeDocumentSubscription = vscode.workspace.onDidChangeTextDocument(
-      (e) => {
-        if (e.document.uri.toString() === document.uri.toString()) {
-          if (pendingWebviewEdits === 0 && e.document.getText() !== lastSavedText) {
-            lastSavedText = e.document.getText();
-            if (isAdrwDocument) {
-              container = AdrwProjectService.parseContainer(lastSavedText, baseFileName);
-            }
-            updateWebview();
-          }
-        }
-      }
-    );
-
-    webviewPanel.onDidDispose(() => {
-      changeDocumentSubscription.dispose();
-    });
-
-    // Initial load push
+    // Send initial content
     updateWebview();
+  }
+
+  /**
+   * Persists the custom document to disk (Save command / Ctrl+S).
+   */
+  public async saveCustomDocument(
+    document: AntiDrawCustomDocument,
+    _cancellation: vscode.CancellationToken
+  ): Promise<void> {
+    const serialized = AdrwProjectService.serializeContainer(document.container);
+    const targetUri = document.isAdrw ? document.uri : document.adrwUri;
+    await AtomicFileWriter.write(vscode.workspace.fs, targetUri, new TextEncoder().encode(serialized));
+    document.setDirty(false);
+  }
+
+  /**
+   * Persists the custom document to a new target destination (Save As command).
+   */
+  public async saveCustomDocumentAs(
+    document: AntiDrawCustomDocument,
+    destination: vscode.Uri,
+    _cancellation: vscode.CancellationToken
+  ): Promise<void> {
+    const serialized = AdrwProjectService.serializeContainer(document.container);
+    await AtomicFileWriter.write(vscode.workspace.fs, destination, new TextEncoder().encode(serialized));
+  }
+
+  /**
+   * Discards uncommitted changes, reloads from disk, and notifies webviews (Revert command).
+   */
+  public async revertCustomDocument(
+    document: AntiDrawCustomDocument,
+    _cancellation: vscode.CancellationToken
+  ): Promise<void> {
+    const sourceUri = document.isAdrw ? document.uri : document.adrwUri;
+    const data = await vscode.workspace.fs.readFile(sourceUri);
+    const text = new TextDecoder('utf-8').decode(data);
+    document.container = AdrwProjectService.parseContainer(text, document.baseFileName);
+    document.setDirty(false);
+
+    document.broadcastMessage({
+      type: 'loadSvg',
+      text: document.container.svgContent,
+      metadata: document.container.companionMetadata || null,
+      locale: vscode.env.language,
+      documentUri: document.isAdrw ? document.uri.toString() : document.adrwUri.toString(),
+      documentDirUri: document.docDir.toString(),
+      fileName: document.baseFileName,
+    });
+  }
+
+  /**
+   * Hot Exit Backup implementation: persists uncommitted state to the destination provided by VS Code.
+   */
+  public async backupCustomDocument(
+    document: AntiDrawCustomDocument,
+    context: vscode.CustomDocumentBackupContext,
+    _cancellation: vscode.CancellationToken
+  ): Promise<vscode.CustomDocumentBackup> {
+    const serialized = AdrwProjectService.serializeContainer(document.container);
+    const buffer = new TextEncoder().encode(serialized);
+
+    await vscode.workspace.fs.writeFile(context.destination, buffer);
+
+    return {
+      id: context.destination.toString(),
+      delete: async () => {
+        try {
+          await vscode.workspace.fs.delete(context.destination, { useTrash: false });
+        } catch (_err) {
+          // Suppress deletion errors on temp cleanup
+        }
+      },
+    };
   }
 
   private getHtmlForWebview(webview: vscode.Webview, docDir?: vscode.Uri): string {
