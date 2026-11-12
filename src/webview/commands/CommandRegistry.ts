@@ -10,9 +10,11 @@
  */
 
 import { CrashGuard } from '../engine/guard/CrashGuard.js';
+import { VectorScene } from '../core/model/VectorScene.js';
 
 export interface CommandContext {
   model: any;
+  scene?: VectorScene;
   selectionTool?: any;
   canvasMgr?: any;
   actionDispatcher?: any;

@@ -3,6 +3,17 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.7] - 2026-11-12
+
+### 🏛️ Architecture & Migration Alignment
+- **Migration Phases Dependency Alignment & VectorScene Decoupling**:
+  - **Phase 1 Canonical VectorScene Contract**: Formally anchored `VectorScene` in Phase 1 (L0 pure in-memory scene graph) providing the canonical contract required by `CommandSpec` in Phase 2, resolving previous forward-dependency architectural paradoxes.
+  - **Decoupled Schneider Curve Fitting**: Decoupled the scene graph adoption from `SchneiderFit.ts`, isolating cubic curve fitting as an independent geometry operation for Boolean CAG without blocking scene-graph migration.
+  - **Hierarchical Group Support in VectorScene**: Enhanced `VectorScene.fromVectorElements` and `VectorScene.toVectorElements` with full recursive support for nested `<g>` group hierarchies.
+  - **Automated Test Coverage**: Added test suite `test-migration-phases-alignment.ts` (Suite 51) verifying 15 assertions covering pure scene manipulation, command precondition evaluation, and bidirectional serialization fidelity.
+
+---
+
 ## [0.103.6] - 2026-11-12
 
 ### 🛡️ Resilience & Fault Recovery

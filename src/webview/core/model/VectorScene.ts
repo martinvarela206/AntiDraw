@@ -120,6 +120,10 @@ export class VectorScene {
     return this.findInGroup(this.root, id);
   }
 
+  public findNodeById(id: string): SceneNode | null {
+    return this.findById(id);
+  }
+
   private findInGroup(group: GroupNode | LayerNode, id: string): SceneNode | null {
     for (const child of group.children) {
       if (child.id === id) return child;
@@ -152,6 +156,40 @@ export class VectorScene {
         this.collectNodes(child, acc);
       }
     }
+  }
+
+  public toVectorElements(): VectorElement[] {
+    const convertNode = (node: SceneNode): VectorElement => {
+      if (node.type === 'path') {
+        return {
+          id: node.id,
+          tagName: 'path',
+          attributes: { ...node.attributes, d: node.d },
+          vertices: node.vertices ? JSON.parse(JSON.stringify(node.vertices)) : undefined,
+          isClosed: node.isClosed,
+          shapeType: 'path',
+        };
+      } else if (node.type === 'shape') {
+        return {
+          id: node.id,
+          tagName: node.tagName,
+          attributes: { ...node.attributes },
+          vertices: node.vertices ? JSON.parse(JSON.stringify(node.vertices)) : undefined,
+          isClosed: node.isClosed,
+          shapeType: node.shapeType,
+          isParametric: true,
+        };
+      } else {
+        return {
+          id: node.id,
+          tagName: 'g',
+          attributes: { ...node.attributes },
+          children: node.children.map(convertNode),
+        };
+      }
+    };
+
+    return this.root.children.map(convertNode);
   }
 
   public getFlattenedElements(): VectorElement[] {
@@ -197,8 +235,26 @@ export class VectorScene {
       canvas.backgroundColor
     );
 
-    for (const el of elements) {
-      if (el.tagName === 'path') {
+    const convertEl = (el: VectorElement, parentId: string) => {
+      if (el.tagName === 'g') {
+        const groupNode: GroupNode = {
+          id: el.id,
+          name: el.attributes['data-name'] || `Group ${el.id}`,
+          type: 'group',
+          visible: el.attributes.display !== 'none',
+          locked: el.attributes['data-locked'] === 'true',
+          opacity: el.attributes.opacity !== undefined ? parseFloat(el.attributes.opacity) : 1,
+          attributes: { ...el.attributes },
+          parentId,
+          children: [],
+        };
+        scene.addNode(groupNode, parentId);
+        if (el.children) {
+          for (const child of el.children) {
+            convertEl(child, groupNode.id);
+          }
+        }
+      } else if (el.tagName === 'path') {
         const pathNode: PathNode = {
           id: el.id,
           name: el.attributes['data-name'] || `Path ${el.id}`,
@@ -210,9 +266,9 @@ export class VectorScene {
           vertices: el.vertices ? JSON.parse(JSON.stringify(el.vertices)) : [],
           isClosed: !!el.isClosed,
           d: el.attributes.d || '',
-          parentId: scene.root.id,
+          parentId,
         };
-        scene.addNode(pathNode);
+        scene.addNode(pathNode, parentId);
       } else {
         const shapeNode: ShapeNode = {
           id: el.id,
@@ -226,10 +282,14 @@ export class VectorScene {
           attributes: { ...el.attributes },
           vertices: el.vertices ? JSON.parse(JSON.stringify(el.vertices)) : undefined,
           isClosed: el.isClosed,
-          parentId: scene.root.id,
+          parentId,
         };
-        scene.addNode(shapeNode);
+        scene.addNode(shapeNode, parentId);
       }
+    };
+
+    for (const el of elements) {
+      convertEl(el, scene.root.id);
     }
 
     return scene;
