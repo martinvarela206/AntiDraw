@@ -3,6 +3,16 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.14] - 2026-11-12
+
+### 🎯 SVG Fidelity & Zero Corruption W3C
+- **Namespaced Proprietary Attribute Purging (`data-antidraw-*` and Internal Editor Keys)**:
+  - **Namespaced Attribute Delimitation**: Delimited attribute stripping strictly to AntiDraw internal namespaces (`data-antidraw-*`) and internal geometry/editor attributes (`data-shape`, `data-parametric`, `data-corner-*`, `data-ellipse-*`, `data-rect-*`, `data-star-*`, `data-blend*`, `data-marker-*`, etc.).
+  - **Third-Party & W3C SVG 2 Data Attribute Preservation**: Legitimate SVG 2 `data-*` attributes from external tools and web frameworks (such as `data-name`, `data-testid`, `data-lucide`, `data-cy`, `data-custom-*`, or `inkscape:*`) are preserved 100% intact through deserialization and serialization round-trips.
+  - **Automated Test Coverage**: Added test suite `test-namespaced-attribute-purge.ts` (Suite 58) verifying 3 assertions covering proprietary attribute purge, third-party preservation, and lossless round-trip serialization.
+
+---
+
 ## [0.103.13] - 2026-11-12
 
 ### 🎯 SVG Fidelity & Zero Corruption W3C

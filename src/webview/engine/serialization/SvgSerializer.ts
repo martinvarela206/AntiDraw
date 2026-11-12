@@ -498,16 +498,63 @@ export class SvgSerializer {
     }
 
     /**
-     * ARCHITECTURAL RATIONALE: Strict W3C SVG Cleanliness & Companion JSON Isolation (Rule 18 / FIX-SVG-01)
-     * All non-standard attributes prefixed with 'data-' (e.g. data-shape, data-parametric,
-     * data-corner-*, data-ellipse-type, data-inner-ratio, data-gradient, data-node-types, etc.)
-     * are strictly excluded from output SVG element tags. They are persisted exclusively to
-     * the companion .json file, maintaining pure standard W3C compliant SVG.
+     * ARCHITECTURAL RATIONALE: Namespaced Proprietary Attribute Purging (FIX-SVG-02)
+     * All proprietary AntiDraw editor attributes prefixed with 'data-antidraw-' or internal
+     * editor keys ('data-shape', 'data-parametric', 'data-corner-*', 'data-ellipse-type',
+     * 'data-inner-ratio', 'data-gradient', 'data-node-types', 'data-locked', 'data-area-type',
+     * 'data-flow-region-*', 'data-rect-*', 'data-star-*', 'data-appearance-*', 'data-contextual')
+     * are strictly purged during W3C serialization and persisted exclusively to companion .svg.json.
+     * Legitimate W3C SVG 2 data attributes and third-party namespaces (e.g. data-name, data-testid,
+     * data-user-*, inkscape:*, sodipodi:*) are preserved 100% intact.
      */
+    const isAntiDrawInternalAttribute = (key: string): boolean => {
+      if (key.startsWith('data-antidraw-')) return true;
+      if (
+        key.startsWith('data-corner') ||
+        key.startsWith('data-ellipse-') ||
+        key.startsWith('data-rect-') ||
+        key.startsWith('data-star-') ||
+        key.startsWith('data-polygon-') ||
+        key.startsWith('data-blend') ||
+        key.startsWith('data-flow-region-') ||
+        key.startsWith('data-appearance-') ||
+        key.startsWith('data-marker-') ||
+        key.startsWith('data-dash-') ||
+        key.startsWith('data-stroke-') ||
+        key.startsWith('data-fill-') ||
+        key.startsWith('data-warp-') ||
+        key.startsWith('data-distort-') ||
+        key.startsWith('data-orig-')
+      ) {
+        return true;
+      }
+      const ANTIDRAW_PROPRIETARY_KEYS = [
+        'data-shape',
+        'data-parametric',
+        'data-primitive',
+        'data-drop-shadow',
+        'data-inner-shadow',
+        'data-gradient',
+        'data-node-types',
+        'data-locked',
+        'data-hidden',
+        'data-area-type',
+        'data-start-angle',
+        'data-end-angle',
+        'data-inner-ratio',
+        'data-contextual',
+        'data-contextual-grid',
+        'data-pivot',
+        'data-swatch-id',
+        'data-tint',
+      ];
+      return ANTIDRAW_PROPRIETARY_KEYS.includes(key);
+    };
+
     const serializeCleanAttrs = (attrs: Record<string, string>): string => {
       let res = '';
       for (const [key, val] of Object.entries(attrs)) {
-        if (key.startsWith('data-')) continue;
+        if (isAntiDrawInternalAttribute(key)) continue;
         res += ` ${key}="${escapeXml(val)}"`;
       }
       return res;
