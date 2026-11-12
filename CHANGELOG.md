@@ -3,6 +3,15 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.11] - 2026-11-12
+
+### 🏛️ Architecture & Layer Assignment
+- **Formal Layer Mapping for Orphan Modules (L0 - L4)**:
+  - **Comprehensive Architectural Map**: Aligned `AntiDraw_Documento_Maestro_Vol1_Estrategia_y_Arquitectura.md` with the real layer locations of SVG serialization (`serialization/` L1/L2), native containers (`container/AdrwContainer` L1/L2), geometric snapping (`operations/snapping/` L1), cross-platform clipboard (`services/ClipboardService.ts` L3/L4), and interactive grids/guides (`ui/grid/` L4).
+  - **Automated Structural Compliance**: Added test suite `test-orphan-modules-architecture.ts` (Suite 55) asserting strict documentation and structural layer alignment across the five architectural tiers.
+
+---
+
 ## [0.103.10] - 2026-11-12
 
 ### 🏛️ Architecture & Transaction Lifecycle
