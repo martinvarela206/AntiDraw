@@ -3,6 +3,18 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.0] - 2026-11-12
+
+### 🛡️ Security & Added
+- **Strict SVG Ingestion Sanitizer (`SvgSanitizer` - Zero-Trust Input Pipeline)**:
+  - **Malicious Tag Purge**: Neutralizes and eradicates dangerous executable tags (`<script>`, `<foreignObject>`, `<iframe>`, `<embed>`, `<object>`, `<audio>`, `<video>`, `<applet>`, `<meta>`, `<link>`, `<form>`, `<input>`) on any imported SVG prior to ingestion into `VectorModel` or projection into Chromium DOM.
+  - **Inline Event Handler Eradication (CWE-79 / Stored XSS Prevention)**: Automatically strips all attributes matching `/^on[a-z]+/i` (`onload`, `onclick`, `onerror`, `onmouseover`, `onfocus`) from all elements across the parsed XML document.
+  - **Dangerous URI Scheme Neutralization**: Sanitizes `href`, `xlink:href`, and `src` attributes, eradicating `javascript:`, `vbscript:`, and `data:text/html` payloads while preserving local fragment anchors (`#id`), standard data URIs (`data:image/*`), and local relative assets.
+  - **Stylesheet Boundary Protection**: Strips `@import` declarations and neutralizes executable `url(javascript:...)` references within `<style>` blocks.
+  - **Automated Security Test Suite (`test-svg-sanitizer.ts`)**: Added Suite 45 to the test harness validating zero-trust ingestion and sanitization across 24 security assertions (100% pass across all 45 test suites).
+
+---
+
 ## [0.102.0] - 2026-10-24
 
 ### 🚀 Added

@@ -8,6 +8,7 @@ import { IVectorModelSerializerContext } from './SvgSerializer.js';
 import type { CompanionMetadata } from '../../bridge/VsCodeBridge.js';
 import { formatNum } from '../geometry/PathGeometryCompiler.js';
 import { RectPrimitive } from '../primitives/RectPrimitive.js';
+import { SvgSanitizer } from '../security/SvgSanitizer.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Dedicated SVG Deserialization Service (SvgDeserializer)
@@ -59,6 +60,14 @@ export class SvgDeserializer {
       const parserError = doc.querySelector('parsererror');
       if (parserError) {
         console.warn('[AntiDraw:SvgDeserializer] XML parser error detectado al procesar SVG');
+      }
+
+      // Neutralize any malicious elements, scripts, or dangerous URI schemes (CVE-AntiXSS)
+      const sanResult = SvgSanitizer.sanitizeDocument(doc);
+      if (sanResult.removedElementsCount > 0 || sanResult.removedAttributesCount > 0 || sanResult.neutralizedStylesCount > 0) {
+        console.info(
+          `[AntiDraw:SvgSanitizer] SVG sanitizado: ${sanResult.removedElementsCount} elementos, ${sanResult.removedAttributesCount} atributos y ${sanResult.neutralizedStylesCount} estilos neutralizados.`
+        );
       }
 
       const svgEl = doc.querySelector('svg');
