@@ -78,7 +78,7 @@ export class HostSyncService {
   }
 
   public syncMetadataToHost(): void {
-    const elementsMetadata: Record<string, Record<string, string>> = {};
+    const elementsMetadata: Record<string, any> = {};
     const collectMeta = (list: VectorElement[]) => {
       for (const el of list) {
         const elData: Record<string, string> = {};
@@ -87,8 +87,83 @@ export class HostSyncService {
             elData[k] = String(v);
           }
         }
-        if (Object.keys(elData).length > 0) {
-          elementsMetadata[el.id] = elData;
+
+        let ds: any = undefined;
+        let is: any = undefined;
+        let blend: any = undefined;
+        let appearanceStack: any = undefined;
+
+        try {
+          if (el.attributes['data-drop-shadow']) {
+            ds = JSON.parse(el.attributes['data-drop-shadow']);
+          }
+        } catch {}
+        try {
+          if (el.attributes['data-inner-shadow']) {
+            is = JSON.parse(el.attributes['data-inner-shadow']);
+          }
+        } catch {}
+        try {
+          if (el.attributes['data-blend']) {
+            blend = JSON.parse(el.attributes['data-blend']);
+          }
+        } catch {}
+        try {
+          if (el.attributes['data-appearance-stack']) {
+            appearanceStack = JSON.parse(el.attributes['data-appearance-stack']);
+          }
+        } catch {}
+
+        const pivot = this.ctx.selectionTool.elementPivots.get(el.id);
+
+        const patternLocks = {
+          lockScale: el.attributes['data-pattern-lock-scale'] === 'true',
+          lockPosition: el.attributes['data-pattern-lock-position'] === 'true',
+          lockRotation: el.attributes['data-pattern-lock-rotation'] === 'true',
+        };
+        const hasPatternLocks = !!(
+          el.attributes['data-pattern-lock-scale'] ||
+          el.attributes['data-pattern-lock-position'] ||
+          el.attributes['data-pattern-lock-rotation']
+        );
+
+        const markerConfig = {
+          startMarkerId: el.attributes['marker-start'],
+          midMarkerId: el.attributes['marker-mid'],
+          endMarkerId: el.attributes['marker-end'],
+          size: el.attributes['data-marker-size'] ? parseFloat(el.attributes['data-marker-size']) : undefined,
+          offset: el.attributes['data-marker-offset'] ? parseFloat(el.attributes['data-marker-offset']) : undefined,
+          units: el.attributes['data-marker-units'] as any,
+          align: el.attributes['data-marker-align'] as any,
+        };
+        const hasMarkerConfig = !!(
+          markerConfig.startMarkerId ||
+          markerConfig.midMarkerId ||
+          markerConfig.endMarkerId ||
+          markerConfig.size !== undefined
+        );
+
+        if (
+          Object.keys(elData).length > 0 ||
+          ds ||
+          is ||
+          blend ||
+          hasPatternLocks ||
+          hasMarkerConfig ||
+          appearanceStack ||
+          pivot
+        ) {
+          elementsMetadata[el.id] = {
+            ...elData,
+            attributes: elData,
+            ...(ds ? { dropShadow: ds } : {}),
+            ...(is ? { innerShadow: is } : {}),
+            ...(blend ? { blendConfig: blend } : {}),
+            ...(hasPatternLocks ? { patternLocks } : {}),
+            ...(hasMarkerConfig ? { markerConfig } : {}),
+            ...(appearanceStack ? { appearanceStack } : {}),
+            ...(pivot ? { customPivot: pivot } : {}),
+          };
         }
         if (el.children && el.children.length > 0) {
           collectMeta(el.children);
@@ -186,12 +261,37 @@ export class HostSyncService {
         I18nService.setIdeLanguage(payload.locale);
       }
       if (payload.metadata) {
-        this.ctx.canvasMgr.guides = Array.isArray(payload.metadata.guides) ? payload.metadata.guides : [];
+        if (Array.isArray(payload.metadata.guides)) {
+          this.ctx.canvasMgr.guides = payload.metadata.guides.map((g: any) => ({
+            id: g.id || `guide_${Date.now()}`,
+            orientation: g.orientation || (g.axis === 'y' ? 'horizontal' : 'vertical'),
+            position: g.position !== undefined ? g.position : (g.pos !== undefined ? g.pos : 0),
+            angle: g.angle || 0,
+            pivotX: g.pivotX || 0,
+            pivotY: g.pivotY || 0,
+            color: g.color,
+            visible: g.visible !== false,
+            locked: g.locked === true,
+            mode: g.mode,
+          }));
+        } else {
+          this.ctx.canvasMgr.guides = [];
+        }
         if (payload.metadata.ruler) {
           this.ctx.canvasMgr.rulerConfig = { ...this.ctx.canvasMgr.rulerConfig, ...payload.metadata.ruler };
         }
         if (payload.metadata.showRulers !== undefined) this.ctx.canvasMgr.showRulers = payload.metadata.showRulers;
-        if (Array.isArray(payload.metadata.grids)) this.ctx.canvasMgr.grids = payload.metadata.grids;
+        if (Array.isArray(payload.metadata.grids)) {
+          this.ctx.canvasMgr.grids = payload.metadata.grids.map((grid: any) => ({
+            id: grid.id || `grid_${Date.now()}`,
+            type: grid.type || 'orthogonal',
+            spacing: grid.spacing || 20,
+            angle: grid.angle || 0,
+            color: grid.color || '#e2e8f0',
+            visible: grid.visible !== false && grid.enabled !== false,
+            alignmentMode: grid.alignmentMode || 'origin',
+          }));
+        }
         if (payload.metadata.showGrid !== undefined) this.ctx.canvasMgr.showGrid = payload.metadata.showGrid;
         if (payload.metadata.showGuides !== undefined) this.ctx.canvasMgr.showGuides = payload.metadata.showGuides;
         if (payload.metadata.lockGuides !== undefined) this.ctx.canvasMgr.lockGuides = payload.metadata.lockGuides;

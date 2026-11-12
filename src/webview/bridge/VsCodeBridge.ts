@@ -24,30 +24,18 @@
 import { SvgValidator } from '../engine/export/SvgValidator.js';
 import { IpcValidator } from '../../shared/ipc/IpcContracts.js';
 
-export interface CompanionMetadata {
-  grids?: any[];
-  guides?: any[];
-  ruler?: any;
-  showRulers?: boolean;
-  showGrid?: boolean;
-  showGuides?: boolean;
-  gridSpacing?: number;
-  snapToPixelGrid?: boolean;
-  snapToGrid?: boolean;
-  snapToGuides?: boolean;
-  snapToNodes?: boolean;
-  snapToEdges?: boolean;
-  snapToVertices?: boolean;
-  snapToViewBox?: boolean;
-  snapAngular?: boolean;
-  shapeConfig?: any;
-  undoStack?: string[];
-  redoStack?: string[];
-  elements?: Record<string, Record<string, string>>;
-  scaleStroke?: boolean;
-  scaleCorners?: boolean;
-  [key: string]: any;
-}
+export {
+  DropShadowConfig,
+  InnerShadowConfig,
+  ElementBlendConfig,
+  PatternLockConfig,
+  ElementMarkerConfig,
+  CanvasGridConfig,
+  CanvasGuideConfig,
+  ElementMetadata,
+  CompanionMetadata,
+} from '../../shared/ipc/IpcContracts.js';
+import type { CompanionMetadata } from '../../shared/ipc/IpcContracts.js';
 
 export interface LoadSvgPayload {
   text: string;

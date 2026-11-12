@@ -1,4 +1,4 @@
-export type GridType = 'orthogonal' | 'isometric' | 'axonometric';
+export type GridType = 'orthogonal' | 'isometric' | 'axonometric' | 'cartesian' | 'polar';
 export type GridAlignmentMode = 'origin' | 'cell-center';
 
 export interface GridConfig {

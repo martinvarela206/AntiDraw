@@ -145,8 +145,21 @@ export class SvgSerializer {
         el.attributes['filter'] = `url(#${filterId})`;
       }
 
-      // Generous filter region prevents clipping blurred shadow margins
-      out += `    <filter id="${filterId}" x="-50%" y="-50%" width="200%" height="200%">\n`;
+      // Dynamic filter region calculation prevents clipping blurred shadow margins
+      const maxOffset = Math.max(
+        Math.abs(ds?.dx || 0),
+        Math.abs(ds?.dy || 0),
+        Math.abs(is?.dx || 0),
+        Math.abs(is?.dy || 0)
+      );
+      const maxBlur = Math.max(ds?.blur || 0, is?.blur || 0);
+      const pad = (ds as any)?.filterRegionPadding || Math.max(50, Math.ceil(maxOffset + 3 * maxBlur) * 2);
+      const xPct = -pad;
+      const yPct = -pad;
+      const wPct = 100 + 2 * pad;
+      const hPct = 100 + 2 * pad;
+
+      out += `    <filter id="${filterId}" x="${xPct}%" y="${yPct}%" width="${wPct}%" height="${hPct}%">\n`;
 
       if (hasDs && !hasIs) {
         out += `      <feDropShadow dx="${ds!.dx}" dy="${ds!.dy}" stdDeviation="${ds!.blur}" flood-color="${ds!.color}" flood-opacity="${ds!.opacity}" />\n`;

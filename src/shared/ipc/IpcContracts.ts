@@ -18,14 +18,111 @@
  *    string fields have type and presence validation, and malformed messages are dropped).
  */
 
+export interface DropShadowConfig {
+  enabled: boolean;
+  dx: number;
+  dy: number;
+  blur: number;
+  color: string;
+  opacity: number;
+  filterRegionPadding?: number;
+}
+
+export interface InnerShadowConfig {
+  enabled: boolean;
+  dx: number;
+  dy: number;
+  blur: number;
+  color: string;
+  opacity: number;
+}
+
+export interface ElementBlendConfig {
+  mode: 'specified-steps' | 'smooth-color' | 'specified-distance';
+  steps: number;
+  distance?: number;
+  alignToPath?: boolean;
+  reverseA?: boolean;
+  reverseB?: boolean;
+  startElementId?: string;
+  endElementId?: string;
+}
+
+export interface PatternLockConfig {
+  lockScale?: boolean;
+  lockPosition?: boolean;
+  lockRotation?: boolean;
+  patternId?: string;
+  scale?: number;
+  rotation?: number;
+}
+
+export interface ElementMarkerConfig {
+  startMarkerId?: string;
+  midMarkerId?: string;
+  endMarkerId?: string;
+  size?: number;
+  offset?: number;
+  units?: 'strokeWidth' | 'userSpaceOnUse';
+  align?: 'auto' | 'auto-start-reverse';
+  color?: string;
+}
+
+export type CanvasGridType = 'orthogonal' | 'cartesian' | 'isometric' | 'axonometric' | 'polar';
+
+export interface CanvasGridConfig {
+  id: string;
+  name?: string;
+  type?: CanvasGridType;
+  spacing: number;
+  subdivisions?: number;
+  color?: string;
+  opacity?: number;
+  enabled?: boolean;
+  visible?: boolean;
+  angle?: number;
+  alignmentMode?: 'origin' | 'cell-center';
+  [key: string]: any;
+}
+
+export interface CanvasGuideConfig {
+  id: string;
+  axis?: 'x' | 'y';
+  pos?: number;
+  orientation?: 'horizontal' | 'vertical' | 'angled';
+  position?: number;
+  angle?: number;
+  pivotX?: number;
+  pivotY?: number;
+  color?: string;
+  visible?: boolean;
+  locked?: boolean;
+  mode?: 'move' | 'rotate';
+  [key: string]: any;
+}
+
+export interface ElementMetadata {
+  attributes?: Record<string, string>;
+  dropShadow?: DropShadowConfig;
+  innerShadow?: InnerShadowConfig;
+  blendConfig?: ElementBlendConfig;
+  patternLocks?: PatternLockConfig;
+  markerConfig?: ElementMarkerConfig;
+  appearanceStack?: any;
+  customPivot?: { x: number; y: number };
+  [key: string]: any;
+}
+
 export interface CompanionMetadata {
-  grids?: any[];
-  guides?: any[];
+  grids?: CanvasGridConfig[];
+  guides?: CanvasGuideConfig[];
   ruler?: any;
   showRulers?: boolean;
   showGrid?: boolean;
   showGuides?: boolean;
+  lockGuides?: boolean;
   gridSpacing?: number;
+  gridAlignmentMode?: 'origin' | 'cell-center';
   snapToPixelGrid?: boolean;
   snapToGrid?: boolean;
   snapToGuides?: boolean;
@@ -37,9 +134,12 @@ export interface CompanionMetadata {
   shapeConfig?: any;
   undoStack?: string[];
   redoStack?: string[];
-  elements?: Record<string, Record<string, string>>;
+  elements?: Record<string, ElementMetadata | Record<string, string>>;
   scaleStroke?: boolean;
   scaleCorners?: boolean;
+  isAspectRatioLocked?: boolean;
+  swatches?: any[];
+  canvas?: any;
   [key: string]: any;
 }
 

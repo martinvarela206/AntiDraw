@@ -3,6 +3,18 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.18] - 2026-11-12
+
+### 🎯 SVG Fidelity & Companion Schema Expansion
+- **Expanded Companion Schema for Advanced Inspector Fidelity (`ElementMetadata` & Dynamic Shadow Filter Regions)**:
+  - **Structured ElementMetadata**: Expanded companion elements schema in `IpcContracts.ts` and `VsCodeBridge.ts` to include typed sub-configurations: `dropShadow`, `innerShadow`, `blendConfig`, `patternLocks`, `markerConfig`, `appearanceStack`, and `customPivot`.
+  - **Dynamic Filter Region Calculation**: Refined `SvgSerializer.compileElementFilters` to compute dynamic bounding margins (`pad = max(50, ceil(offset + 3*blur)*2)`) preventing clipping of large blurred drop shadows.
+  - **Lossless Deserialization Rehydration**: Updated `SvgDeserializer` to rehydrate both legacy flat `data-*` dictionaries and structured `ElementMetadata` records into element attributes without data loss.
+  - **Multi-Grid & Multi-Guide Persistent Configuration**: Supported typed arrays `CanvasGridConfig[]` and `CanvasGuideConfig[]` across workspace sync and storage.
+  - **Automated Test Coverage**: Added test suite `test-expanded-companion-schema.ts` (Suite 61) verifying 4 assertions covering structured metadata, rehydration, dynamic filter regions, and multi-grid persistence.
+
+---
+
 ## [0.103.17] - 2026-11-12
 
 ### 🎯 SVG Fidelity & Sidecar Integrity

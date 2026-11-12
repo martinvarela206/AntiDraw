@@ -94,8 +94,9 @@ async function main() {
   const ok58 = await runSuite(path.join(__dirname, 'test-namespaced-attribute-purge.ts'), 'runNamespacedAttributePurgeTests');
   const ok59 = await runSuite(path.join(__dirname, 'test-custom-document-lifecycle.ts'), 'runCustomDocumentLifecycleTests');
   const ok60 = await runSuite(path.join(__dirname, 'test-sidecar-integrity.ts'), 'runSidecarIntegrityTests');
+  const ok61 = await runSuite(path.join(__dirname, 'test-expanded-companion-schema.ts'), 'runExpandedCompanionSchemaTests');
 
-  const results = [ok1, ok2, ok3, ok4, ok5, ok6, ok7, ok8, ok9, ok10, ok11, ok12, ok13, ok14, ok15, ok16, ok17, ok18, ok19, ok20, ok21, ok22, ok23, ok24, ok25, ok26, ok27, ok28, ok29, ok30, ok31, ok32, ok33, ok34, ok35, ok36, ok37, ok38, ok39, ok40, ok41, ok42, ok43, ok44, ok45, ok46, ok47, ok48, ok49, ok50, ok51, ok52, ok53, ok54, ok55, ok56, ok57, ok58, ok59, ok60];
+  const results = [ok1, ok2, ok3, ok4, ok5, ok6, ok7, ok8, ok9, ok10, ok11, ok12, ok13, ok14, ok15, ok16, ok17, ok18, ok19, ok20, ok21, ok22, ok23, ok24, ok25, ok26, ok27, ok28, ok29, ok30, ok31, ok32, ok33, ok34, ok35, ok36, ok37, ok38, ok39, ok40, ok41, ok42, ok43, ok44, ok45, ok46, ok47, ok48, ok49, ok50, ok51, ok52, ok53, ok54, ok55, ok56, ok57, ok58, ok59, ok60, ok61];
   results.forEach((r, i) => {
     if (!r) console.error(`❌ Suite ok${i + 1} returned false!`);
   });

@@ -41,6 +41,41 @@ import { IsomorphicXmlParserFactory, IXmlParser } from './XmlParser.js';
  *    persisted in the companion JSON file.
  */
 export class SvgDeserializer {
+  private static rehydrateElementAttributes(targetAttrs: Record<string, string>, rawMeta: any): void {
+    if (!rawMeta || typeof rawMeta !== 'object') return;
+    if (rawMeta.attributes) {
+      Object.assign(targetAttrs, rawMeta.attributes);
+    }
+    if (rawMeta.dropShadow && !targetAttrs['data-drop-shadow']) {
+      targetAttrs['data-drop-shadow'] = JSON.stringify(rawMeta.dropShadow);
+    }
+    if (rawMeta.innerShadow && !targetAttrs['data-inner-shadow']) {
+      targetAttrs['data-inner-shadow'] = JSON.stringify(rawMeta.innerShadow);
+    }
+    if (rawMeta.blendConfig && !targetAttrs['data-blend']) {
+      targetAttrs['data-blend'] = JSON.stringify(rawMeta.blendConfig);
+    }
+    if (rawMeta.patternLocks) {
+      if (rawMeta.patternLocks.lockScale !== undefined) targetAttrs['data-pattern-lock-scale'] = String(rawMeta.patternLocks.lockScale);
+      if (rawMeta.patternLocks.lockPosition !== undefined) targetAttrs['data-pattern-lock-position'] = String(rawMeta.patternLocks.lockPosition);
+      if (rawMeta.patternLocks.lockRotation !== undefined) targetAttrs['data-pattern-lock-rotation'] = String(rawMeta.patternLocks.lockRotation);
+    }
+    if (rawMeta.markerConfig) {
+      if (rawMeta.markerConfig.size !== undefined) targetAttrs['data-marker-size'] = String(rawMeta.markerConfig.size);
+      if (rawMeta.markerConfig.offset !== undefined) targetAttrs['data-marker-offset'] = String(rawMeta.markerConfig.offset);
+      if (rawMeta.markerConfig.units !== undefined) targetAttrs['data-marker-units'] = rawMeta.markerConfig.units;
+      if (rawMeta.markerConfig.align !== undefined) targetAttrs['data-marker-align'] = rawMeta.markerConfig.align;
+    }
+    if (rawMeta.appearanceStack && !targetAttrs['data-appearance-stack']) {
+      targetAttrs['data-appearance-stack'] = typeof rawMeta.appearanceStack === 'string' ? rawMeta.appearanceStack : JSON.stringify(rawMeta.appearanceStack);
+    }
+    for (const [k, v] of Object.entries(rawMeta)) {
+      if (k.startsWith('data-') && typeof v === 'string') {
+        targetAttrs[k] = v;
+      }
+    }
+  }
+
   /**
    * Parses an SVG document string and populates the model canvas, custom defs, and vector elements.
    * Fuses companion metadata into element attributes to rehydrate full parametric editor state.
@@ -303,7 +338,7 @@ export class SvgDeserializer {
           usedIds.add(groupElemId);
 
           if (companionMetadata?.elements && companionMetadata.elements[groupElemId]) {
-            Object.assign(gAttrs, companionMetadata.elements[groupElemId]);
+            SvgDeserializer.rehydrateElementAttributes(gAttrs, companionMetadata.elements[groupElemId]);
           }
 
           const groupEl: VectorElement = {
@@ -659,7 +694,7 @@ export class SvgDeserializer {
 
           // Rehydrate proprietary attributes from companion JSON metadata (Rule 18 / FIX-SVG-01)
           if (companionMetadata?.elements && companionMetadata.elements[elementId]) {
-            Object.assign(attrs, companionMetadata.elements[elementId]);
+            SvgDeserializer.rehydrateElementAttributes(attrs, companionMetadata.elements[elementId]);
           }
 
           const elem: VectorElement = {
