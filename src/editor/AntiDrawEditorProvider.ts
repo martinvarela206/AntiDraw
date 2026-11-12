@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { AdrwProjectService, AdrwContainer } from '../webview/engine/project/AdrwContainer.js';
+import { IpcValidator } from '../shared/ipc/IpcContracts.js';
 
 export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
   public static readonly viewType = 'antidraw.svgEditor';
@@ -117,8 +118,14 @@ export class AntiDrawEditorProvider implements vscode.CustomTextEditorProvider {
       }
     };
 
-    // Receive messages from the webview
-    webviewPanel.webview.onDidReceiveMessage(async (message) => {
+    // Receive messages from the webview with strict schema validation
+    webviewPanel.webview.onDidReceiveMessage(async (rawMessage) => {
+      const validation = IpcValidator.validateWebviewToHost(rawMessage);
+      if (!validation.isValid || !validation.message) {
+        console.warn('[AntiDraw:HostIPC] Mensaje de Webview inválido rechazado:', validation.error, rawMessage);
+        return;
+      }
+      const message = validation.message;
       switch (message.type) {
         case 'ready':
           await updateWebview();

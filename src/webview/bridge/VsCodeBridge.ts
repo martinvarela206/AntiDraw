@@ -22,6 +22,7 @@
  */
 
 import { SvgValidator } from '../engine/export/SvgValidator.js';
+import { IpcValidator } from '../../shared/ipc/IpcContracts.js';
 
 export interface CompanionMetadata {
   grids?: any[];
@@ -116,8 +117,12 @@ export class VsCodeBridge {
 
   private initMessageListener(): void {
     window.addEventListener('message', (event: MessageEvent) => {
-      const msg = event.data;
-      if (!msg || typeof msg !== 'object') return;
+      const validation = IpcValidator.validateHostToWebview(event.data);
+      if (!validation.isValid || !validation.message) {
+        console.warn('[AntiDraw:WebviewIPC] Mensaje de Host inválido rechazado:', validation.error, event.data);
+        return;
+      }
+      const msg = validation.message;
 
       if (msg.type === 'loadSvg') {
         if (msg.fileName) {
