@@ -9,6 +9,7 @@ import type { CompanionMetadata } from '../../bridge/VsCodeBridge.js';
 import { formatNum } from '../geometry/PathGeometryCompiler.js';
 import { RectPrimitive } from '../primitives/RectPrimitive.js';
 import { SvgSanitizer } from '../security/SvgSanitizer.js';
+import { IsomorphicXmlParserFactory, IXmlParser } from './XmlParser.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Dedicated SVG Deserialization Service (SvgDeserializer)
@@ -47,7 +48,8 @@ export class SvgDeserializer {
   public static loadSvgString(
     svgText: string,
     ctx: IVectorModelSerializerContext,
-    companionMetadata?: CompanionMetadata | null
+    companionMetadata?: CompanionMetadata | null,
+    customParser?: IXmlParser
   ): void {
     if (!svgText || !svgText.trim()) {
       ctx.createDefaultCanvas();
@@ -61,8 +63,9 @@ export class SvgDeserializer {
         console.info(`[AntiDraw:SvgDeserializer] ${strippedCount} declaración(es) DOCTYPE o entidades XML neutralizadas.`);
       }
 
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(sanitizedXml, 'image/svg+xml');
+      const doc = customParser
+        ? customParser.parseFromString(sanitizedXml, 'image/svg+xml')
+        : IsomorphicXmlParserFactory.parse(sanitizedXml, 'image/svg+xml');
       const parserError = doc.querySelector('parsererror');
       if (parserError) {
         console.warn('[AntiDraw:SvgDeserializer] XML parser error detectado al procesar SVG');

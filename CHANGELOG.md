@@ -3,6 +3,17 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.12] - 2026-11-12
+
+### 🏛️ Architecture & Isomorphic Serialization
+- **Isomorphic XML Parser Abstraction (IXmlParser & IsomorphicXmlParserFactory)**:
+  - **Environment-Agnostic XML Parsing**: Decoupled `SvgDeserializer` from implicit browser `window.DOMParser` globals via `IXmlParser` contract.
+  - **Dual-Engine Polymorphism**: Built `NativeBrowserXmlParser` for ultra-fast W3C standard parsing in webview runtime, and `HeadlessNodeXmlParser` for Node.js / CLI / automated test runners using `linkedom`.
+  - **Dependency Injection & Global Override**: Supported direct parser injection into `SvgDeserializer.loadSvgString` as well as global test-harness configuration via `IsomorphicXmlParserFactory.setDefaultParser`.
+  - **Automated Test Coverage**: Added test suite `test-xml-parser-abstraction.ts` (Suite 56) verifying 4 assertions covering factory resolution, headless fallback, custom parser injection, and global override mechanisms.
+
+---
+
 ## [0.103.11] - 2026-11-12
 
 ### 🏛️ Architecture & Layer Assignment
