@@ -712,7 +712,14 @@ export class SvgSerializer {
           delete el.attributes['data-gradient'];
         }
 
-        if (el.tagName === 'text' || el.children || el.textContent) {
+        if (el.isOpaque || el.shapeType === 'opaque' || el.rawInnerXml !== undefined) {
+          const raw = el.rawInnerXml || (el.textContent ? escapeXml(el.textContent) : '');
+          if (raw) {
+            elSvg += `${indent}<${el.tagName}${serializeCleanAttrs(el.attributes)}>${raw}</${el.tagName}>\n`;
+          } else {
+            elSvg += `${indent}<${el.tagName}${serializeCleanAttrs(el.attributes)} />\n`;
+          }
+        } else if (el.tagName === 'text' || el.children || el.textContent) {
           if (el.children && el.children.length > 0) {
             elSvg += `${indent}<${el.tagName}${serializeCleanAttrs(el.attributes)}>\n`;
             for (const ch of el.children) {

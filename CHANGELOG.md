@@ -3,6 +3,17 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.13] - 2026-11-12
+
+### 🎯 SVG Fidelity & Zero Corruption W3C
+- **Preservation of Opaque Elements (Zero-Corruption W3C Standard Compliance)**:
+  - **Opaque Element Model Representation (`OpaqueElement`)**: Extended `VectorElement` with `isOpaque`, `shapeType: 'opaque'`, and `rawInnerXml`, guaranteeing that non-directly editable SVG nodes are preserved verbatim.
+  - **Comprehensive Opaque Tag Coverage**: Integrated full deserialization preservation for `<defs>`, `<clipPath>`, `<mask>`, `<filter>`, `<pattern>`, `<marker>`, `<style>`, `<use>`, `<symbol>`, `<linearGradient>`, and `<radialGradient>`.
+  - **100% Round-Trip Markup Fidelity**: Configured `SvgSerializer` to re-emit opaque elements preserving their exact original XML inner markup, eliminating silent corruption of complex filters, clip paths, and symbol definitions.
+  - **Automated Test Coverage**: Added test suite `test-opaque-elements-fidelity.ts` (Suite 57) verifying 3 assertions covering clip path extraction, multi-tag ingestion, and round-trip serialization fidelity.
+
+---
+
 ## [0.103.12] - 2026-11-12
 
 ### 🏛️ Architecture & Isomorphic Serialization

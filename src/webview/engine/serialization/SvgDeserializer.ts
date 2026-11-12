@@ -775,6 +775,63 @@ export class SvgDeserializer {
           }
 
           targetList.push(elem);
+          return;
+        }
+
+        /**
+         * CAPA L1 / L2: Preservación de Nodos Opacos (Cero Corrupción W3C)
+         * Preserva elementos SVG no editables directamente como geometrías vectoriales
+         * (<defs>, <clipPath>, <mask>, <filter>, <pattern>, <marker>, <style>, <use>, <symbol>, <linearGradient>, <radialGradient>)
+         * conservando sus atributos completos y su contenido XML interno para re-emisión 100% fiel.
+         */
+        const OPAQUE_TAGS = [
+          'defs',
+          'clippath',
+          'mask',
+          'filter',
+          'pattern',
+          'marker',
+          'style',
+          'use',
+          'symbol',
+          'lineargradient',
+          'radialgradient',
+        ];
+
+        if (OPAQUE_TAGS.includes(tag)) {
+          // Si es un <defs> directo hijo de <svg>, ya se procesa al inicio de loadSvgString en customDefs
+          if (tag === 'defs' && (node.parentElement === (svgEl as any) || node.parentElement?.tagName.toLowerCase() === 'svg')) {
+            return;
+          }
+
+          const idx = elementIdx++;
+          const attrs: Record<string, string> = {};
+          for (let i = 0; i < node.attributes.length; i++) {
+            const attr = node.attributes[i];
+            attrs[attr.name] = attr.value;
+          }
+
+          let elementId = attrs.id;
+          if (!elementId || usedIds.has(elementId)) {
+            elementId = `opaque_${tag}_${idx}_${Date.now().toString(36)}`;
+            attrs.id = elementId;
+          }
+          usedIds.add(elementId);
+
+          const innerXml = node.innerHTML ? node.innerHTML.trim() : '';
+
+          const opaqueElem: VectorElement = {
+            id: elementId,
+            tagName: node.tagName, // Preserva la capitalización original del tag (e.g. clipPath, linearGradient)
+            attributes: attrs,
+            isOpaque: true,
+            shapeType: 'opaque',
+            rawInnerXml: innerXml,
+            textContent: node.children.length === 0 ? node.textContent || '' : undefined,
+          };
+
+          targetList.push(opaqueElem);
+          return;
         }
       };
 

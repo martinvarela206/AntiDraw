@@ -34,14 +34,16 @@ export type ParametricShapeType = 'rect' | 'circle' | 'ellipse' | 'line' | 'poly
 
 export interface VectorElement {
   id: string;
-  tagName: string; // 'path' | 'rect' | 'ellipse' | 'circle' | 'line' | 'polygon' | 'polyline'
+  tagName: string; // 'path' | 'rect' | 'ellipse' | 'circle' | 'line' | 'polygon' | 'polyline' | 'opaque' ...
   attributes: Record<string, string>;
   vertices?: PathVertex[];
   isClosed?: boolean;
   isParametric?: boolean;
-  shapeType?: ParametricShapeType | 'path' | 'star';
+  shapeType?: ParametricShapeType | 'path' | 'star' | 'opaque';
   children?: VectorElement[];
   textContent?: string;
+  rawInnerXml?: string;
+  isOpaque?: boolean;
 }
 
 export interface CanvasSettings {
