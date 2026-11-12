@@ -4,6 +4,7 @@ import { SelectionTool } from '../engine/SelectionTool.js';
 import { CanvasManager } from '../engine/CanvasManager.js';
 import { ToolStateMachine, ToolSessionState } from './ToolStateMachine.js';
 import { CameraViewportTransform } from './CoordinateSpaceTransformer.js';
+import { ToolTransactionManager } from './ToolTransactionManager.js';
 
 export interface ConfirmOptions {
   title: string;
@@ -31,6 +32,7 @@ export interface ToolContext {
   isPointerOverRuler?(clientX: number, clientY: number, orientation?: 'horizontal' | 'vertical' | 'angled'): boolean;
   getCameraTransform?(): CameraViewportTransform;
   getStateMachine?(): ToolStateMachine;
+  getTransactionManager?(): ToolTransactionManager;
 }
 
 /**

@@ -94,6 +94,7 @@ export class ToolFactory {
       confirm: (options) => ConfirmationModal.confirm(options),
       applyCanvasSize: () => ctx.getWorkspaceLayout().applyCanvasSize(),
       isPointerOverRuler: (x, y, o) => ctx.getRulerView()?.isPointOverRuler(x, y, o) ?? false,
+      getTransactionManager: () => session.transactionManager,
     };
 
     const selectToolHandler = new SelectToolHandler(toolCtx, ctx.nodeEditorTool, {

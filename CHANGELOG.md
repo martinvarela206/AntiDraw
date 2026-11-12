@@ -3,6 +3,17 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.10] - 2026-11-12
+
+### 🏛️ Architecture & Transaction Lifecycle
+- **Atomic Tool Transactions (ToolTransactionManager: Begin, Preview, Commit, Cancel)**:
+  - **Monotonic Transaction Identifiers (`txId`)**: Formalized interactive tool sessions with unique identifiers (`tx_${toolType}_${timestamp}_${counter}`) allowing multi-step interactions to be tracked, correlated, and audited cleanly.
+  - **Discriminated Transaction Lifecycle**: Enforced explicit four-phase interaction cycle (`Begin`, `Preview`, `Commit`, `Cancel`), guaranteeing that ephemeral preview shapes never leak into the undo stack or SVG DOM.
+  - **Session Integration**: Connected `ToolTransactionManager` directly into `Session` and `ToolFactory`, dispatching transactional lifecycle actions and preserving base document snapshots on demand.
+  - **Automated Test Coverage**: Added test suite `test-tool-transactions.ts` (Suite 54) verifying 7 assertions covering monotonic IDs, transient preview emissions, atomic commits, rollback cancellation, listener subscriptions, and audit history logging.
+
+---
+
 ## [0.103.9] - 2026-11-12
 
 ### 🏛️ Architecture & Tool State Reducer

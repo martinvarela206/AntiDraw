@@ -11,11 +11,13 @@ import { ShapeBuilderToolHandler } from '../../tools/ShapeBuilderToolHandler.js'
 import { EraserToolHandler } from '../../tools/EraserToolHandler.js';
 import { ScissorKnifeToolHandler } from '../../tools/ScissorKnifeToolHandler.js';
 import { DocumentState } from '../../core/model/DocumentState.js';
+import { ToolTransactionManager, ActiveToolTransaction } from '../../tools/ToolTransactionManager.js';
 
 export interface ActiveInteraction {
   readonly label: string;
   readonly baseSnapshot: DocumentState;
   readonly startPoint: Point;
+  readonly txId?: string;
   lastPreviewPoint?: Point;
 }
 
@@ -58,6 +60,7 @@ export class Session {
 
   // Formal Interaction Cycle (VectorCraft Begin -> Preview -> Commit/Cancel)
   public activeInteraction: ActiveInteraction | null = null;
+  public readonly transactionManager: ToolTransactionManager = new ToolTransactionManager();
 
   // Handlers
   public readonly selectHandler: SelectToolHandler;
@@ -191,11 +194,16 @@ export class Session {
 
   public beginInteraction(label: string, startPt: Point): void {
     const baseSnapshot = this.callbacks.getBaseSnapshot?.();
+    const beginAction = this.transactionManager.begin(this.activeTool, {
+      description: label,
+      initialDocumentState: baseSnapshot,
+    });
     if (baseSnapshot) {
       this.activeInteraction = {
         label,
         baseSnapshot,
         startPoint: { ...startPt },
+        txId: beginAction.txId,
       };
     }
   }
@@ -203,11 +211,13 @@ export class Session {
   public previewInteraction(currentPt: Point): void {
     if (this.activeInteraction) {
       this.activeInteraction.lastPreviewPoint = { ...currentPt };
+      this.transactionManager.preview({ payload: { currentPt } });
     }
   }
 
   public commitInteraction(): void {
     if (this.activeInteraction) {
+      this.transactionManager.commit(this.activeInteraction.label);
       this.callbacks.onCommitSnapshot?.(this.activeInteraction.label);
       this.activeInteraction = null;
     }
@@ -215,6 +225,7 @@ export class Session {
 
   public cancelInteraction(): boolean {
     if (this.activeInteraction) {
+      this.transactionManager.cancel('interaction_cancelled');
       this.callbacks.onRestoreSnapshot?.(this.activeInteraction.baseSnapshot);
       this.activeInteraction = null;
       return true;
