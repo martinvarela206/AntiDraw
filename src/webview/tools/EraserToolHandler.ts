@@ -99,14 +99,18 @@ export class EraserToolHandler implements IToolHandler {
     return true;
   }
 
-  public onPointerMove(e: PointerEvent, pt: Point): boolean {
-    this.currentPoint = pt;
+  public onPointerMove(e: PointerEvent, pt: Point, coalescedPts?: Point[]): boolean {
+    const effectivePt = coalescedPts && coalescedPts.length > 0 ? coalescedPts[coalescedPts.length - 1] : pt;
+    this.currentPoint = effectivePt;
     this.isAltPressed = e.altKey;
 
     if (this.isDragging) {
-      const lastPt = this.trajectoryPoints[this.trajectoryPoints.length - 1];
-      if (!lastPt || Math.hypot(pt.x - lastPt.x, pt.y - lastPt.y) >= 2) {
-        this.trajectoryPoints.push(pt);
+      const pointsToAppend = (coalescedPts && coalescedPts.length > 0) ? coalescedPts : [effectivePt];
+      for (const p of pointsToAppend) {
+        const lastPt = this.trajectoryPoints[this.trajectoryPoints.length - 1];
+        if (!lastPt || Math.hypot(p.x - lastPt.x, p.y - lastPt.y) >= 1.5) {
+          this.trajectoryPoints.push(p);
+        }
       }
     }
 

@@ -429,10 +429,11 @@ export class SelectToolHandler implements IToolHandler {
     return true;
   }
 
-  public onPointerMove(e: PointerEvent, pt: Point): boolean {
+  public onPointerMove(e: PointerEvent, pt: Point, coalescedPts?: Point[]): boolean {
+    const effectivePt = coalescedPts && coalescedPts.length > 0 ? coalescedPts[coalescedPts.length - 1] : pt;
     if (!this.isDragging || !this.activeHandle) {
       // 1. Guide hover cursor
-      const guideCursor = this.guideInteraction.getHoverCursor(this.ctx, pt);
+      const guideCursor = this.guideInteraction.getHoverCursor(this.ctx, effectivePt);
       if (guideCursor) {
         this.callbacks.setCursor?.(guideCursor);
         return true;

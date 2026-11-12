@@ -3,6 +3,17 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.9] - 2026-11-12
+
+### 🏛️ Architecture & Tool State Reducer
+- **Deterministic Tool State Machine (ITool / ToolStateMachine) & 3-Tier Coordinate Projections**:
+  - **Deterministic State Reducer (`ToolStateMachine`)**: Formalized tool interactions as a pure mathematical reducer `(State, Event) -> NextState` with typed events (`ACTIVATE`, `POINTER_DOWN`, `POINTER_MOVE`, `POINTER_UP`, `KEY_DOWN`, `KEY_UP`, `CANCEL`) and transition audit logging.
+  - **High-Frequency Pointer Coalescence (`getCoalescedEvents`)**: Integrated sub-frame event coalescence across `CanvasInteractionController` and specialized handlers (`PenToolHandler`, `EraserToolHandler`, `SmartFillToolHandler`, `ShapeBuilderToolHandler`, `ScissorKnifeToolHandler`), eliminating jitter on high-refresh styluses and digitizers.
+  - **3-Tier Canonical Coordinate Projections (`CoordinateSpaceTransformer`)**: Engineered analytical bidirectional projection pipeline bridging Screen Space (Client px) -> Document Space (viewBox world) -> Local Space (Object matrix).
+  - **Automated Test Coverage**: Added test suite `test-tool-state-machine.ts` (Suite 53) verifying 12 assertions covering deterministic reducer transitions, keyboard tracking, 3-tier coordinate projections, and pointer coalescence extraction.
+
+---
+
 ## [0.103.8] - 2026-11-12
 
 ### ⚡ Performance & State Management

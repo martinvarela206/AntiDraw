@@ -253,8 +253,9 @@ export class ShapeToolHandler implements IToolHandler {
     return ActionIntentFactory.preview('shape.preview', { ghost: this.ghostShapeElement });
   }
 
-  public onPointerMove(e: PointerEvent, pt: Point): boolean {
-    const intent = this.evalPointerMove(e, pt);
+  public onPointerMove(e: PointerEvent, pt: Point, coalescedPts?: Point[]): boolean {
+    const effectivePt = coalescedPts && coalescedPts.length > 0 ? coalescedPts[coalescedPts.length - 1] : pt;
+    const intent = this.evalPointerMove(e, effectivePt);
     if (intent.kind === 'none') return false;
     this.ctx.renderOverlay();
     return true;

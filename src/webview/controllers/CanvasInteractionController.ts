@@ -375,31 +375,42 @@ export class CanvasInteractionController implements CanvasViewDelegate {
         return;
       }
 
+      // Extracción de eventos de puntero coalescidos (W3C Pointer Events getCoalescedEvents)
+      let coalescedPts: Point[] | undefined;
+      if (typeof (e as any).getCoalescedEvents === 'function') {
+        try {
+          const events = (e as any).getCoalescedEvents() as PointerEvent[];
+          if (events && events.length > 0) {
+            coalescedPts = events.map((ev) => this.getCanvasPoint(ev));
+          }
+        } catch (_err) {}
+      }
+
       // Tool Delegation
       if (activeTool === 'select' || activeTool === 'stroke') {
-        if (this.selectToolHandler.onPointerMove(e, pt)) return;
+        if (this.selectToolHandler.onPointerMove(e, pt, coalescedPts)) return;
       } else if (activeTool === 'polyline') {
         canvasView?.setCursor('crosshair');
-        this.polylineToolHandler.onPointerMove(e, pt);
+        this.polylineToolHandler.onPointerMove(e, pt, coalescedPts);
         return;
       } else if (activeTool === 'pen') {
         canvasView?.setCursor('crosshair');
-        this.penToolHandler.onPointerMove(e, pt);
+        this.penToolHandler.onPointerMove(e, pt, coalescedPts);
         return;
       } else if (activeTool === 'smartFill') {
         canvasView?.setCursor('crosshair');
-        if (this.smartFillToolHandler.onPointerMove(e, pt)) return;
+        if (this.smartFillToolHandler.onPointerMove(e, pt, coalescedPts)) return;
       } else if (activeTool === 'shapeBuilder') {
         canvasView?.setCursor('crosshair');
-        if (this.shapeBuilderToolHandler.onPointerMove(e, pt)) return;
+        if (this.shapeBuilderToolHandler.onPointerMove(e, pt, coalescedPts)) return;
       } else if (activeTool === 'eraser') {
         canvasView?.setCursor('none');
-        if (this.eraserToolHandler.onPointerMove(e, pt)) return;
+        if (this.eraserToolHandler.onPointerMove(e, pt, coalescedPts)) return;
       } else if (activeTool === 'scissors') {
         canvasView?.setCursor('crosshair');
-        if (this.scissorKnifeToolHandler.onPointerMove(e, pt)) return;
+        if (this.scissorKnifeToolHandler.onPointerMove(e, pt, coalescedPts)) return;
       } else if (session.activeHandle === 'shape') {
-        this.shapeToolHandler.onPointerMove(e, pt);
+        this.shapeToolHandler.onPointerMove(e, pt, coalescedPts);
         return;
       }
     });

@@ -27,6 +27,8 @@ export interface KeyboardControllerContext {
   polylineToolHandler: PolylineToolHandler;
   eraserToolHandler?: import('../tools/EraserToolHandler.js').EraserToolHandler;
   scissorKnifeToolHandler?: import('../tools/ScissorKnifeToolHandler.js').ScissorKnifeToolHandler;
+  smartFillToolHandler?: import('../tools/SmartFillToolHandler.js').SmartFillToolHandler;
+  shapeBuilderToolHandler?: import('../tools/ShapeBuilderToolHandler.js').ShapeBuilderToolHandler;
   isDragging: () => boolean;
   activeHandle: () => 'origin-drag' | 'guide-create' | 'shape' | null;
   copySelection: () => void;
@@ -79,13 +81,39 @@ export class KeyboardShortcutController {
       this.ctx.selectionTool.isTouchingMarquee = false;
       this.ctx.renderOverlay();
     }
+
+    // Delegación canónica de onKeyUp según la herramienta activa
+    const activeTool = this.ctx.toolbar.activeTool;
     if (this.ctx.shapeToolHandler.shapeStartPt !== null) {
       if (this.ctx.shapeToolHandler.onKeyUp(e)) {
         return;
       }
     }
-    if (this.ctx.toolbar.activeTool === 'eraser') {
-      this.ctx.eraserToolHandler?.onKeyUp(e);
+
+    switch (activeTool) {
+      case 'eraser':
+        this.ctx.eraserToolHandler?.onKeyUp?.(e);
+        break;
+      case 'scissors':
+        this.ctx.scissorKnifeToolHandler?.onKeyUp?.(e);
+        break;
+      case 'pen':
+        this.ctx.penToolHandler?.onKeyUp?.(e);
+        break;
+      case 'polyline':
+        this.ctx.polylineToolHandler?.onKeyUp?.(e);
+        break;
+      case 'node':
+        this.ctx.nodeToolHandler?.onKeyUp?.(e);
+        break;
+      case 'smartFill':
+        this.ctx.smartFillToolHandler?.onKeyUp?.(e);
+        break;
+      case 'shapeBuilder':
+        this.ctx.shapeBuilderToolHandler?.onKeyUp?.(e);
+        break;
+      default:
+        break;
     }
   }
 

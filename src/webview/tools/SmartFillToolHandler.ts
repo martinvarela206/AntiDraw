@@ -148,24 +148,28 @@ export class SmartFillToolHandler implements IToolHandler {
     return true;
   }
 
-  public onPointerMove(e: PointerEvent, pt: Point): boolean {
+  public onPointerMove(e: PointerEvent, pt: Point, coalescedPts?: Point[]): boolean {
     if (this.ctx.getActiveTool() !== 'smartFill') return false;
 
     const regions = this.ensureCachedRegions();
+    const effectivePt = coalescedPts && coalescedPts.length > 0 ? coalescedPts[coalescedPts.length - 1] : pt;
 
     // Active sweep drag gesture
     if (this.lastDownPt && (e.buttons & 1) === 1) {
-      const dragDist = Math.hypot(pt.x - this.lastDownPt.x, pt.y - this.lastDownPt.y);
+      const dragDist = Math.hypot(effectivePt.x - this.lastDownPt.x, effectivePt.y - this.lastDownPt.y);
       if (dragDist > 5) {
         this.isSweeping = true;
       }
 
       if (this.isSweeping) {
-        const targetRegion = SmartFillEngine.findRegionAtPoint(pt, regions);
-        if (targetRegion) {
-          const key = this.getRegionKey(targetRegion);
-          if (!this.sweptRegions.has(key)) {
-            this.sweptRegions.set(key, targetRegion);
+        const pointsToSample = (coalescedPts && coalescedPts.length > 0) ? coalescedPts : [effectivePt];
+        for (const samplePt of pointsToSample) {
+          const targetRegion = SmartFillEngine.findRegionAtPoint(samplePt, regions);
+          if (targetRegion) {
+            const key = this.getRegionKey(targetRegion);
+            if (!this.sweptRegions.has(key)) {
+              this.sweptRegions.set(key, targetRegion);
+            }
           }
         }
 
@@ -182,15 +186,21 @@ export class SmartFillToolHandler implements IToolHandler {
     }
 
     // Passive hover over candidate region
-    const targetRegion = SmartFillEngine.findRegionAtPoint(pt, regions);
+    const targetRegion = SmartFillEngine.findRegionAtPoint(effectivePt, regions);
     const newD = targetRegion ? SmartFillEngine.compileRegionD(targetRegion, this.ctx.model) : null;
 
     if (this.hoverRegionD !== newD) {
       this.hoverRegionD = newD;
       this.ctx.renderOverlay();
     }
-
     return true;
+  }
+
+  public onKeyUp?(e: KeyboardEvent): boolean | void {
+    if (e.key === 'Shift') {
+      this.ctx.renderOverlay();
+      return true;
+    }
   }
 
   public onPointerUp(e: PointerEvent, pt: Point): boolean {

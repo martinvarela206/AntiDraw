@@ -99,9 +99,12 @@ export class PenToolHandler implements IToolHandler {
     return ActionIntentFactory.preview('pen.move', { pt, altKey: e.altKey });
   }
 
-  public onPointerMove(e: PointerEvent, pt: Point): boolean {
+  public onPointerMove(e: PointerEvent, pt: Point, coalescedPts?: Point[]): boolean {
     const intent = this.evalPointerMove(e, pt);
     if (intent.kind === 'none') return false;
+
+    // Si disponemos de muestras coalescidas de alta tasa de muestreo, procesamos el punto más reciente
+    const effectivePt = coalescedPts && coalescedPts.length > 0 ? coalescedPts[coalescedPts.length - 1] : pt;
 
     if (this.isDragging && this.penActiveVertexIdx !== null) {
       const v = this.currentPenVertices[this.penActiveVertexIdx];
@@ -109,7 +112,7 @@ export class PenToolHandler implements IToolHandler {
       this.currentPenVertices.forEach((item, idx) => {
         if (idx !== this.penActiveVertexIdx) otherVertices.push({ x: item.x, y: item.y });
       });
-      let snappedPt = this.ctx.snapPoint(pt, otherVertices);
+      let snappedPt = this.ctx.snapPoint(effectivePt, otherVertices);
       if (e.shiftKey) {
         snappedPt = PointUtils.snapAngle({ x: v.x, y: v.y }, snappedPt, Math.PI / 12);
       }
@@ -364,5 +367,13 @@ export class PenToolHandler implements IToolHandler {
     }
 
     return descriptors;
+  }
+
+  public onKeyUp?(e: KeyboardEvent): boolean | void {
+    if (e.key === 'Alt' && this.isCuspBroken) {
+      // Finalización de modo de quiebre de nodo
+      this.ctx.renderOverlay();
+      return true;
+    }
   }
 }

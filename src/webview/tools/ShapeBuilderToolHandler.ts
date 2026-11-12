@@ -141,24 +141,31 @@ export class ShapeBuilderToolHandler implements IToolHandler {
     return false;
   }
 
-  public onPointerMove(e: PointerEvent, pt: Point): boolean {
+  public onPointerMove(e: PointerEvent, pt: Point, coalescedPts?: Point[]): boolean {
     if (this.cachedSubSegments.length === 0 || this.isCacheStale()) {
       this.refreshSubSegments();
     }
 
     const z = this.ctx.canvasMgr.zoom || 1;
-    const hit = SegmentTrimEngine.findSubSegmentAtPoint(pt, this.cachedSubSegments, 12 / z);
+    const effectivePt = coalescedPts && coalescedPts.length > 0 ? coalescedPts[coalescedPts.length - 1] : pt;
+    const hit = SegmentTrimEngine.findSubSegmentAtPoint(effectivePt, this.cachedSubSegments, 12 / z);
 
     let needsOverlayUpdate = false;
 
     if (this.isDragging && this.dragStartPoint) {
-      const screenDist = Math.hypot(pt.x - this.dragStartPoint.x, pt.y - this.dragStartPoint.y) * z;
+      const screenDist = Math.hypot(effectivePt.x - this.dragStartPoint.x, effectivePt.y - this.dragStartPoint.y) * z;
       if (screenDist > 5) {
         this.hasExceededDragThreshold = true;
       }
-      if (this.hasExceededDragThreshold && hit && !this.sweptSubSegIds.has(hit.id)) {
-        this.sweptSubSegIds.add(hit.id);
-        needsOverlayUpdate = true;
+      if (this.hasExceededDragThreshold) {
+        const pointsToSample = (coalescedPts && coalescedPts.length > 0) ? coalescedPts : [effectivePt];
+        for (const samplePt of pointsToSample) {
+          const sampleHit = SegmentTrimEngine.findSubSegmentAtPoint(samplePt, this.cachedSubSegments, 12 / z);
+          if (sampleHit && !this.sweptSubSegIds.has(sampleHit.id)) {
+            this.sweptSubSegIds.add(sampleHit.id);
+            needsOverlayUpdate = true;
+          }
+        }
       }
     }
 
@@ -177,6 +184,13 @@ export class ShapeBuilderToolHandler implements IToolHandler {
     }
 
     return false;
+  }
+
+  public onKeyUp?(e: KeyboardEvent): boolean | void {
+    if (e.key === 'Alt') {
+      this.ctx.renderOverlay();
+      return true;
+    }
   }
 
   public onPointerUp(e: PointerEvent, _pt: Point): boolean {

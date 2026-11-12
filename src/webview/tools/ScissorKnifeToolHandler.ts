@@ -127,7 +127,7 @@ export class ScissorKnifeToolHandler implements IToolHandler {
     return true;
   }
 
-  public onPointerMove(e: PointerEvent, pt: Point): boolean {
+  public onPointerMove(e: PointerEvent, pt: Point, coalescedPts?: Point[]): boolean {
     const otherVerts: Point[] = [];
     this.ctx.model.elements.forEach((el) => {
       if (el.vertices) {
@@ -135,14 +135,18 @@ export class ScissorKnifeToolHandler implements IToolHandler {
       }
     });
 
-    const snappedPt = this.ctx.snapPoint ? this.ctx.snapPoint(pt, otherVerts) : pt;
+    const effectivePt = coalescedPts && coalescedPts.length > 0 ? coalescedPts[coalescedPts.length - 1] : pt;
+    const snappedPt = this.ctx.snapPoint ? this.ctx.snapPoint(effectivePt, otherVerts) : effectivePt;
     this.currentPoint = snappedPt;
-    this.hoverSnapPoint = Math.hypot(snappedPt.x - pt.x, snappedPt.y - pt.y) > 0.5 ? snappedPt : null;
+    this.hoverSnapPoint = Math.hypot(snappedPt.x - effectivePt.x, snappedPt.y - effectivePt.y) > 0.5 ? snappedPt : null;
 
     if (this.isDragging) {
-      const lastPt = this.trajectoryPoints[this.trajectoryPoints.length - 1];
-      if (!lastPt || Math.hypot(snappedPt.x - lastPt.x, snappedPt.y - lastPt.y) >= 2) {
-        this.trajectoryPoints.push(snappedPt);
+      const pointsToAppend = (coalescedPts && coalescedPts.length > 0) ? coalescedPts : [snappedPt];
+      for (const p of pointsToAppend) {
+        const lastPt = this.trajectoryPoints[this.trajectoryPoints.length - 1];
+        if (!lastPt || Math.hypot(p.x - lastPt.x, p.y - lastPt.y) >= 2) {
+          this.trajectoryPoints.push(p);
+        }
       }
     }
 

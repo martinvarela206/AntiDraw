@@ -586,13 +586,15 @@ export class NodeToolHandler implements IToolHandler {
     return true;
   }
 
-  public onPointerMove(e: PointerEvent, pt: Point): boolean {
+  public onPointerMove(e: PointerEvent, pt: Point, coalescedPts?: Point[]): boolean {
     const activeTool = this.ctx.getActiveTool();
     if (activeTool !== 'node') return false;
 
+    const effectivePt = coalescedPts && coalescedPts.length > 0 ? coalescedPts[coalescedPts.length - 1] : pt;
+
     if (this.isDragging && this.activeHandle) {
       const z = this.ctx.canvasMgr.zoom || 1;
-      if (Math.hypot(pt.x - this.dragStartPt.x, pt.y - this.dragStartPt.y) > 4 / z) {
+      if (Math.hypot(effectivePt.x - this.dragStartPt.x, effectivePt.y - this.dragStartPt.y) > 4 / z) {
         this.lastClickTime = 0;
         this.pendingSingleVertexId = null;
       }
@@ -605,7 +607,7 @@ export class NodeToolHandler implements IToolHandler {
       const isCtrl = e.ctrlKey || e.metaKey;
 
       if (this.activeHandle === 'marquee') {
-        this.marqueeSelector.updateMarquee(pt);
+        this.marqueeSelector.updateMarquee(effectivePt);
         this.ctx.renderOverlay();
         return true;
       }
@@ -614,7 +616,7 @@ export class NodeToolHandler implements IToolHandler {
         const paramMove = this.parametricController.handlePointerMove(
           selectedEl,
           this.activeHandle,
-          pt,
+          effectivePt,
           isShift,
           isCtrl,
           e.altKey
@@ -1634,5 +1636,12 @@ export class NodeToolHandler implements IToolHandler {
     }
 
     return descriptors;
+  }
+
+  public onKeyUp?(e: KeyboardEvent): boolean | void {
+    if (e.key === 'Shift' || e.key === 'Control' || e.key === 'Alt') {
+      this.ctx.renderOverlay();
+      return true;
+    }
   }
 }

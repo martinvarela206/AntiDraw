@@ -131,8 +131,9 @@ export class PolylineToolHandler implements IToolHandler {
     return ActionIntentFactory.preview('polyline.hover', { point: snappedPt });
   }
 
-  public onPointerMove(e: PointerEvent, pt: Point): boolean {
-    const intent = this.evalPointerMove(e, pt);
+  public onPointerMove(e: PointerEvent, pt: Point, coalescedPts?: Point[]): boolean {
+    const effectivePt = coalescedPts && coalescedPts.length > 0 ? coalescedPts[coalescedPts.length - 1] : pt;
+    const intent = this.evalPointerMove(e, effectivePt);
     if (intent.kind === 'none') return false;
 
     if (intent.kind === 'preview' && intent.payload?.point) {
@@ -140,6 +141,13 @@ export class PolylineToolHandler implements IToolHandler {
     }
     this.ctx.renderOverlay();
     return true;
+  }
+
+  public onKeyUp?(e: KeyboardEvent): boolean | void {
+    if (e.key === 'Shift') {
+      this.ctx.renderOverlay();
+      return true;
+    }
   }
 
   public evalPointerUp(_e: PointerEvent, _pt: Point): ActionIntent {

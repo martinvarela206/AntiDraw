@@ -2,6 +2,8 @@ import { ToolType } from './ToolType.js';
 import { Point, VectorModel } from '../engine/VectorModel.js';
 import { SelectionTool } from '../engine/SelectionTool.js';
 import { CanvasManager } from '../engine/CanvasManager.js';
+import { ToolStateMachine, ToolSessionState } from './ToolStateMachine.js';
+import { CameraViewportTransform } from './CoordinateSpaceTransformer.js';
 
 export interface ConfirmOptions {
   title: string;
@@ -27,33 +29,28 @@ export interface ToolContext {
   confirm(options: ConfirmOptions): Promise<boolean>;
   applyCanvasSize?(): void;
   isPointerOverRuler?(clientX: number, clientY: number, orientation?: 'horizontal' | 'vertical' | 'angled'): boolean;
+  getCameraTransform?(): CameraViewportTransform;
+  getStateMachine?(): ToolStateMachine;
 }
 
 /**
- * ARCHITECTURAL RATIONALE: Unified Tool Handler Contract (IToolHandler)
+ * ARCHITECTURAL RATIONALE: Unified Tool Handler Contract (ITool / IToolHandler)
  *
- * 1. Monolithic State Machine Dissolution:
- *    In the legacy architecture, `main.ts` acted as an unchecked global state machine, mixing
- *    transient pointer coordinates (`shapeStartPt`, `polylineHoverPoint`, `currentPolylineVertices`),
- *    ephemeral rendering logic, and model commitments in a single 3,500-line class.
- *    `IToolHandler` enforces encapsulation by delegating tool-specific pointer events, cancellation,
- *    and overlay rendering to specialized handler classes.
+ * 1. Deterministic State Machine Integration:
+ *    Tools can integrate with `ToolStateMachine` or operate as specialized reducers
+ *    handling pointer down, move, up, double click, key down, key up, and explicit cancellation.
  *
- * 2. Polymorphic Event Dispatch:
- *    `main.ts` dispatches pointer events (`pointerdown`, `pointermove`, `pointerup`, `dblclick`)
- *    and cancellation (`Escape` / contextmenu) polymorphically through the active tool handler.
- *    Handlers return a boolean indicating whether the event was absorbed, allowing fallback to
- *    canvas-wide interactions (e.g. deselection or panning) when appropriate.
+ * 2. High-Frequency Sampling & Pointer Coalescence:
+ *    `onPointerMove` can accept coalesced pointer points for high-refresh-rate stylus and digitizer
+ *    devices (`getCoalescedEvents`), preventing jitter in freehand pen and eraser tools.
  *
- * 3. Ephemeral Overlay Segregation:
- *    Tools frequently draw transient previews (*ghost shapes*, rubber bands, snap circles) that
- *    must never pollute the real SVG document model. `renderOverlay` provides an isolated channel
- *    for handlers to generate non-destructive SVG markup directly into the overlay layer.
+ * 3. 3-Tier Canonical Coordinate Projections:
+ *    Screen Space (Client px) -> Document Space (viewBox) -> Local Space (Object Matrix).
  */
 export interface IToolHandler {
   readonly toolTypes: ToolType[];
   onPointerDown(e: PointerEvent, pt: Point): boolean | void;
-  onPointerMove(e: PointerEvent, pt: Point): boolean | void;
+  onPointerMove(e: PointerEvent, pt: Point, coalescedPts?: Point[]): boolean | void;
   onPointerUp(e: PointerEvent, pt: Point): boolean | void;
   onDoubleClick?(e: MouseEvent, pt: Point): boolean | void;
   cancel?(): boolean;
@@ -62,4 +59,5 @@ export interface IToolHandler {
   deactivate?(): void;
   onKeyDown?(e: KeyboardEvent): boolean | void;
   onKeyUp?(e: KeyboardEvent): boolean | void;
+  getState?(): ToolSessionState;
 }
