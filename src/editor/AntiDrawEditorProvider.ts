@@ -4,27 +4,33 @@ import { IpcValidator } from '../shared/ipc/IpcContracts.js';
 import { HostSaveValidator } from '../shared/validation/HostSaveValidator.js';
 import { AtomicFileWriter } from './AtomicFileWriter.js';
 import { AntiDrawCustomDocument } from './AntiDrawCustomDocument.js';
+import { SessionStateStorage, VolatileSessionState } from './SessionStateStorage.js';
 
 /**
- * ARCHITECTURAL RATIONALE: Native CustomEditorProvider Lifecycle with Hot Exit & Dirty State Governance
+ * ARCHITECTURAL RATIONALE: Native CustomEditorProvider Lifecycle with Hot Exit & Git-Clean Session Storage
  *
  * 1. Native CustomEditorProvider Contract:
- *    Migrated from CustomTextEditorProvider (which relied on synthetic WorkspaceEdit text buffer replacements)
- *    to vscode.CustomEditorProvider<AntiDrawCustomDocument>. This provides first-class custom document
- *    lifecycle management, eliminating race conditions, serialization churn, and document position calculation bugs.
+ *    Migrated from CustomTextEditorProvider to vscode.CustomEditorProvider<AntiDrawCustomDocument>.
+ *    Provides first-class custom document lifecycle management, eliminating race conditions,
+ *    synthetic buffer churn, and document position calculation bugs.
  *
  * 2. Hot Exit & Crash Recovery (backupCustomDocument & openCustomDocument from backupId):
- *    Full implementation of `backupCustomDocument` writing current in-memory project snapshots to the VS Code
- *    backup directory. On startup or window reload, `openCustomDocument` detects `openContext.backupId` and
- *    restores unsaved work with zero data loss.
+ *    Full implementation of `backupCustomDocument` writing current in-memory project snapshots
+ *    (including transient volatile state) to the VS Code backup directory. Restores unsaved work
+ *    with zero data loss.
  *
- * 3. Revert & External Sync Coordination (revertCustomDocument):
+ * 3. Git-Clean Companion Metadata Sanity:
+ *    Volatile workstation state (camera offset, zoom level, undo/redo stacks) is extracted via
+ *    `SessionStateStorage` and persisted in VS Code's `workspaceState`. The on-disk companion file
+ *    (.svg.json / .adrw) strictly retains persistent vector configurations, eliminating Git commit noise.
+ *
+ * 4. Revert & External Sync Coordination (revertCustomDocument):
  *    Implements `revertCustomDocument` to discard transient dirty state, reload the committed disk version,
  *    and broadcast clean `loadSvg` synchronization messages to all connected webview panels.
  *
- * 4. Dirty State Governance (onDidChangeCustomDocument):
- *    Emits `CustomDocumentContentChangeEvent` whenever the webview dispatches `updateDocument` or `updateMetadata`,
- *    allowing VS Code to accurately display dirty status (the tab dot indicator) and govern save/auto-save timing.
+ * 5. Deterministic Dirty State Governance (onDidChangeCustomDocument):
+ *    Emits `CustomDocumentContentChangeEvent` when vector contents or persistent metadata change.
+ *    Pure camera panning and zooming do not dirty the document.
  */
 export class AntiDrawEditorProvider implements vscode.CustomEditorProvider<AntiDrawCustomDocument> {
   public static readonly viewType = 'antidraw.svgEditor';
@@ -71,14 +77,16 @@ export class AntiDrawEditorProvider implements vscode.CustomEditorProvider<AntiD
   }
 
   /**
-   * Reads companion sidecar metadata if available on disk.
+   * Reads companion sidecar metadata if available on disk, stripping any historical volatile keys.
    */
   public async readSidecarMetadata(svgUri: vscode.Uri): Promise<any> {
     try {
       const sidecarUri = this.getSidecarUri(svgUri);
       const data = await vscode.workspace.fs.readFile(sidecarUri);
       const text = new TextDecoder('utf-8').decode(data);
-      return JSON.parse(text);
+      const raw = JSON.parse(text);
+      const { persistent } = SessionStateStorage.splitMetadata(raw);
+      return persistent;
     } catch (_e) {
       return null;
     }
@@ -109,6 +117,14 @@ export class AntiDrawEditorProvider implements vscode.CustomEditorProvider<AntiD
         const backupData = await vscode.workspace.fs.readFile(backupUri);
         const backupText = new TextDecoder('utf-8').decode(backupData);
         container = AdrwProjectService.parseContainer(backupText, baseFileName);
+
+        // Extract volatile state if included in backup
+        const { persistent, volatile, hasVolatile } = SessionStateStorage.splitMetadata(container.companionMetadata);
+        container.companionMetadata = persistent;
+        if (hasVolatile) {
+          await SessionStateStorage.saveSessionState(this.context.workspaceState, uri, volatile);
+        }
+
         vscode.window.showInformationMessage(
           `[AntiDraw] Restaurado documento no guardado desde copia de seguridad Hot Exit (${baseFileName}).`
         );
@@ -125,12 +141,26 @@ export class AntiDrawEditorProvider implements vscode.CustomEditorProvider<AntiD
       const data = await vscode.workspace.fs.readFile(uri);
       const text = new TextDecoder('utf-8').decode(data);
       container = AdrwProjectService.parseContainer(text, baseFileName);
+      if (container.companionMetadata) {
+        const { persistent, volatile, hasVolatile } = SessionStateStorage.splitMetadata(container.companionMetadata);
+        container.companionMetadata = persistent;
+        if (hasVolatile) {
+          await SessionStateStorage.saveSessionState(this.context.workspaceState, uri, volatile);
+        }
+      }
     } else {
       // SVG opened: check if companion .adrw already exists
       try {
         const adrwBytes = await vscode.workspace.fs.readFile(adrwUri);
         const adrwText = new TextDecoder('utf-8').decode(adrwBytes);
         container = AdrwProjectService.parseContainer(adrwText, baseFileName);
+        if (container.companionMetadata) {
+          const { persistent, volatile, hasVolatile } = SessionStateStorage.splitMetadata(container.companionMetadata);
+          container.companionMetadata = persistent;
+          if (hasVolatile) {
+            await SessionStateStorage.saveSessionState(this.context.workspaceState, uri, volatile);
+          }
+        }
       } catch (_e) {
         // Generate new .adrw container from SVG
         const svgBytes = await vscode.workspace.fs.readFile(uri);
@@ -173,10 +203,13 @@ export class AntiDrawEditorProvider implements vscode.CustomEditorProvider<AntiD
 
     const updateWebview = () => {
       const docDirWebviewUri = webviewPanel.webview.asWebviewUri(document.docDir).toString().replace(/\/+$/, '');
+      const volatile = SessionStateStorage.getSessionState(this.context.workspaceState, document.uri);
+      const mergedMeta = SessionStateStorage.mergeMetadata(document.container.companionMetadata, volatile);
+
       webviewPanel.webview.postMessage({
         type: 'loadSvg',
         text: document.container.svgContent,
-        metadata: document.container.companionMetadata || null,
+        metadata: mergedMeta || null,
         locale: vscode.env.language,
         documentUri: document.isAdrw ? document.uri.toString() : document.adrwUri.toString(),
         documentDirUri: document.docDir.toString(),
@@ -216,10 +249,21 @@ export class AntiDrawEditorProvider implements vscode.CustomEditorProvider<AntiD
 
         case 'updateMetadata': {
           if (message.metadata !== undefined) {
-            document.container.companionMetadata = message.metadata;
-            document.container.metadata.modified = Date.now();
-            document.setDirty(true);
-            this._onDidChangeCustomDocument.fire({ document });
+            const { persistent, volatile, hasVolatile } = SessionStateStorage.splitMetadata(message.metadata);
+            if (hasVolatile) {
+              await SessionStateStorage.saveSessionState(this.context.workspaceState, document.uri, volatile);
+            }
+
+            const prevStr = JSON.stringify(document.container.companionMetadata || {});
+            const nextStr = JSON.stringify(persistent);
+
+            // Only mark document as dirty if persistent form/appearance metadata changed
+            if (prevStr !== nextStr) {
+              document.container.companionMetadata = persistent;
+              document.container.metadata.modified = Date.now();
+              document.setDirty(true);
+              this._onDidChangeCustomDocument.fire({ document });
+            }
           }
           break;
         }
@@ -391,14 +435,28 @@ export class AntiDrawEditorProvider implements vscode.CustomEditorProvider<AntiD
 
   /**
    * Persists the custom document to disk (Save command / Ctrl+S).
+   * Strips any volatile workstation keys from on-disk storage.
    */
   public async saveCustomDocument(
     document: AntiDrawCustomDocument,
     _cancellation: vscode.CancellationToken
   ): Promise<void> {
+    if (document.container.companionMetadata) {
+      const { persistent } = SessionStateStorage.splitMetadata(document.container.companionMetadata);
+      document.container.companionMetadata = persistent;
+    }
+
     const serialized = AdrwProjectService.serializeContainer(document.container);
     const targetUri = document.isAdrw ? document.uri : document.adrwUri;
     await AtomicFileWriter.write(vscode.workspace.fs, targetUri, new TextEncoder().encode(serialized));
+
+    // For SVG documents: also synchronize clean companion sidecar JSON if companionMetadata exists
+    if (!document.isAdrw && document.container.companionMetadata) {
+      const sidecarUri = this.getSidecarUri(document.uri);
+      const sidecarText = JSON.stringify(document.container.companionMetadata, null, 2);
+      await AtomicFileWriter.write(vscode.workspace.fs, sidecarUri, new TextEncoder().encode(sidecarText));
+    }
+
     document.setDirty(false);
   }
 
@@ -410,6 +468,11 @@ export class AntiDrawEditorProvider implements vscode.CustomEditorProvider<AntiD
     destination: vscode.Uri,
     _cancellation: vscode.CancellationToken
   ): Promise<void> {
+    if (document.container.companionMetadata) {
+      const { persistent } = SessionStateStorage.splitMetadata(document.container.companionMetadata);
+      document.container.companionMetadata = persistent;
+    }
+
     const serialized = AdrwProjectService.serializeContainer(document.container);
     await AtomicFileWriter.write(vscode.workspace.fs, destination, new TextEncoder().encode(serialized));
   }
@@ -425,12 +488,21 @@ export class AntiDrawEditorProvider implements vscode.CustomEditorProvider<AntiD
     const data = await vscode.workspace.fs.readFile(sourceUri);
     const text = new TextDecoder('utf-8').decode(data);
     document.container = AdrwProjectService.parseContainer(text, document.baseFileName);
+
+    if (document.container.companionMetadata) {
+      const { persistent } = SessionStateStorage.splitMetadata(document.container.companionMetadata);
+      document.container.companionMetadata = persistent;
+    }
+
     document.setDirty(false);
+
+    const volatile = SessionStateStorage.getSessionState(this.context.workspaceState, document.uri);
+    const mergedMeta = SessionStateStorage.mergeMetadata(document.container.companionMetadata, volatile);
 
     document.broadcastMessage({
       type: 'loadSvg',
       text: document.container.svgContent,
-      metadata: document.container.companionMetadata || null,
+      metadata: mergedMeta || null,
       locale: vscode.env.language,
       documentUri: document.isAdrw ? document.uri.toString() : document.adrwUri.toString(),
       documentDirUri: document.docDir.toString(),
@@ -446,7 +518,13 @@ export class AntiDrawEditorProvider implements vscode.CustomEditorProvider<AntiD
     context: vscode.CustomDocumentBackupContext,
     _cancellation: vscode.CancellationToken
   ): Promise<vscode.CustomDocumentBackup> {
-    const serialized = AdrwProjectService.serializeContainer(document.container);
+    const volatile = SessionStateStorage.getSessionState(this.context.workspaceState, document.uri);
+    const backupContainer = {
+      ...document.container,
+      companionMetadata: SessionStateStorage.mergeMetadata(document.container.companionMetadata, volatile),
+    };
+
+    const serialized = AdrwProjectService.serializeContainer(backupContainer);
     const buffer = new TextEncoder().encode(serialized);
 
     await vscode.workspace.fs.writeFile(context.destination, buffer);

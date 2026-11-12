@@ -1,9 +1,10 @@
 import { strict as assert } from 'assert';
 import { AntiDrawCustomDocument } from '../src/editor/AntiDrawCustomDocument.js';
 import { AntiDrawEditorProvider } from '../src/editor/AntiDrawEditorProvider.js';
+import { SessionStateStorage } from '../src/editor/SessionStateStorage.js';
 import { AdrwProjectService, AdrwContainer } from '../src/webview/engine/project/AdrwContainer.js';
 import * as vscode from 'vscode';
-import { mockFsStorage, Uri } from './mocks/vscode.js';
+import { mockFsStorage, Uri, MockMemento } from './mocks/vscode.js';
 
 export async function runCustomDocumentLifecycleTests(): Promise<boolean> {
   console.log('\n======================================================');
@@ -20,6 +21,15 @@ export async function runCustomDocumentLifecycleTests(): Promise<boolean> {
       console.error(`  ❌ [FAIL] ${desc}:`, err);
       throw err;
     }
+  }
+
+  function createMockContext(): any {
+    return {
+      extensionUri: Uri.file('/antidraw-ext'),
+      extension: { packageJSON: { version: '0.103.15' } },
+      workspaceState: new MockMemento(),
+      globalState: new MockMemento(),
+    };
   }
 
   const initialSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect id="r1" width="100" height="100"/></svg>';
@@ -84,10 +94,7 @@ export async function runCustomDocumentLifecycleTests(): Promise<boolean> {
     const serialized = AdrwProjectService.serializeContainer(initialContainer);
     mockFsStorage.set(fileUri.path, new TextEncoder().encode(serialized));
 
-    const mockContext: any = {
-      extensionUri: Uri.file('/antidraw-ext'),
-      extension: { packageJSON: { version: '0.103.14' } },
-    };
+    const mockContext = createMockContext();
     const provider = new AntiDrawEditorProvider(mockContext);
 
     const openContext: any = { backupId: undefined, untitledDocumentData: undefined };
@@ -108,10 +115,7 @@ export async function runCustomDocumentLifecycleTests(): Promise<boolean> {
     const serializedBackup = AdrwProjectService.serializeContainer(modifiedContainer);
     mockFsStorage.set(backupUri.path, new TextEncoder().encode(serializedBackup));
 
-    const mockContext: any = {
-      extensionUri: Uri.file('/antidraw-ext'),
-      extension: { packageJSON: { version: '0.103.14' } },
-    };
+    const mockContext = createMockContext();
     const provider = new AntiDrawEditorProvider(mockContext);
 
     const openContext: any = { backupId: backupUri.toString(), untitledDocumentData: undefined };
@@ -133,10 +137,7 @@ export async function runCustomDocumentLifecycleTests(): Promise<boolean> {
       Uri.file('/test-workspace') as any
     );
 
-    const mockContext: any = {
-      extensionUri: Uri.file('/antidraw-ext'),
-      extension: { packageJSON: { version: '0.103.14' } },
-    };
+    const mockContext = createMockContext();
     const provider = new AntiDrawEditorProvider(mockContext);
 
     const backupDest = Uri.file('/backup-dir/active_backup.json') as any;
@@ -164,10 +165,7 @@ export async function runCustomDocumentLifecycleTests(): Promise<boolean> {
     );
     doc.setDirty(true);
 
-    const mockContext: any = {
-      extensionUri: Uri.file('/antidraw-ext'),
-      extension: { packageJSON: { version: '0.103.14' } },
-    };
+    const mockContext = createMockContext();
     const provider = new AntiDrawEditorProvider(mockContext);
     const cancelToken: any = { isCancellationRequested: false };
 
@@ -205,10 +203,7 @@ export async function runCustomDocumentLifecycleTests(): Promise<boolean> {
       onDidDispose: () => ({ dispose: () => {} }),
     } as any);
 
-    const mockContext: any = {
-      extensionUri: Uri.file('/antidraw-ext'),
-      extension: { packageJSON: { version: '0.103.14' } },
-    };
+    const mockContext = createMockContext();
     const provider = new AntiDrawEditorProvider(mockContext);
     const cancelToken: any = { isCancellationRequested: false };
 
@@ -218,6 +213,91 @@ export async function runCustomDocumentLifecycleTests(): Promise<boolean> {
     assert.equal(broadcasted.length, 1);
     assert.equal(broadcasted[0].type, 'loadSvg');
     assert.equal(broadcasted[0].text, '<svg id="committed"/>');
+  });
+
+  await test('SessionStateStorage separates volatile workstation keys from persistent shape metadata', () => {
+    const mixed = {
+      zoom: 1.75,
+      cameraOffset: { x: 250, y: 120 },
+      undoStack: ['snap1', 'snap2'],
+      redoStack: ['snap3'],
+      grids: [{ spacing: 20 }],
+      guides: [{ pos: 50 }],
+      elements: {
+        el1: { 'data-shape': 'rect' },
+      },
+    };
+
+    const { persistent, volatile, hasVolatile } = SessionStateStorage.splitMetadata(mixed);
+    assert.equal(hasVolatile, true);
+    assert.equal(volatile.zoom, 1.75);
+    assert.deepEqual(volatile.cameraOffset, { x: 250, y: 120 });
+    assert.deepEqual(volatile.undoStack, ['snap1', 'snap2']);
+    assert.deepEqual(volatile.redoStack, ['snap3']);
+
+    // Persistent must NOT have volatile keys
+    assert.equal(persistent.zoom, undefined);
+    assert.equal(persistent.cameraOffset, undefined);
+    assert.equal(persistent.undoStack, undefined);
+    assert.equal(persistent.redoStack, undefined);
+
+    // Persistent retains shapes and canvas config
+    assert.deepEqual(persistent.grids, [{ spacing: 20 }]);
+    assert.deepEqual(persistent.guides, [{ pos: 50 }]);
+    assert.deepEqual(persistent.elements, { el1: { 'data-shape': 'rect' } });
+
+    // Round-trip merge restores full state for webview consumption
+    const merged = SessionStateStorage.mergeMetadata(persistent, volatile);
+    assert.equal(merged.zoom, 1.75);
+    assert.deepEqual(merged.cameraOffset, { x: 250, y: 120 });
+    assert.deepEqual(merged.undoStack, ['snap1', 'snap2']);
+    assert.deepEqual(merged.elements, { el1: { 'data-shape': 'rect' } });
+  });
+
+  await test('saveCustomDocument for SVG documents writes clean sidecar JSON without volatile Git noise', async () => {
+    const svgUri = Uri.file('/test-workspace/drawing.svg') as any;
+    const sidecarUri = Uri.file('/test-workspace/drawing.json') as any;
+
+    const mockContext = createMockContext();
+    const provider = new AntiDrawEditorProvider(mockContext);
+
+    // Container with mixed persistent and volatile metadata
+    const mixedContainer: AdrwContainer = {
+      ...initialContainer,
+      companionMetadata: {
+        zoom: 3.0,
+        cameraOffset: { x: 999, y: 888 },
+        undoStack: ['snapshot1'],
+        guides: [{ axis: 'x', pos: 100 }],
+        elements: { rect_1: { 'data-shape': 'rect' } },
+      },
+    };
+
+    const doc = new AntiDrawCustomDocument(
+      svgUri,
+      mixedContainer,
+      false, // isAdrw = false (SVG mode)
+      'drawing.svg',
+      Uri.file('/test-workspace/drawing.adrw') as any,
+      Uri.file('/test-workspace') as any
+    );
+    doc.setDirty(true);
+
+    const cancelToken: any = { isCancellationRequested: false };
+    await provider.saveCustomDocument(doc, cancelToken);
+
+    assert(mockFsStorage.has(sidecarUri.path), 'Sidecar JSON was written to fs');
+    const sidecarBytes = mockFsStorage.get(sidecarUri.path)!;
+    const sidecarJson = JSON.parse(new TextDecoder('utf-8').decode(sidecarBytes));
+
+    // Verify ZERO volatile keys in sidecar JSON!
+    assert.equal(sidecarJson.zoom, undefined, 'No zoom in on-disk sidecar');
+    assert.equal(sidecarJson.cameraOffset, undefined, 'No cameraOffset in on-disk sidecar');
+    assert.equal(sidecarJson.undoStack, undefined, 'No undoStack in on-disk sidecar');
+
+    // Verify persistent properties are intact
+    assert.deepEqual(sidecarJson.guides, [{ axis: 'x', pos: 100 }]);
+    assert.deepEqual(sidecarJson.elements, { rect_1: { 'data-shape': 'rect' } });
   });
 
   console.log(`\nResults: ${passed} passed, 0 failed.`);

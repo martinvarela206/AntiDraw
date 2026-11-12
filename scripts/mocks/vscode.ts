@@ -123,6 +123,33 @@ export const env = {
   openExternal: async (_uri: Uri) => true,
 };
 
+export interface Memento {
+  get<T>(key: string): T | undefined;
+  get<T>(key: string, defaultValue: T): T;
+  update(key: string, value: any): Thenable<void>;
+  keys(): readonly string[];
+}
+
+export class MockMemento implements Memento {
+  private storage = new Map<string, any>();
+
+  public get<T>(key: string, defaultValue?: T): any {
+    return this.storage.has(key) ? this.storage.get(key) : defaultValue;
+  }
+
+  public async update(key: string, value: any): Promise<void> {
+    if (value === undefined) {
+      this.storage.delete(key);
+    } else {
+      this.storage.set(key, value);
+    }
+  }
+
+  public keys(): readonly string[] {
+    return Array.from(this.storage.keys());
+  }
+}
+
 export const CancellationTokenNone = {
   isCancellationRequested: false,
   onCancellationRequested: new EventEmitter().event,

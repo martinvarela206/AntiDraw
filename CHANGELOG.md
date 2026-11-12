@@ -3,6 +3,17 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.16] - 2026-11-12
+
+### 🔌 VS Code Integration & Git Sanitation
+- **Git Sanitation of Sidecar JSON & Volatile Workstation State (`SessionStateStorage`)**:
+  - **Volatile State Decoupling**: Offloaded transient workstation session state (`zoom`, `cameraOffset`, `undoStack`, `redoStack`) from companion sidecar files to VS Code's native `workspaceState` memento.
+  - **Zero-Noise Git Commits**: Restricts on-disk `.svg.json` sidecar files exclusively to persistent enriched shape metadata (appearance stacks, custom gradients, pivots, swatches, grids, guides). Navigating, panning, and zooming in an active file no longer creates noisy Git diffs or triggers false dirty states.
+  - **Transparent Webview Hydration**: Automatically merges persistent disk metadata with session workstation state on document load, seamlessly preserving camera coordinates and undo history across editor activations.
+  - **Automated Test Coverage**: Added test assertions to `test-custom-document-lifecycle.ts` (Suite 59) asserting volatile/persistent separation, workspace state persistence, and clean sidecar serialization.
+
+---
+
 ## [0.103.15] - 2026-11-12
 
 ### 🔌 VS Code Integration & Document Lifecycle
