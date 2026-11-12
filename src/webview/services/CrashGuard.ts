@@ -6,6 +6,8 @@ export interface CrashGuardContext {
   render: () => void;
   notifier?: INotifier;
   reportStatusError?: (msg: string) => void;
+  resetInteractionFlags?: () => void;
+  releasePointerCapture?: () => void;
 }
 
 /**
@@ -21,7 +23,11 @@ export interface CrashGuardContext {
  *    operations. If an unhandled exception or geometric degeneracy occurs, it rolls back
  *    to the pre-operation snapshot in O(1).
  *
- * 3. Inverted Notification Port:
+ * 3. Guaranteed Interaction Recovery:
+ *    Immediately forces pointer capture release and resets interaction flags (isDragging)
+ *    to prevent the canvas or input loop from freezing.
+ *
+ * 4. Inverted Notification Port:
  *    Decoupled from VsCodeBridge via INotifier port injection, keeping L3 independent of L4.
  */
 export class CrashGuard {
@@ -36,10 +42,19 @@ export class CrashGuard {
       const errMsg = err instanceof Error ? err.message : String(err);
       console.error(`[AntiDraw:CrashGuard] Panic prevented during '${operationName}':`, err);
 
-      // Instant O(1) deterministic state rollback
+      // 1. Liberación garantizada de captura de puntero y reseteo forzado de interacción
+      try {
+        this.ctx.releasePointerCapture?.();
+      } catch (_e) {}
+      try {
+        this.ctx.resetInteractionFlags?.();
+      } catch (_e) {}
+
+      // 2. Instant O(1) deterministic state rollback
       this.ctx.historyService.applyState(fallback);
       this.ctx.render();
 
+      // 3. Notificación de error
       if (this.ctx.notifier) {
         this.ctx.notifier.showError(
           `AntiDraw: Se recuperó el lienzo tras un fallo en '${operationName}': ${errMsg}`

@@ -83,6 +83,13 @@ export class CoreServiceRegistry {
       historyService,
       render: () => workspaceLayout.render(),
       notifier: bridge,
+      resetInteractionFlags: () => {
+        const tools = ctx.getTools?.();
+        if (tools?.session) {
+          tools.session.isDragging = false;
+          tools.session.activeHandle = null;
+        }
+      },
     });
 
     const actionDispatcher = new CanvasActionDispatcher({

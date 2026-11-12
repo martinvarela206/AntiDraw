@@ -225,6 +225,37 @@ export class CanvasInteractionController implements CanvasViewDelegate {
     } catch (_e) {}
   }
 
+  /**
+   * Fuerza la liberación de captura de puntero y cancelación de animación RAF.
+   */
+  public forceReleasePointerCapture(): void {
+    const canvasView = this.ctx.getCanvasView();
+    try {
+      canvasView?.cancelRaf();
+      canvasView?.setCursor('default');
+    } catch (_e) {}
+  }
+
+  /**
+   * Reseteo forzado de banderas de interacción (isDragging, activeHandle) y overlays.
+   */
+  public forceResetInteractionFlags(): void {
+    this.session.isDragging = false;
+    this.session.activeHandle = null;
+
+    try {
+      this.cancelCurrentAction();
+    } catch (_e) {}
+
+    try {
+      const overlay = document.getElementById('svg-overlay');
+      if (overlay) {
+        overlay.innerHTML = '';
+      }
+      this.ctx.renderOverlay();
+    } catch (_e) {}
+  }
+
   public onPointerDown(e: PointerEvent, pt: Point): void {
     this.safeExecute('pointerdown', e, () => {
       this.ctx.getContextMenu()?.hide();

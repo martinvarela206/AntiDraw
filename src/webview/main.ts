@@ -8,6 +8,7 @@ import { ToolFactory, ToolSuite } from './tools/ToolFactory.js';
 import { AppLayoutManager } from './ui/AppLayoutManager.js';
 import { ContextMenu } from './ui/ContextMenu.js';
 import { CoreServiceRegistry, CoreServices } from './services/CoreServiceRegistry.js';
+import { CrashGuard as EngineCrashGuard } from './engine/guard/CrashGuard.js';
 import { HostSyncService } from './services/HostSyncService.js';
 import { CanvasInteractionController } from './controllers/CanvasInteractionController.js';
 import { PropertyPanelActionController } from './controllers/PropertyPanelActionController.js';
@@ -214,6 +215,13 @@ class AntiDrawApp {
       },
       this.interactionCtrl
     );
+
+    // Resilient CrashGuard interaction cleanup & global unhandled rejection containment
+    EngineCrashGuard.setInteractionCleanup({
+      releasePointerCapture: () => this.interactionCtrl.forceReleasePointerCapture(),
+      resetInteractionFlags: () => this.interactionCtrl.forceResetInteractionFlags(),
+    });
+    EngineCrashGuard.installGlobalHandlers();
 
     this.hostSyncService = new HostSyncService({
       model: this.model,

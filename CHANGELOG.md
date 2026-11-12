@@ -3,6 +3,17 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.6] - 2026-11-12
+
+### 🛡️ Resilience & Fault Recovery
+- **CrashGuard Resilience Hardening, Global Unhandled Rejection & Pointer Capture Release**:
+  - **Global Promise Rejection Catch (`installGlobalHandlers`)**: Attached global window listeners for `unhandledrejection` and `window.error`, ensuring unhandled asynchronous exceptions in background pipelines never freeze or crash the webview canvas.
+  - **Guaranteed Pointer Capture Release**: Implemented `IInteractionCleanup.releasePointerCapture()` executed automatically on any synchronous panic, async rejection, or global error, eliminating locked mouse pointers and frozen drags.
+  - **Forced Interaction Flag Reset**: Enforced systematic resets of `isDragging`, `activeHandle`, and orphaned DOM overlay elements upon exception containment, restoring interactive responsiveness immediately.
+  - **Automated Test Coverage**: Added test suite `test-crashguard-resilience.ts` (Suite 50) verifying 18 assertions of cleanup callbacks, async rejection handling, and global listener life-cycle management.
+
+---
+
 ## [0.103.5] - 2026-11-12
 
 ### 🏛️ Architecture & Refactoring
