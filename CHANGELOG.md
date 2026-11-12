@@ -3,6 +3,18 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.21] - 2026-11-12
+
+### ⌨️ Keymap & International Ergonomics
+- **Centralized International Keymap Registry (`KeymapRegistry` & `KeyboardShortcutController`)**:
+  - **Dual-Resolution Physical & Semantic Key Evaluation**: Evaluates both physical keyboard location (`event.code`, e.g. `KeyV`, `KeyA`) and semantic localized characters (`event.key`), ensuring seamless tool selection and shortcuts across US QWERTY, Spanish ISO, French AZERTY, and German QWERTZ layouts.
+  - **Unified macOS Meta / Command (⌘) Normalization**: Implemented `KeymapRegistry.isCtrlOrMeta` to normalize Windows/Linux `Ctrl` and macOS `Cmd` (`e.metaKey`), ensuring standard VS Code keyboard shortcuts behave identically across operating systems.
+  - **AltGr Character Collision Elimination**: Inspects `e.getModifierState('AltGraph')` to strictly filter out synthetic `Ctrl+Alt` events triggered by AltGr on Spanish, German, and European keyboards, preventing unintended command execution when typing characters like `[`, `]`, `{`, `}`, `@`, `#`, and `~`.
+  - **Declarative Keybinding Centralization**: Wired `KeyboardShortcutController` into `KeymapRegistry`, delegating single-key tool switches, clipboard operations, z-order, node conversions, and nudging through `CommandRegistry`.
+  - **Automated Test Coverage**: Added test suite `test-international-keymap.ts` (Suite 64) verifying 5 assertions covering dual-resolution matching, macOS Command key normalization, AltGr collision suppression, and controller command dispatch.
+
+---
+
 ## [0.103.20] - 2026-11-12
 
 ### ⚙️ Build Infrastructure & Runtime Target Alignment

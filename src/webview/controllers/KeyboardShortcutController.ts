@@ -12,6 +12,7 @@ import { PenToolHandler } from '../tools/PenToolHandler.js';
 import { PolylineToolHandler } from '../tools/PolylineToolHandler.js';
 import { CommandRegistry } from '../engine/commands/CommandRegistry.js';
 import { GroupHierarchyService } from '../engine/selection/GroupHierarchyService.js';
+import { KeymapRegistry } from '../commands/KeymapRegistry.js';
 
 export interface KeyboardControllerContext {
   toolbar: Toolbar;
@@ -147,202 +148,78 @@ export class KeyboardShortcutController {
 
     if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'SELECT') return;
 
-    // Single-key Tool Switches & Selection Mode Shortcuts (when not holding Ctrl/Meta)
-    if (!e.ctrlKey && !e.metaKey && !e.altKey) {
-      const isSelectActive = this.ctx.toolbar.activeTool === 'select' || this.ctx.selectionTool.selectedElementIds.size > 0;
+    const isSelectActive = this.ctx.toolbar.activeTool === 'select' || this.ctx.selectionTool.selectedElementIds.size > 0;
 
-      // Shift+E: Herramienta Borrador (evaluado con prioridad antes de tecla E)
-      if (e.shiftKey && (e.key === 'E' || e.key === 'e')) {
-        e.preventDefault();
-        this.ctx.toolbar.setTool('eraser');
-        return;
-      }
-
-      // Dedicated Free Transform / Homography Shortcut (D) cuando hay selección activa
-      if (isSelectActive && (e.key === 'd' || e.key === 'D') && !e.shiftKey) {
-        e.preventDefault();
-        this.ctx.selectionTool.selectionMode = this.ctx.selectionTool.selectionMode === 'distort' ? 'scale' : 'distort';
-        this.ctx.propertyPanel.update();
-        this.ctx.renderOverlay();
-        return;
-      }
-
-      // Atajos directos canónicos 1:1 para cada herramienta (sin modificadores)
-      if (!e.shiftKey) {
-        if (e.key === 'v' || e.key === 'V') { e.preventDefault(); this.ctx.toolbar.setTool('select'); return; }
-        if (e.key === 'a' || e.key === 'A' || e.key === 'n' || e.key === 'N') { e.preventDefault(); this.ctx.toolbar.setTool('node'); return; }
-        if (e.key === 't' || e.key === 'T') { e.preventDefault(); this.ctx.toolbar.setTool('stroke'); return; }
-        if (e.key === 'p' || e.key === 'P') { e.preventDefault(); this.ctx.toolbar.setTool('pen'); return; }
-        if (e.key === 'l' || e.key === 'L') { e.preventDefault(); this.ctx.toolbar.setTool('line'); return; }
-        if (e.key === 'y' || e.key === 'Y') { e.preventDefault(); this.ctx.toolbar.setTool('polyline'); return; }
-        if (e.key === 'r' || e.key === 'R') { e.preventDefault(); this.ctx.toolbar.setTool('rect'); return; }
-        if (e.key === 'o' || e.key === 'O') { e.preventDefault(); this.ctx.toolbar.setTool('circle'); return; }
-        if (e.key === 'e' || e.key === 'E') { e.preventDefault(); this.ctx.toolbar.setTool('ellipse'); return; }
-        if (e.key === 'g' || e.key === 'G') { e.preventDefault(); this.ctx.toolbar.setTool('polygon'); return; }
-        if (e.key === 's' || e.key === 'S') { e.preventDefault(); this.ctx.toolbar.setTool('star'); return; }
-        if (e.key === 'c' || e.key === 'C') { e.preventDefault(); this.ctx.toolbar.setTool('scissors'); return; }
-        if (e.key === 'k' || e.key === 'K') { e.preventDefault(); this.ctx.toolbar.setTool('scissors'); return; }
-        if (e.key === 'f' || e.key === 'F') { e.preventDefault(); this.ctx.toolbar.setTool('smartFill'); return; }
-        if (e.key === 'm' || e.key === 'M') { e.preventDefault(); this.ctx.toolbar.setTool('shapeBuilder'); return; }
-        if (e.key === 'i' || e.key === 'I') { e.preventDefault(); this.ctx.toolbar.setTool('image'); return; }
-        if (e.key === '+' || e.key === '=') { e.preventDefault(); this.ctx.toolbar.setTool('addVertex'); return; }
-        if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); this.ctx.toolbar.setTool('zoom'); return; }
-      }
+    // Dedicated Free Transform / Homography Shortcut (D) cuando hay selección activa (sin modificadores)
+    if (isSelectActive && (e.code === 'KeyD' || e.key === 'd' || e.key === 'D') && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+      e.preventDefault();
+      this.ctx.selectionTool.selectionMode = this.ctx.selectionTool.selectionMode === 'distort' ? 'scale' : 'distort';
+      this.ctx.propertyPanel.update();
+      this.ctx.renderOverlay();
+      return;
     }
 
-    const isCtrl = e.ctrlKey || e.metaKey;
     const cmdRegistry = CommandRegistry.getInstance();
+    const keymap = KeymapRegistry.getInstance();
+    const matched = keymap.findMatchingBinding(e);
 
-    if (isCtrl && (e.key === 'c' || e.key === 'C')) {
-      if (cmdRegistry.has('edit.copy') && cmdRegistry.isEnabled('edit.copy')) {
+    if (matched) {
+      if (matched.toolId) {
         e.preventDefault();
-        cmdRegistry.execute('edit.copy');
-        return;
-      } else if (this.ctx.selectionTool.selectedElementIds.size > 0 || this.ctx.canvasMgr.selectedGuideId) {
-        e.preventDefault();
-        this.ctx.copySelection();
+        this.ctx.toolbar.setTool(matched.toolId as ToolType);
         return;
       }
-    }
 
-    if (isCtrl && (e.key === 'j' || e.key === 'J')) {
-      if (cmdRegistry.has('node.join') && cmdRegistry.isEnabled('node.join')) {
+      if (matched.commandId) {
         e.preventDefault();
-        cmdRegistry.execute('node.join');
-        return;
-      } else if (this.ctx.toolbar.activeTool === 'node') {
-        e.preventDefault();
-        this.ctx.nodeToolHandler.handleJoinSelectedNodes();
-        return;
-      }
-    }
-
-    if (isCtrl && (e.key === 'q' || e.key === 'Q')) {
-      if (cmdRegistry.has('object.convertToCurves') && cmdRegistry.isEnabled('object.convertToCurves')) {
-        e.preventDefault();
-        cmdRegistry.execute('object.convertToCurves');
-        return;
-      } else if (this.ctx.selectionTool.selectedElementIds.size > 0) {
-        e.preventDefault();
-        this.ctx.handleConvertToCurves();
-        return;
-      }
-    }
-
-    if (isCtrl && (e.key === 'x' || e.key === 'X')) {
-      if (cmdRegistry.has('edit.cut') && cmdRegistry.isEnabled('edit.cut')) {
-        e.preventDefault();
-        cmdRegistry.execute('edit.cut');
-        return;
-      } else if (this.ctx.selectionTool.selectedElementIds.size > 0 || this.ctx.canvasMgr.selectedGuideId) {
-        e.preventDefault();
-        this.ctx.cutSelection();
-        return;
-      }
-    }
-
-    if (isCtrl && (e.key === 'v' || e.key === 'V')) {
-      if (cmdRegistry.has('edit.paste') && cmdRegistry.isEnabled('edit.paste')) {
-        e.preventDefault();
-        cmdRegistry.execute('edit.paste');
-        return;
-      } else if (this.ctx.clipboardService.hasContent) {
-        e.preventDefault();
-        this.ctx.pasteClipboard();
-        return;
-      }
-    }
-
-    if (isCtrl && (e.key === 'd' || e.key === 'D')) {
-      if (cmdRegistry.has('edit.duplicate') && cmdRegistry.isEnabled('edit.duplicate')) {
-        e.preventDefault();
-        cmdRegistry.execute('edit.duplicate');
-        return;
-      } else if (this.ctx.selectionTool.selectedElementIds.size > 0 || this.ctx.canvasMgr.selectedGuideId) {
-        e.preventDefault();
-        this.ctx.duplicateSelection();
-        return;
-      }
-    }
-
-    if (isCtrl && (e.key === 'g' || e.key === 'G')) {
-      const groupCmd = e.shiftKey ? 'object.ungroup' : 'object.group';
-      if (cmdRegistry.has(groupCmd) && cmdRegistry.isEnabled(groupCmd)) {
-        e.preventDefault();
-        cmdRegistry.execute(groupCmd);
-        return;
-      }
-    }
-
-    if (isCtrl && e.shiftKey && (e.key === 'e' || e.key === 'E')) {
-      if (cmdRegistry.has('file.exportAsset') && cmdRegistry.isEnabled('file.exportAsset')) {
-        e.preventDefault();
-        cmdRegistry.execute('file.exportAsset');
-        return;
-      }
-    }
-
-    if (isCtrl && e.key === '0') {
-      if (cmdRegistry.has('view.recenterViewBox') && cmdRegistry.isEnabled('view.recenterViewBox')) {
-        e.preventDefault();
-        cmdRegistry.execute('view.recenterViewBox');
-        return;
-      }
-    }
-
-    if (isCtrl && e.altKey) {
-      if (e.key === ';' || e.key === ':') {
-        if (cmdRegistry.has('guide.toggleLock')) {
-          e.preventDefault();
-          cmdRegistry.execute('guide.toggleLock');
+        if (cmdRegistry.has(matched.commandId) && cmdRegistry.isEnabled(matched.commandId)) {
+          cmdRegistry.execute(matched.commandId);
           return;
         }
-      }
-      if (e.key === 'l' || e.key === 'L') {
-        if (cmdRegistry.has('layer.lockAllAbove') && cmdRegistry.isEnabled('layer.lockAllAbove')) {
-          e.preventDefault();
-          cmdRegistry.execute('layer.lockAllAbove');
-          return;
-        }
-      }
-      if (e.key === '2') {
-        if (cmdRegistry.has('layer.unlockAll')) {
-          e.preventDefault();
-          cmdRegistry.execute('layer.unlockAll');
-          return;
-        }
-      }
-      if (e.key === '3') {
-        const cmd = e.shiftKey ? 'layer.showAll' : 'layer.hideAllAbove';
-        if (cmdRegistry.has(cmd) && cmdRegistry.isEnabled(cmd)) {
-          e.preventDefault();
-          cmdRegistry.execute(cmd);
-          return;
-        }
-      }
-    }
 
-    if (isCtrl && (e.key === 'z' || e.key === 'Z')) {
-      e.preventDefault();
-      const undoCmd = e.shiftKey ? 'edit.redo' : 'edit.undo';
-      if (cmdRegistry.has(undoCmd)) {
-        cmdRegistry.execute(undoCmd);
-      } else if (e.shiftKey) {
-        this.ctx.redo();
-      } else {
-        this.ctx.undo();
+        // Resilient Fallback executions if command is unhandled by CommandRegistry
+        switch (matched.commandId) {
+          case 'edit.copy':
+            if (this.ctx.selectionTool.selectedElementIds.size > 0 || this.ctx.canvasMgr.selectedGuideId) {
+              this.ctx.copySelection();
+            }
+            return;
+          case 'edit.cut':
+            if (this.ctx.selectionTool.selectedElementIds.size > 0 || this.ctx.canvasMgr.selectedGuideId) {
+              this.ctx.cutSelection();
+            }
+            return;
+          case 'edit.paste':
+            if (this.ctx.clipboardService.hasContent) {
+              this.ctx.pasteClipboard();
+            }
+            return;
+          case 'edit.duplicate':
+            if (this.ctx.selectionTool.selectedElementIds.size > 0 || this.ctx.canvasMgr.selectedGuideId) {
+              this.ctx.duplicateSelection();
+            }
+            return;
+          case 'edit.undo':
+            this.ctx.undo();
+            return;
+          case 'edit.redo':
+            this.ctx.redo();
+            return;
+          case 'node.join':
+            if (this.ctx.toolbar.activeTool === 'node') {
+              this.ctx.nodeToolHandler.handleJoinSelectedNodes();
+            }
+            return;
+          case 'object.convertToCurves':
+            if (this.ctx.selectionTool.selectedElementIds.size > 0) {
+              this.ctx.handleConvertToCurves();
+            }
+            return;
+          case 'edit.deleteSelected':
+            this.handleDeleteSelected();
+            return;
+        }
       }
-      return;
-    }
-
-    if (isCtrl && (e.key === 'y' || e.key === 'Y')) {
-      e.preventDefault();
-      if (cmdRegistry.has('edit.redo')) {
-        cmdRegistry.execute('edit.redo');
-      } else {
-        this.ctx.redo();
-      }
-      return;
     }
 
     if (e.key === 'Escape') {
@@ -410,36 +287,8 @@ export class KeyboardShortcutController {
         cmdRegistry.execute('edit.deleteSelected');
         return;
       }
-
-      // Fallback si CommandRegistry no estuviera inicializado
-      // 1. Delete selected guide line
-      if (this.ctx.canvasMgr.selectedGuideId) {
-        this.ctx.canvasMgr.removeGuide(this.ctx.canvasMgr.selectedGuideId);
-        this.ctx.propertyPanel.resetPanelMode();
-        this.ctx.render();
-        this.ctx.syncMetadataToHost();
-        return;
-      }
-
-      // 1b. Delete selected vertex in node editor
-      if (this.ctx.toolbar.activeTool === 'node' && this.ctx.nodeEditorTool.selectedVertexId) {
-        if (this.ctx.nodeToolHandler.deleteSelectedVertex()) {
-          this.ctx.propertyPanel.update(null, 'node');
-          return;
-        }
-      }
-
-      // 2. Delete selected vector elements
-      if (this.ctx.selectionTool.selectedElementIds.size > 0) {
-        this.ctx.pushUndo();
-        this.ctx.model.elements = this.ctx.model.elements.filter(
-          (el) => !this.ctx.selectionTool.isSelected(el.id)
-        );
-        this.ctx.selectionTool.deselectAll();
-        this.ctx.propertyPanel.resetPanelMode();
-        this.ctx.render();
-        this.ctx.syncToHost();
-      }
+      this.handleDeleteSelected();
+      return;
     }
 
     // Arrow Key Nudge for selected vectors with modifier multiplier steps
@@ -448,9 +297,10 @@ export class KeyboardShortcutController {
         e.preventDefault();
 
         let step = 1;
-        const ctrl = e.ctrlKey || e.metaKey;
+        const isAltGr = KeymapRegistry.isAltGraph(e);
+        const ctrl = KeymapRegistry.isCtrlOrMeta(e) && !isAltGr;
         const shift = e.shiftKey;
-        const alt = e.altKey;
+        const alt = e.altKey && !isAltGr;
 
         if (shift && alt) {
           step = 100;
@@ -531,6 +381,37 @@ export class KeyboardShortcutController {
         this.ctx.render();
         this.ctx.syncToHost();
       }
+    }
+  }
+
+  private handleDeleteSelected(): void {
+    // 1. Delete selected guide line
+    if (this.ctx.canvasMgr.selectedGuideId) {
+      this.ctx.canvasMgr.removeGuide(this.ctx.canvasMgr.selectedGuideId);
+      this.ctx.propertyPanel.resetPanelMode();
+      this.ctx.render();
+      this.ctx.syncMetadataToHost();
+      return;
+    }
+
+    // 1b. Delete selected vertex in node editor
+    if (this.ctx.toolbar.activeTool === 'node' && this.ctx.nodeEditorTool.selectedVertexId) {
+      if (this.ctx.nodeToolHandler.deleteSelectedVertex()) {
+        this.ctx.propertyPanel.update(null, 'node');
+        return;
+      }
+    }
+
+    // 2. Delete selected vector elements
+    if (this.ctx.selectionTool.selectedElementIds.size > 0) {
+      this.ctx.pushUndo();
+      this.ctx.model.elements = this.ctx.model.elements.filter(
+        (el) => !this.ctx.selectionTool.isSelected(el.id)
+      );
+      this.ctx.selectionTool.deselectAll();
+      this.ctx.propertyPanel.resetPanelMode();
+      this.ctx.render();
+      this.ctx.syncToHost();
     }
   }
 }

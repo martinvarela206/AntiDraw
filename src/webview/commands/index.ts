@@ -11,6 +11,7 @@ import { registerNodeCommands } from './NodeCommands.js';
 import { registerBooleanCommands } from './BooleanCommands.js';
 
 export * from './CommandRegistry.js';
+export * from './KeymapRegistry.js';
 export * from './ShapeCommands.js';
 export * from './PathCommands.js';
 export * from './TransformCommands.js';
