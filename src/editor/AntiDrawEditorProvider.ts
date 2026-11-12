@@ -48,9 +48,6 @@ export class AntiDrawEditorProvider implements vscode.CustomEditorProvider<AntiD
       AntiDrawEditorProvider.viewType,
       provider,
       {
-        webviewOptions: {
-          retainContextWhenHidden: true,
-        },
         supportsMultipleEditorsPerDocument: false,
       }
     );
@@ -58,9 +55,6 @@ export class AntiDrawEditorProvider implements vscode.CustomEditorProvider<AntiD
       AntiDrawEditorProvider.projectEditorViewType,
       provider,
       {
-        webviewOptions: {
-          retainContextWhenHidden: true,
-        },
         supportsMultipleEditorsPerDocument: false,
       }
     );

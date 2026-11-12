@@ -19,6 +19,7 @@ import { ImageIngestionService } from './services/ImageIngestionService.js';
 import { ThemeService } from './services/ThemeService.js';
 import { I18nService } from './i18n/I18nService.js';
 import { WelcomeModal } from './ui/WelcomeModal.js';
+import { WebviewStateManager } from './services/WebviewStateManager.js';
 import './styles/main.css';
 
 /**
@@ -280,10 +281,22 @@ class AntiDrawApp {
       getLayoutMgr: () => this.layoutMgr,
     });
 
-    // 7. Ready notification to VS Code Host
+    // 8. Instant state restoration from WebviewStateManager (eliminates blank flashes without retainContextWhenHidden)
+    const cachedState = WebviewStateManager.restoreState();
+    if (cachedState && cachedState.svgText) {
+      this.hostSyncService.applyPayload(
+        {
+          text: cachedState.svgText,
+          metadata: cachedState.metadata,
+        },
+        true
+      );
+    }
+
+    // 9. Ready notification to VS Code Host
     this.hostSyncService.notifyReady();
 
-    // 8. Welcome / Support Modal on plugin open
+    // 10. Welcome / Support Modal on plugin open
     WelcomeModal.show();
   }
 }

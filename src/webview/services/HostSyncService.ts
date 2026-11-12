@@ -7,6 +7,7 @@ import { ViewportController } from '../engine/ViewportController.js';
 import { TopBar } from '../ui/TopBar.js';
 import { DocumentState, DocumentStateFactory } from '../core/model/DocumentState.js';
 import { I18nService } from '../i18n/I18nService.js';
+import { WebviewStateManager, IWebviewPersistentState } from './WebviewStateManager.js';
 
 export interface HostSyncContext {
   model: VectorModel;
@@ -174,7 +175,7 @@ export class HostSyncService {
 
     const viewportCtrl = this.ctx.getViewportCtrl();
 
-    this.vscodeBridge.updateMetadata({
+    const metadataPayload = {
       grids: this.ctx.canvasMgr.grids,
       guides: this.ctx.canvasMgr.guides,
       ruler: this.ctx.canvasMgr.rulerConfig,
@@ -204,6 +205,14 @@ export class HostSyncService {
       canvas: { currentColor: this.ctx.model.canvas.currentColor },
       swatches: this.ctx.model.swatches,
       elements: elementsMetadata,
+    };
+    this.vscodeBridge.updateMetadata(metadataPayload);
+
+    WebviewStateManager.saveState({
+      svgText: this.ctx.model.toFinalSvgString(),
+      metadata: metadataPayload,
+      zoom: this.ctx.canvasMgr.zoom,
+      cameraOffset: viewportCtrl ? { x: viewportCtrl.cameraOffset.x, y: viewportCtrl.cameraOffset.y } : undefined,
     });
   }
 
@@ -255,106 +264,122 @@ export class HostSyncService {
     this.updateStatusGridAlignment();
   }
 
-  private bindHostEvents(): void {
-    this.vscodeBridge.onLoadSvg((payload) => {
-      if (payload.locale) {
-        I18nService.setIdeLanguage(payload.locale);
-      }
-      if (payload.metadata) {
-        if (Array.isArray(payload.metadata.guides)) {
-          this.ctx.canvasMgr.guides = payload.metadata.guides.map((g: any) => ({
-            id: g.id || `guide_${Date.now()}`,
-            orientation: g.orientation || (g.axis === 'y' ? 'horizontal' : 'vertical'),
-            position: g.position !== undefined ? g.position : (g.pos !== undefined ? g.pos : 0),
-            angle: g.angle || 0,
-            pivotX: g.pivotX || 0,
-            pivotY: g.pivotY || 0,
-            color: g.color,
-            visible: g.visible !== false,
-            locked: g.locked === true,
-            mode: g.mode,
-          }));
-        } else {
-          this.ctx.canvasMgr.guides = [];
-        }
-        if (payload.metadata.ruler) {
-          this.ctx.canvasMgr.rulerConfig = { ...this.ctx.canvasMgr.rulerConfig, ...payload.metadata.ruler };
-        }
-        if (payload.metadata.showRulers !== undefined) this.ctx.canvasMgr.showRulers = payload.metadata.showRulers;
-        if (Array.isArray(payload.metadata.grids)) {
-          this.ctx.canvasMgr.grids = payload.metadata.grids.map((grid: any) => ({
-            id: grid.id || `grid_${Date.now()}`,
-            type: grid.type || 'orthogonal',
-            spacing: grid.spacing || 20,
-            angle: grid.angle || 0,
-            color: grid.color || '#e2e8f0',
-            visible: grid.visible !== false && grid.enabled !== false,
-            alignmentMode: grid.alignmentMode || 'origin',
-          }));
-        }
-        if (payload.metadata.showGrid !== undefined) this.ctx.canvasMgr.showGrid = payload.metadata.showGrid;
-        if (payload.metadata.showGuides !== undefined) this.ctx.canvasMgr.showGuides = payload.metadata.showGuides;
-        if (payload.metadata.lockGuides !== undefined) this.ctx.canvasMgr.lockGuides = payload.metadata.lockGuides;
-        if (payload.metadata.gridSpacing !== undefined) this.ctx.canvasMgr.gridSpacing = payload.metadata.gridSpacing;
-        if (payload.metadata.gridAlignmentMode !== undefined) {
-          this.ctx.canvasMgr.gridAlignmentMode = payload.metadata.gridAlignmentMode;
-          this.updateStatusGridAlignment();
-        }
-        if (payload.metadata.snapToPixelGrid !== undefined) this.ctx.canvasMgr.snapToPixelGrid = payload.metadata.snapToPixelGrid;
-        if (payload.metadata.snapToGrid !== undefined) this.ctx.canvasMgr.snapToGrid = payload.metadata.snapToGrid;
-        if (payload.metadata.snapToGuides !== undefined) this.ctx.canvasMgr.snapToGuides = payload.metadata.snapToGuides;
-        if (payload.metadata.snapToNodes !== undefined) this.ctx.canvasMgr.snapToNodes = payload.metadata.snapToNodes;
-        else if (payload.metadata.snapToVertices !== undefined) this.ctx.canvasMgr.snapToNodes = payload.metadata.snapToVertices;
-        if (payload.metadata.snapToEdges !== undefined) this.ctx.canvasMgr.snapToEdges = payload.metadata.snapToEdges;
-        if (payload.metadata.snapToViewBox !== undefined) this.ctx.canvasMgr.snapToViewBox = payload.metadata.snapToViewBox;
-        if (payload.metadata.snapAngular !== undefined) this.ctx.canvasMgr.snapAngular = payload.metadata.snapAngular;
-        if (payload.metadata.shapeConfig) {
-          this.ctx.canvasMgr.shapeConfig = { ...this.ctx.canvasMgr.shapeConfig, ...payload.metadata.shapeConfig };
-        }
-        this.ctx.historyService.loadFromMetadata(payload.metadata);
-        if (payload.metadata.zoom !== undefined) {
-          this.ctx.canvasMgr.zoom = payload.metadata.zoom;
-        }
-        if (payload.metadata.isAspectRatioLocked !== undefined) {
-          this.ctx.selectionTool.isAspectRatioLocked = payload.metadata.isAspectRatioLocked;
-        }
-        if (payload.metadata.scaleStroke !== undefined) {
-          this.ctx.selectionTool.scaleStroke = payload.metadata.scaleStroke;
-        }
-        if (payload.metadata.scaleCorners !== undefined) {
-          this.ctx.selectionTool.scaleCorners = payload.metadata.scaleCorners;
-        }
-        if (payload.metadata.elementPivots) {
-          this.ctx.selectionTool.elementPivots = new Map(Object.entries(payload.metadata.elementPivots));
-        }
-
-        const container = this.ctx.getCanvasContainer();
-        container?.classList.toggle('no-rulers', !this.ctx.canvasMgr.showRulers);
-
-        const topBar = this.ctx.getTopBar();
-        topBar?.update();
+  public applyPayload(
+    payload: { text: string; metadata?: any; locale?: string },
+    isCachedRestore: boolean = false
+  ): void {
+    if (payload.locale) {
+      I18nService.setIdeLanguage(payload.locale);
+    }
+    if (payload.metadata) {
+      if (Array.isArray(payload.metadata.guides)) {
+        this.ctx.canvasMgr.guides = payload.metadata.guides.map((g: any) => ({
+          id: g.id || `guide_${Date.now()}`,
+          orientation: g.orientation || (g.axis === 'y' ? 'horizontal' : 'vertical'),
+          position: g.position !== undefined ? g.position : (g.pos !== undefined ? g.pos : 0),
+          angle: g.angle || 0,
+          pivotX: g.pivotX || 0,
+          pivotY: g.pivotY || 0,
+          color: g.color,
+          visible: g.visible !== false,
+          locked: g.locked === true,
+          mode: g.mode,
+        }));
       } else {
         this.ctx.canvasMgr.guides = [];
       }
-
-      this.ctx.model.loadSvgString(payload.text, payload.metadata);
-      this.ctx.applyCanvasSize();
-      this.ctx.render();
-      this.markSaved();
-
-      if (!this.hasInitialCentered) {
-        this.hasInitialCentered = true;
-        setTimeout(() => {
-          const viewportCtrl = this.ctx.getViewportCtrl();
-          if (payload.metadata?.cameraOffset && viewportCtrl) {
-            viewportCtrl.cameraOffset = { ...payload.metadata.cameraOffset };
-            viewportCtrl.applyCameraTransform();
-            viewportCtrl.syncRulerScroll();
-          } else {
-            this.ctx.recenterViewBox();
-          }
-        }, 40);
+      if (payload.metadata.ruler) {
+        this.ctx.canvasMgr.rulerConfig = { ...this.ctx.canvasMgr.rulerConfig, ...payload.metadata.ruler };
       }
+      if (payload.metadata.showRulers !== undefined) this.ctx.canvasMgr.showRulers = payload.metadata.showRulers;
+      if (Array.isArray(payload.metadata.grids)) {
+        this.ctx.canvasMgr.grids = payload.metadata.grids.map((grid: any) => ({
+          id: grid.id || `grid_${Date.now()}`,
+          type: grid.type || 'orthogonal',
+          spacing: grid.spacing || 20,
+          angle: grid.angle || 0,
+          color: grid.color || '#e2e8f0',
+          visible: grid.visible !== false && grid.enabled !== false,
+          alignmentMode: grid.alignmentMode || 'origin',
+        }));
+      }
+      if (payload.metadata.showGrid !== undefined) this.ctx.canvasMgr.showGrid = payload.metadata.showGrid;
+      if (payload.metadata.showGuides !== undefined) this.ctx.canvasMgr.showGuides = payload.metadata.showGuides;
+      if (payload.metadata.lockGuides !== undefined) this.ctx.canvasMgr.lockGuides = payload.metadata.lockGuides;
+      if (payload.metadata.gridSpacing !== undefined) this.ctx.canvasMgr.gridSpacing = payload.metadata.gridSpacing;
+      if (payload.metadata.gridAlignmentMode !== undefined) {
+        this.ctx.canvasMgr.gridAlignmentMode = payload.metadata.gridAlignmentMode;
+        this.updateStatusGridAlignment();
+      }
+      if (payload.metadata.snapToPixelGrid !== undefined) this.ctx.canvasMgr.snapToPixelGrid = payload.metadata.snapToPixelGrid;
+      if (payload.metadata.snapToGrid !== undefined) this.ctx.canvasMgr.snapToGrid = payload.metadata.snapToGrid;
+      if (payload.metadata.snapToGuides !== undefined) this.ctx.canvasMgr.snapToGuides = payload.metadata.snapToGuides;
+      if (payload.metadata.snapToNodes !== undefined) this.ctx.canvasMgr.snapToNodes = payload.metadata.snapToNodes;
+      else if (payload.metadata.snapToVertices !== undefined) this.ctx.canvasMgr.snapToNodes = payload.metadata.snapToVertices;
+      if (payload.metadata.snapToEdges !== undefined) this.ctx.canvasMgr.snapToEdges = payload.metadata.snapToEdges;
+      if (payload.metadata.snapToViewBox !== undefined) this.ctx.canvasMgr.snapToViewBox = payload.metadata.snapToViewBox;
+      if (payload.metadata.snapAngular !== undefined) this.ctx.canvasMgr.snapAngular = payload.metadata.snapAngular;
+      if (payload.metadata.shapeConfig) {
+        this.ctx.canvasMgr.shapeConfig = { ...this.ctx.canvasMgr.shapeConfig, ...payload.metadata.shapeConfig };
+      }
+      this.ctx.historyService.loadFromMetadata(payload.metadata);
+      if (payload.metadata.zoom !== undefined) {
+        this.ctx.canvasMgr.zoom = payload.metadata.zoom;
+      }
+      if (payload.metadata.isAspectRatioLocked !== undefined) {
+        this.ctx.selectionTool.isAspectRatioLocked = payload.metadata.isAspectRatioLocked;
+      }
+      if (payload.metadata.scaleStroke !== undefined) {
+        this.ctx.selectionTool.scaleStroke = payload.metadata.scaleStroke;
+      }
+      if (payload.metadata.scaleCorners !== undefined) {
+        this.ctx.selectionTool.scaleCorners = payload.metadata.scaleCorners;
+      }
+      if (payload.metadata.elementPivots) {
+        this.ctx.selectionTool.elementPivots = new Map(Object.entries(payload.metadata.elementPivots));
+      }
+
+      const container = this.ctx.getCanvasContainer();
+      container?.classList.toggle('no-rulers', !this.ctx.canvasMgr.showRulers);
+
+      const topBar = this.ctx.getTopBar();
+      topBar?.update();
+    } else {
+      this.ctx.canvasMgr.guides = [];
+    }
+
+    this.ctx.model.loadSvgString(payload.text, payload.metadata);
+    this.ctx.applyCanvasSize();
+    this.ctx.render();
+    this.markSaved();
+
+    if (!isCachedRestore) {
+      WebviewStateManager.saveState({
+        svgText: payload.text,
+        metadata: payload.metadata,
+        zoom: this.ctx.canvasMgr.zoom,
+        cameraOffset: this.ctx.getViewportCtrl()?.cameraOffset,
+      }, true);
+    }
+
+    if (!this.hasInitialCentered || isCachedRestore) {
+      this.hasInitialCentered = true;
+      setTimeout(() => {
+        const viewportCtrl = this.ctx.getViewportCtrl();
+        if (payload.metadata?.cameraOffset && viewportCtrl) {
+          viewportCtrl.cameraOffset = { ...payload.metadata.cameraOffset };
+          viewportCtrl.applyCameraTransform();
+          viewportCtrl.syncRulerScroll();
+        } else if (!isCachedRestore) {
+          this.ctx.recenterViewBox();
+        }
+      }, 40);
+    }
+  }
+
+  private bindHostEvents(): void {
+    this.vscodeBridge.onLoadSvg((payload) => {
+      this.applyPayload(payload, false);
     });
   }
 }

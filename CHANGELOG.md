@@ -3,6 +3,18 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.19] - 2026-11-12
+
+### ⚡ Performance & Webview Memory Optimization
+- **Eliminated Webview RAM Leak & Implemented High-Efficiency State Persistence (`WebviewStateManager` & `getState`/`setState`)**:
+  - **Eliminated `retainContextWhenHidden`**: Removed blind `retainContextWhenHidden: true` from `AntiDrawEditorProvider.register`, allowing VS Code to suspend and dispose background Chromium webview processes when tabs are hidden, drastically reducing workstation RAM consumption.
+  - **Dedicated `WebviewStateManager` Service**: Created `WebviewStateManager` leveraging VS Code's native `getState()` and `setState()` primitives to store compact snapshots of document markup, viewport zoom, camera offset, and active metadata.
+  - **Zero-Latency Tab Switch Restoration**: Wired `WebviewStateManager.restoreState()` into `AntiDrawApp.bootstrap()` and `HostSyncService.applyPayload`, enabling instant, flicker-free rendering upon switching back to an inactive tab without waiting for extension host IPC round-trip latency.
+  - **Debounced Viewport Sync**: Synchronized viewport pan/zoom updates to persistent webview state with automatic debouncing to prevent serialization bottlenecks.
+  - **Automated Test Coverage**: Added test suite `test-webview-state-persistence.ts` (Suite 62) verifying 4 assertions covering serialization, partial update merging, state clearing, and provider registration without `retainContextWhenHidden`.
+
+---
+
 ## [0.103.18] - 2026-11-12
 
 ### 🎯 SVG Fidelity & Companion Schema Expansion
