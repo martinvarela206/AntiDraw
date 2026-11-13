@@ -2,20 +2,23 @@ const esbuild = require('esbuild');
 const { syncIcons } = require('./scripts/sync-icons.js');
 const { resolveVsCodeTargets } = require('./scripts/vscode-target-resolver.js');
 const isWatch = process.argv.includes('--watch');
+const isProduction = process.argv.includes('--production') || process.env.NODE_ENV === 'production';
+const hasSourcemap = !isProduction && !process.argv.includes('--no-sourcemap');
+const isMinify = isProduction || process.argv.includes('--minify');
 
 async function main() {
   syncIcons();
   const targets = resolveVsCodeTargets();
   console.log(
-    `[AntiDraw:Build] Derived targets from engines.vscode (${targets.rawEngineString}): Node ${targets.nodeTarget} (Electron ${targets.electronVersion}), Webview ${targets.chromeTarget}`
+    `[AntiDraw:Build] Derived targets from engines.vscode (${targets.rawEngineString}): Node ${targets.nodeTarget} (Electron ${targets.electronVersion}), Webview ${targets.chromeTarget} [production=${isProduction}, sourcemap=${hasSourcemap}, minify=${isMinify}]`
   );
 
   const extensionCtx = await esbuild.context({
     entryPoints: ['src/extension.ts'],
     bundle: true,
     format: 'cjs',
-    minify: false,
-    sourcemap: true,
+    minify: isMinify,
+    sourcemap: hasSourcemap,
     platform: 'node',
     target: [targets.nodeTarget],
     outfile: 'dist/extension.js',
@@ -27,8 +30,8 @@ async function main() {
     entryPoints: ['src/webview/main.ts'],
     bundle: true,
     format: 'iife',
-    minify: false,
-    sourcemap: true,
+    minify: isMinify,
+    sourcemap: hasSourcemap,
     platform: 'browser',
     target: [targets.chromeTarget],
     outfile: 'dist/webview.js',

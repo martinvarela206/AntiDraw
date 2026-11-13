@@ -3,6 +3,25 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.45] - 2026-11-13
+
+### 🚀 CI/CD Automation, Pre-Release Channel & Production Sourcemap Exclusion
+- **GitHub Actions Continuous Integration (`.github/workflows/ci.yml`)**:
+  - Automated CI pipeline executing on pushes and pull requests targeting `main`.
+  - Multi-OS matrix validation across `ubuntu-latest` and `windows-latest` on Node.js 20.x with pnpm cache.
+  - End-to-end execution of TypeScript compilation, L0-L4 layer boundary audit (`dependency-cruiser`), the entire 88-suite automated test matrix, minified production build validation, and VSIX packaging verification.
+- **GitHub Actions Release & Delivery Pipeline (`.github/workflows/release.yml`)**:
+  - Automated release pipeline triggered on `v*` version tags and manual `workflow_dispatch`.
+  - Built-in `--pre-release` channel dispatch for beta/insider releases with automatic tag classification (`beta`, `alpha`, `preview`, `rc`).
+  - Automated GitHub Releases publishing with attached VSIX binaries and dual-store distribution to Visual Studio Marketplace and Open VSX Registry.
+- **Production Optimization & Zero-Sourcemap VSIX Packaging**:
+  - Enhanced `esbuild.js` with conditional `--production` mode, disabling debug sourcemaps and activating high-ratio minification.
+  - Formally excluded sourcemap artifacts (`**/*.map`) in `.vscodeignore`, drastically shrinking production VSIX package size from **1.86 MB** down to **604 KB** (67.5% payload reduction).
+  - Added dedicated packaging scripts in `package.json`: `"build:prod"`, `"package:pre-release"`, and optimized `"package"`.
+- **Automated Test Coverage**: Added test suite `test-ci-cd-automation.ts` (Suite 88) with 19 assertions validating CI/CD workflows, pre-release dispatch options, package scripts, and production sourcemap suppression.
+
+---
+
 ## [0.103.44] - 2026-11-13
 
 ### 🧪 Automated Testing Pipeline, Property-Based Geometry & E2E Integration Harness

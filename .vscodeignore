@@ -19,3 +19,4 @@ pnpm-workspace.yaml
 node_modules/**
 *.vsix
 *.log
+**/*.map
