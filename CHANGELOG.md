@@ -3,6 +3,18 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.36] - 2026-11-12
+
+### 📐 Free Distort (D) Projective Homography & Destructive Baking Architecture Specification
+- **Architectural Specification of Destructive Baking in W3C SVG (`Vol 2`, `Vol 3`)**:
+  - **W3C SVG Affine Constraint**: Documented the mathematical limitation of SVG 1.1/2.0 (`transform="matrix(...)"` strictly affine 6-parameter) where perspective convergence to vanishing points cannot be modeled natively with transformation matrices.
+  - **Node & Tangent Baking Policy**: Documented closed-form Paul Heckbert ($3 \times 3$) projective homography deformation baking directly into vertex coordinates and Bézier direction handles (`handleIn`, `handleOut`) to preserve $C^1$ tangent continuity.
+  - **Rigid Primitives & Text De-structuring**: Specified compulsory conversion of rigid SVG shapes (`<rect>`, `<circle>`, `<ellipse>`) and typography (`<text>`) into freeform `<path>` Bézier curves upon committing perspective distortion.
+  - **Lossless Companion Rollback**: Specified preservation of pristine base coordinates in companion metadata (`data-distort-base`), enabling full non-destructive restoration via "Restaurar Esquinas" without numeric drift.
+  - **Automated Test Coverage**: Added test suite `test-free-distort-specification.ts` (Suite 79) with 5 assertions covering Heckbert homography mapping, $C^1$ tangent handle collinearity preservation, primitive-to-curve baking, lossless base restoration, and quadrilateral convexity checks.
+
+---
+
 ## [0.103.35] - 2026-11-12
 
 ### 🔢 Configurable Floating-Point Precision Normalization & Git Noise Elimination
