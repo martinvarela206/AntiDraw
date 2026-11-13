@@ -186,6 +186,9 @@ export class ToolFactory {
         getBaseSnapshot: () => ctx.getHistoryService().createSnapshot(),
         onRestoreSnapshot: (state) => ctx.getHistoryService().applyState(state),
         onCommitSnapshot: () => ctx.getHistoryService().pushUndo(),
+        onBeginPreview: () => ctx.getHostSyncService().beginPreview(),
+        onCommitPreview: () => ctx.getHostSyncService().commitPreview(),
+        onCancelPreview: () => ctx.getHostSyncService().cancelPreview(),
       }
     );
 

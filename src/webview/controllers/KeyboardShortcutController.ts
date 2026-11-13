@@ -44,6 +44,7 @@ export interface KeyboardControllerContext {
   render: () => void;
   renderOverlay: () => void;
   syncToHost: () => void;
+  syncToHostDebounced?: (delayMs?: number) => void;
   syncMetadataToHost: () => void;
 }
 
@@ -354,7 +355,11 @@ export class KeyboardShortcutController {
               activeEl.isClosed
             );
             this.ctx.render();
-            this.ctx.syncToHost();
+            if (this.ctx.syncToHostDebounced) {
+              this.ctx.syncToHostDebounced(150);
+            } else {
+              this.ctx.syncToHost();
+            }
             return;
           }
         }
@@ -379,7 +384,11 @@ export class KeyboardShortcutController {
         });
 
         this.ctx.render();
-        this.ctx.syncToHost();
+        if (this.ctx.syncToHostDebounced) {
+          this.ctx.syncToHostDebounced(150);
+        } else {
+          this.ctx.syncToHost();
+        }
       }
     }
   }

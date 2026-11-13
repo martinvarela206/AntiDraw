@@ -40,8 +40,10 @@ export interface HostSyncContext {
 export class HostSyncService {
   private vscodeBridge: VsCodeBridge = VsCodeBridge.getInstance();
   private metadataSyncTimeout: any = null;
+  private documentSyncTimeout: any = null;
   private hasInitialCentered: boolean = false;
   private savedState: DocumentState | null = null;
+  private isPreviewActive: boolean = false;
 
   constructor(private ctx: HostSyncContext) {
     this.bindHostEvents();
@@ -66,7 +68,54 @@ export class HostSyncService {
     return this.savedState;
   }
 
-  public syncToHost(): boolean {
+  /**
+   * Begins a Preview session (e.g. interactive drag, handle scrubbing, live transform).
+   * During preview, full document SVG serialization and IPC messaging are deferred
+   * to guarantee 60 FPS UI rendering without IPC backpressure.
+   */
+  public beginPreview(): void {
+    this.isPreviewActive = true;
+  }
+
+  /**
+   * Commits the current Preview session, immediately executing full SVG and metadata
+   * serialization and flushing any pending sync to the host.
+   */
+  public commitPreview(): boolean {
+    this.isPreviewActive = false;
+    if (this.documentSyncTimeout !== null) {
+      clearTimeout(this.documentSyncTimeout);
+      this.documentSyncTimeout = null;
+    }
+    return this.syncToHost(true);
+  }
+
+  /**
+   * Cancels the current Preview session, discarding any pending sync.
+   */
+  public cancelPreview(): void {
+    this.isPreviewActive = false;
+    if (this.documentSyncTimeout !== null) {
+      clearTimeout(this.documentSyncTimeout);
+      this.documentSyncTimeout = null;
+    }
+  }
+
+  /**
+   * Synchronizes document content to host.
+   * If a preview is active and immediate is not explicitly true, uses debounced batch synchronization.
+   */
+  public syncToHost(immediate: boolean = false): boolean {
+    if (this.isPreviewActive && !immediate) {
+      this.syncToHostDebounced();
+      return true;
+    }
+
+    if (this.documentSyncTimeout !== null) {
+      clearTimeout(this.documentSyncTimeout);
+      this.documentSyncTimeout = null;
+    }
+
     const svgText = this.ctx.model.toFinalSvgString();
     const success = this.vscodeBridge.updateDocument(svgText);
     if (!success) {
@@ -76,6 +125,19 @@ export class HostSyncService {
     this.syncMetadataToHost();
     this.markSaved();
     return true;
+  }
+
+  /**
+   * Debounces document serialization and IPC dispatch by default 250ms.
+   */
+  public syncToHostDebounced(delayMs: number = 250): void {
+    if (this.documentSyncTimeout !== null) {
+      clearTimeout(this.documentSyncTimeout);
+    }
+    this.documentSyncTimeout = setTimeout(() => {
+      this.syncToHost(true);
+      this.documentSyncTimeout = null;
+    }, delayMs);
   }
 
   public syncMetadataToHost(): void {

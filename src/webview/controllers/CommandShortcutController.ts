@@ -75,6 +75,7 @@ export class CommandShortcutController {
       pushUndo: () => ctx.historyService.pushUndo(),
       render: () => ctx.workspaceLayout.render(),
       syncToHost: () => ctx.hostSyncService.syncToHost(),
+      syncToHostDebounced: (d?: number) => ctx.hostSyncService.syncToHostDebounced(d),
       syncMetadataToHost: () => ctx.hostSyncService.syncMetadataToHost(),
       cutSelection: () => ctx.clipboardService.cut(),
       copySelection: () => ctx.clipboardService.copy(),
@@ -115,6 +116,7 @@ export class CommandShortcutController {
       render: () => ctx.workspaceLayout.render(),
       renderOverlay: () => ctx.workspaceLayout.renderOverlay(),
       syncToHost: () => ctx.hostSyncService.syncToHost(),
+      syncToHostDebounced: (d?: number) => ctx.hostSyncService.syncToHostDebounced(d),
       syncMetadataToHost: () => ctx.hostSyncService.syncMetadataToHost(),
     });
 

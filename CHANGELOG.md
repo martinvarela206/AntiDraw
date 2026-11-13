@@ -3,6 +3,18 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.23] - 2026-11-12
+
+### ⚡ Performance & Batch Synchronization Debounce
+- **Deferred Document Serialization & Preview Debounce (`HostSyncService` & `Session`)**:
+  - **Preview Gating (`beginPreview` / `commitPreview` / `cancelPreview`)**: Configured `HostSyncService` to defer full XML serialization and IPC messaging during interactive Preview sessions (dragging, transform handles, live geometry manipulation), ensuring consistent 60 FPS rendering without IPC message queue backpressure.
+  - **Atomic Commit Flushing**: On pointerup or transaction completion (`commitPreview`), immediately flushes final document state to the extension host and resets debouncing timers.
+  - **Rollback Safety**: On transaction abort or Escape (`cancelPreview`), discards pending serialization buffers without leaving dirty residual state.
+  - **Debounced Viewport & Nudge Batching**: Implemented `syncToHostDebounced(delayMs)` for rapid-fire operations (such as arrow key nudging repeat), coalescing multiple mutations into a single debounced IPC commit.
+  - **Automated Test Coverage**: Added test suite `test-batch-sync-debounce.ts` (Suite 66) verifying 5 assertions covering synchronous sync, preview coalescing, commit flushing, cancel rollback, and keyboard repeat batching.
+
+---
+
 ## [0.103.22] - 2026-11-12
 
 ### 🔌 IPC Handshake, Monotonic Revision & Deduplication

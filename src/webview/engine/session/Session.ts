@@ -30,6 +30,9 @@ export interface SessionCallbacks {
   getBaseSnapshot?: () => DocumentState;
   onRestoreSnapshot?: (state: DocumentState) => void;
   onCommitSnapshot?: (label: string) => void;
+  onBeginPreview?: () => void;
+  onCommitPreview?: () => void;
+  onCancelPreview?: () => void;
 }
 
 /**
@@ -119,6 +122,11 @@ export class Session {
       this.handlers.push(this.scissorKnifeHandler);
     }
     this.callbacks = callbacks;
+    this.transactionManager.addListener({
+      onBegin: () => this.callbacks.onBeginPreview?.(),
+      onCommit: () => this.callbacks.onCommitPreview?.(),
+      onCancel: () => this.callbacks.onCancelPreview?.(),
+    });
   }
 
   public getAllHandlers(): IToolHandler[] {
