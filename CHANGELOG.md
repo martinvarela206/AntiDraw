@@ -3,6 +3,27 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.44] - 2026-11-13
+
+### 🧪 Automated Testing Pipeline, Property-Based Geometry & E2E Integration Harness
+- **Geometric Property-Based Testing with `fast-check` (`test-property-based-geometry.ts`)**:
+  - Implemented rigorous invariant testing across core mathematical operations with randomized generative inputs (200 runs per property):
+    - **Euclidean Metric Invariants (`PointUtils.distance`)**: Formally verified symmetry $d(A, B) = d(B, A)$, non-negativity $d \ge 0$, and identity of indiscernibles $d(A, A) = 0$.
+    - **Analytical Bounding Box Containment (`BoundingBoxCalculator`)**: Formally proven that every sampled coordinate in arbitrary point clouds lies strictly within the calculated rectangular bounding envelope.
+    - **Cubic Bézier Boundary Invariants**: Guaranteed boundary clamping $B(0) = P_0$ and $B(1) = P_3$ across arbitrary control point quadruplets.
+    - **Affine Reversibility & Roundtrip Precision**: Proved $T(-dx, -dy)(T(dx, dy)(P)) = P$ without floating-point accumulation drift.
+    - **W3C SVG 1.1 Hex Color Decomposition (`Color.decomposeColor`)**: Guaranteed exact preservation of `#RRGGBB` base chromaticity and normalized $[0.0, 1.0]$ alpha channels from arbitrary 8-digit hexadecimal colors.
+    - **Schneider Curve Fitting Extremity Anchorage (`SchneiderFit.fitCurve`)**: Verified that fitted cubic Bézier curves anchor the initial and terminal points of non-degenerate digitizer paths.
+- **Headless E2E Integration Harness (`@vscode/test-electron`)**:
+  - Scaffolded native VS Code integration test runner under `src/test/runTest.ts`, `src/test/suite/index.ts`, and `src/test/suite/extension.test.ts`.
+  - Automated verification of extension lifecycle, custom editor provider bindings for `.adrw` (`antidraw.projectEditor`) and `.svg` (`antidraw.svgEditor`), and command contributions (`antidraw.openEditor`, `antidraw.purgeMetadata`).
+- **Comprehensive Quality Scripts (`package.json`)**:
+  - Integrated `"lint": "tsc -p . --noEmit && tsc -p tsconfig.core.json && depcruise --config .dependency-cruiser.cjs src/webview"`.
+  - Added dedicated property testing and E2E scripts: `"test:property"` and `"test:e2e"`.
+- **Automated Test Coverage**: Added test suite `test-property-based-geometry.ts` (Suite 87) with 6 comprehensive property assertions integrated into the full 87-suite test harness.
+
+---
+
 ## [0.103.43] - 2026-11-13
 
 ### 🛡️ Automated Layer Boundary Audit & Strict L0-L4 Hierarchy Enforcement

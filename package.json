@@ -2,7 +2,7 @@
   "name": "antidraw",
   "displayName": "%antidraw.displayName%",
   "description": "%antidraw.description%",
-  "version": "0.103.43",
+  "version": "0.103.44",
   "icon": "icon.png",
   "publisher": "martinvarela206",
   "author": {
@@ -110,22 +110,27 @@
     "watch": "node esbuild.js --watch",
     "compile": "tsc -p . --noEmit && tsc -p tsconfig.core.json",
     "compile:core": "tsc -p tsconfig.core.json",
+    "lint": "tsc -p . --noEmit && tsc -p tsconfig.core.json && depcruise --config .dependency-cruiser.cjs src/webview",
     "lint:layers": "depcruise --config .dependency-cruiser.cjs src/webview",
     "test": "node scripts/run-tests.js",
+    "test:property": "tsx scripts/test-property-based-geometry.ts",
+    "test:e2e": "node dist/test/runTest.js",
     "bench": "node scripts/run-benchmarks.js",
     "version:sync": "node scripts/sync-version.js",
     "version:bump": "node scripts/sync-version.js",
     "package": "pnpm run build && vsce package --no-dependencies",
     "publish:marketplace": "vsce publish --no-dependencies",
-    "publish:openvsx": "npx -y ovsx publish antidraw-0.103.43.vsix"
+    "publish:openvsx": "npx -y ovsx publish antidraw-0.103.44.vsix"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.80.0",
+    "@vscode/test-electron": "^3.1.0",
     "@vscode/vsce": "^3.2.1",
     "@xmldom/xmldom": "^0.9.12",
     "dependency-cruiser": "^18.7.2",
     "esbuild": "^0.20.0",
+    "fast-check": "^4.10.2",
     "linkedom": "^0.18.13",
     "typescript": "^5.0.0"
   },
