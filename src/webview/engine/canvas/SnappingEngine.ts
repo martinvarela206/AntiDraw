@@ -5,6 +5,7 @@ import { RulerConfig } from '../CanvasManager.js';
 import { EdgeSnappingService } from './EdgeSnappingService.js';
 import { IntersectionSnappingService } from './IntersectionSnappingService.js';
 import { ContextualVectorGridService } from '../scene/ContextualVectorGridService.js';
+import { SpatialGrid } from '../spatial/SpatialGrid.js';
 
 export type SnapKind = 'none' | 'node' | 'edge' | 'intersection' | 'guide' | 'grid' | 'viewbox';
 
@@ -102,13 +103,33 @@ export class SnappingEngine {
     if (snapToNodesActive && otherVertices.length > 0) {
       let minDist = threshold;
       let bestVertex: Point | null = null;
-      for (const v of otherVertices) {
-        const d = Math.hypot(pt.x - v.x, pt.y - v.y);
-        if (d <= minDist) {
-          minDist = d;
-          bestVertex = v;
+
+      if (otherVertices.length > 32) {
+        // Broad-phase spatial acceleration index
+        const grid = new SpatialGrid<Point>(Math.max(threshold * 2, 32));
+        for (let i = 0; i < otherVertices.length; i++) {
+          const v = otherVertices[i];
+          grid.insertPoint(`v_${i}`, v, v);
+        }
+        const candidates = grid.queryPoint(pt, threshold);
+        for (const item of candidates) {
+          const v = item.data;
+          const d = Math.hypot(pt.x - v.x, pt.y - v.y);
+          if (d <= minDist) {
+            minDist = d;
+            bestVertex = v;
+          }
+        }
+      } else {
+        for (const v of otherVertices) {
+          const d = Math.hypot(pt.x - v.x, pt.y - v.y);
+          if (d <= minDist) {
+            minDist = d;
+            bestVertex = v;
+          }
         }
       }
+
       if (bestVertex) {
         snappedX = bestVertex.x;
         snappedY = bestVertex.y;

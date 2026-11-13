@@ -1,6 +1,7 @@
 import { Point, VectorElement } from '../VectorModel.js';
 import { GuideLine } from './GuideManager.js';
 import { EdgeSnappingService } from './EdgeSnappingService.js';
+import { SpatialGrid } from '../spatial/SpatialGrid.js';
 
 export interface CurveSegment {
   type: 'linear' | 'cubic';
@@ -428,64 +429,52 @@ export class IntersectionSnappingService {
       }
     }
 
-    // 3. Path × Path Intersections
-    for (let i = 0; i < elementSegments.length; i++) {
-      for (let j = i; j < elementSegments.length; j++) {
-        const esA = elementSegments[i];
-        const esB = elementSegments[j];
-        const isSameElement = i === j;
+    // 3. Path × Path Intersections (Spatial Grid Broad-Phase Acceleration)
+    let totalSegments = 0;
+    for (const es of elementSegments) {
+      totalSegments += es.segments.length;
+    }
 
-        for (let si = 0; si < esA.segments.length; si++) {
-          const sjStart = isSameElement ? si + 2 : 0; // skip adjacent segments of same element
-          for (let sj = sjStart; sj < esB.segments.length; sj++) {
-            const segA = esA.segments[si];
-            const segB = esB.segments[sj];
+    if (totalSegments > 16) {
+      const segmentGrid = new SpatialGrid<{ seg: CurveSegment; elId: string; segIndex: number }>(Math.max(threshold * 2, 48));
+      let segCounter = 0;
+      for (const es of elementSegments) {
+        for (let sIdx = 0; sIdx < es.segments.length; sIdx++) {
+          const seg = es.segments[sIdx];
+          segmentGrid.insert(`s_${es.elId}_${sIdx}_${segCounter++}`, seg.box, {
+            seg,
+            elId: es.elId,
+            segIndex: sIdx,
+          });
+        }
+      }
 
-            // Bounding box overlap filter
-            if (
-              segA.box.maxX < segB.box.minX - threshold ||
-              segA.box.minX > segB.box.maxX + threshold ||
-              segA.box.maxY < segB.box.minY - threshold ||
-              segA.box.minY > segB.box.maxY + threshold
-            ) {
-              continue;
-            }
+      const pairs = segmentGrid.findOverlappingPairs();
+      for (const [itemA, itemB] of pairs) {
+        const dA = itemA.data;
+        const dB = itemB.data;
+        if (dA.elId === dB.elId && Math.abs(dA.segIndex - dB.segIndex) <= 1) {
+          continue; // Adjacent segments of same element share endpoint
+        }
+        this.evaluateSegmentPairIntersection(dA.seg, dB.seg, pt, threshold, intersections);
+      }
+    } else {
+      for (let i = 0; i < elementSegments.length; i++) {
+        for (let j = i; j < elementSegments.length; j++) {
+          const esA = elementSegments[i];
+          const esB = elementSegments[j];
+          const isSameElement = i === j;
 
-            if (segA.type === 'linear' && segB.type === 'linear') {
-              const inter = this.intersectSegments(segA.p0, segA.p3, segB.p0, segB.p3);
-              if (inter && Math.hypot(pt.x - inter.x, pt.y - inter.y) <= threshold) {
-                intersections.push(inter);
-              }
-            } else if (segA.type === 'cubic' && segB.type === 'cubic') {
-              const inter = this.intersectBezierMeeting(
-                segA.p0, segA.p1!, segA.p2!, segA.p3,
-                segB.p0, segB.p1!, segB.p2!, segB.p3,
+          for (let si = 0; si < esA.segments.length; si++) {
+            const sjStart = isSameElement ? si + 2 : 0; // skip adjacent segments of same element
+            for (let sj = sjStart; sj < esB.segments.length; sj++) {
+              this.evaluateSegmentPairIntersection(
+                esA.segments[si],
+                esB.segments[sj],
                 pt,
-                threshold
+                threshold,
+                intersections
               );
-              if (inter) {
-                intersections.push(inter);
-              }
-            } else if (segA.type === 'linear' && segB.type === 'cubic') {
-              const inter = this.intersectSegmentAndBezier(
-                segA.p0, segA.p3,
-                segB.p0, segB.p1!, segB.p2!, segB.p3,
-                pt,
-                threshold
-              );
-              if (inter) {
-                intersections.push(inter);
-              }
-            } else if (segA.type === 'cubic' && segB.type === 'linear') {
-              const inter = this.intersectSegmentAndBezier(
-                segB.p0, segB.p3,
-                segA.p0, segA.p1!, segA.p2!, segA.p3,
-                pt,
-                threshold
-              );
-              if (inter) {
-                intersections.push(inter);
-              }
             }
           }
         }
@@ -501,6 +490,61 @@ export class IntersectionSnappingService {
     }
 
     return unique;
+  }
+
+  private static evaluateSegmentPairIntersection(
+    segA: CurveSegment,
+    segB: CurveSegment,
+    pt: Point,
+    threshold: number,
+    intersections: Point[]
+  ): void {
+    // Bounding box overlap filter
+    if (
+      segA.box.maxX < segB.box.minX - threshold ||
+      segA.box.minX > segB.box.maxX + threshold ||
+      segA.box.maxY < segB.box.minY - threshold ||
+      segA.box.minY > segB.box.maxY + threshold
+    ) {
+      return;
+    }
+
+    if (segA.type === 'linear' && segB.type === 'linear') {
+      const inter = this.intersectSegments(segA.p0, segA.p3, segB.p0, segB.p3);
+      if (inter && Math.hypot(pt.x - inter.x, pt.y - inter.y) <= threshold) {
+        intersections.push(inter);
+      }
+    } else if (segA.type === 'cubic' && segB.type === 'cubic') {
+      const inter = this.intersectBezierMeeting(
+        segA.p0, segA.p1!, segA.p2!, segA.p3,
+        segB.p0, segB.p1!, segB.p2!, segB.p3,
+        pt,
+        threshold
+      );
+      if (inter) {
+        intersections.push(inter);
+      }
+    } else if (segA.type === 'linear' && segB.type === 'cubic') {
+      const inter = this.intersectSegmentAndBezier(
+        segA.p0, segA.p3,
+        segB.p0, segB.p1!, segB.p2!, segB.p3,
+        pt,
+        threshold
+      );
+      if (inter) {
+        intersections.push(inter);
+      }
+    } else if (segA.type === 'cubic' && segB.type === 'linear') {
+      const inter = this.intersectSegmentAndBezier(
+        segB.p0, segB.p3,
+        segA.p0, segA.p1!, segA.p2!, segA.p3,
+        pt,
+        threshold
+      );
+      if (inter) {
+        intersections.push(inter);
+      }
+    }
   }
 
   /**

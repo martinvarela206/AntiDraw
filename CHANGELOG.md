@@ -3,6 +3,17 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.25] - 2026-11-12
+
+### ⚡ Spatial Grid Broad-Phase Snapping & Intersection Acceleration
+- **High-Performance Spatial Broad-Phase Acceleration (`SpatialGrid`, `SnappingEngine` & `IntersectionSnappingService`)**:
+  - **Generic 2D Spatial Grid (`SpatialGrid<T>`)**: Created uniform spatial hashing index partitioning coordinate space into spatial buckets (cells) for O(1) point neighborhood queries and O(N) broad-phase candidate pair generation via `findOverlappingPairs()`.
+  - **Accelerated Vertex Snapping (`SnappingEngine`)**: Added spatial broad-phase indexing when evaluating dense vertex clouds (>32 vertices), eliminating linear O(N) distance scans during live interactive snapping.
+  - **Broad-Phase Curve Intersections (`IntersectionSnappingService`)**: Integrated spatial grid partitioning for segment bounding boxes in `collectAllIntersections`. Replaced quadratic nested loops with broad-phase overlapping pair discovery (`findOverlappingPairs`), drastically speeding up Path × Path intersection detection on complex documents.
+  - **Automated Test Coverage**: Added test suite `test-spatial-snapping-acceleration.ts` (Suite 68) verifying 5 assertions covering insertion/removal/querying, broad-phase overlapping pairs, dense vertex snapping, crossing-path detection, and nearest point retrieval.
+
+---
+
 ## [0.103.24] - 2026-11-12
 
 ### 📋 Resilient Multi-Flavour Clipboard
