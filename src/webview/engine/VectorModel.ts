@@ -162,6 +162,8 @@ export class VectorModel {
     return search(this.elements);
   }
 
+  public sourceSvgText?: string;
+
   constructor() {}
 
   /**
@@ -169,8 +171,16 @@ export class VectorModel {
    * Fuses companion metadata to rehydrate full parametric editor state.
    */
   public loadSvgString(svgText: string, companionMetadata?: CompanionMetadata | null): void {
+    this.sourceSvgText = svgText;
     SvgSerializer.loadSvgString(svgText, this, companionMetadata);
     this.rebuildSpatialIndex();
+  }
+
+  /**
+   * Serializes the document to SVG, utilizing surgical in-place modification when requested.
+   */
+  public serializeSvg(options?: { excludeContextual?: boolean; surgical?: boolean }): string {
+    return SvgSerializer.toSvgString(this, options);
   }
 
   /**

@@ -3,6 +3,18 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.33] - 2026-11-12
+
+### 💉 Surgical SVG In-Place Editing & Foreign Namespace Preservation
+- **Surgical SVG In-Place Modifier (`SurgicalSvgModifier.ts`)**:
+  - **In-Place DOM Mutation**: Built a targeted patching engine that preserves existing XML document layout, indentation, XML comments (`<!-- ... -->`), and the exact attribute ordering of untouched elements.
+  - **Foreign Namespace & Metadata Retention**: Preserves third-party namespace declarations and attributes (`xmlns:inkscape`, `xmlns:sodipodi`, `inkscape:label`, `sodipodi:nodetypes`, `sketch:type`, `figma:id`) without stripping them upon save or serialization.
+  - **Lossless `currentColor` Restoration**: Restores original `currentColor` fill and stroke presentation attributes tracked via `data-original-fill` / `data-original-stroke` during deserialization, while sanitizing proprietary internal attributes prior to export.
+  - **Surgical Element Deletion & Insertion**: Cleanly synchronizes newly drawn elements and deleted paths directly against the source XML DOM tree structure without rewriting untouched nodes.
+  - **Automated Test Coverage**: Added test suite `test-surgical-svg-editing.ts` (Suite 76) with 5 assertions covering comment preservation, external namespace retention, untouched attribute formatting preservation, `currentColor` restoration, and structural synchronization.
+
+---
+
 ## [0.103.32] - 2026-11-12
 
 ### 🔄 Canonical XML Tree Comparator & Round-Trip SVG Corpus Verification

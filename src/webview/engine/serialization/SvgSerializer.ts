@@ -12,6 +12,7 @@ import {
 import { PathGeometryCompiler, formatNum } from '../geometry/PathGeometryCompiler.js';
 import { DashCornerAligner } from '../geometry/DashCornerAligner.js';
 import { AppearanceStackManager } from '../appearance/AppearanceStackManager.js';
+import { SurgicalSvgModifier } from './SurgicalSvgModifier.js';
 
 export interface IVectorModelSerializerContext {
   canvas: CanvasSettings;
@@ -427,8 +428,12 @@ export class SvgSerializer {
    */
   public static toSvgString(
     ctx: IVectorModelSerializerContext,
-    options?: { excludeContextual?: boolean }
+    options?: { excludeContextual?: boolean; surgical?: boolean }
   ): string {
+    if (options?.surgical === true && (ctx as any).sourceSvgText) {
+      return SurgicalSvgModifier.patchSvgDocument((ctx as any).sourceSvgText, ctx, options);
+    }
+
     const {
       width,
       height,
