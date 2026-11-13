@@ -318,9 +318,6 @@ export class SvgDeserializer {
       };
 
       const rootInheritedAttrs = extractPresentationAttrs(svgEl);
-      if (ctx.canvas.currentColor && !rootInheritedAttrs['color']) {
-        rootInheritedAttrs['color'] = ctx.canvas.currentColor;
-      }
 
       // Parse child vector elements with recursive group and cascading presentation attribute inheritance
       const usedIds = new Set<string>();
@@ -977,8 +974,8 @@ export class SvgDeserializer {
   public static normalizeTransform(transformStr: string, cssVars?: Record<string, string>): string {
     if (!transformStr || !transformStr.trim()) return '';
 
-    // Pre-resolve CSS variables if present
-    if (cssVars || transformStr.includes('var(')) {
+    // Pre-resolve CSS variables only if present
+    if (transformStr.includes('var(')) {
       const resolver = new CssStyleResolver();
       if (cssVars) {
         for (const [k, v] of Object.entries(cssVars)) {
@@ -1209,84 +1206,92 @@ export class SvgDeserializer {
     cssResolver: CssStyleResolver,
     canvasDefaultColor: string
   ): { effectiveColor: string; elementVars: Record<string, string> } {
-    const tag = node.tagName.toLowerCase();
-    const nodeId = node.getAttribute('id') || null;
-    const nodeClass = node.getAttribute('class') || '';
-    const classList = nodeClass.split(/\s+/).filter(Boolean);
+    const hasCssActive = cssResolver.hasRulesOrVariables() || Object.keys(inheritedVars).length > 0;
+    const hasInlineVars = !!(attrs.style && attrs.style.includes('--'));
 
-    // Extract inline style variables if any
-    const inlineVars: Record<string, string> = {};
-    if (attrs.style) {
-      for (const pair of attrs.style.split(';')) {
-        const colon = pair.indexOf(':');
-        if (colon > 0) {
-          const p = pair.substring(0, colon).trim();
-          const v = pair.substring(colon + 1).trim();
-          if (p.startsWith('--') && v) {
-            inlineVars[p] = v;
+    let elementVars = inheritedVars;
+
+    if (hasCssActive || hasInlineVars) {
+      const tag = node.tagName.toLowerCase();
+      const nodeId = node.getAttribute('id') || null;
+      const nodeClass = node.getAttribute('class') || '';
+      const classList = nodeClass ? nodeClass.split(/\s+/).filter(Boolean) : [];
+
+      // Extract inline style variables if any
+      const inlineVars: Record<string, string> = {};
+      if (hasInlineVars && attrs.style) {
+        for (const pair of attrs.style.split(';')) {
+          const colon = pair.indexOf(':');
+          if (colon > 0) {
+            const p = pair.substring(0, colon).trim();
+            const v = pair.substring(colon + 1).trim();
+            if (p.startsWith('--') && v) {
+              inlineVars[p] = v;
+            }
           }
         }
       }
-    }
 
-    // Match rules from stylesheet
-    const matched = cssResolver.matchElement(tag, nodeId, classList);
-    const elementVars: Record<string, string> = {
-      ...inheritedVars,
-      ...matched.variables,
-      ...inlineVars,
-    };
+      // Match rules from stylesheet
+      const matched = cssResolver.matchElement(tag, nodeId, classList);
+      elementVars = {
+        ...inheritedVars,
+        ...matched.variables,
+        ...inlineVars,
+      };
 
-    // Apply declarations from matched CSS rules if not directly declared on element
-    for (const [prop, val] of Object.entries(matched.declarations)) {
-      if (prop === 'transform') {
-        if (attrs.transform) {
-          attrs.transform = `${val} ${attrs.transform}`;
-        } else {
-          attrs.transform = val;
+      // Apply declarations from matched CSS rules if not directly declared on element
+      for (const [prop, val] of Object.entries(matched.declarations)) {
+        if (prop === 'transform') {
+          if (attrs.transform) {
+            attrs.transform = `${val} ${attrs.transform}`;
+          } else {
+            attrs.transform = val;
+          }
+        } else if (attrs[prop] === undefined) {
+          attrs[prop] = val;
         }
-      } else if (attrs[prop] === undefined) {
-        attrs[prop] = val;
+      }
+
+      // Resolve var(...) in all attributes
+      for (const [k, v] of Object.entries(attrs)) {
+        if (typeof v === 'string' && v.includes('var(')) {
+          attrs[k] = cssResolver.resolveVariables(v, elementVars);
+        }
       }
     }
 
-    // Resolve var(...) in all attributes
-    for (const [k, v] of Object.entries(attrs)) {
-      if (typeof v === 'string' && v.includes('var(')) {
-        attrs[k] = cssResolver.resolveVariables(v, elementVars);
-      }
-    }
+    // Resolve currentColor for fill and stroke only if encountered
+    const fillIsCc = attrs.fill === 'currentColor' || attrs.fill === 'currentcolor';
+    const strokeIsCc = attrs.stroke === 'currentColor' || attrs.stroke === 'currentcolor';
 
-    // Determine cascading effectiveColor
-    if (!attrs.color && attrs.style) {
-      const match = attrs.style.match(/(?:^|;)\s*color\s*:\s*([^;]+)/i);
-      if (match) {
-        attrs.color = match[1].trim();
+    let effectiveColor = '';
+    if (fillIsCc || strokeIsCc) {
+      if (!attrs.color && attrs.style && attrs.style.includes('color')) {
+        const match = attrs.style.match(/(?:^|;)\s*color\s*:\s*([^;]+)/i);
+        if (match) {
+          attrs.color = match[1].trim();
+        }
       }
-    }
-    const rawColor = attrs.color || inherited['color'] || '';
-    const effectiveColor = rawColor
-      ? cssResolver.resolveVariables(rawColor, elementVars)
-      : (canvasDefaultColor || '#000000');
+      const rawColor = attrs.color || inherited['color'] || '';
+      effectiveColor = rawColor
+        ? (rawColor.includes('var(') ? cssResolver.resolveVariables(rawColor, elementVars) : rawColor)
+        : (canvasDefaultColor || '#000000');
 
-    // Resolve currentColor for fill and stroke
-    if (attrs.fill) {
-      const fillCheck = attrs.fill.trim().toLowerCase();
-      if (fillCheck === 'currentcolor') {
+      if (fillIsCc) {
         attrs['data-original-fill'] = 'currentColor';
         attrs.fill = effectiveColor;
       }
-    }
-    if (attrs.stroke) {
-      const strokeCheck = attrs.stroke.trim().toLowerCase();
-      if (strokeCheck === 'currentcolor') {
+      if (strokeIsCc) {
         attrs['data-original-stroke'] = 'currentColor';
         attrs.stroke = effectiveColor;
       }
     }
 
     // Clean inline style attribute (removes transform & font shorthand, expanding into attrs)
-    SvgDeserializer.cleanStyleAttr(attrs, elementVars);
+    if (attrs.style) {
+      SvgDeserializer.cleanStyleAttr(attrs, elementVars);
+    }
 
     // Normalize transform
     if (attrs.transform) {

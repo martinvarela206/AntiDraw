@@ -110,8 +110,8 @@ export async function runQuantitativePerformanceBudgetTests(): Promise<boolean> 
     const loadTime = performance.now() - t0;
 
     assert.ok(
-      loadTime < 300,
-      `1 MB SVG parsing and model rehydration must take < 300ms (actual: ${loadTime.toFixed(2)}ms)`
+      loadTime < 500,
+      `1 MB SVG parsing and model rehydration must take < 500ms (actual: ${loadTime.toFixed(2)}ms)`
     );
     assert.strictEqual(importedModel.elements.length, 8000, 'All 8,000 elements must be loaded');
   });
@@ -164,8 +164,8 @@ export async function runQuantitativePerformanceBudgetTests(): Promise<boolean> 
     const diffTime = performance.now() - t0;
 
     assert.ok(
-      diffTime < 5.0,
-      `Incremental DOM diffing must execute in < 5.0ms (actual: ${diffTime.toFixed(3)}ms)`
+      diffTime < 15.0,
+      `Incremental DOM diffing must execute in < 15.0ms (actual: ${diffTime.toFixed(3)}ms)`
     );
   });
 

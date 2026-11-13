@@ -3,6 +3,17 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.32] - 2026-11-12
+
+### 🔄 Canonical XML Tree Comparator & Round-Trip SVG Corpus Verification
+- **Deterministic Canonical XML Tree Comparator (`CanonicalXmlComparator.ts`)**:
+  - **Attribute Order Invariance**: Implemented attribute canonicalization sorting attribute keys deterministically and filtering ignorable transient attributes.
+  - **Floating-Point & Coordinate Resilient Matching**: Integrated numerical epsilon tolerance ($\pm 0.05$) across scalar attributes, viewBox bounds, and affine transform components.
+  - **SVG Path (`d`) Command Equivalence**: Built path tokenization decomposing commands and coordinate streams to verify geometric identity independent of spacing differences.
+  - **W3C, Lucide & Heroicons Round-Trip Verification**: Added automated test suite `test-roundtrip-canonical-corpus.ts` (Suite 75) verifying 5 assertions ensuring fixed-point serialization round-trips ($S_1 \equiv S_2$) across standard W3C geometric primitives, Lucide stroke-centric icons, Heroicons complex paths, hierarchical groups, and defs/gradients.
+
+---
+
 ## [0.103.31] - 2026-11-12
 
 ### 🎨 Extended CSS Transformations, Variable Expansion & currentColor Cascading

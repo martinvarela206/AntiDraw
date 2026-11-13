@@ -42,6 +42,13 @@ export class CssStyleResolver {
   }
 
   /**
+   * Returns whether any CSS rules or custom properties have been registered.
+   */
+  public hasRulesOrVariables(): boolean {
+    return this.rules.length > 0 || Object.keys(this.globalVariables).length > 0;
+  }
+
+  /**
    * Parses raw CSS stylesheet text, extracting CSS variables and rules with specificity weights.
    */
   public parseCssText(cssText: string): void {
@@ -155,6 +162,13 @@ export class CssStyleResolver {
     id: string | null,
     classes: string[]
   ): MatchedStylesResult {
+    if (this.rules.length === 0) {
+      return {
+        declarations: {},
+        variables: this.globalVariables,
+      };
+    }
+
     const mergedDecls: Record<string, string> = {};
     const mergedVars: Record<string, string> = { ...this.globalVariables };
 
@@ -257,25 +271,32 @@ export class CssStyleResolver {
   ): CssStyleResolver {
     const resolver = new CssStyleResolver();
 
-    // Ingest global styles from companion metadata if available
     if (companionMetadata?.canvas?.currentColor) {
       resolver.setGlobalVariable('--currentColor', companionMetadata.canvas.currentColor);
     }
 
-    // Traverse all <style> elements in the document
-    let styleNodes: Element[] = [];
-    if (typeof doc.querySelectorAll === 'function') {
+    const styleNodes: Element[] = [];
+    if (typeof doc.getElementsByTagName === 'function') {
       try {
-        styleNodes = Array.from(doc.querySelectorAll('style'));
+        const found = doc.getElementsByTagName('style');
+        if (found && found.length > 0) {
+          for (let i = 0; i < found.length; i++) {
+            styleNodes.push(found[i]);
+          }
+        }
       } catch (_e) {
-        // Fallback for custom or simplified DOMs
+        // Fallback
       }
-    }
-    if (styleNodes.length === 0 && typeof doc.getElementsByTagName === 'function') {
+    } else if (typeof doc.querySelectorAll === 'function') {
       try {
-        styleNodes = Array.from(doc.getElementsByTagName('style'));
+        const found = doc.querySelectorAll('style');
+        if (found && found.length > 0) {
+          for (let i = 0; i < found.length; i++) {
+            styleNodes.push(found[i]);
+          }
+        }
       } catch (_e) {
-        // Ignore
+        // Fallback
       }
     }
 
