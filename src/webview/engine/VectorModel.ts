@@ -44,6 +44,7 @@ export interface VectorElement {
   textContent?: string;
   rawInnerXml?: string;
   isOpaque?: boolean;
+  dirty?: boolean;
 }
 
 export interface CanvasSettings {
@@ -198,6 +199,25 @@ export class VectorModel {
 
   public toFinalSvgString(): string {
     return SvgSerializer.toSvgString(this, { excludeContextual: true });
+  }
+
+  public markElementDirty(id: string): void {
+    const el = this.elements.find((e) => e.id === id);
+    if (el) {
+      el.dirty = true;
+    }
+  }
+
+  public markAllDirty(): void {
+    for (const el of this.elements) {
+      el.dirty = true;
+    }
+  }
+
+  public clearDirtyFlags(): void {
+    for (const el of this.elements) {
+      el.dirty = false;
+    }
   }
 
   public getViewBoxBounds(): { minX: number; minY: number; width: number; height: number } {
