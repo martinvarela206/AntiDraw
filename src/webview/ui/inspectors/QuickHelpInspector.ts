@@ -1,5 +1,6 @@
 import { ToolIcons } from '../../icons/ToolIcons.js';
 import { I18nService } from '../../i18n/index.js';
+import { ToolCatalogManifest } from '../../tools/ToolCatalogManifest.js';
 import { TOOL_HELP_MAP_DE } from './quickHelp/quickHelpDe.js';
 import { TOOL_HELP_MAP_FR } from './quickHelp/quickHelpFr.js';
 import { TOOL_HELP_MAP_RU } from './quickHelp/quickHelpRu.js';
@@ -842,8 +843,22 @@ export class QuickHelpInspector {
     else if (lang === 'ru') map = TOOL_HELP_MAP_RU;
     else if (lang === 'ja') map = TOOL_HELP_MAP_JA;
 
-    const key = isGuideOrRuler ? 'ruler' : (map[activeTool] ? activeTool : 'select');
-    const config = map[key] || map.select;
+    const manifestTool = ToolCatalogManifest.getTool(activeTool as any);
+    const key = isGuideOrRuler ? 'ruler' : (map[activeTool] ? activeTool : (manifestTool ? activeTool : 'select'));
+    let config = map[key];
+    if (!config && manifestTool) {
+      const icon = (ToolIcons as any)[manifestTool.iconName] || ToolIcons.selectTool;
+      config = {
+        title: manifestTool.name,
+        toolId: manifestTool.id,
+        icon,
+        shortcuts: [
+          { keys: [manifestTool.primaryShortcut], description: manifestTool.description },
+        ],
+      };
+    } else if (!config) {
+      config = map.select;
+    }
 
     const rowsHtml = config.shortcuts
       .map((item) => {

@@ -3,6 +3,20 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.46] - 2026-11-13
+
+### 📋 Single Source of Truth Tool Catalog Manifest & Dynamic Manual Synchronization
+- **Centralized Typed Tool Catalog Manifest (`ToolCatalogManifest.ts`)**:
+  - Implemented the Single Source of Truth (SSOT) catalog in `src/webview/tools/ToolCatalogManifest.ts` declaring all 20 canonical vector tools (`ToolType`).
+  - Structured data contract: unique ID, localized title, taxonomy category (`selection`, `vector`, `shape`, `topology`, `utility`), primary keyboard shortcut, alternative international shortcuts, `ToolIcons` vector asset binding, implementation status (`implemented`), primary inspector ID, functional description, and user manual anchor section.
+- **Inspector & QuickHelp Integration (`QuickHelpInspector.ts`)**:
+  - Refactored `QuickHelpInspector` to query `ToolCatalogManifest` as its authoritative fallback and metadata source, guaranteeing zero divergence between UI shortcuts, inspector icons, and keybinding listeners.
+- **Automated Documentation Table Generation (`generateManualMarkdownTable()`)**:
+  - Built-in GFM (GitHub Flavored Markdown) table generator producing canonical markdown reference documentation directly from executable TypeScript code, eliminating manual documentation drift.
+- **Automated Test Coverage**: Added test suite `test-tool-catalog-manifest.ts` (Suite 89) with 11 assertions validating coverage of all 20 tools, valid SVG icon bindings in `ToolIcons`, shortcut lookups, dynamic Markdown table synthesis, and `QuickHelpInspector` integration.
+
+---
+
 ## [0.103.45] - 2026-11-13
 
 ### 🚀 CI/CD Automation, Pre-Release Channel & Production Sourcemap Exclusion
