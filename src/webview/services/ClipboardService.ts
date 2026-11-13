@@ -36,6 +36,7 @@ export interface ClipboardServiceContext {
 export class ClipboardService {
   private clipboardElements: VectorElement[] = [];
   private clipboardGuides: GuideLine[] = [];
+  private clipboardPivots: Record<string, { x: number; y: number }> = {};
 
   constructor(private ctx: ClipboardServiceContext) {}
 
@@ -48,12 +49,21 @@ export class ClipboardService {
       const selected = this.ctx.model.elements.filter((el) => this.ctx.selectionTool.isSelected(el.id));
       this.clipboardElements = JSON.parse(JSON.stringify(selected));
 
-      // Asynchronously publish multi-flavour representations (SVG + Plain Text + PNG) to OS clipboard
+      this.clipboardPivots = {};
+      for (const el of selected) {
+        const pivot = this.ctx.selectionTool.elementPivots?.get(el.id);
+        if (pivot) {
+          this.clipboardPivots[el.id] = { ...pivot };
+        }
+      }
+
+      // Asynchronously publish multi-flavour representations (SVG + Plain Text + HTML + PNG) to OS clipboard
       ClipboardManager.copySelectionMultiFlavour(selected).catch((err) => {
         console.warn('[ClipboardService] System clipboard export warning:', err);
       });
     } else {
       this.clipboardElements = [];
+      this.clipboardPivots = {};
     }
 
     if (this.ctx.canvasMgr.selectedGuideId) {
@@ -92,8 +102,10 @@ export class ClipboardService {
 
     if (this.clipboardElements.length > 0) {
       this.ctx.pushUndo();
+      const newPivots: Record<string, { x: number; y: number }> = {};
       const pastedElements: VectorElement[] = this.clipboardElements.map((srcEl) => {
         const el: VectorElement = JSON.parse(JSON.stringify(srcEl));
+        const originalId = srcEl.id;
         /**
          * HISTORICAL ARCHITECTURE (FIX-19):
          * Strict Synchronization of el.attributes.id with el.id on Clipboard Paste.
@@ -108,6 +120,16 @@ export class ClipboardService {
          */
         el.id = `el_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
         el.attributes.id = el.id;
+
+        // Replicate and stagger element-specific pivot if recorded
+        if (this.clipboardPivots[originalId]) {
+          const oldPivot = this.clipboardPivots[originalId];
+          const staggeredPivot = { x: oldPivot.x + offset, y: oldPivot.y + offset };
+          newPivots[el.id] = staggeredPivot;
+          if (this.ctx.selectionTool.elementPivots) {
+            this.ctx.selectionTool.elementPivots.set(el.id, staggeredPivot);
+          }
+        }
 
         if (el.vertices && el.vertices.length > 0) {
           el.vertices.forEach((v) => {
@@ -157,8 +179,9 @@ export class ClipboardService {
         newSelectedIds.push(el.id);
       });
 
-      // Update clipboard elements so repeated pastes stagger automatically
+      // Update clipboard elements and pivots so repeated pastes stagger automatically
       this.clipboardElements = JSON.parse(JSON.stringify(pastedElements));
+      this.clipboardPivots = newPivots;
 
       this.ctx.onResetPropertyPanel();
       this.ctx.onUpdatePropertyPanel();

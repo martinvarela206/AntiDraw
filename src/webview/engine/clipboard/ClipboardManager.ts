@@ -102,13 +102,17 @@ export class ClipboardManager {
 
     // If running in browser/webview with modern clipboard API
     if (typeof navigator !== 'undefined' && navigator.clipboard && typeof ClipboardItem !== 'undefined') {
-      try {
-        const textBlob = new Blob([svgString], { type: 'text/plain' });
-        const svgBlob = new Blob([svgString], { type: 'image/svg+xml' });
-        const pngBlob = await renderSvgToPngBlob(svgString, width, height);
+      const textBlob = new Blob([svgString], { type: 'text/plain' });
+      const htmlSnippet = `<meta charset="utf-8"><!--StartFragment-->${svgString}<!--EndFragment-->`;
+      const htmlBlob = new Blob([htmlSnippet], { type: 'text/html' });
+      const svgBlob = new Blob([svgString], { type: 'image/svg+xml' });
+      const pngBlob = await renderSvgToPngBlob(svgString, width, height);
 
+      // Attempt 1: Multi-flavour write including SVG, HTML, Plain Text and PNG
+      try {
         const clipboardPayload: Record<string, Blob> = {
           'text/plain': textBlob,
+          'text/html': htmlBlob,
           'image/svg+xml': svgBlob,
         };
 
@@ -120,13 +124,28 @@ export class ClipboardManager {
         await navigator.clipboard.write([item]);
         return true;
       } catch (err) {
-        // Fallback: Attempt plain-text writeText if complex multi-MIME write was blocked
+        // Attempt 2: Native Chromium/Electron flavours (text/plain, text/html, image/png)
+        // Some Chromium/Electron runtimes restrict image/svg+xml in ClipboardItem without flag
         try {
-          if (navigator.clipboard.writeText) {
-            await navigator.clipboard.writeText(svgString);
-            return true;
+          const chromiumPayload: Record<string, Blob> = {
+            'text/plain': textBlob,
+            'text/html': htmlBlob,
+          };
+          if (pngBlob) {
+            chromiumPayload['image/png'] = pngBlob;
           }
-        } catch (_) {}
+          const item = new ClipboardItem(chromiumPayload);
+          await navigator.clipboard.write([item]);
+          return true;
+        } catch (_err2) {
+          // Attempt 3: Plain-text fallback via writeText
+          try {
+            if (navigator.clipboard.writeText) {
+              await navigator.clipboard.writeText(svgString);
+              return true;
+            }
+          } catch (_) {}
+        }
       }
     }
 

@@ -3,6 +3,17 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.24] - 2026-11-12
+
+### 📋 Resilient Multi-Flavour Clipboard
+- **Multi-Flavour MIME Payload & Resilient Chromium Fallback Hierarchy (`ClipboardManager` & `ClipboardService`)**:
+  - **Graceful Fallback Hierarchy**: Calibrated `ClipboardManager.copySelectionMultiFlavour` to attempt writing all standard flavours (`image/svg+xml`, `text/plain`, `text/html`, and `image/png`). If standard Chromium restrictions reject `image/svg+xml` in `ClipboardItem`, it automatically falls back to native Chromium flavours (`text/plain`, `text/html`, `image/png`), and further degrades to `writeText` SVG markup if `ClipboardItem` access is constrained.
+  - **HTML Fragment Interoperability**: Wrapped HTML clipboard snippets in `<!--StartFragment-->...<!--EndFragment-->` comments to ensure seamless paste behavior across third-party graphic and word-processing applications (Figma, Inkscape, Word, Slack, Discord).
+  - **Rich In-Memory Buffer Calibration**: Enhanced `ClipboardService` to track and stagger element-specific transformation pivots (`clipboardPivots`), ensuring geometric transform centers remain synchronized on subsequent staggered pastes.
+  - **Automated Test Coverage**: Added test suite `test-resilient-clipboard.ts` (Suite 67) verifying 5 assertions covering isolated bounded SVG generation, full multi-flavour writes, Chromium fallback without `image/svg+xml`, `writeText` fallback, and internal pivot buffer staggering.
+
+---
+
 ## [0.103.23] - 2026-11-12
 
 ### ⚡ Performance & Batch Synchronization Debounce
