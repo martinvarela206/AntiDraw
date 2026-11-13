@@ -2,7 +2,7 @@
   "name": "antidraw",
   "displayName": "%antidraw.displayName%",
   "description": "%antidraw.description%",
-  "version": "0.103.41",
+  "version": "0.103.42",
   "icon": "icon.png",
   "publisher": "martinvarela206",
   "author": {
@@ -108,14 +108,15 @@
     "sync-icons": "node scripts/sync-icons.js",
     "build": "node esbuild.js",
     "watch": "node esbuild.js --watch",
-    "compile": "tsc -p . --noEmit",
+    "compile": "tsc -p . --noEmit && tsc -p tsconfig.core.json",
+    "compile:core": "tsc -p tsconfig.core.json",
     "test": "node scripts/run-tests.js",
     "bench": "node scripts/run-benchmarks.js",
     "version:sync": "node scripts/sync-version.js",
     "version:bump": "node scripts/sync-version.js",
     "package": "pnpm run build && vsce package --no-dependencies",
     "publish:marketplace": "vsce publish --no-dependencies",
-    "publish:openvsx": "npx -y ovsx publish antidraw-0.103.41.vsix"
+    "publish:openvsx": "npx -y ovsx publish antidraw-0.103.42.vsix"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

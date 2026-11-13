@@ -1,12 +1,12 @@
 import { Point } from '../geom/Point.js';
-import { PathVertex, VectorElement, CanvasSettings, ParametricShapeType } from '../../engine/VectorModel.js';
+import { PathVertex, VectorElement, CanvasSettings, ParametricShapeType } from './VectorTypes.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Pure In-Memory Scene Graph (L0 - VectorScene)
  *
  * 1. Decoupling from Browser DOM:
  *    Represents vector hierarchy, groups, layers, and geometry purely in memory,
- *    eliminating reliance on synchronous Chromium SVGElement properties during
+ *    eliminating reliance on synchronous browser SVG DOM properties during
  *    transform calculations, algorithmic operations, and serialization.
  *
  * 2. Hierarchical Composition:

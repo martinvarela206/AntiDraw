@@ -1,6 +1,5 @@
 import { Point } from '../geom/Point.js';
-import { VectorElement, CanvasSettings } from '../../engine/VectorModel.js';
-import { GuideLine } from '../../engine/CanvasManager.js';
+import { VectorElement, CanvasSettings, GuideLine } from './VectorTypes.js';
 import { VectorScene } from './VectorScene.js';
 
 export type NodeId = string;

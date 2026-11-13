@@ -1,5 +1,5 @@
 import { Point } from '../../../core/geom/Point.js';
-import { PathVertex } from '../../VectorModel.js';
+import { PathVertex } from '../../../core/model/VectorTypes.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Schneider Cubic Bézier Curve Fitting (SchneiderFit)

@@ -18,8 +18,7 @@
  */
 
 import { DocumentState, DocumentStateFactory } from './DocumentState.js';
-import { VectorElement } from '../../engine/VectorModel.js';
-import { GuideLine } from '../../engine/CanvasManager.js';
+import { VectorElement, GuideLine } from './VectorTypes.js';
 
 export type PatchOp = 'add' | 'remove' | 'replace';
 

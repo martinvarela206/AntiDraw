@@ -3,6 +3,22 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.42] - 2026-11-13
+
+### 🧩 Architectural Layer Type Isolation & DOM-Free Core Models
+- **Dedicated Core TypeScript Compilation (`tsconfig.core.json`, `npm run compile:core`)**:
+  - Configured a dedicated TypeScript compilation target for `src/webview/core/**/*` and `src/webview/engine/operations/**/*` with `"lib": ["ES2022"]`, explicitly excluding browser DOM libraries (`"DOM"`).
+  - Guarantees compile-time isolation and zero unintentional couplings with Chromium DOM APIs (`window`, `document`, `HTMLElement`, `SVGElement`, `DOMParser`, `XMLSerializer`) across core vector data structures and algorithmic operations.
+- **Decoupled Pure Vector Types (`src/webview/core/model/VectorTypes.ts`)**:
+  - Extracted pure data contracts from legacy `VectorModel.ts` into a standalone, DOM-independent types module: `Point`, `PointUtils`, `NodeType`, `PathVertex`, `PathSegment`, `RectCorners`, `ParametricShapeType`, `VectorElement`, `CanvasSettings`, `DropShadowConfig`, `InnerShadowConfig`, `GradientStop`, `GradientConfig`, and `GuideLine`.
+  - Updated `DocumentPatch.ts`, `DocumentState.ts`, `VectorScene.ts`, and `SchneiderFit.ts` to consume pure types from `VectorTypes.js`.
+  - Preserved complete backward compatibility by re-exporting all types from `VectorModel.ts`.
+- **Integrated Dual-Target Compilation Pipeline (`package.json`)**:
+  - Configured `"compile": "tsc -p . --noEmit && tsc -p tsconfig.core.json"` ensuring full workspace type safety and isolated core layer purity on every compile check.
+- **Automated Test Coverage**: Added test suite `test-layer-type-isolation.ts` (Suite 85) with 22 assertions verifying `tsconfig.core.json` configuration, DOM library exclusion, compile-time validation, pure type exports, DOM symbol scanning across core modules, and retrocompatibility re-exports.
+
+---
+
 ## [0.103.41] - 2026-11-13
 
 ### 🎨 Residual Emoji Eradication & Standardized SVG Vector Icons

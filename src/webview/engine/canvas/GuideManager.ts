@@ -1,17 +1,7 @@
 import { Point } from '../VectorModel.js';
+import { GuideLine } from '../../core/model/VectorTypes.js';
 
-export interface GuideLine {
-  id: string;
-  orientation: 'horizontal' | 'vertical' | 'angled';
-  position: number;
-  angle: number;       // Angle in degrees: 0 = horizontal (left-to-right), 90 = vertical (top-to-bottom)
-  pivotX: number;      // Center pivot point X in canvas coordinates
-  pivotY: number;      // Center pivot point Y in canvas coordinates
-  color?: string;      // Guide line color, default cyan (#00f0ff)
-  visible?: boolean;   // Visibility toggle (default true)
-  locked?: boolean;    // Lock toggle preventing accidental selection or drag
-  mode?: 'move' | 'rotate'; // Interactive mode: 'move' (only center handle) or 'rotate' (center + rotation markers)
-}
+export type { GuideLine };
 
 export interface GuideGeometry {
   p1: Point;
