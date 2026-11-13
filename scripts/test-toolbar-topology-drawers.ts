@@ -295,10 +295,10 @@ export async function runToolbarTopologyDrawersTests(): Promise<boolean> {
   assert(toolbar.activeTool === 'smartFill', 'Key "f" activates Smart Fill tool ("smartFill")');
   assert(toolbar.drawerConstruct.activeChildId === 'smartFill', 'Drawer B slot synced to "smartFill" on key "f"');
 
-  // Press 'm' -> activates shapeBuilder
-  (keyController as any).handleKeyDown(createKeyEvt('m'));
-  assert(toolbar.activeTool === 'shapeBuilder', 'Key "m" activates Shape Builder tool ("shapeBuilder")');
-  assert(toolbar.drawerConstruct.activeChildId === 'shapeBuilder', 'Drawer B slot synced to "shapeBuilder" on key "m"');
+  // Press 'Shift+M' -> activates shapeBuilder (canonical Illustrator standard)
+  (keyController as any).handleKeyDown(createKeyEvt('M', { shiftKey: true }));
+  assert(toolbar.activeTool === 'shapeBuilder', 'Key "Shift+M" activates Shape Builder tool ("shapeBuilder")');
+  assert(toolbar.drawerConstruct.activeChildId === 'shapeBuilder', 'Drawer B slot synced to "shapeBuilder" on key "Shift+M"');
 
   // Press 'a' -> activates node
   (keyController as any).handleKeyDown(createKeyEvt('a'));

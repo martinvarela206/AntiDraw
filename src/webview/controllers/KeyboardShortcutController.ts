@@ -147,17 +147,53 @@ export class KeyboardShortcutController {
       return;
     }
 
+    if (this.ctx.toolbar.activeTool === 'polyline' && this.ctx.polylineToolHandler.onKeyDown(e)) {
+      e.preventDefault();
+      return;
+    }
+
+    if (this.ctx.toolbar.activeTool === 'pen' && this.ctx.penToolHandler.onKeyDown(e)) {
+      e.preventDefault();
+      return;
+    }
+
     if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'SELECT') return;
 
     const isSelectActive = this.ctx.toolbar.activeTool === 'select' || this.ctx.selectionTool.selectedElementIds.size > 0;
+    const hasSelection = this.ctx.selectionTool.selectedElementIds.size > 0;
+    const isPlainKey = !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey;
 
-    // Dedicated Free Transform / Homography Shortcut (D) cuando hay selección activa (sin modificadores)
-    if (isSelectActive && (e.code === 'KeyD' || e.key === 'd' || e.key === 'D') && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
-      e.preventDefault();
-      this.ctx.selectionTool.selectionMode = this.ctx.selectionTool.selectionMode === 'distort' ? 'scale' : 'distort';
-      this.ctx.propertyPanel.update();
-      this.ctx.renderOverlay();
-      return;
+    // Contextual Selection Transform Modes (W = Move, E = Scale, R = Rotate, D = Distort)
+    // Only intercepts when elements are selected in select context, freeing M/L/E/R for tools when no selection
+    if (isSelectActive && hasSelection && isPlainKey) {
+      if (e.code === 'KeyW' || e.key === 'w' || e.key === 'W') {
+        e.preventDefault();
+        this.ctx.selectionTool.selectionMode = 'move';
+        this.ctx.propertyPanel.update();
+        this.ctx.renderOverlay();
+        return;
+      }
+      if (e.code === 'KeyE' || e.key === 'e' || e.key === 'E') {
+        e.preventDefault();
+        this.ctx.selectionTool.selectionMode = 'scale';
+        this.ctx.propertyPanel.update();
+        this.ctx.renderOverlay();
+        return;
+      }
+      if (e.code === 'KeyR' || e.key === 'r' || e.key === 'R') {
+        e.preventDefault();
+        this.ctx.selectionTool.selectionMode = 'rotate';
+        this.ctx.propertyPanel.update();
+        this.ctx.renderOverlay();
+        return;
+      }
+      if (e.code === 'KeyD' || e.key === 'd' || e.key === 'D') {
+        e.preventDefault();
+        this.ctx.selectionTool.selectionMode = this.ctx.selectionTool.selectionMode === 'distort' ? 'scale' : 'distort';
+        this.ctx.propertyPanel.update();
+        this.ctx.renderOverlay();
+        return;
+      }
     }
 
     const cmdRegistry = CommandRegistry.getInstance();

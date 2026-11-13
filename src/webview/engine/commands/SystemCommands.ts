@@ -354,7 +354,7 @@ export function registerSystemCommands(registry: CommandRegistry): void {
     id: 'layer.lockAllAbove',
     label: 'Bloquear Capas Superiores',
     category: 'layer',
-    shortcut: 'Ctrl+Alt+L',
+    shortcut: 'Ctrl+Shift+L',
     isEnabled: (ctx: CommandContext) => (ctx.selectionTool?.selectedElementIds?.size || 0) > 0,
     execute: executeLockAllAbove,
   });
@@ -363,7 +363,7 @@ export function registerSystemCommands(registry: CommandRegistry): void {
     id: 'object.lockAllAbove',
     label: 'Bloquear Capas Superiores',
     category: 'object',
-    shortcut: 'Ctrl+Alt+L',
+    shortcut: 'Ctrl+Shift+L',
     isEnabled: (ctx: CommandContext) => (ctx.selectionTool?.selectedElementIds?.size || 0) > 0,
     execute: executeLockAllAbove,
   });
@@ -386,7 +386,7 @@ export function registerSystemCommands(registry: CommandRegistry): void {
     id: 'layer.hideAllAbove',
     label: 'Ocultar Capas Superiores',
     category: 'layer',
-    shortcut: 'Ctrl+Alt+3',
+    shortcut: 'Ctrl+Shift+H',
     isEnabled: (ctx: CommandContext) => (ctx.selectionTool?.selectedElementIds?.size || 0) > 0,
     execute: executeHideAllAbove,
   });
@@ -395,7 +395,7 @@ export function registerSystemCommands(registry: CommandRegistry): void {
     id: 'object.hideAllAbove',
     label: 'Ocultar Capas Superiores',
     category: 'object',
-    shortcut: 'Ctrl+Alt+3',
+    shortcut: 'Ctrl+Shift+H',
     isEnabled: (ctx: CommandContext) => (ctx.selectionTool?.selectedElementIds?.size || 0) > 0,
     execute: executeHideAllAbove,
   });
@@ -404,7 +404,7 @@ export function registerSystemCommands(registry: CommandRegistry): void {
     id: 'layer.unlockAll',
     label: 'Desbloquear Todo',
     category: 'layer',
-    shortcut: 'Ctrl+Alt+2',
+    shortcut: 'Ctrl+Shift+2',
     execute: (ctx: CommandContext) => {
       if (!ctx.model) return { success: false, error: 'Modelo no disponible' };
       const res = SceneLayerService.unlockAll(ctx.model.elements);
@@ -422,7 +422,7 @@ export function registerSystemCommands(registry: CommandRegistry): void {
     id: 'layer.showAll',
     label: 'Mostrar Todo',
     category: 'layer',
-    shortcut: 'Ctrl+Alt+Shift+3',
+    shortcut: 'Ctrl+Shift+3',
     execute: (ctx: CommandContext) => {
       if (!ctx.model) return { success: false, error: 'Modelo no disponible' };
       const res = SceneLayerService.showAll(ctx.model.elements);
@@ -597,7 +597,7 @@ export function registerSystemCommands(registry: CommandRegistry): void {
     id: 'guide.toggleLock',
     label: 'Bloquear Guías',
     category: 'view',
-    shortcut: 'Ctrl+Alt+;',
+    shortcut: 'Ctrl+Shift+;',
     execute: (ctx: CommandContext) => {
       if (!ctx.canvasMgr) return { success: false, error: 'CanvasManager no disponible' };
       ctx.canvasMgr.lockGuides = !ctx.canvasMgr.lockGuides;
@@ -679,7 +679,7 @@ export function registerSystemCommands(registry: CommandRegistry): void {
     id: 'blend.create',
     label: 'Crear Fusión Paramétrica (Blend)',
     category: 'object',
-    shortcut: 'Ctrl+Alt+B',
+    shortcut: 'Ctrl+Shift+B',
     execute: (ctx: CommandContext) => {
       if (!ctx.model || !ctx.selectionTool) return { success: false, error: 'Contexto no disponible' };
       const selected = ctx.model.elements.filter((el: VectorElement) => ctx.selectionTool.isSelected(el.id));

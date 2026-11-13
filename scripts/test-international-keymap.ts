@@ -94,16 +94,16 @@ export async function runInternationalKeymapTests(): Promise<boolean> {
     const match = keymap.findMatchingBinding(spanishAltGrBracket);
     assert.equal(match, undefined, 'AltGr text symbol should NOT trigger any command');
 
-    // Genuine Ctrl + Alt + L (without AltGraph) should trigger layer.lockAllAbove
-    const genuineCtrlAltL = mockKeyEvent({
+    // Genuine Ctrl + Shift + L (sanitized shortcut without AltGr collision) should trigger layer.lockAllAbove
+    const genuineCtrlShiftL = mockKeyEvent({
       ctrlKey: true,
-      altKey: true,
+      shiftKey: true,
       code: 'KeyL',
       key: 'l',
       modifierState: { AltGraph: false },
     });
 
-    const genuineMatch = keymap.findMatchingBinding(genuineCtrlAltL);
+    const genuineMatch = keymap.findMatchingBinding(genuineCtrlShiftL);
     assert.ok(genuineMatch);
     assert.equal(genuineMatch?.commandId, 'layer.lockAllAbove');
   });

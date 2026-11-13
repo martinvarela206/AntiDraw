@@ -90,7 +90,7 @@ export class ContextMenuController {
           {
             id: 'toggle-lock-guides',
             label: this.ctx.canvasMgr.lockGuides ? 'Desbloquear Guías' : 'Bloquear Guías',
-            shortcut: 'Ctrl+Alt+;',
+            shortcut: 'Ctrl+Shift+;',
             action: () => cmdRegistry.execute('guide.toggleLock'),
           },
           { id: 'separator', label: '', action: () => {} },
@@ -247,7 +247,7 @@ export class ContextMenuController {
         {
           id: 'lock-all-above',
           label: 'Bloquear Capas Superiores',
-          shortcut: 'Ctrl+Alt+L',
+          shortcut: 'Ctrl+Shift+L',
           action: () => {
             cmdRegistry.execute('object.lockAllAbove');
           },
@@ -255,7 +255,7 @@ export class ContextMenuController {
         {
           id: 'hide-all-above',
           label: 'Ocultar Capas Superiores',
-          shortcut: 'Ctrl+Alt+3',
+          shortcut: 'Ctrl+Shift+H',
           action: () => {
             cmdRegistry.execute('object.hideAllAbove');
           },
@@ -319,7 +319,7 @@ export class ContextMenuController {
         {
           id: 'toggle-lock-guides',
           label: this.ctx.canvasMgr.lockGuides ? 'Desbloquear Guías' : 'Bloquear Guías',
-          shortcut: 'Ctrl+Alt+;',
+          shortcut: 'Ctrl+Shift+;',
           action: () => cmdRegistry.execute('guide.toggleLock'),
         },
         { id: 'separator', label: '', action: () => {} },

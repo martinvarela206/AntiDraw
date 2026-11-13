@@ -201,6 +201,12 @@ export class PenToolHandler implements IToolHandler {
         return true;
       }
     }
+    if ((e.key === 'z' || e.key === 'Z') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (this.currentPenVertices.length >= 2) {
+        this.finishPenPath(true);
+        return true;
+      }
+    }
     if (e.key === 'Enter') {
       if (this.currentPenVertices.length >= 2) {
         this.finishPenPath(false);
@@ -240,7 +246,7 @@ export class PenToolHandler implements IToolHandler {
    * Coincident Vertex Deduplication and Topological Fusion (unifyClosingVertices)
    */
   public finishPenPath(close: boolean = false): void {
-    const z = this.ctx.canvasMgr.zoom || 1;
+    const z = this.ctx.canvasMgr?.zoom || 1;
     const cleanVerts = this.ctx.model.unifyClosingVertices(
       this.currentPenVertices,
       close,

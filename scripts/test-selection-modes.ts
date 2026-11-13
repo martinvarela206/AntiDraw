@@ -277,6 +277,9 @@ export async function runSelectionModesTests(): Promise<boolean> {
   });
 
   // Test KeyboardShortcutController dispatch with window keydown event
+  // Deselect to ensure idle tool switching without active selection override
+  selectionTool.deselectAll();
+
   // Test R: activates rect tool without collision
   (globalThis as any).window.dispatchEvent({
     type: 'keydown',
@@ -306,6 +309,9 @@ export async function runSelectionModesTests(): Promise<boolean> {
     preventDefault: () => {},
   });
   assert(mockToolbar.activeTool === 'select', 'Keyboard Controller: Dispatched "v" activates "select" tool');
+
+  // Re-select element for subsequent Mini-HUD and interaction tests
+  selectionTool.select('rect-1', rectEl);
 
   // 4.5 QuickHelpInspector Documentation
   const selectHelp = (QuickHelpInspector as any).TOOL_HELP_MAP['select'];

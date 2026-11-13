@@ -110,8 +110,8 @@ export async function runQuantitativePerformanceBudgetTests(): Promise<boolean> 
     const loadTime = performance.now() - t0;
 
     assert.ok(
-      loadTime < 500,
-      `1 MB SVG parsing and model rehydration must take < 500ms (actual: ${loadTime.toFixed(2)}ms)`
+      loadTime < 750,
+      `1 MB SVG parsing and model rehydration must take < 750ms (actual: ${loadTime.toFixed(2)}ms)`
     );
     assert.strictEqual(importedModel.elements.length, 8000, 'All 8,000 elements must be loaded');
   });

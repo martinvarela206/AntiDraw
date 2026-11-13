@@ -3,6 +3,22 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.37] - 2026-11-13
+
+### ⌨️ Keyboard Shortcuts Disambiguation & AltGr Collision Eradication
+- **AltGr / International Keyboard Protection (`KeymapRegistry.ts`, `SystemCommands.ts`, `ContextMenuController.ts`)**:
+  - **Complete `Ctrl+Alt` Eradication**: Replaced all `Ctrl+Alt+...` key combinations with safe `Ctrl+Shift+...` alternatives across commands, keymaps, and context menus (`guide.toggleLock` -> `Ctrl+Shift+;`, `layer.lockAllAbove` -> `Ctrl+Shift+L`, `layer.hideAllAbove` -> `Ctrl+Shift+H`, `blend.create` -> `Ctrl+Shift+B`, `layer.unlockAll` -> `Ctrl+Shift+2`, `layer.showAll` -> `Ctrl+Shift+3`).
+  - **AltGr Synthetic Modifier Suppression**: Verified `KeymapRegistry.isAltGraph` suppresses false-positive command executions when international layout users type `@`, `\`, `~`, `|`, and bracket symbols.
+- **`Z` Dual-Context Disambiguation (`PolylineToolHandler.ts`, `PenToolHandler.ts`, `KeyboardShortcutController.ts`)**:
+  - **Path Closure on Drawing**: Pressing `Z` when actively plotting with the Polyline or Pen tools (`vertexCount >= 2`) deterministically finalizes and closes the active path (`finishPolylinePath(true)` / `finishPenPath(true)`).
+  - **Viewport Zoom when Idle**: When not actively drawing, pressing plain `Z` activates the Viewport Zoom tool, while `Ctrl+Z` executes Undo and `Ctrl+Shift+Z` / `Ctrl+Y` executes Redo without collision.
+- **Canonical Drawing Tools & Contextual Selection Transform Cycle**:
+  - **Canonical Industry Standard Hotkeys**: Resolved tool convention to Selection (`V`), Nodes (`A` with alias `N`), Rectangle (`M` with alias `R`), Ellipse (`L` with alias `E`), and Shape Builder (`Shift+M`).
+  - **Contextual Selection Modes (`W/E/R/D`)**: When elements are selected in Selection mode, keys `W`, `E`, `R`, and `D` cycle contextual transform behaviors (Move, Scale, Rotate, Distort) without colliding with tool switches.
+- **Automated Test Coverage**: Added test suite `test-keyboard-shortcuts-disambiguation.ts` (Suite 80) with 5 assertions covering `Ctrl+Alt` eradication, `Z` disambiguation, canonical drawing tools, selection-contextual transform modes, and sanitized productivity shortcuts.
+
+---
+
 ## [0.103.36] - 2026-11-12
 
 ### 📐 Free Distort (D) Projective Homography & Destructive Baking Architecture Specification

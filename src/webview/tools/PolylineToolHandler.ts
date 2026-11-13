@@ -173,6 +173,12 @@ export class PolylineToolHandler implements IToolHandler {
       this.ctx.renderOverlay();
       return true;
     }
+    if ((e.key === 'z' || e.key === 'Z') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (this.currentPolylineVertices.length >= 2) {
+        this.finishPolylinePath(true);
+        return true;
+      }
+    }
     if (e.key === 'Enter') {
       if (this.currentPolylineVertices.length >= 2) {
         this.finishPolylinePath(false);
@@ -218,7 +224,7 @@ export class PolylineToolHandler implements IToolHandler {
    *    - Open 2-node straight segments are preserved as native SVG `<line>` primitives.
    */
   public finishPolylinePath(close: boolean = false): void {
-    const z = this.ctx.canvasMgr.zoom || 1;
+    const z = this.ctx.canvasMgr?.zoom || 1;
     const cleanVerts = this.ctx.model.unifyClosingVertices(
       this.currentPolylineVertices,
       close,

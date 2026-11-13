@@ -142,17 +142,18 @@ export class KeymapRegistry {
       { toolId: 'node', code: ['KeyA', 'KeyN'], key: ['a', 'n'] },
       { toolId: 'stroke', code: 'KeyT', key: 't' },
       { toolId: 'pen', code: 'KeyP', key: 'p' },
-      { toolId: 'line', code: 'KeyL', key: 'l' },
+      { toolId: 'line', code: ['Backslash', 'IntlBackslash'], key: ['\\', '|'] },
+      { toolId: 'line', code: 'KeyL', key: ['l', 'L'], shift: true },
       { toolId: 'polyline', code: 'KeyY', key: 'y' },
-      { toolId: 'rect', code: 'KeyR', key: 'r' },
+      { toolId: 'rect', code: ['KeyM', 'KeyR'], key: ['m', 'r'] },
       { toolId: 'circle', code: 'KeyO', key: 'o' },
-      { toolId: 'ellipse', code: 'KeyE', key: 'e' },
+      { toolId: 'ellipse', code: ['KeyL', 'KeyE'], key: ['l', 'e'] },
       { toolId: 'polygon', code: 'KeyG', key: 'g' },
       { toolId: 'star', code: 'KeyS', key: 's' },
       { toolId: 'scissors', code: ['KeyC', 'KeyK'], key: ['c', 'k'] },
       { toolId: 'eraser', code: 'KeyE', key: 'e', shift: true },
       { toolId: 'smartFill', code: 'KeyF', key: 'f' },
-      { toolId: 'shapeBuilder', code: 'KeyM', key: 'm' },
+      { toolId: 'shapeBuilder', code: 'KeyM', key: 'm', shift: true },
       { toolId: 'image', code: 'KeyI', key: 'i' },
       { toolId: 'addVertex', key: ['+', '='] },
       { toolId: 'zoom', code: 'KeyZ', key: 'z' },
@@ -174,13 +175,14 @@ export class KeymapRegistry {
       { commandId: 'object.ungroup', code: 'KeyG', key: 'g', ctrlOrMeta: true, shift: true },
       { commandId: 'file.exportAsset', code: 'KeyE', key: 'e', ctrlOrMeta: true, shift: true },
       { commandId: 'view.recenterViewBox', code: 'Digit0', key: '0', ctrlOrMeta: true },
+      { commandId: 'blend.create', code: 'KeyB', key: 'b', ctrlOrMeta: true, shift: true },
 
-      // --- Capas y Guías (Protegidas explícitamente contra AltGr) ---
-      { commandId: 'guide.toggleLock', code: 'Semicolon', key: [';', ':'], ctrlOrMeta: true, alt: true },
-      { commandId: 'layer.lockAllAbove', code: 'KeyL', key: 'l', ctrlOrMeta: true, alt: true },
-      { commandId: 'layer.unlockAll', code: 'Digit2', key: '2', ctrlOrMeta: true, alt: true },
-      { commandId: 'layer.hideAllAbove', code: 'Digit3', key: '3', ctrlOrMeta: true, alt: true },
-      { commandId: 'layer.showAll', code: 'Digit3', key: '3', ctrlOrMeta: true, shift: true, alt: true },
+      // --- Capas y Guías (Saneadas: sin combinaciones Ctrl+Alt para prevenir colisiones con AltGr) ---
+      { commandId: 'guide.toggleLock', code: 'Semicolon', key: [';', ':'], ctrlOrMeta: true, shift: true },
+      { commandId: 'layer.lockAllAbove', code: 'KeyL', key: 'l', ctrlOrMeta: true, shift: true },
+      { commandId: 'layer.unlockAll', code: 'Digit2', key: '2', ctrlOrMeta: true, shift: true },
+      { commandId: 'layer.hideAllAbove', code: ['Digit3', 'KeyH'], key: ['3', 'h', 'H'], ctrlOrMeta: true, shift: true },
+      { commandId: 'layer.showAll', code: ['Digit4', 'KeyU'], key: ['4', 'u', 'U'], ctrlOrMeta: true, shift: true },
     ];
   }
 }
