@@ -270,11 +270,17 @@ export interface ReadImageUriResponseMessage {
   error?: string;
 }
 
+export interface PurgeMetadataMessage {
+  type: 'purgeMetadata';
+  requestId?: string;
+}
+
 export type HostToWebviewMessage =
   | LoadSvgMessage
   | SaveLinkedImageResponseMessage
   | ImageFileSelectedMessage
-  | ReadImageUriResponseMessage;
+  | ReadImageUriResponseMessage
+  | PurgeMetadataMessage;
 
 // ---------------------------------------------------------------------------
 // 3. Validation Results & Type Guards
@@ -522,6 +528,16 @@ export class IpcValidator {
             fileName: typeof msg.fileName === 'string' ? msg.fileName : undefined,
             sizeBytes: typeof msg.sizeBytes === 'number' ? msg.sizeBytes : undefined,
             error: typeof msg.error === 'string' ? msg.error : undefined,
+          },
+        };
+      }
+
+      case 'purgeMetadata': {
+        return {
+          isValid: true,
+          message: {
+            type: 'purgeMetadata',
+            requestId: typeof msg.requestId === 'string' ? msg.requestId : undefined,
           },
         };
       }

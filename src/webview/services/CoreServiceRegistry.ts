@@ -15,6 +15,7 @@ import { SvgDomRenderer } from '../engine/canvas/SvgDomRenderer.js';
 import { CrashGuard } from './CrashGuard.js';
 import { CrashGuard as EngineCrashGuard } from '../engine/guard/CrashGuard.js';
 import { VsCodeBridge } from '../bridge/VsCodeBridge.js';
+import { CommandRegistry } from '../commands/CommandRegistry.js';
 
 export interface CoreServiceContext {
   model: VectorModel;
@@ -79,6 +80,10 @@ export class CoreServiceRegistry {
 
     const bridge = VsCodeBridge.getInstance();
     EngineCrashGuard.setNotifier(bridge);
+    bridge.onPurgeMetadata(() => {
+      CommandRegistry.getInstance().execute('document.purgeMetadata');
+      bridge.showInfo('AntiDraw: Metadatos de terceros purgados correctamente.');
+    });
     const crashGuard = new CrashGuard({
       historyService,
       render: () => workspaceLayout.render(),

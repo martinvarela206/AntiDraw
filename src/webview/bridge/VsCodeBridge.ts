@@ -85,6 +85,7 @@ export class VsCodeBridge {
   private currentRevision: number = 0;
   private loadSvgCallbacks: Array<(payload: LoadSvgPayload) => void> = [];
   private imageFileSelectedCallbacks: Array<(payload: ImageFileSelectedPayload) => void> = [];
+  private purgeMetadataCallbacks: Array<() => void> = [];
   private pendingImageSaveResolvers: Map<string, (res: SaveLinkedImageResponse) => void> = new Map();
   private pendingReadUriResolvers: Map<string, (res: ReadImageUriResponse) => void> = new Map();
   private currentFileName: string = 'drawing.svg';
@@ -184,6 +185,10 @@ export class VsCodeBridge {
         for (const cb of this.imageFileSelectedCallbacks) {
           cb(payload);
         }
+      } else if (msg.type === 'purgeMetadata') {
+        for (const cb of this.purgeMetadataCallbacks) {
+          cb();
+        }
       }
     });
   }
@@ -199,6 +204,13 @@ export class VsCodeBridge {
     this.imageFileSelectedCallbacks.push(callback);
     return () => {
       this.imageFileSelectedCallbacks = this.imageFileSelectedCallbacks.filter((cb) => cb !== callback);
+    };
+  }
+
+  public onPurgeMetadata(callback: () => void): () => void {
+    this.purgeMetadataCallbacks.push(callback);
+    return () => {
+      this.purgeMetadataCallbacks = this.purgeMetadataCallbacks.filter((cb) => cb !== callback);
     };
   }
 

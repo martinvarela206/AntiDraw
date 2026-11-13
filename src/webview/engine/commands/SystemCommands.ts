@@ -165,6 +165,29 @@ export function registerSystemCommands(registry: CommandRegistry): void {
     },
   });
 
+  registry.register({
+    id: 'document.purgeMetadata',
+    label: 'Purgar metadatos de terceros',
+    description: 'Elimina comentarios, namespaces externos (Inkscape, Figma), etiquetas y atributos de terceros',
+    category: 'edit',
+    execute: (ctx: CommandContext) => {
+      if (!ctx.model) {
+        return { success: false, error: 'Modelo no disponible' };
+      }
+      if (typeof ctx.pushUndo === 'function') {
+        ctx.pushUndo();
+      }
+      const result = ctx.model.purgeMetadata();
+      if (typeof ctx.render === 'function') {
+        ctx.render();
+      }
+      if (typeof ctx.syncToHost === 'function') {
+        ctx.syncToHost();
+      }
+      return { success: true, value: result };
+    },
+  });
+
   // --- OBJETOS Y GEOMETRÍA ---
   registry.register({
     id: 'object.convertToCurves',

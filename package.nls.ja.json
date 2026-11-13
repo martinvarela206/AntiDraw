@@ -4,5 +4,6 @@
   "antidraw.editor.displayName": "AntiDraw SVG エディタ",
   "antidraw.projectEditor.displayName": "AntiDraw プロジェクトエディター (.adrw)",
   "antidraw.command.openEditor": "AntiDraw SVG エディタで開く",
+  "antidraw.command.purgeMetadata": "AntiDraw: サードパーティのメタデータを消去 (Inkscape, Figma など)",
   "antidraw.untrustedWorkspaces.description": "AntiDrawは、制限モードでも厳格なゼロトラストサニタイズにより、SVGおよび.adrwファイルを安全に表示および編集します。"
 }

@@ -183,6 +183,19 @@ export class CanvasInspector {
 
 
       ${SwatchPaletteInspector.renderHtml(model, null)}
+
+      <div class="panel-section">
+        <div class="panel-title">Optimización y Limpieza</div>
+        <button id="btn-purge-metadata" class="prop-input" style="width:100%;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;padding:6px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:4px;color:var(--vscode-errorForeground, #ef4444);font-weight:600;" title="Purgar metadatos de terceros (Inkscape, Figma, etc.) y comentarios XML">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            <line x1="10" y1="11" x2="10" y2="17"></line>
+            <line x1="14" y1="11" x2="14" y2="17"></line>
+          </svg>
+          Purgar Metadatos Externos
+        </button>
+      </div>
     `;
 
     const presetSelect = container.querySelector<HTMLSelectElement>('#canvas-preset');
@@ -432,6 +445,13 @@ export class CanvasInspector {
       });
     }
 
+
+    bindInspectorMouseDown(container, 'btn-purge-metadata', () => {
+      callbacks.onPushUndo?.();
+      model.purgeMetadata();
+      callbacks.onUpdateCanvas();
+      onReRender();
+    });
 
     SwatchPaletteInspector.bindEvents(container, model, null, callbacks, onReRender);
   }

@@ -3,6 +3,18 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.34] - 2026-11-12
+
+### 🧹 Explicit On-Demand Metadata Purge & Foreign Attribute Sanitizer
+- **Explicit Metadata Purge Engine (`SvgMetadataCleaner.ts`)**:
+  - **Foreign Namespace & Tag Removal**: Built an on-demand cleaner stripping third-party namespaces (`xmlns:inkscape`, `xmlns:sodipodi`, `xmlns:sketch`, `xmlns:figma`, `xmlns:adobe`) and editor-specific metadata tags (`<sodipodi:namedview>`, `<inkscape:perspective>`, `<metadata>`, `<i:pgf>`) without silent data loss on regular saves.
+  - **Foreign Attribute Cleansing**: Sanitizes custom editor attributes (`inkscape:label`, `sodipodi:nodetypes`, `sketch:type`, `figma:id`) and internal tracking attributes (`data-*`, `antidraw:*`) while preserving standard W3C geometric and presentation properties.
+  - **Unreferenced Defs Pruning**: Scans `<defs>` to detect and purge orphaned gradients, patterns, filters, and markers unreferenced across the document.
+  - **Full UI & Command Palette Integration**: Registered VS Code command `antidraw.purgeMetadata` ("AntiDraw: Purge Third-Party Metadata"), wired `document.purgeMetadata` into `CommandRegistry`, and added an "Optimización y Limpieza" action button in `CanvasInspector`.
+  - **Automated Test Coverage**: Added test suite `test-explicit-metadata-purge.ts` (Suite 77) with 5 assertions covering Inkscape/Sodipodi tag/namespace purging, Figma/Sketch/Adobe attribute stripping, XML comments/data-* cleaning, orphaned defs pruning, and end-to-end command execution.
+
+---
+
 ## [0.103.33] - 2026-11-12
 
 ### 💉 Surgical SVG In-Place Editing & Foreign Namespace Preservation

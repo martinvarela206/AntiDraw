@@ -22,6 +22,18 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(openEditorCmd);
+
+  const purgeMetadataCmd = vscode.commands.registerCommand(
+    'antidraw.purgeMetadata',
+    () => {
+      const dispatched = AntiDrawEditorProvider.purgeActiveDocumentMetadata();
+      if (!dispatched) {
+        vscode.window.showInformationMessage('AntiDraw: No active AntiDraw editor document found to purge metadata.');
+      }
+    }
+  );
+
+  context.subscriptions.push(purgeMetadataCmd);
 }
 
 export function deactivate() {}

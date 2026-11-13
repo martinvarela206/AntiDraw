@@ -61,6 +61,21 @@ export class AntiDrawEditorProvider implements vscode.CustomEditorProvider<AntiD
     return vscode.Disposable.from(svgRegistration, projectRegistration);
   }
 
+  private static _activeDocument: AntiDrawCustomDocument | null = null;
+
+  public static getActiveDocument(): AntiDrawCustomDocument | null {
+    return AntiDrawEditorProvider._activeDocument;
+  }
+
+  public static purgeActiveDocumentMetadata(): boolean {
+    const doc = AntiDrawEditorProvider._activeDocument;
+    if (!doc) {
+      return false;
+    }
+    doc.broadcastMessage({ type: 'purgeMetadata' });
+    return true;
+  }
+
   constructor(private readonly context: vscode.ExtensionContext) {}
 
   /**
@@ -204,6 +219,21 @@ export class AntiDrawEditorProvider implements vscode.CustomEditorProvider<AntiD
     _token: vscode.CancellationToken
   ): Promise<void> {
     document.registerPanel(webviewPanel);
+    AntiDrawEditorProvider._activeDocument = document;
+    if (typeof webviewPanel.onDidChangeViewState === 'function') {
+      webviewPanel.onDidChangeViewState((e) => {
+        if (e.webviewPanel.active) {
+          AntiDrawEditorProvider._activeDocument = document;
+        }
+      });
+    }
+    if (typeof webviewPanel.onDidDispose === 'function') {
+      webviewPanel.onDidDispose(() => {
+        if (AntiDrawEditorProvider._activeDocument === document) {
+          AntiDrawEditorProvider._activeDocument = null;
+        }
+      });
+    }
 
     webviewPanel.webview.options = {
       enableScripts: true,

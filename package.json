@@ -2,7 +2,7 @@
   "name": "antidraw",
   "displayName": "%antidraw.displayName%",
   "description": "%antidraw.description%",
-  "version": "0.103.33",
+  "version": "0.103.34",
   "icon": "icon.png",
   "publisher": "martinvarela206",
   "author": {
@@ -97,6 +97,10 @@
       {
         "command": "antidraw.openEditor",
         "title": "%antidraw.command.openEditor%"
+      },
+      {
+        "command": "antidraw.purgeMetadata",
+        "title": "%antidraw.command.purgeMetadata%"
       }
     ]
   },
@@ -111,7 +115,7 @@
     "version:bump": "node scripts/sync-version.js",
     "package": "pnpm run build && vsce package --no-dependencies",
     "publish:marketplace": "vsce publish --no-dependencies",
-    "publish:openvsx": "npx -y ovsx publish antidraw-0.103.33.vsix"
+    "publish:openvsx": "npx -y ovsx publish antidraw-0.103.34.vsix"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

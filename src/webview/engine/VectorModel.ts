@@ -109,6 +109,7 @@ export interface GradientConfig {
 }
 
 import { SvgSerializer, STANDARD_MARKERS_INNER_XML, escapeXml } from './serialization/SvgSerializer.js';
+import { SvgMetadataCleaner, SvgMetadataCleanerOptions, SvgCleanResult } from './serialization/SvgMetadataCleaner.js';
 import { PathGeometryCompiler, formatNum } from './geometry/PathGeometryCompiler.js';
 import { RectPrimitive } from './primitives/RectPrimitive.js';
 import { EllipsePrimitive } from './primitives/EllipsePrimitive.js';
@@ -127,6 +128,9 @@ export {
   GlobalSwatch,
   GlobalSwatchManager,
   SpatialIndex,
+  SvgMetadataCleaner,
+  SvgMetadataCleanerOptions,
+  SvgCleanResult,
 };
 
 export class VectorModel {
@@ -537,5 +541,14 @@ export class VectorModel {
    */
   public convertPathToPrimitive(el: VectorElement): ParametricShapeType | null {
     return PrimitiveDetector.convertPathToPrimitive(el, this);
+  }
+
+  /**
+   * Explicit On-Demand Metadata Purge.
+   * Strips third-party namespaces, editor tags (Inkscape, Figma, etc.), XML comments,
+   * unreferenced defs, and internal data-* attributes under explicit user demand.
+   */
+  public purgeMetadata(options?: SvgMetadataCleanerOptions): SvgCleanResult {
+    return SvgMetadataCleaner.cleanModel(this, options);
   }
 }
