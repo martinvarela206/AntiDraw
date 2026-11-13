@@ -33,6 +33,57 @@ export interface BoundingBox {
  *    precision directly on grid intersections, guidelines, and other vector vertices.
  */
 export class BoundingBoxCalculator {
+  private static cache = new WeakMap<VectorElement, { box: BoundingBox; sig: string }>();
+  private static cacheHits = 0;
+  private static cacheMisses = 0;
+
+  public static get stats(): { hits: number; misses: number } {
+    return { hits: this.cacheHits, misses: this.cacheMisses };
+  }
+
+  public static resetStats(): void {
+    this.cacheHits = 0;
+    this.cacheMisses = 0;
+  }
+
+  public static invalidate(element: VectorElement): void {
+    this.cache.delete(element);
+  }
+
+  public static invalidateAll(): void {
+    this.cache = new WeakMap();
+  }
+
+  private static computeElementSignature(element: VectorElement): string {
+    if (element.tagName === 'g') {
+      return `g_${element.children?.length ?? 0}`;
+    }
+    if (element.tagName === 'image') {
+      return `img_${element.attributes.x}_${element.attributes.y}_${element.attributes.width}_${element.attributes.height}`;
+    }
+    const verts = element.vertices;
+    if (!verts || verts.length === 0) {
+      return `empty_${element.attributes.d || ''}`;
+    }
+    const len = verts.length;
+    let sumX = 0;
+    let sumY = 0;
+    for (let i = 0; i < len; i++) {
+      const v = verts[i];
+      sumX += v.x;
+      sumY += v.y;
+      if (v.handleIn) {
+        sumX += v.handleIn.x;
+        sumY += v.handleIn.y;
+      }
+      if (v.handleOut) {
+        sumX += v.handleOut.x;
+        sumY += v.handleOut.y;
+      }
+    }
+    return `v_${len}_${sumX.toFixed(2)},${sumY.toFixed(2)}_${element.attributes.d || ''}_${element.isClosed}`;
+  }
+
   /**
    * Evaluates a 1D cubic Bézier coordinate at parameter t in [0, 1].
    */
@@ -157,32 +208,54 @@ export class BoundingBoxCalculator {
   }
 
   /**
-   * Computes the axis-aligned bounding box bounding an element (including Bézier curve extrema).
+   * Computes the axis-aligned bounding box bounding an element (including Bézier curve extrema)
+   * with L0 analytical caching to avoid forced browser layout reflows (getBBox / getBoundingClientRect).
    */
   public static getBoundingBox(element: VectorElement): BoundingBox | null {
+    if (!element) return null;
+
+    const sig = this.computeElementSignature(element);
+    const cached = this.cache.get(element);
+    if (cached && cached.sig === sig) {
+      this.cacheHits++;
+      return { ...cached.box };
+    }
+
+    this.cacheMisses++;
+    let computedBox: BoundingBox | null = null;
+
     if (element.tagName === 'g' && element.children && element.children.length > 0) {
-      return this.getGroupBoundingBox(element.children);
-    }
-    if (element.tagName === 'image') {
+      computedBox = this.getGroupBoundingBox(element.children);
+    } else if (element.tagName === 'image') {
       if (element.vertices && element.vertices.length > 0) {
-        return this.getPathBoundingBox(element.vertices as PathVertex[], false);
+        computedBox = this.getPathBoundingBox(element.vertices as PathVertex[], false);
+      } else {
+        const x = parseFloat(element.attributes.x || '0');
+        const y = parseFloat(element.attributes.y || '0');
+        const w = Math.max(1, parseFloat(element.attributes.width || '100'));
+        const h = Math.max(1, parseFloat(element.attributes.height || '100'));
+        computedBox = {
+          x,
+          y,
+          width: w,
+          height: h,
+          cx: x + w / 2,
+          cy: y + h / 2,
+        };
       }
-      const x = parseFloat(element.attributes.x || '0');
-      const y = parseFloat(element.attributes.y || '0');
-      const w = Math.max(1, parseFloat(element.attributes.width || '100'));
-      const h = Math.max(1, parseFloat(element.attributes.height || '100'));
-      return {
-        x,
-        y,
-        width: w,
-        height: h,
-        cx: x + w / 2,
-        cy: y + h / 2,
-      };
+    } else if (!element.vertices || element.vertices.length === 0) {
+      return null;
+    } else {
+      const isClosed = element.isClosed !== false;
+      computedBox = this.getPathBoundingBox(element.vertices as PathVertex[], isClosed);
     }
-    if (!element.vertices || element.vertices.length === 0) return null;
-    const isClosed = element.isClosed !== false;
-    return this.getPathBoundingBox(element.vertices as PathVertex[], isClosed);
+
+    if (computedBox) {
+      this.cache.set(element, { box: computedBox, sig });
+      return { ...computedBox };
+    }
+
+    return null;
   }
 
   /**

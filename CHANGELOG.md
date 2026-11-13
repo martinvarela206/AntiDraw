@@ -3,6 +3,18 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.27] - 2026-11-12
+
+### ⚡ Analytical Layer L0 Bounding Box Cache
+- **Analytical Geometric Caching & Forced Layout Thrashing Elimination (`BoundingBoxCalculator`)**:
+  - **WeakMap Analytical Cache**: Implemented element-level bounding box caching via `WeakMap` with geometric vertex signature hashing, completely eradicating redundant polynomial extrema evaluations and vertex scans on static elements.
+  - **Zero-DOM & Zero-Reflow Guarantee**: Maintained strict Layer L0 analytical boundary computations, eliminating synchronous browser layout readings (`getBBox` / `getBoundingClientRect`) and preventing layout thrashing during mouse movements, hover tests, and selection transformations.
+  - **Dynamic Invalidation & Cache Stats**: Added fine-grained signature detection that invalidates stale bounding boxes when vertices, control handles, or tags mutate, alongside explicit eviction APIs (`invalidate`, `invalidateAll`) and telemetry counters (`hits`, `misses`).
+  - **Group Bounds Reuse**: Accelerated `getGroupBoundingBox` by leveraging O(1) cache hits across constituent elements, dramatically speeding up multi-element selection bounding envelopes.
+  - **Automated Test Coverage**: Added test suite `test-analytical-bbox-cache.ts` (Suite 70) verifying 5 assertions covering initial miss/compute, subsequent cache hit, mutation invalidation, explicit eviction, and group cache reuse.
+
+---
+
 ## [0.103.26] - 2026-11-12
 
 ### 📐 Robust Bézier Projection & High-Order Convergence
