@@ -24,18 +24,121 @@ export interface CubicBezier {
   p1: Point;
   p2: Point;
   p3: Point;
+  isCornerStart?: boolean;
+  isCornerEnd?: boolean;
+}
+
+export interface SchneiderFitOptions {
+  errorTolerance?: number;
+  zoom?: number;
+  scale?: number;
+  cornerAngle?: number; // Corner detection threshold in degrees (default 60 deg)
+  detectCorners?: boolean; // Enable sharp corner segmentation (default true)
 }
 
 export class SchneiderFit {
   /**
-   * Fits a series of cubic Bézier curves to a sequence of digitized 2D points.
+   * Resolves effective fitting error tolerance adaptively based on document scale and zoom level.
+   */
+  public static resolveAdaptiveTolerance(
+    baseTolerance: number = 2.0,
+    zoom: number = 1.0,
+    scale: number = 1.0
+  ): number {
+    const z = Math.max(0.01, zoom);
+    const s = Math.max(0.01, scale);
+    return Math.max(0.05, baseTolerance / (z * s));
+  }
+
+  /**
+   * Detects indices of sharp directional corners along a digitized point chain.
+   */
+  public static detectCornerIndices(
+    points: Point[],
+    angleThresholdDeg: number = 60
+  ): number[] {
+    if (!points || points.length < 3) return [];
+
+    const cornerIndices: number[] = [];
+    const minLengthSq = 1e-6;
+
+    for (let i = 1; i < points.length - 1; i++) {
+      const pPrev = points[i - 1];
+      const pCurr = points[i];
+      const pNext = points[i + 1];
+
+      const v1x = pCurr.x - pPrev.x;
+      const v1y = pCurr.y - pPrev.y;
+      const v2x = pNext.x - pCurr.x;
+      const v2y = pNext.y - pCurr.y;
+
+      const len1Sq = v1x * v1x + v1y * v1y;
+      const len2Sq = v2x * v2x + v2y * v2y;
+
+      if (len1Sq < minLengthSq || len2Sq < minLengthSq) continue;
+
+      const len1 = Math.sqrt(len1Sq);
+      const len2 = Math.sqrt(len2Sq);
+
+      const dotVal = (v1x * v2x + v1y * v2y) / (len1 * len2);
+      const clampedDot = Math.max(-1, Math.min(1, dotVal));
+      const angleDeg = (Math.acos(clampedDot) * 180) / Math.PI;
+
+      if (angleDeg >= angleThresholdDeg) {
+        // Suppress consecutive false-positive clusters by keeping local extremum
+        if (cornerIndices.length > 0 && cornerIndices[cornerIndices.length - 1] === i - 1) {
+          // Compare angle with previous corner
+          const prevIdx = cornerIndices[cornerIndices.length - 1];
+          const pP0 = points[prevIdx - 1];
+          const pP1 = points[prevIdx];
+          const pP2 = points[prevIdx + 1];
+          const dP1 = (pP1.x - pP0.x) * (pP2.x - pP1.x) + (pP1.y - pP0.y) * (pP2.y - pP1.y);
+          const lP = Math.hypot(pP1.x - pP0.x, pP1.y - pP0.y) * Math.hypot(pP2.x - pP1.x, pP2.y - pP1.y);
+          const prevAngle = lP > 0 ? (Math.acos(Math.max(-1, Math.min(1, dP1 / lP))) * 180) / Math.PI : 0;
+          if (angleDeg > prevAngle) {
+            cornerIndices[cornerIndices.length - 1] = i;
+          }
+        } else {
+          cornerIndices.push(i);
+        }
+      }
+    }
+
+    return cornerIndices;
+  }
+
+  /**
+   * Fits a series of cubic Bézier curves to a sequence of digitized 2D points,
+   * featuring analytical corner segmentation and adaptive zoom/scale tolerance.
    *
    * @param points Array of sequential digitized points
-   * @param errorTolerance Maximum allowed Euclidean pixel distance (e.g. 1.0 to 4.0)
+   * @param errorToleranceOrOptions Maximum allowed Euclidean distance or SchneiderFitOptions
    * @returns Array of fitted cubic Bézier segments
    */
-  public static fitCurve(points: Point[], errorTolerance: number = 2.0): CubicBezier[] {
-    if (points.length < 2) return [];
+  public static fitCurve(
+    points: Point[],
+    errorToleranceOrOptions: number | SchneiderFitOptions = 2.0
+  ): CubicBezier[] {
+    if (!points || points.length < 2) return [];
+
+    let baseError = 2.0;
+    let zoom = 1.0;
+    let scale = 1.0;
+    let detectCorners = true;
+    let cornerAngle = 60;
+
+    if (typeof errorToleranceOrOptions === 'number') {
+      baseError = errorToleranceOrOptions;
+    } else if (errorToleranceOrOptions) {
+      baseError = errorToleranceOrOptions.errorTolerance ?? 2.0;
+      zoom = errorToleranceOrOptions.zoom ?? 1.0;
+      scale = errorToleranceOrOptions.scale ?? 1.0;
+      detectCorners = errorToleranceOrOptions.detectCorners ?? true;
+      cornerAngle = errorToleranceOrOptions.cornerAngle ?? 60;
+    }
+
+    const effectiveTolerance = this.resolveAdaptiveTolerance(baseError, zoom, scale);
+
     if (points.length === 2) {
       return [
         {
@@ -53,22 +156,61 @@ export class SchneiderFit {
       ];
     }
 
-    const tHat1 = this.computeLeftTangent(points, 0);
-    const tHat2 = this.computeRightTangent(points, points.length - 1);
-    const result: CubicBezier[] = [];
-    this.fitCubic(points, 0, points.length - 1, tHat1, tHat2, errorTolerance, result);
-    return result;
+    // Analytical corner detection & segmentation
+    const corners = detectCorners ? this.detectCornerIndices(points, cornerAngle) : [];
+
+    if (corners.length === 0) {
+      const tHat1 = this.computeLeftTangent(points, 0);
+      const tHat2 = this.computeRightTangent(points, points.length - 1);
+      const result: CubicBezier[] = [];
+      this.fitCubic(points, 0, points.length - 1, tHat1, tHat2, effectiveTolerance, result);
+      return result;
+    }
+
+    // Segment point chain across detected corners
+    const partitions: { first: number; last: number }[] = [];
+    let startIdx = 0;
+    for (const cIdx of corners) {
+      if (cIdx > startIdx) {
+        partitions.push({ first: startIdx, last: cIdx });
+        startIdx = cIdx;
+      }
+    }
+    if (startIdx < points.length - 1) {
+      partitions.push({ first: startIdx, last: points.length - 1 });
+    }
+
+    const allCurves: CubicBezier[] = [];
+    for (let p = 0; p < partitions.length; p++) {
+      const { first, last } = partitions[p];
+      if (last - first < 1) continue;
+
+      const subPoints = points.slice(first, last + 1);
+      const tHat1 = this.computeLeftTangent(subPoints, 0);
+      const tHat2 = this.computeRightTangent(subPoints, subPoints.length - 1);
+      const segmentCurves: CubicBezier[] = [];
+      this.fitCubic(subPoints, 0, subPoints.length - 1, tHat1, tHat2, effectiveTolerance, segmentCurves);
+
+      if (segmentCurves.length > 0) {
+        if (p > 0) segmentCurves[0].isCornerStart = true;
+        if (p < partitions.length - 1) segmentCurves[segmentCurves.length - 1].isCornerEnd = true;
+        allCurves.push(...segmentCurves);
+      }
+    }
+
+    return allCurves;
   }
 
   /**
-   * Fits digitized points and compiles them into a sequence of PathVertex nodes.
+   * Fits digitized points and compiles them into a sequence of PathVertex nodes
+   * with accurate corner node typing.
    */
   public static fitPointsToVertices(
     points: Point[],
-    errorTolerance: number = 2.0,
+    errorToleranceOrOptions: number | SchneiderFitOptions = 2.0,
     isClosed: boolean = false
   ): PathVertex[] {
-    const curves = this.fitCurve(points, errorTolerance);
+    const curves = this.fitCurve(points, errorToleranceOrOptions);
     if (curves.length === 0) return [];
 
     const vertices: PathVertex[] = [];
@@ -79,7 +221,7 @@ export class SchneiderFit {
       x: curves[0].p0.x,
       y: curves[0].p0.y,
       handleOut: { x: curves[0].p1.x, y: curves[0].p1.y },
-      nodeType: 'smooth',
+      nodeType: curves[0].isCornerStart ? 'sharp' : 'smooth',
       command: 'M',
     });
 
@@ -87,6 +229,7 @@ export class SchneiderFit {
       const c = curves[i];
       const isLast = i === curves.length - 1;
       const nextCurve = !isLast ? curves[i + 1] : null;
+      const isSharp = c.isCornerEnd || (nextCurve && nextCurve.isCornerStart);
 
       vertices.push({
         id: `v_fit_${Date.now()}_${i + 1}`,
@@ -94,7 +237,7 @@ export class SchneiderFit {
         y: c.p3.y,
         handleIn: { x: c.p2.x, y: c.p2.y },
         handleOut: nextCurve ? { x: nextCurve.p1.x, y: nextCurve.p1.y } : undefined,
-        nodeType: 'smooth',
+        nodeType: isSharp ? 'sharp' : 'smooth',
         command: isLast && isClosed ? 'Z' : 'C',
       });
     }

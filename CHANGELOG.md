@@ -3,6 +3,17 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.30] - 2026-11-12
+
+### 📐 Analytical Schneider Curve Segmentation & Corner Detection
+- **Adaptive Curve Segmentation & Corner Preservation (`SchneiderFit.ts`)**:
+  - **Analytical Corner Detection**: Added `detectCornerIndices()` analyzing consecutive unit tangent direction vectors and angular changes ($\ge 60^\circ$) alongside local curvature extrema clustering, robustly pinpointing sharp $G^0$ cusps in digitized point streams.
+  - **Partitioned Multi-Span Curve Fitting**: Upgraded `fitCurveWithCorners()` to partition input point chains across detected corner points, executing independent Schneider cubic fits per segment with unconstrained, decoupled tangents at corner boundaries to eliminate artificial corner rounding and over-smoothing.
+  - **Scale-Adaptive Fit Tolerance**: Introduced `resolveAdaptiveTolerance(baseTolerance, zoom, scale)` dynamically scaling error thresholds ($\text{baseTolerance} / (\text{zoom} \times \text{scale})$) down to sub-pixel accuracy (0.5px) during high-zoom editing and relaxing tolerance during zoomed-out drawing.
+  - **Automated Test Coverage**: Added test suite `test-schneider-corner-segmentation.ts` (Suite 73) verifying 5 assertions covering angular corner detection on sharp bends, noise suppression on smooth curves, corner preservation vs. traditional single-span fits, and zoom-dependent adaptive tolerance scaling.
+
+---
+
 ## [0.103.29] - 2026-11-12
 
 ### ⚡ Quantitative Performance Budgets & Automated Verification
