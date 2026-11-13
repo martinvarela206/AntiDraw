@@ -45,6 +45,8 @@ export interface LoadSvgPayload {
   documentUri?: string;
   documentDirUri?: string;
   documentDirWebviewUri?: string;
+  revision?: number;
+  requestId?: string;
 }
 
 export interface SaveLinkedImageResponse {
@@ -80,6 +82,7 @@ export class VsCodeBridge {
   private static instance: VsCodeBridge | null = null;
   private vscodeApi: ReturnType<typeof acquireVsCodeApi>;
   private isUpdatingFromWebview: boolean = false;
+  private currentRevision: number = 0;
   private loadSvgCallbacks: Array<(payload: LoadSvgPayload) => void> = [];
   private imageFileSelectedCallbacks: Array<(payload: ImageFileSelectedPayload) => void> = [];
   private pendingImageSaveResolvers: Map<string, (res: SaveLinkedImageResponse) => void> = new Map();
@@ -103,6 +106,10 @@ export class VsCodeBridge {
     return this.currentFileName;
   }
 
+  public getRevision(): number {
+    return this.currentRevision;
+  }
+
   private initMessageListener(): void {
     window.addEventListener('message', (event: MessageEvent) => {
       const validation = IpcValidator.validateHostToWebview(event.data);
@@ -113,6 +120,9 @@ export class VsCodeBridge {
       const msg = validation.message;
 
       if (msg.type === 'loadSvg') {
+        if (msg.revision !== undefined) {
+          this.currentRevision = Math.max(this.currentRevision, msg.revision);
+        }
         if (msg.fileName) {
           this.currentFileName = msg.fileName;
         }
@@ -127,6 +137,8 @@ export class VsCodeBridge {
           documentUri: msg.documentUri,
           documentDirUri: msg.documentDirUri,
           documentDirWebviewUri: msg.documentDirWebviewUri,
+          revision: msg.revision,
+          requestId: msg.requestId,
         };
 
         if (this.isUpdatingFromWebview) {
@@ -245,7 +257,10 @@ export class VsCodeBridge {
   }
 
   public notifyReady(): void {
-    this.vscodeApi.postMessage({ type: 'ready' });
+    this.vscodeApi.postMessage({
+      type: 'ready',
+      requestId: `ready_${Date.now()}`,
+    });
   }
 
   public updateDocument(svgText: string): boolean {
@@ -257,15 +272,24 @@ export class VsCodeBridge {
       return false;
     }
 
+    this.currentRevision++;
     this.isUpdatingFromWebview = true;
-    this.vscodeApi.postMessage({ type: 'updateDocument', text: svgText });
+    this.vscodeApi.postMessage({
+      type: 'updateDocument',
+      text: svgText,
+      revision: this.currentRevision,
+      requestId: `doc_${Date.now()}_${this.currentRevision}`,
+    });
     return true;
   }
 
   public updateMetadata(metadata: CompanionMetadata): void {
+    this.currentRevision++;
     this.vscodeApi.postMessage({
       type: 'updateMetadata',
       metadata,
+      revision: this.currentRevision,
+      requestId: `meta_${Date.now()}_${this.currentRevision}`,
     });
   }
 

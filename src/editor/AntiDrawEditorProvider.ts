@@ -218,7 +218,16 @@ export class AntiDrawEditorProvider implements vscode.CustomEditorProvider<AntiD
 
     webviewPanel.webview.html = this.getHtmlForWebview(webviewPanel.webview, document.docDir);
 
+    let isWebviewReady = false;
+    let pendingUpdate: (() => void) | null = null;
+    let currentDocumentRevision = 1;
+    const processedRequestIds = new Set<string>();
+
     const updateWebview = () => {
+      if (!isWebviewReady) {
+        pendingUpdate = updateWebview;
+        return;
+      }
       const docDirWebviewUri = webviewPanel.webview.asWebviewUri(document.docDir).toString().replace(/\/+$/, '');
       const volatile = SessionStateStorage.getSessionState(this.context.workspaceState, document.uri);
       const mergedMeta = SessionStateStorage.mergeMetadata(document.container.companionMetadata, volatile);
@@ -232,6 +241,7 @@ export class AntiDrawEditorProvider implements vscode.CustomEditorProvider<AntiD
         documentDirUri: document.docDir.toString(),
         documentDirWebviewUri: docDirWebviewUri,
         fileName: document.baseFileName,
+        revision: currentDocumentRevision,
       });
     };
 
@@ -243,13 +253,41 @@ export class AntiDrawEditorProvider implements vscode.CustomEditorProvider<AntiD
         return;
       }
       const message = validation.message;
+
+      if (message.requestId) {
+        if (processedRequestIds.has(message.requestId)) {
+          return;
+        }
+        processedRequestIds.add(message.requestId);
+        if (processedRequestIds.size > 200) {
+          const first = processedRequestIds.values().next().value;
+          if (first) processedRequestIds.delete(first);
+        }
+      }
+
       switch (message.type) {
         case 'ready':
+          isWebviewReady = true;
           updateWebview();
+          if (pendingUpdate) {
+            pendingUpdate = null;
+          }
           break;
 
         case 'updateDocument': {
           if (message.text !== undefined) {
+            if (message.revision !== undefined && message.revision < currentDocumentRevision) {
+              console.warn(
+                `[AntiDraw:HostIPC] Stale updateDocument rejected: revision ${message.revision} < current ${currentDocumentRevision}`
+              );
+              break;
+            }
+            if (message.revision !== undefined) {
+              currentDocumentRevision = message.revision;
+            } else {
+              currentDocumentRevision++;
+            }
+
             const validation = HostSaveValidator.validateSvgIntegrity(message.text, document.container.svgContent);
             if (!validation.isValid) {
               vscode.window.showErrorMessage(`[AntiDraw] SafeSave: ${validation.error}`);
@@ -266,6 +304,18 @@ export class AntiDrawEditorProvider implements vscode.CustomEditorProvider<AntiD
 
         case 'updateMetadata': {
           if (message.metadata !== undefined) {
+            if (message.revision !== undefined && message.revision < currentDocumentRevision) {
+              console.warn(
+                `[AntiDraw:HostIPC] Stale updateMetadata rejected: revision ${message.revision} < current ${currentDocumentRevision}`
+              );
+              break;
+            }
+            if (message.revision !== undefined) {
+              currentDocumentRevision = message.revision;
+            } else {
+              currentDocumentRevision++;
+            }
+
             const { persistent, volatile, hasVolatile } = SessionStateStorage.splitMetadata(message.metadata);
             if (hasVolatile) {
               await SessionStateStorage.saveSessionState(this.context.workspaceState, document.uri, volatile);

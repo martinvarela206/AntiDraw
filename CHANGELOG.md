@@ -3,6 +3,17 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.22] - 2026-11-12
+
+### 🔌 IPC Handshake, Monotonic Revision & Deduplication
+- **Formal Ready Handshake & Monotonic Revision Sequencing (`IpcContracts`, `VsCodeBridge`, & `AntiDrawEditorProvider`)**:
+  - **Formal Handshake Gating**: Configured `AntiDrawEditorProvider` to queue initial document broadcasts until receiving a verified `ready` handshake from the webview, eliminating race conditions on mount.
+  - **Monotonic Revision Counter**: Added `revision: number` to `updateDocument`, `updateMetadata`, and `loadSvg`. The host process rejects stale or out-of-order updates (`revision < currentDocumentRevision`), preventing race-condition overwrites.
+  - **Request Correlation & Deduplication**: Added `requestId: string` to all protocol messages. The host deduplicates identical request IDs within a rolling cache, preventing duplicated operations from re-broadcasts or event loops.
+  - **Automated Test Coverage**: Added test suite `test-ipc-handshake-revision.ts` (Suite 65) verifying 5 assertions covering message schemas, handshake gating, monotonic revision incrementing, stale update rejection, and host deduplication.
+
+---
+
 ## [0.103.21] - 2026-11-12
 
 ### ⌨️ Keymap & International Ergonomics

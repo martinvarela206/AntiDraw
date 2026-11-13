@@ -149,16 +149,22 @@ export interface CompanionMetadata {
 
 export interface ReadyMessage {
   type: 'ready';
+  requestId?: string;
+  clientVersion?: string;
 }
 
 export interface UpdateDocumentMessage {
   type: 'updateDocument';
   text: string;
+  revision?: number;
+  requestId?: string;
 }
 
 export interface UpdateMetadataMessage {
   type: 'updateMetadata';
   metadata: CompanionMetadata;
+  revision?: number;
+  requestId?: string;
 }
 
 export interface ExportFileMessage {
@@ -166,6 +172,7 @@ export interface ExportFileMessage {
   filename?: string;
   content: string;
   format: string;
+  requestId?: string;
 }
 
 export interface SaveLinkedImageMessage {
@@ -190,16 +197,19 @@ export interface ReadImageUriMessage {
 export interface ShowInfoMessage {
   type: 'showInfo';
   message: string;
+  requestId?: string;
 }
 
 export interface ShowErrorMessage {
   type: 'showError';
   message: string;
+  requestId?: string;
 }
 
 export interface OpenExternalMessage {
   type: 'openExternal';
   url: string;
+  requestId?: string;
 }
 
 export type WebviewToHostMessage =
@@ -227,6 +237,8 @@ export interface LoadSvgMessage {
   documentUri?: string;
   documentDirUri?: string;
   documentDirWebviewUri?: string;
+  revision?: number;
+  requestId?: string;
 }
 
 export interface SaveLinkedImageResponseMessage {
@@ -292,13 +304,28 @@ export class IpcValidator {
 
     switch (type) {
       case 'ready':
-        return { isValid: true, message: { type: 'ready' } };
+        return {
+          isValid: true,
+          message: {
+            type: 'ready',
+            requestId: typeof msg.requestId === 'string' ? msg.requestId : undefined,
+            clientVersion: typeof msg.clientVersion === 'string' ? msg.clientVersion : undefined,
+          },
+        };
 
       case 'updateDocument': {
         if (typeof msg.text !== 'string') {
           return { isValid: false, error: 'updateDocument requires string field "text"' };
         }
-        return { isValid: true, message: { type: 'updateDocument', text: msg.text } };
+        return {
+          isValid: true,
+          message: {
+            type: 'updateDocument',
+            text: msg.text,
+            revision: typeof msg.revision === 'number' ? msg.revision : undefined,
+            requestId: typeof msg.requestId === 'string' ? msg.requestId : undefined,
+          },
+        };
       }
 
       case 'updateMetadata': {
@@ -307,7 +334,12 @@ export class IpcValidator {
         }
         return {
           isValid: true,
-          message: { type: 'updateMetadata', metadata: msg.metadata as CompanionMetadata },
+          message: {
+            type: 'updateMetadata',
+            metadata: msg.metadata as CompanionMetadata,
+            revision: typeof msg.revision === 'number' ? msg.revision : undefined,
+            requestId: typeof msg.requestId === 'string' ? msg.requestId : undefined,
+          },
         };
       }
 
@@ -427,6 +459,8 @@ export class IpcValidator {
             documentUri: typeof msg.documentUri === 'string' ? msg.documentUri : undefined,
             documentDirUri: typeof msg.documentDirUri === 'string' ? msg.documentDirUri : undefined,
             documentDirWebviewUri: typeof msg.documentDirWebviewUri === 'string' ? msg.documentDirWebviewUri : undefined,
+            revision: typeof msg.revision === 'number' ? msg.revision : undefined,
+            requestId: typeof msg.requestId === 'string' ? msg.requestId : undefined,
           },
         };
       }
