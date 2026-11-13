@@ -1,6 +1,6 @@
 import { VectorModel } from '../VectorModel.js';
 import { VectorScene } from '../../core/model/VectorScene.js';
-import { ImageIngestionService } from '../../services/ImageIngestionService.js';
+import { AssetUriResolver } from './AssetUriResolver.js';
 
 export interface RenderStats {
   fullRenders: number;
@@ -109,7 +109,7 @@ export class SvgDomRenderer {
       const domEl = document.createElementNS(SvgDomRenderer.SVG_NS, el.tagName);
       for (const [key, value] of Object.entries(el.attributes)) {
         if (el.tagName === 'image' && (key === 'href' || key === 'xlink:href')) {
-          const resolved = ImageIngestionService.resolveLiveAssetUri(value);
+          const resolved = AssetUriResolver.resolveLiveAssetUri(value);
           domEl.setAttribute(key, resolved);
           domEl.setAttributeNS('http://www.w3.org/1999/xlink', 'href', resolved);
         } else {
@@ -169,7 +169,7 @@ export class SvgDomRenderer {
           for (const [attrKey, attrVal] of Object.entries(el.attributes)) {
             if (existing.getAttribute(attrKey) !== attrVal) {
               if (el.tagName === 'image' && (attrKey === 'href' || attrKey === 'xlink:href')) {
-                const resolved = ImageIngestionService.resolveLiveAssetUri(attrVal);
+                const resolved = AssetUriResolver.resolveLiveAssetUri(attrVal);
                 existing.setAttribute(attrKey, resolved);
                 existing.setAttributeNS('http://www.w3.org/1999/xlink', 'href', resolved);
               } else {
@@ -187,7 +187,7 @@ export class SvgDomRenderer {
         const newDom = document.createElementNS(SvgDomRenderer.SVG_NS, el.tagName);
         for (const [attrKey, attrVal] of Object.entries(el.attributes)) {
           if (el.tagName === 'image' && (attrKey === 'href' || attrKey === 'xlink:href')) {
-            const resolved = ImageIngestionService.resolveLiveAssetUri(attrVal);
+            const resolved = AssetUriResolver.resolveLiveAssetUri(attrVal);
             newDom.setAttribute(attrKey, resolved);
             newDom.setAttributeNS('http://www.w3.org/1999/xlink', 'href', resolved);
           } else {
@@ -234,7 +234,7 @@ export class SvgDomRenderer {
       const domEl = document.createElementNS(SvgDomRenderer.SVG_NS, el.tagName);
       for (const [key, value] of Object.entries(el.attributes)) {
         if (el.tagName === 'image' && (key === 'href' || key === 'xlink:href')) {
-          const resolved = ImageIngestionService.resolveLiveAssetUri(value);
+          const resolved = AssetUriResolver.resolveLiveAssetUri(value);
           domEl.setAttribute(key, resolved);
           domEl.setAttributeNS('http://www.w3.org/1999/xlink', 'href', resolved);
         } else {
@@ -246,7 +246,7 @@ export class SvgDomRenderer {
           const childDom = document.createElementNS(SvgDomRenderer.SVG_NS, child.tagName);
           for (const [ck, cv] of Object.entries(child.attributes)) {
             if (child.tagName === 'image' && (ck === 'href' || ck === 'xlink:href')) {
-              const resolved = ImageIngestionService.resolveLiveAssetUri(cv);
+              const resolved = AssetUriResolver.resolveLiveAssetUri(cv);
               childDom.setAttribute(ck, resolved);
               childDom.setAttributeNS('http://www.w3.org/1999/xlink', 'href', resolved);
             } else {

@@ -22,6 +22,7 @@ import { ImageProcessorService } from './ImageProcessorService.js';
 import { ImageOptimizationModal } from '../ui/ImageOptimizationModal.js';
 import { PrimitiveDetector } from '../engine/primitives/PrimitiveDetector.js';
 import { ImageStorageChoiceModal } from '../ui/ImageStorageChoiceModal.js';
+import { AssetUriResolver } from '../engine/canvas/AssetUriResolver.js';
 
 export interface ImageIngestionContext {
   model: VectorModel;
@@ -34,7 +35,6 @@ export interface ImageIngestionContext {
 
 export class ImageIngestionService {
   private static instance: ImageIngestionService | null = null;
-  private static liveAssetCache: Map<string, string> = new Map();
   private ctx!: ImageIngestionContext;
   private fileInputEl: HTMLInputElement | null = null;
 
@@ -52,34 +52,17 @@ export class ImageIngestionService {
   }
 
   public static cacheLiveAsset(key: string, resolvedUri: string): void {
-    if (!key || !resolvedUri) return;
-    this.liveAssetCache.set(key, resolvedUri);
-    const clean = key.replace(/^\.\//, '');
-    this.liveAssetCache.set(clean, resolvedUri);
-    const fileName = clean.split('/').pop();
-    if (fileName) {
-      this.liveAssetCache.set(fileName, resolvedUri);
-    }
+    AssetUriResolver.cacheLiveAsset(key, resolvedUri);
   }
 
   public static resolveLiveAssetUri(href: string): string {
-    if (!href) return '';
-    if (this.liveAssetCache.has(href)) {
-      return this.liveAssetCache.get(href)!;
-    }
-    const clean = href.replace(/^\.\//, '');
-    if (this.liveAssetCache.has(clean)) {
-      return this.liveAssetCache.get(clean)!;
-    }
-    const fileName = clean.split('/').pop();
-    if (fileName && this.liveAssetCache.has(fileName)) {
-      return this.liveAssetCache.get(fileName)!;
-    }
-    const docDirWebviewUri = VsCodeBridge.getInstance().getDocumentDirWebviewUri();
-    if (docDirWebviewUri && (href.startsWith('./') || !href.includes(':'))) {
-      return `${docDirWebviewUri}/${clean}`;
-    }
-    return href;
+    try {
+      if (typeof window !== 'undefined' && typeof (window as any).acquireVsCodeApi === 'function') {
+        const docDirWebviewUri = VsCodeBridge.getInstance().getDocumentDirWebviewUri();
+        AssetUriResolver.setBaseWebviewUri(docDirWebviewUri || null);
+      }
+    } catch (_) {}
+    return AssetUriResolver.resolveLiveAssetUri(href);
   }
 
   private setupEventListeners(): void {

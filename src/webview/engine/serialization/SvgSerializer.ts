@@ -68,7 +68,7 @@ export {
 import { SvgMarkerCatalog } from './SvgMarkerCatalog.js';
 export { SvgDeserializer } from './SvgDeserializer.js';
 import { SvgDeserializer } from './SvgDeserializer.js';
-import type { CompanionMetadata } from '../../bridge/VsCodeBridge.js';
+import type { CompanionMetadata } from '../../../shared/ipc/IpcContracts.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Dedicated SVG Serialization & Deserialization Service (SvgSerializer)

@@ -9,13 +9,13 @@ import { ClipboardService } from '../services/ClipboardService.js';
 import { HistoryService } from '../services/HistoryService.js';
 import { HostSyncService } from '../services/HostSyncService.js';
 import { CanvasActionDispatcher } from '../services/CanvasActionDispatcher.js';
-import { WorkspaceLayoutService } from '../engine/canvas/WorkspaceLayoutService.js';
+import { WorkspaceLayoutService } from '../services/WorkspaceLayoutService.js';
 import { CanvasInteractionController } from './CanvasInteractionController.js';
 import { KeyboardShortcutController } from './KeyboardShortcutController.js';
 import { ContextMenuController } from './ContextMenuController.js';
-import { CommandRegistry } from '../engine/commands/CommandRegistry.js';
-import { registerSystemCommands } from '../engine/commands/SystemCommands.js';
-import { ToolSuite } from '../tools/ToolFactory.js';
+import { CommandRegistry } from '../commands/CommandRegistry.js';
+import { registerSystemCommands } from '../commands/SystemCommands.js';
+import { ToolSuite } from '../services/ToolFactory.js';
 
 export interface CommandShortcutContext {
   model: VectorModel;

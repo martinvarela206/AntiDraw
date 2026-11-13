@@ -3,6 +3,25 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.43] - 2026-11-13
+
+### 🛡️ Automated Layer Boundary Audit & Strict L0-L4 Hierarchy Enforcement
+- **Automated Layer Linting with `dependency-cruiser` (`.dependency-cruiser.cjs`, `npm run lint:layers`)**:
+  - Integrated `dependency-cruiser` into development scripts and test pipelines, enforcing strict unidirectional layer hierarchy across the 5 core tiers of AntiDraw:
+    - **L0 (Core & Pure Geometry)**: Zero imports from higher layers (`engine`, `tools`, `ui`, `controllers`, `services`, `bridge`).
+    - **L1 (Domain Engine & Operations)**: Only imports from L0; prohibited from importing L2 (`tools`), L3 (`ui`, `controllers`, `services`), and L4 (`bridge`).
+    - **L2 (Tools & State Machines)**: Can import L0 and L1; prohibited from importing L3 and L4.
+    - **L3 (Presentation, UI, Commands & Services)**: Consumes L0-L2; prohibited from bypassing host bridges.
+    - **L4 (Orchestration, Bridge & Extension Host)**: Composition root and external VS Code environment.
+- **Architectural Refactoring & Decoupling**:
+  - **Asset URI Resolution Purity (`AssetUriResolver.ts`)**: Extracted in-memory asset URI resolution and local file caching into pure L1 module (`engine/canvas/AssetUriResolver.ts`), decoupling `SvgDomRenderer` from L3 UI and bridge dependencies.
+  - **Bridge Dependency Elimination in L1**: Rewired `VectorModel.ts`, `SvgDeserializer.ts`, `SvgSerializer.ts`, and `CssStyleResolver.ts` to consume `CompanionMetadata` directly from `shared/ipc/IpcContracts.ts` instead of `bridge/VsCodeBridge.ts`.
+  - **Tool Handler Interface Decoupling (`OverlayRenderer.ts`, `OverlayDescriptor.ts`)**: Replaced concrete `IToolHandler` and `ToolType` imports in `OverlayRenderer.ts` with polymorphic `IOverlayRenderable` interface.
+  - **Canonical Relocations (`SystemCommands.ts`, `WorkspaceLayoutService.ts`, `Session.ts`, `ToolFactory.ts`)**: Relocated system commands, layout orchestrator, interaction session, and tool wiring factory to their canonical L3 layers (`commands/` and `services/`), with retrocompatible re-exports.
+- **Automated Test Coverage**: Added test suite `test-layer-boundary-audit.ts` (Suite 86) with 11 assertions verifying `dependency-cruiser` configuration, 0 architectural violations across 302 modules (1,066 dependencies), L1 asset URI resolver purity, and canonical layer placement.
+
+---
+
 ## [0.103.42] - 2026-11-13
 
 ### 🧩 Architectural Layer Type Isolation & DOM-Free Core Models

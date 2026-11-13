@@ -5,7 +5,7 @@ import {
   VectorElement,
 } from '../VectorModel.js';
 import { IVectorModelSerializerContext } from './SvgSerializer.js';
-import type { CompanionMetadata } from '../../bridge/VsCodeBridge.js';
+import type { CompanionMetadata } from '../../../shared/ipc/IpcContracts.js';
 import { formatNum } from '../geometry/PathGeometryCompiler.js';
 import { RectPrimitive } from '../primitives/RectPrimitive.js';
 import { SvgSanitizer } from '../security/SvgSanitizer.js';

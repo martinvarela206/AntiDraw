@@ -87,3 +87,7 @@ export type OverlayDescriptor =
   | PathOverlayDescriptor
   | TextOverlayDescriptor
   | RawOverlayDescriptor;
+
+export interface IOverlayRenderable {
+  renderOverlay?(zoom: number): string | OverlayDescriptor[];
+}

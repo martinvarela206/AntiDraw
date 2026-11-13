@@ -23,7 +23,7 @@ import { EllipsePrimitive } from './primitives/EllipsePrimitive.js';
 import { PrimitiveDetector } from './primitives/PrimitiveDetector.js';
 import { GlobalSwatch, GlobalSwatchManager } from './color/GlobalSwatchManager.js';
 import { SpatialIndex } from './spatial/SpatialIndex.js';
-import type { CompanionMetadata } from '../bridge/VsCodeBridge.js';
+import type { CompanionMetadata } from '../../shared/ipc/IpcContracts.js';
 
 export {
   STANDARD_MARKERS_INNER_XML,

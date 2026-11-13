@@ -2,25 +2,23 @@ import { VectorModel, Point } from './VectorModel.js';
 import { SelectionTool } from './SelectionTool.js';
 import { CanvasManager } from './CanvasManager.js';
 import { NodeEditorTool } from './NodeEditorTool.js';
-import { IToolHandler } from '../tools/IToolHandler.js';
-import { ToolType } from '../tools/ToolType.js';
 import { MarkerHelper, GuideHelper, NodeHelper, GUIDE_ROTATE_LEFT_PATH, GUIDE_ROTATE_RIGHT_PATH } from './canvas/helpers/index.js';
 import { SnappingEngine } from './canvas/SnappingEngine.js';
-import { OverlayDescriptor } from './canvas/OverlayDescriptor.js';
+import { OverlayDescriptor, IOverlayRenderable } from './canvas/OverlayDescriptor.js';
 
 export interface OverlayRenderContext {
   model: VectorModel;
   canvasMgr: CanvasManager;
   selectionTool: SelectionTool;
   nodeEditorTool: NodeEditorTool;
-  activeTool: ToolType;
+  activeTool: string;
   dragOriginPt: Point | null;
   dragGuideOrientation?: 'horizontal' | 'vertical';
   dragGuideCurrentPt?: Point;
   isDraggingGuideCreate?: boolean;
   isDraggingOrigin?: boolean;
   hasGhostNodeVertices?: boolean;
-  tools: IToolHandler[];
+  tools: IOverlayRenderable[];
 }
 
 export { GUIDE_ROTATE_LEFT_PATH, GUIDE_ROTATE_RIGHT_PATH };

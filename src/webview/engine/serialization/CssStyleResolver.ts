@@ -1,4 +1,4 @@
-import type { CompanionMetadata } from '../../bridge/VsCodeBridge.js';
+import type { CompanionMetadata } from '../../../shared/ipc/IpcContracts.js';
 
 export interface CssRuleEntry {
   selector: string;

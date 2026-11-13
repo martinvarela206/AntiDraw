@@ -14,7 +14,7 @@ import { CommandRegistry } from '../commands/CommandRegistry.js';
 import { WarpEngine, WarpArcOptions } from '../engine/warp/WarpEngine.js';
 import { BoundingBoxCalculator } from '../engine/geometry/BoundingBoxCalculator.js';
 
-import { ToolSuite } from '../tools/ToolFactory.js';
+import { ToolSuite } from '../services/ToolFactory.js';
 import { CoreServices } from '../services/CoreServiceRegistry.js';
 import { HostSyncService } from '../services/HostSyncService.js';
 

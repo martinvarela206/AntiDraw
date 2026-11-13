@@ -4,7 +4,7 @@ import { NodeEditorTool } from './engine/NodeEditorTool.js';
 import { CanvasManager } from './engine/CanvasManager.js';
 import { ViewportController } from './engine/ViewportController.js';
 import { CanvasView } from './engine/canvas/CanvasView.js';
-import { ToolFactory, ToolSuite } from './tools/ToolFactory.js';
+import { ToolFactory, ToolSuite } from './services/ToolFactory.js';
 import { AppLayoutManager } from './ui/AppLayoutManager.js';
 import { ContextMenu } from './ui/ContextMenu.js';
 import { CoreServiceRegistry, CoreServices } from './services/CoreServiceRegistry.js';
