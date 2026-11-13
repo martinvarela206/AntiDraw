@@ -59,6 +59,7 @@ export interface CanvasSettings {
   svgStrokeWidth?: string;
   svgStrokeLinecap?: string;
   svgStrokeLinejoin?: string;
+  precision?: number;
 }
 
 export interface DropShadowConfig {
@@ -183,7 +184,7 @@ export class VectorModel {
   /**
    * Serializes the document to SVG, utilizing surgical in-place modification when requested.
    */
-  public serializeSvg(options?: { excludeContextual?: boolean; surgical?: boolean }): string {
+  public serializeSvg(options?: { excludeContextual?: boolean; surgical?: boolean; precision?: number }): string {
     return SvgSerializer.toSvgString(this, options);
   }
 
@@ -375,8 +376,8 @@ export class VectorModel {
    * Convert vertices back into SVG 'd' string with proper per-subpath closing and Bézier curves.
    * Delegated to PathGeometryCompiler.
    */
-  public compilePathD(vertices: PathVertex[], isClosed?: boolean): string {
-    return PathGeometryCompiler.compilePathD(vertices, isClosed);
+  public compilePathD(vertices: PathVertex[], isClosed?: boolean, precision: number = 3): string {
+    return PathGeometryCompiler.compilePathD(vertices, isClosed, precision);
   }
 
   /**

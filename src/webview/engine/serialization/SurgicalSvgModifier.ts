@@ -1,12 +1,14 @@
 import { IVectorModelSerializerContext } from './SvgSerializer.js';
 import { VectorElement } from '../VectorModel.js';
 import { IsomorphicXmlParserFactory } from './XmlParser.js';
+import { formatNum } from '../geometry/PathGeometryCompiler.js';
 
 export interface SurgicalPatchOptions {
   excludeContextual?: boolean;
   preserveComments?: boolean;
   preserveNamespaces?: boolean;
   surgical?: boolean;
+  precision?: number;
 }
 
 /**
@@ -37,15 +39,22 @@ export class SurgicalSvgModifier {
         return originalSvgText;
       }
 
+      const precision = options.precision ?? (ctx.canvas as any).precision ?? 3;
+
       // 1. Sync Root Canvas Attributes (only if mutated)
       if (ctx.canvas.width && !svgEl.hasAttribute('width')) {
-        svgEl.setAttribute('width', String(ctx.canvas.width));
+        svgEl.setAttribute('width', formatNum(ctx.canvas.width, precision));
       }
       if (ctx.canvas.height && !svgEl.hasAttribute('height')) {
-        svgEl.setAttribute('height', String(ctx.canvas.height));
+        svgEl.setAttribute('height', formatNum(ctx.canvas.height, precision));
       }
       if (ctx.canvas.viewBox && svgEl.getAttribute('viewBox') !== ctx.canvas.viewBox) {
-        svgEl.setAttribute('viewBox', ctx.canvas.viewBox);
+        const cleanVb = ctx.canvas.viewBox
+          .trim()
+          .split(/\s+/)
+          .map((n) => formatNum(parseFloat(n), precision))
+          .join(' ');
+        svgEl.setAttribute('viewBox', cleanVb);
       }
 
       // 2. Flatten model elements for fast ID lookup
@@ -93,7 +102,7 @@ export class SurgicalSvgModifier {
 
           // If path, update geometry from vertices if compiled
           if (el.vertices && el.vertices.length > 0 && (el.tagName === 'path' || el.shapeType === 'path')) {
-            const compiledD = ctx.compilePathD(el.vertices, el.isClosed);
+            const compiledD = ctx.compilePathD(el.vertices, el.isClosed, precision);
             if (compiledD) {
               domNode.setAttribute('d', compiledD);
             }
@@ -128,6 +137,12 @@ export class SurgicalSvgModifier {
             'points',
           ];
 
+          const NUMERIC_ATTRS = new Set([
+            'x', 'y', 'width', 'height', 'cx', 'cy', 'r', 'rx', 'ry',
+            'x1', 'y1', 'x2', 'y2', 'stroke-width', 'opacity', 'fill-opacity',
+            'stroke-opacity'
+          ]);
+
           for (const attrName of standardSvgAttrs) {
             let val = el.attributes[attrName];
 
@@ -143,6 +158,28 @@ export class SurgicalSvgModifier {
             }
 
             if (val !== undefined && val !== null) {
+              if (NUMERIC_ATTRS.has(attrName)) {
+                const num = parseFloat(val);
+                if (Number.isFinite(num) && !val.endsWith('%') && !val.endsWith('em') && !val.endsWith('pt')) {
+                  val = formatNum(num, precision);
+                }
+              } else if (attrName === 'points') {
+                val = val
+                  .trim()
+                  .split(/\s+/)
+                  .map((pt) =>
+                    pt
+                      .split(',')
+                      .map((c) => formatNum(parseFloat(c), precision))
+                      .join(',')
+                  )
+                  .join(' ');
+              } else if (attrName === 'transform') {
+                val = val.replace(
+                  /[-+]?(?:\d+\.\d+|\d+|\.\d+)(?:[eE][-+]?\d+)?/g,
+                  (numStr) => formatNum(parseFloat(numStr), precision)
+                );
+              }
               domNode.setAttribute(attrName, val);
             }
           }

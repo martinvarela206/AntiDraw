@@ -2,7 +2,7 @@
   "name": "antidraw",
   "displayName": "%antidraw.displayName%",
   "description": "%antidraw.description%",
-  "version": "0.103.34",
+  "version": "0.103.35",
   "icon": "icon.png",
   "publisher": "martinvarela206",
   "author": {
@@ -115,7 +115,7 @@
     "version:bump": "node scripts/sync-version.js",
     "package": "pnpm run build && vsce package --no-dependencies",
     "publish:marketplace": "vsce publish --no-dependencies",
-    "publish:openvsx": "npx -y ovsx publish antidraw-0.103.34.vsix"
+    "publish:openvsx": "npx -y ovsx publish antidraw-0.103.35.vsix"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

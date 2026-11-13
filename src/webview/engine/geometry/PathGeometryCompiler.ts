@@ -1,7 +1,10 @@
 import { NodeType, PathVertex, Point } from '../VectorModel.js';
 
-export function formatNum(n: number): string {
-  return (Math.round(n * 100) / 100).toString();
+export function formatNum(n: number, precision: number = 3): string {
+  if (!Number.isFinite(n)) return '0';
+  const factor = Math.pow(10, Math.max(0, Math.min(8, precision)));
+  const rounded = Math.round(n * factor) / factor;
+  return Object.is(rounded, -0) ? '0' : rounded.toString();
 }
 
 /**
@@ -465,7 +468,11 @@ export class PathGeometryCompiler {
   /**
    * Convert vertices back into SVG 'd' string with proper per-subpath closing and Bézier curves.
    */
-  public static compilePathD(vertices: PathVertex[], isClosed?: boolean): string {
+  public static compilePathD(
+    vertices: PathVertex[],
+    isClosed?: boolean,
+    precision: number = 3
+  ): string {
     if (!vertices || vertices.length === 0) return '';
 
     // Group vertices by subpath (each subpath begins with command 'M' or first vertex)
@@ -506,7 +513,7 @@ export class PathGeometryCompiler {
         }
       }
 
-      let spD = `M ${formatNum(effSp[0].x)} ${formatNum(effSp[0].y)}`;
+      let spD = `M ${formatNum(effSp[0].x, precision)} ${formatNum(effSp[0].y, precision)}`;
 
       for (let i = 1; i < effSp.length; i++) {
         const v = effSp[i];
@@ -514,9 +521,9 @@ export class PathGeometryCompiler {
         if (prev.handleOut || v.handleIn) {
           const h1 = prev.handleOut || { x: prev.x, y: prev.y };
           const h2 = v.handleIn || { x: v.x, y: v.y };
-          spD += ` C ${formatNum(h1.x)} ${formatNum(h1.y)} ${formatNum(h2.x)} ${formatNum(h2.y)} ${formatNum(v.x)} ${formatNum(v.y)}`;
+          spD += ` C ${formatNum(h1.x, precision)} ${formatNum(h1.y, precision)} ${formatNum(h2.x, precision)} ${formatNum(h2.y, precision)} ${formatNum(v.x, precision)} ${formatNum(v.y, precision)}`;
         } else {
-          spD += ` L ${formatNum(v.x)} ${formatNum(v.y)}`;
+          spD += ` L ${formatNum(v.x, precision)} ${formatNum(v.y, precision)}`;
         }
       }
 
@@ -528,7 +535,7 @@ export class PathGeometryCompiler {
         if (h1 || h2) {
           const h1Pt = h1 || { x: last.x, y: last.y };
           const h2Pt = h2 || { x: first.x, y: first.y };
-          spD += ` C ${formatNum(h1Pt.x)} ${formatNum(h1Pt.y)} ${formatNum(h2Pt.x)} ${formatNum(h2Pt.y)} ${formatNum(first.x)} ${formatNum(first.y)} Z`;
+          spD += ` C ${formatNum(h1Pt.x, precision)} ${formatNum(h1Pt.y, precision)} ${formatNum(h2Pt.x, precision)} ${formatNum(h2Pt.y, precision)} ${formatNum(first.x, precision)} ${formatNum(first.y, precision)} Z`;
         } else {
           spD += ' Z';
         }

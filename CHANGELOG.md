@@ -3,6 +3,17 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.35] - 2026-11-12
+
+### 🔢 Configurable Floating-Point Precision Normalization & Git Noise Elimination
+- **Configurable Precision Normalization (`PathGeometryCompiler.ts`, `SvgSerializer.ts` & `SurgicalSvgModifier.ts`)**:
+  - **Dynamic Precision & Trailing Zero Elimination**: Upgraded `formatNum(n, precision = 3)` to format numbers to configurable decimal places, stripping unnecessary trailing zeros (`10.500` -> `10.5`), clamping precision (0 to 8 decimals), and normalizing negative zero (`-0` -> `0`).
+  - **Path Coordinate Normalization**: Upgraded `PathGeometryCompiler.compilePathD(vertices, isClosed, precision)` to enforce configurable coordinate precision across all `M`, `L`, `C`, and closing segment coordinates.
+  - **Attribute & Transform Drift Elimination**: Enhanced `SvgSerializer.toSvgString` and `SurgicalSvgModifier.patchSvgDocument` to normalize root viewBoxes, geometric scalar attributes (`x`, `y`, `width`, `height`, `cx`, `cy`, `r`, `rx`, `ry`, `x1`, `y1`, `x2`, `y2`, `stroke-width`, `opacity`), polyline `points`, and affine `transform` strings (`translate`, `rotate`, `matrix`), eliminating Git commit churn caused by floating-point arithmetic noise.
+  - **Automated Test Coverage**: Added test suite `test-numeric-precision-normalization.ts` (Suite 78) with 5 assertions covering `formatNum` edge cases, `compilePathD` configurable precision, `SvgSerializer` root/element normalization, polyline `points`/transform normalization, and surgical modifier precision preservation.
+
+---
+
 ## [0.103.34] - 2026-11-12
 
 ### 🧹 Explicit On-Demand Metadata Purge & Foreign Attribute Sanitizer

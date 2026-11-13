@@ -40,7 +40,13 @@ export interface IVectorModelSerializerContext {
     innerRatio?: number
   ): string;
   isElementClosed(el: VectorElement): boolean;
-  compilePathD(vertices: PathVertex[], isClosed?: boolean): string;
+  compilePathD(vertices: PathVertex[], isClosed?: boolean, precision?: number): string;
+}
+
+export interface SvgSerializerOptions {
+  excludeContextual?: boolean;
+  surgical?: boolean;
+  precision?: number;
 }
 
 export function escapeXml(unsafe: string): string {
@@ -428,10 +434,11 @@ export class SvgSerializer {
    */
   public static toSvgString(
     ctx: IVectorModelSerializerContext,
-    options?: { excludeContextual?: boolean; surgical?: boolean }
+    options?: SvgSerializerOptions
   ): string {
+    const precision = options?.precision ?? (ctx.canvas as any).precision ?? 3;
     if (options?.surgical === true && (ctx as any).sourceSvgText) {
-      return SurgicalSvgModifier.patchSvgDocument((ctx as any).sourceSvgText, ctx, options);
+      return SurgicalSvgModifier.patchSvgDocument((ctx as any).sourceSvgText, ctx, { ...options, precision });
     }
 
     const {
@@ -447,7 +454,17 @@ export class SvgSerializer {
       svgStrokeLinejoin,
     } = ctx.canvas;
 
-    let rootAttrs = `xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${viewBox}"`;
+    const cleanW = formatNum(width, precision);
+    const cleanH = formatNum(height, precision);
+    const cleanViewBox = viewBox
+      ? viewBox
+          .trim()
+          .split(/\s+/)
+          .map((n) => formatNum(parseFloat(n), precision))
+          .join(' ')
+      : viewBox;
+
+    let rootAttrs = `xmlns="http://www.w3.org/2000/svg" width="${cleanW}" height="${cleanH}" viewBox="${cleanViewBox}"`;
     if (preserveAspectRatio && preserveAspectRatio !== 'xMidYMid meet') {
       rootAttrs += ` preserveAspectRatio="${escapeXml(preserveAspectRatio)}"`;
     }
@@ -569,11 +586,40 @@ export class SvgSerializer {
       return ANTIDRAW_PROPRIETARY_KEYS.includes(key);
     };
 
+    const NUMERIC_ATTRS = new Set([
+      'x', 'y', 'width', 'height', 'cx', 'cy', 'r', 'rx', 'ry',
+      'x1', 'y1', 'x2', 'y2', 'stroke-width', 'opacity', 'fill-opacity',
+      'stroke-opacity', 'stroke-miterlimit', 'font-size'
+    ]);
+
     const serializeCleanAttrs = (attrs: Record<string, string>): string => {
       let res = '';
       for (const [key, val] of Object.entries(attrs)) {
         if (isAntiDrawInternalAttribute(key)) continue;
-        res += ` ${key}="${escapeXml(val)}"`;
+        let formattedVal = val;
+        if (NUMERIC_ATTRS.has(key)) {
+          const num = parseFloat(val);
+          if (Number.isFinite(num) && !val.endsWith('%') && !val.endsWith('em') && !val.endsWith('pt')) {
+            formattedVal = formatNum(num, precision);
+          }
+        } else if (key === 'points') {
+          formattedVal = val
+            .trim()
+            .split(/\s+/)
+            .map((pt) =>
+              pt
+                .split(',')
+                .map((c) => formatNum(parseFloat(c), precision))
+                .join(',')
+            )
+            .join(' ');
+        } else if (key === 'transform') {
+          formattedVal = val.replace(
+            /[-+]?(?:\d+\.\d+|\d+|\.\d+)(?:[eE][-+]?\d+)?/g,
+            (numStr) => formatNum(parseFloat(numStr), precision)
+          );
+        }
+        res += ` ${key}="${escapeXml(formattedVal)}"`;
       }
       return res;
     };
@@ -609,7 +655,7 @@ export class SvgSerializer {
         ctx.syncParametricAttributes(el);
       }
       if (el.vertices && el.vertices.length > 0 && el.tagName === 'path') {
-        el.attributes.d = ctx.compilePathD(el.vertices, el.isClosed);
+        el.attributes.d = ctx.compilePathD(el.vertices, el.isClosed, precision);
       }
 
       const stack = AppearanceStackManager.getStack(el);
