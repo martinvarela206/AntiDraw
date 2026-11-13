@@ -100,7 +100,9 @@ export class SvgDomRenderer {
     bgRect.setAttribute('fill', artboardBg && artboardBg !== 'transparent' ? artboardBg : 'none');
     svgCanvas.appendChild(bgRect);
 
-    svgCanvas.style.color = model.canvas.currentColor || '#000000';
+    if (svgCanvas.style) {
+      svgCanvas.style.color = model.canvas.currentColor || '#000000';
+    }
 
     // 2. Direct DOM projection for vector elements (bypassing expensive HTML serialization)
     for (const el of model.elements) {
@@ -141,7 +143,9 @@ export class SvgDomRenderer {
     if (bgRect.getAttribute('height') !== vb.height.toString()) bgRect.setAttribute('height', vb.height.toString());
     if (bgRect.getAttribute('fill') !== targetFill) bgRect.setAttribute('fill', targetFill);
 
-    svgCanvas.style.color = model.canvas.currentColor || '#000000';
+    if (svgCanvas.style) {
+      svgCanvas.style.color = model.canvas.currentColor || '#000000';
+    }
 
     // 2. Index existing DOM child nodes by element ID
     const existingNodeMap = new Map<string, SVGElement>();

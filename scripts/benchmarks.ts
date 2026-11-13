@@ -189,6 +189,40 @@ export function runAllBenchmarks(): boolean {
     }
   );
 
+  // Bench 8: 5,000 Vector Nodes Frame Budget (60 FPS -> < 16.6ms)
+  // 1,250 elements x 4 vertices = 5,000 vector nodes
+  const model5000Nodes = generateSyntheticDocument(1250);
+  const spatial5000 = new SpatialIndex(256);
+  spatial5000.build(model5000Nodes.elements);
+
+  runBenchmark(
+    '5,000 Nodes 60FPS Frame Budget',
+    5000,
+    16.6, // Budget: < 16.6ms (60 FPS target)
+    20,
+    () => {
+      // Simulates an interactive pointer frame: spatial hit test + bounding box query
+      HitTestService.hitTestSpatial(spatial5000, { x: 1200, y: 800 }, 2.0);
+      spatial5000.queryRect({ x: 1100, y: 700, width: 200, height: 200 }, true);
+    }
+  );
+
+  // Bench 9: 1 MB SVG Document Deserialization & Rehydration (< 300ms)
+  const largeModel = generateSyntheticDocument(6500); // Generates ~1.0 MB of clean SVG markup
+  const largeSvgString = SvgSerializer.toSvgString(largeModel);
+  const actualSizeBytes = Buffer.byteLength(largeSvgString, 'utf8');
+
+  runBenchmark(
+    `1 MB SVG Parsing (${(actualSizeBytes / 1024 / 1024).toFixed(2)} MB)`,
+    6500,
+    300.0, // Budget: < 300.0ms target
+    5,
+    () => {
+      const targetModel = new VectorModel();
+      targetModel.loadSvgString(largeSvgString);
+    }
+  );
+
   // Print Formatted Report Table
   console.log('| Metric / Operation              | Entities | Latency    | Budget     | Ops/sec    | Status |');
   console.log('|:--------------------------------|:--------:|:----------:|:----------:|:----------:|:------:|');
