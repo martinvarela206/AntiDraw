@@ -42,6 +42,10 @@ export interface Translations {
     alignTop: string;
     alignMiddle: string;
     alignBottom: string;
+    alignTo: string;
+    alignToSelection: string;
+    alignToKeyObject: string;
+    alignToCanvas: string;
     flipHorizontal: string;
     flipVertical: string;
     bringFront: string;
@@ -157,6 +161,17 @@ export interface Translations {
     ungroup: string;
     ungroupShortcut: string;
     groupShortcut: string;
+    alignSelection: string;
+    alignTo: string;
+    alignToSelection: string;
+    alignToKeyObject: string;
+    alignToCanvas: string;
+    alignLeft: string;
+    alignCenter: string;
+    alignRight: string;
+    alignTop: string;
+    alignMiddle: string;
+    alignBottom: string;
     blendMode: string;
     blendModeNormal: string;
     blendModeMultiply: string;

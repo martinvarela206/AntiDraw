@@ -135,14 +135,14 @@ export class SelectionMiniHud {
    */
   private rebuildButtons(container: HTMLElement): void {
     container.innerHTML = `
-      <button type="button" class="mini-hud-btn ${this.currentMode === 'move' ? 'active' : ''}" data-mode="move" title="${I18nService.t('miniHud.moveTitle')}">
-        <span class="mini-hud-icon">✥</span> ${I18nService.t('miniHud.move')}
+      <button type="button" class="mini-hud-btn ${this.currentMode === 'move' ? 'active' : ''}" data-mode="move" role="button" aria-pressed="${this.currentMode === 'move'}" title="${I18nService.t('miniHud.moveTitle')} (W)">
+        <span class="mini-hud-icon">✥</span> <span class="mini-hud-badge">MOV</span> ${I18nService.t('miniHud.move')}
       </button>
-      <button type="button" class="mini-hud-btn ${this.currentMode === 'scale' ? 'active' : ''}" data-mode="scale" title="${I18nService.t('miniHud.scaleTitle')}">
-        <span class="mini-hud-icon">⤢</span> ${I18nService.t('miniHud.scale')}
+      <button type="button" class="mini-hud-btn ${this.currentMode === 'scale' ? 'active' : ''}" data-mode="scale" role="button" aria-pressed="${this.currentMode === 'scale'}" title="${I18nService.t('miniHud.scaleTitle')} (E)">
+        <span class="mini-hud-icon">⤢</span> <span class="mini-hud-badge">SCL</span> ${I18nService.t('miniHud.scale')}
       </button>
-      <button type="button" class="mini-hud-btn ${this.currentMode === 'rotate' ? 'active' : ''}" data-mode="rotate" title="${I18nService.t('miniHud.rotateTitle')}">
-        <span class="mini-hud-icon">⟳</span> ${I18nService.t('miniHud.rotate')}
+      <button type="button" class="mini-hud-btn ${this.currentMode === 'rotate' ? 'active' : ''}" data-mode="rotate" role="button" aria-pressed="${this.currentMode === 'rotate'}" title="${I18nService.t('miniHud.rotateTitle')} (R)">
+        <span class="mini-hud-icon">⟳</span> <span class="mini-hud-badge">ROT</span> ${I18nService.t('miniHud.rotate')}
       </button>
     `;
 
@@ -177,10 +177,13 @@ export class SelectionMiniHud {
   private updateActiveButton(container: HTMLElement): void {
     const buttons = container.querySelectorAll<HTMLButtonElement>('.mini-hud-btn');
     buttons.forEach((btn) => {
-      if (btn.dataset.mode === this.currentMode) {
+      const isActive = btn.dataset.mode === this.currentMode;
+      if (isActive) {
         btn.classList.add('active');
+        btn.setAttribute('aria-pressed', 'true');
       } else {
         btn.classList.remove('active');
+        btn.setAttribute('aria-pressed', 'false');
       }
     });
   }

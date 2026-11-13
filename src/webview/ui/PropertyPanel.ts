@@ -53,6 +53,7 @@ export interface PropertyPanelCallbacks {
   onConvertGuideToVector?: () => void;
   onGroup?: () => void;
   onUngroup?: () => void;
+  onAlign?: (type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom', target?: import('../engine/layout/ElementAligner.js').AlignmentTarget, keyObjectId?: string | null) => void;
   syncMetadataToHost?: () => void;
   getEraserHandler?: () => import('../tools/EraserToolHandler.js').EraserToolHandler | undefined;
   getScissorHandler?: () => import('../tools/ScissorKnifeToolHandler.js').ScissorKnifeToolHandler | undefined;

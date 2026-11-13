@@ -1,6 +1,6 @@
 import { MultiPolygon } from 'polygon-clipping';
 import { VectorElement, VectorModel } from './VectorModel.js';
-import { ElementAligner, AlignmentType, ElementBoundingBox } from './layout/ElementAligner.js';
+import { ElementAligner, AlignmentType, AlignmentTarget, ElementBoundingBox } from './layout/ElementAligner.js';
 import { LayerReorderService, ReorderAction } from './layout/LayerReorderService.js';
 import { StrokeOutlineGenerator } from './boolean/StrokeOutlineGenerator.js';
 import { PolygonBooleanService } from './boolean/PolygonBooleanService.js';
@@ -17,6 +17,7 @@ import { Point } from './VectorModel.js';
 export {
   ElementAligner,
   AlignmentType,
+  AlignmentTarget,
   ElementBoundingBox,
   LayerReorderService,
   ReorderAction,
@@ -126,9 +127,11 @@ export class BooleanOperations {
     elements: VectorElement[],
     type: AlignmentType,
     canvasWidth: number,
-    canvasHeight: number
+    canvasHeight: number,
+    target: AlignmentTarget = 'selection',
+    keyObjectId?: string | null
   ): VectorElement[] {
-    return ElementAligner.alignElements(elements, type, canvasWidth, canvasHeight);
+    return ElementAligner.alignElements(elements, type, canvasWidth, canvasHeight, target, keyObjectId);
   }
 
   /**

@@ -6,6 +6,7 @@ export interface TopBarCallbacks {
   onUndo?: () => void;
   onRedo?: () => void;
   onAlign: (type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => void;
+  onAlignTargetChange?: (target: 'selection' | 'key_object' | 'canvas') => void;
   onFlip?: (axis: 'horizontal' | 'vertical') => void;
   onBoolean?: (op: 'union' | 'subtract' | 'intersect' | 'exclude' | 'combine' | 'fragment') => void;
   onZOrder: (action: 'front' | 'forward' | 'backward' | 'back') => void;
@@ -51,7 +52,12 @@ export class TopBar {
       <div class="top-bar-divider"></div>
 
       <!-- Alignments -->
-      <div class="top-bar-group">
+      <div class="top-bar-group" id="topbar-align-group">
+        <select class="top-bar-select" id="select-topbar-align-target" title="${t('topbar.alignTo')}">
+          <option value="selection" ${this.canvasMgr.alignmentTarget === 'selection' ? 'selected' : ''}>${t('topbar.alignToSelection')}</option>
+          <option value="key_object" ${this.canvasMgr.alignmentTarget === 'key_object' ? 'selected' : ''}>${t('topbar.alignToKeyObject')}</option>
+          <option value="canvas" ${this.canvasMgr.alignmentTarget === 'canvas' ? 'selected' : ''}>${t('topbar.alignToCanvas')}</option>
+        </select>
         <button class="btn-icon" id="btn-align-left" title="${t('topbar.alignLeft')}">${ToolIcons.alignLeft}</button>
         <button class="btn-icon" id="btn-align-center" title="${t('topbar.alignCenter')}">${ToolIcons.alignCenter}</button>
         <button class="btn-icon" id="btn-align-right" title="${t('topbar.alignRight')}">${ToolIcons.alignRight}</button>
@@ -115,6 +121,15 @@ export class TopBar {
     // Bind event listeners
     this.bindClick('btn-undo', () => this.callbacks.onUndo?.());
     this.bindClick('btn-redo', () => this.callbacks.onRedo?.());
+
+    const alignTargetSelect = this.container.querySelector<HTMLSelectElement>('#select-topbar-align-target');
+    if (alignTargetSelect) {
+      alignTargetSelect.addEventListener('change', () => {
+        const val = alignTargetSelect.value as 'selection' | 'key_object' | 'canvas';
+        this.canvasMgr.alignmentTarget = val;
+        this.callbacks.onAlignTargetChange?.(val);
+      });
+    }
 
     this.bindClick('btn-align-left', () => this.callbacks.onAlign('left'));
     this.bindClick('btn-align-center', () => this.callbacks.onAlign('center'));

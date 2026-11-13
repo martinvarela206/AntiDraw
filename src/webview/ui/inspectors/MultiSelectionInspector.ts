@@ -62,10 +62,10 @@ export class MultiSelectionInspector {
         <div class="panel-title">${I18nService.t('inspector.transformGroup')}</div>
         <div class="prop-row">
           <span class="prop-label">${I18nService.t('inspector.mode')}</span>
-          <div style="display:flex; gap:4px; flex:1;">
-            <button class="prop-input" id="btn-multi-mode-move" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'move' ? 'background:#10b981; color:#ffffff;' : ''}" title="${I18nService.t('inspector.modeMove')} (W)">${I18nService.t('inspector.modeMove')}</button>
-            <button class="prop-input" id="btn-multi-mode-scale" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'scale' ? 'background:var(--figma-brand); color:#ffffff;' : ''}" title="${I18nService.t('inspector.modeScale')} (R)">${I18nService.t('inspector.modeScale')}</button>
-            <button class="prop-input" id="btn-multi-mode-rotate" style="flex:1; cursor:pointer; font-weight:600; padding:4px; ${selectionTool.selectionMode === 'rotate' ? 'background:#8b5cf6; color:#ffffff;' : ''}" title="${I18nService.t('inspector.modeRotate')} (E)">${I18nService.t('inspector.modeRotate')}</button>
+          <div style="display:flex; gap:4px; flex:1;" role="group" aria-label="${I18nService.t('inspector.mode')}">
+            <button class="prop-input ${selectionTool.selectionMode === 'move' ? 'mode-active-btn' : ''}" id="btn-multi-mode-move" role="button" aria-pressed="${selectionTool.selectionMode === 'move'}" style="flex:1; cursor:pointer; font-weight:600; padding:4px; display:flex; align-items:center; justify-content:center; gap:3px; ${selectionTool.selectionMode === 'move' ? 'background:#10b981; color:#ffffff; border:1px solid #059669;' : ''}" title="${I18nService.t('inspector.modeMove')} (W)"><span class="mode-glyph">✥</span> ${I18nService.t('inspector.modeMove')}</button>
+            <button class="prop-input ${selectionTool.selectionMode === 'scale' ? 'mode-active-btn' : ''}" id="btn-multi-mode-scale" role="button" aria-pressed="${selectionTool.selectionMode === 'scale'}" style="flex:1; cursor:pointer; font-weight:600; padding:4px; display:flex; align-items:center; justify-content:center; gap:3px; ${selectionTool.selectionMode === 'scale' ? 'background:var(--figma-brand); color:#ffffff; border:1px solid #4f46e5;' : ''}" title="${I18nService.t('inspector.modeScale')} (E)"><span class="mode-glyph">⤢</span> ${I18nService.t('inspector.modeScale')}</button>
+            <button class="prop-input ${selectionTool.selectionMode === 'rotate' ? 'mode-active-btn' : ''}" id="btn-multi-mode-rotate" role="button" aria-pressed="${selectionTool.selectionMode === 'rotate'}" style="flex:1; cursor:pointer; font-weight:600; padding:4px; display:flex; align-items:center; justify-content:center; gap:3px; ${selectionTool.selectionMode === 'rotate' ? 'background:#8b5cf6; color:#ffffff; border:1px solid #7c3aed;' : ''}" title="${I18nService.t('inspector.modeRotate')} (R)"><span class="mode-glyph">⟳</span> ${I18nService.t('inspector.modeRotate')}</button>
           </div>
         </div>
         <div class="prop-row" style="margin-top:2px;">
@@ -97,6 +97,27 @@ export class MultiSelectionInspector {
           </div>
         </div>
         ${groupBox ? DistortInspectorControls.renderHtml(selectionTool, groupBox.x, groupBox.y, groupBox.width, groupBox.height, 'multi-') : ''}
+      </div>
+
+      <!-- Alignment Section -->
+      <div class="panel-section">
+        <div class="panel-title">${I18nService.t('inspector.alignSelection')}</div>
+        <div class="prop-row" style="margin-bottom:6px;">
+          <span class="prop-label" style="font-size:11px;">${I18nService.t('inspector.alignTo')}</span>
+          <select class="prop-input" id="select-multi-align-target" style="flex:1; cursor:pointer;" title="${I18nService.t('inspector.alignTo')}">
+            <option value="selection" ${selectionTool.alignmentTarget === 'selection' ? 'selected' : ''}>${I18nService.t('inspector.alignToSelection')}</option>
+            <option value="key_object" ${selectionTool.alignmentTarget === 'key_object' ? 'selected' : ''}>${I18nService.t('inspector.alignToKeyObject')}</option>
+            <option value="canvas" ${selectionTool.alignmentTarget === 'canvas' ? 'selected' : ''}>${I18nService.t('inspector.alignToCanvas')}</option>
+          </select>
+        </div>
+        <div class="prop-row" style="justify-content: flex-start; gap: 4px; flex-wrap: wrap;">
+          <button class="btn-icon" id="btn-multi-align-left" title="${I18nService.t('topbar.alignLeft')}">${ToolIcons.alignLeft}</button>
+          <button class="btn-icon" id="btn-multi-align-center" title="${I18nService.t('topbar.alignCenter')}">${ToolIcons.alignCenter}</button>
+          <button class="btn-icon" id="btn-multi-align-right" title="${I18nService.t('topbar.alignRight')}">${ToolIcons.alignRight}</button>
+          <button class="btn-icon" id="btn-multi-align-top" title="${I18nService.t('topbar.alignTop')}">${ToolIcons.alignTop}</button>
+          <button class="btn-icon" id="btn-multi-align-middle" title="${I18nService.t('topbar.alignMiddle')}">${ToolIcons.alignMiddle}</button>
+          <button class="btn-icon" id="btn-multi-align-bottom" title="${I18nService.t('topbar.alignBottom')}">${ToolIcons.alignBottom}</button>
+        </div>
       </div>
 
       <div class="panel-section">
@@ -207,6 +228,27 @@ export class MultiSelectionInspector {
     bindInspectorMouseDown(container, 'btn-prop-bool-exclude', () => callbacks.onBoolean && callbacks.onBoolean('exclude'));
     bindInspectorMouseDown(container, 'btn-prop-bool-combine', () => callbacks.onBoolean && callbacks.onBoolean('combine'));
     bindInspectorMouseDown(container, 'btn-prop-bool-fragment', () => callbacks.onBoolean && callbacks.onBoolean('fragment'));
+
+    const multiAlignTargetSelect = container.querySelector<HTMLSelectElement>('#select-multi-align-target');
+    if (multiAlignTargetSelect) {
+      multiAlignTargetSelect.addEventListener('change', () => {
+        selectionTool.alignmentTarget = multiAlignTargetSelect.value as any;
+      });
+    }
+
+    const bindAlignBtn = (btnId: string, type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => {
+      bindInspectorMouseDown(container, btnId, () => {
+        if (callbacks.onAlign) {
+          callbacks.onAlign(type, selectionTool.alignmentTarget, selectionTool.keyObjectId);
+        }
+      });
+    };
+    bindAlignBtn('btn-multi-align-left', 'left');
+    bindAlignBtn('btn-multi-align-center', 'center');
+    bindAlignBtn('btn-multi-align-right', 'right');
+    bindAlignBtn('btn-multi-align-top', 'top');
+    bindAlignBtn('btn-multi-align-middle', 'middle');
+    bindAlignBtn('btn-multi-align-bottom', 'bottom');
 
     const btnMultiGroup = container.querySelector<HTMLButtonElement>('#btn-multi-group');
     if (btnMultiGroup) {

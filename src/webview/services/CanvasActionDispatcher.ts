@@ -1,6 +1,6 @@
 import { VectorModel, VectorElement } from '../engine/VectorModel.js';
 import { SelectionTool } from '../engine/SelectionTool.js';
-import { BooleanOperations } from '../engine/BooleanOperations.js';
+import { BooleanOperations, AlignmentType, AlignmentTarget } from '../engine/BooleanOperations.js';
 import { ConfirmationModal } from '../ui/ConfirmationModal.js';
 import { CrashGuard } from './CrashGuard.js';
 import { VectorCloneHelper } from '../engine/selection/VectorCloneHelper.js';
@@ -39,7 +39,11 @@ export interface CanvasActionDispatcherContext {
 export class CanvasActionDispatcher {
   constructor(private ctx: CanvasActionDispatcherContext) {}
 
-  public align(type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom'): void {
+  public align(
+    type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom',
+    target?: AlignmentTarget,
+    keyObjectId?: string | null
+  ): void {
     const selectedIds = Array.from(this.ctx.selectionTool.selectedElementIds);
     const selectedEls: VectorElement[] = [];
     selectedIds.forEach((id) => {
@@ -49,11 +53,15 @@ export class CanvasActionDispatcher {
 
     if (selectedEls.length > 0) {
       this.ctx.pushUndo();
+      const alignTarget = target || this.ctx.selectionTool.alignmentTarget || 'selection';
+      const keyId = keyObjectId !== undefined ? keyObjectId : this.ctx.selectionTool.keyObjectId;
       const aligned = BooleanOperations.alignElements(
         selectedEls,
         type,
         this.ctx.model.canvas.width,
-        this.ctx.model.canvas.height
+        this.ctx.model.canvas.height,
+        alignTarget,
+        keyId
       );
       aligned.forEach((aEl) => {
         const target = this.ctx.model.elements.find((e) => e.id === aEl.id);

@@ -175,6 +175,7 @@ export class PropertyPanelActionController {
       onConvertToCurves: (_el) => s.actionDispatcher.convertToCurves(),
       onGroup: () => s.actionDispatcher.groupSelection(),
       onUngroup: () => s.actionDispatcher.ungroupSelection(),
+      onAlign: (type, target, keyObjectId) => s.actionDispatcher.align(type, target, keyObjectId),
       onPushUndo: () => s.historyService.pushUndo(),
       onDistortCornerChange: (cornerKey: 'nw' | 'ne' | 'se' | 'sw', coord: Point) => {
         const selectedEls = this.ctx.model.elements.filter((el) => this.ctx.selectionTool.isSelected(el.id));

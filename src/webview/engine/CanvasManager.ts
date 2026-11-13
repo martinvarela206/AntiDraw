@@ -37,6 +37,7 @@ export class CanvasManager {
   public showRulers: boolean = true;
   public showGuides: boolean = true;
   public showVectorExplorer: boolean = false;
+  public alignmentTarget: 'selection' | 'key_object' | 'canvas' = 'selection';
 
   /**
    * ARCHITECTURAL RATIONALE: Parametric Multi-Grid Architecture

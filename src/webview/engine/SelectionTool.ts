@@ -6,12 +6,14 @@ import { BoundingBox, BoundingBoxCalculator } from './geometry/BoundingBoxCalcul
 import { HandleType, HitTestResult, HitTestService } from './selection/HitTestService.js';
 import { QuadCorners } from './geometry/ProjectiveHomography.js';
 import { SpatialIndex } from './spatial/SpatialIndex.js';
+import type { AlignmentTarget } from './layout/ElementAligner.js';
 import type { Polygon } from 'polygon-clipping';
 
 export { BoundingBox, BoundingBoxCalculator } from './geometry/BoundingBoxCalculator.js';
 export { HandleType, HitTestResult, HitTestService } from './selection/HitTestService.js';
 export { QuadCorners } from './geometry/ProjectiveHomography.js';
 export { SpatialIndex } from './spatial/SpatialIndex.js';
+export type { AlignmentTarget } from './layout/ElementAligner.js';
 
 export interface DragState {
   initialElement: VectorElement;
@@ -71,6 +73,15 @@ export class SelectionTool {
    */
   public scaleStroke: boolean = false;
   public scaleCorners: boolean = false;
+
+  /**
+   * Reference target for layout alignment operations:
+   * - 'selection': Collective bounding box of all selected items
+   * - 'key_object': Stationary key object designated by `keyObjectId`
+   * - 'canvas': Artboard / Canvas boundary (0, 0, width, height)
+   */
+  public alignmentTarget: AlignmentTarget = 'selection';
+  public keyObjectId: string | null = null;
 
   // Backward compatibility getter & setter
   public get selectedElementId(): string | null {

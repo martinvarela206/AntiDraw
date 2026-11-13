@@ -3,6 +3,25 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.39] - 2026-11-13
+
+### 🎯 Selection Ergonomics, Visual Accessibility & Multi-Target Alignment
+- **Zero Reliance on Color Alone for Selection Modes (WCAG Accessibility)**:
+  - **Accessible On-Canvas Mode Badges (`TransformInteraction.ts`)**: Rendered a dedicated SVG status badge (`<g class="ad-selection-mode-badge" role="status" aria-label="...">`) above the selection bounding box with high-contrast text tags: `MOVER (W)`, `ESCALAR (E)`, `ROTAR (R)`, and `DEFORMAR (D)`, ensuring operators with color vision deficiencies never rely solely on green, blue, or purple hues.
+  - **Accessible Mode Cursors (`SelectionCursorHelper.ts`)**: Embedded 3-letter textual codes (`MOV`, `SCL`, `ROT`, `DST`), canonical hotkeys, and semantic `<title>` elements directly into custom SVG cursor data-URIs with helper methods `getModeLabel`, `getModeBadge`, and `getModeShortcut`.
+  - **Semantic Controls & Aria Indicators (`SelectionMiniHud.ts`, `GeometryInspector.ts`, `MultiSelectionInspector.ts`, `GroupInspector.ts`)**: Upgraded transform mode buttons with `role="button"`, `aria-pressed`, distinct geometric glyphs (`✥`, `⤢`, `⟳`), high-contrast focus/active border outlines, and canonical hotkey hints (`(W)`, `(E)`, `(R)`).
+- **Multi-Target Alignment Engine (`ElementAligner.ts`, `BooleanOperations.ts`, `CanvasActionDispatcher.ts`)**:
+  - **Selection Boundary Target (`'selection'`)**: Aligns multiple elements against the collective bounding box ($minX, maxX, cx, minY, maxY, cy$) of the entire selection without shifting the outer envelope.
+  - **Key Object Alignment Target (`'key_object'`)**: Designates a stationary anchor object (`keyObjectId`, defaulting to the first selected item) which remains 100% fixed while all subordinate items align to its bounds or center.
+  - **Canvas Boundary Target (`'canvas'`)**: Simultaneously aligns multiple elements against the active artboard / canvas boundaries ($0$, $width/2$, $width$, $0$, $height/2$, $height$).
+- **UI Alignment Target Selectors & i18n Localization**:
+  - Added "Align to:" (`alignTo`) dropdown selector across `TopBar`, `MultiSelectionInspector`, and `GroupInspector` supporting Selection, Key Object, and Canvas targets.
+  - Added dedicated alignment toolbars in `MultiSelectionInspector` with 6 standard alignment actions.
+  - Added complete i18n localization across all 7 supported languages (English, Spanish, German, French, Japanese, Russian, Simplified Chinese).
+- **Automated Test Coverage**: Added test suite `test-selection-ergonomics-alignment-target.ts` (Suite 82) with 5 assertions covering collective selection alignment, stationary key object alignment, canvas boundary alignment, visual accessibility badges, and UI state synchronization.
+
+---
+
 ## [0.103.38] - 2026-11-13
 
 ### 🎨 W3C Standard Hex Color Alpha Decomposition (Universal Vector Engine Compatibility)

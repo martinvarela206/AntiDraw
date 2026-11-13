@@ -578,6 +578,18 @@ export class TransformInteraction {
           html += `<rect x="${groupBox.x}" y="${groupBox.y}" width="${groupBox.width}" height="${groupBox.height}" fill="none" stroke="${boxStroke}" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke" />`;
         }
 
+        // Render accessible textual mode identifier tag (ensures zero reliance on color alone for color-blindness accessibility)
+        const modeBadgeLabel = mode === 'move' ? 'MOVER (W)' : mode === 'rotate' ? 'ROTAR (R)' : mode === 'distort' ? 'DEFORMAR (D)' : 'ESCALAR (E)';
+        const badgeBg = mode === 'distort' ? '#78350f' : mode === 'rotate' ? '#4c1d95' : mode === 'move' ? '#064e3b' : '#1e3a8a';
+        const badgeW = 74 / z;
+        const badgeH = 14 / z;
+        const badgeX = groupBox.x;
+        const badgeY = groupBox.y - (badgeH + 4 / z);
+        html += `<g class="ad-selection-mode-badge" data-mode="${mode}" role="status" aria-label="${modeBadgeLabel}">`;
+        html += `<rect x="${badgeX}" y="${badgeY}" width="${badgeW}" height="${badgeH}" rx="${3 / z}" fill="${badgeBg}" stroke="${boxStroke}" stroke-width="1" vector-effect="non-scaling-stroke" />`;
+        html += `<text x="${badgeX + badgeW / 2}" y="${badgeY + 10 / z}" text-anchor="middle" fill="#ffffff" font-size="${8.5 / z}" font-family="system-ui, -apple-system, sans-serif" font-weight="bold">${modeBadgeLabel}</text>`;
+        html += `</g>`;
+
         if (mode !== 'move') {
           const rotOffset = 18 / z;
 

@@ -93,6 +93,9 @@ export class ChromeActionController {
       onUndo: () => this.ctx.historyService().undo(),
       onRedo: () => this.ctx.historyService().redo(),
       onAlign: (type) => this.ctx.actionDispatcher().align(type),
+      onAlignTargetChange: (target) => {
+        this.ctx.selectionTool.alignmentTarget = target;
+      },
       onFlip: (axis) => this.ctx.actionDispatcher().flip(axis),
       onBoolean: (op) => this.ctx.actionDispatcher().executeBoolean(op),
       onZOrder: (action) => this.ctx.actionDispatcher().reorderZ(action),
