@@ -2,6 +2,7 @@ import { IVectorModelSerializerContext } from './SvgSerializer.js';
 import { VectorElement } from '../VectorModel.js';
 import { IsomorphicXmlParserFactory } from './XmlParser.js';
 import { formatNum } from '../geometry/PathGeometryCompiler.js';
+import { Color } from '../../core/color/Color.js';
 
 export interface SurgicalPatchOptions {
   excludeContextual?: boolean;
@@ -154,6 +155,26 @@ export class SurgicalSvgModifier {
             } else if (attrName === 'stroke' && el.attributes['data-original-stroke'] === 'currentColor') {
               if (val === ctx.canvas.currentColor || val === '#000000') {
                 val = 'currentColor';
+              }
+            } else if (attrName === 'fill' && val) {
+              const decomp = Color.decomposeColor(val);
+              if (decomp) {
+                val = decomp.color;
+                if (decomp.alpha !== undefined && decomp.alpha < 1) {
+                  const currentOp = el.attributes['fill-opacity'] ? parseFloat(el.attributes['fill-opacity']) : 1;
+                  const combined = Number.isFinite(currentOp) ? currentOp * decomp.alpha : decomp.alpha;
+                  domNode.setAttribute('fill-opacity', formatNum(combined, precision));
+                }
+              }
+            } else if (attrName === 'stroke' && val) {
+              const decomp = Color.decomposeColor(val);
+              if (decomp) {
+                val = decomp.color;
+                if (decomp.alpha !== undefined && decomp.alpha < 1) {
+                  const currentOp = el.attributes['stroke-opacity'] ? parseFloat(el.attributes['stroke-opacity']) : 1;
+                  const combined = Number.isFinite(currentOp) ? currentOp * decomp.alpha : decomp.alpha;
+                  domNode.setAttribute('stroke-opacity', formatNum(combined, precision));
+                }
               }
             }
 

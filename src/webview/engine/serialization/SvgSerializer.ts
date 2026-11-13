@@ -13,6 +13,7 @@ import { PathGeometryCompiler, formatNum } from '../geometry/PathGeometryCompile
 import { DashCornerAligner } from '../geometry/DashCornerAligner.js';
 import { AppearanceStackManager } from '../appearance/AppearanceStackManager.js';
 import { SurgicalSvgModifier } from './SurgicalSvgModifier.js';
+import { Color } from '../../core/color/Color.js';
 
 export interface IVectorModelSerializerContext {
   canvas: CanvasSettings;
@@ -319,7 +320,7 @@ export class SvgSerializer {
     };
   }
 
-  public static compileElementGradients(elements: VectorElement[]): string {
+  public static compileElementGradients(elements: VectorElement[], precision: number = 3): string {
     let out = '';
     elements.forEach((el) => {
       const gradStr = el.attributes['data-gradient'];
@@ -396,8 +397,16 @@ export class SvgSerializer {
       const sortedStops = [...grad.stops].sort((a, b) => a.offset - b.offset);
       sortedStops.forEach((stop) => {
         const offPct = Math.round(stop.offset * 100);
-        const op = stop.opacity !== undefined ? stop.opacity : 1;
-        out += `      <stop offset="${offPct}%" stop-color="${stop.color}" stop-opacity="${op}" />\n`;
+        let op = stop.opacity !== undefined ? stop.opacity : 1;
+        let stopColor = stop.color;
+        const decomp = Color.decomposeColor(stopColor);
+        if (decomp) {
+          stopColor = decomp.color;
+          if (decomp.alpha !== undefined && decomp.alpha < 1) {
+            op = op * decomp.alpha;
+          }
+        }
+        out += `      <stop offset="${offPct}%" stop-color="${escapeXml(stopColor)}" stop-opacity="${formatNum(op, precision)}" />\n`;
       });
 
       if (grad.type === 'linear') {
@@ -512,7 +521,7 @@ export class SvgSerializer {
       (el) => !!(el.attributes['marker-start'] || el.attributes['marker-mid'] || el.attributes['marker-end'])
     );
     const filterDefs = this.compileElementFilters(allElements);
-    const gradientDefs = this.compileElementGradients(allElements);
+    const gradientDefs = this.compileElementGradients(allElements, precision);
 
     const hasCustomDefs = !!(ctx.customDefs && ctx.customDefs.trim().length > 0);
     if (hasMarkers || filterDefs.length > 0 || gradientDefs.length > 0 || hasCustomDefs) {
@@ -593,8 +602,36 @@ export class SvgSerializer {
     ]);
 
     const serializeCleanAttrs = (attrs: Record<string, string>): string => {
+      const cleanDict = { ...attrs };
+
+      // W3C SVG 1.1 Standard Color Alpha Decomposition:
+      // Replace non-standard #RRGGBBAA, #RGBA or rgba() with standard #RRGGBB + fill-opacity / stroke-opacity
+      if (cleanDict.fill) {
+        const decomp = Color.decomposeColor(cleanDict.fill);
+        if (decomp) {
+          cleanDict.fill = decomp.color;
+          if (decomp.alpha !== undefined && decomp.alpha < 1) {
+            const currentOp = cleanDict['fill-opacity'] ? parseFloat(cleanDict['fill-opacity']) : 1;
+            const combined = Number.isFinite(currentOp) ? currentOp * decomp.alpha : decomp.alpha;
+            cleanDict['fill-opacity'] = formatNum(combined, precision);
+          }
+        }
+      }
+
+      if (cleanDict.stroke) {
+        const decomp = Color.decomposeColor(cleanDict.stroke);
+        if (decomp) {
+          cleanDict.stroke = decomp.color;
+          if (decomp.alpha !== undefined && decomp.alpha < 1) {
+            const currentOp = cleanDict['stroke-opacity'] ? parseFloat(cleanDict['stroke-opacity']) : 1;
+            const combined = Number.isFinite(currentOp) ? currentOp * decomp.alpha : decomp.alpha;
+            cleanDict['stroke-opacity'] = formatNum(combined, precision);
+          }
+        }
+      }
+
       let res = '';
-      for (const [key, val] of Object.entries(attrs)) {
+      for (const [key, val] of Object.entries(cleanDict)) {
         if (isAntiDrawInternalAttribute(key)) continue;
         let formattedVal = val;
         if (NUMERIC_ATTRS.has(key)) {

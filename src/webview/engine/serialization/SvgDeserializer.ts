@@ -11,6 +11,7 @@ import { RectPrimitive } from '../primitives/RectPrimitive.js';
 import { SvgSanitizer } from '../security/SvgSanitizer.js';
 import { IsomorphicXmlParserFactory, IXmlParser } from './XmlParser.js';
 import { CssStyleResolver } from './CssStyleResolver.js';
+import { Color } from '../../core/color/Color.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Dedicated SVG Deserialization Service (SvgDeserializer)
@@ -655,15 +656,22 @@ export class SvgDeserializer {
                     const offStr = s.getAttribute('offset') || '0';
                     const offVal = offStr.includes('%') ? parseFloat(offStr) / 100 : parseFloat(offStr);
                     const safeOffset = Number.isFinite(offVal) ? Math.max(0, Math.min(1, offVal)) : 0;
-                    const color = s.getAttribute('stop-color') || '#000000';
+                    let color = s.getAttribute('stop-color') || '#000000';
                     const opStr = s.getAttribute('stop-opacity');
-                    const op = opStr ? parseFloat(opStr) : 1;
-                    const safeOp = Number.isFinite(op) ? Math.max(0, Math.min(1, op)) : 1;
+                    let op = opStr ? parseFloat(opStr) : 1;
+                    let safeOp = Number.isFinite(op) ? Math.max(0, Math.min(1, op)) : 1;
+                    const decomp = Color.decomposeColor(color);
+                    if (decomp) {
+                      color = decomp.color;
+                      if (decomp.alpha !== undefined && decomp.alpha < 1) {
+                        safeOp = safeOp * decomp.alpha;
+                      }
+                    }
                     return {
                       id: `stop_${sIdx}`,
                       offset: safeOffset,
                       color,
-                      opacity: safeOp,
+                      opacity: Math.round(safeOp * 1000) / 1000,
                     };
                   });
                   if (stops.length >= 2) {
@@ -1296,6 +1304,32 @@ export class SvgDeserializer {
     // Normalize transform
     if (attrs.transform) {
       attrs.transform = SvgDeserializer.normalizeTransform(attrs.transform, elementVars);
+    }
+
+    // W3C SVG 1.1 Standard Color Alpha Decomposition upon ingestion:
+    // Decompose #RRGGBBAA, #RGBA or rgba() into standard #RRGGBB + fill-opacity / stroke-opacity
+    if (attrs.fill) {
+      const decompFill = Color.decomposeColor(attrs.fill);
+      if (decompFill) {
+        attrs.fill = decompFill.color;
+        if (decompFill.alpha !== undefined && decompFill.alpha < 1) {
+          const existingOp = attrs['fill-opacity'] ? parseFloat(attrs['fill-opacity']) : 1;
+          const combinedOp = Number.isFinite(existingOp) ? existingOp * decompFill.alpha : decompFill.alpha;
+          attrs['fill-opacity'] = formatNum(combinedOp, 3);
+        }
+      }
+    }
+
+    if (attrs.stroke) {
+      const decompStroke = Color.decomposeColor(attrs.stroke);
+      if (decompStroke) {
+        attrs.stroke = decompStroke.color;
+        if (decompStroke.alpha !== undefined && decompStroke.alpha < 1) {
+          const existingOp = attrs['stroke-opacity'] ? parseFloat(attrs['stroke-opacity']) : 1;
+          const combinedOp = Number.isFinite(existingOp) ? existingOp * decompStroke.alpha : decompStroke.alpha;
+          attrs['stroke-opacity'] = formatNum(combinedOp, 3);
+        }
+      }
     }
 
     return { effectiveColor, elementVars };

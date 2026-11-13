@@ -4,6 +4,7 @@ import { bindInspectorMouseDown } from './CanvasInspector.js';
 import { ToolIcons } from '../../icons/ToolIcons.js';
 import { I18nService } from '../../i18n/index.js';
 import { ColorPickerPopover } from '../ColorPickerPopover.js';
+import { Color } from '../../core/color/Color.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Bi-directional Conversion Between SVG Miter Limit and Degrees
@@ -478,9 +479,17 @@ export class AppearanceInspector {
         if (fillType === 'solid') {
           const val = elFillHex.value.trim();
           if (val.startsWith('#') && (val.length === 4 || val.length === 7 || val.length === 9)) {
-            el.attributes['fill'] = val;
+            const decomp = Color.decomposeColor(val);
+            if (decomp) {
+              el.attributes['fill'] = decomp.color;
+              if (decomp.alpha !== undefined && decomp.alpha < 1) {
+                el.attributes['fill-opacity'] = decomp.alpha.toFixed(2);
+              }
+            } else {
+              el.attributes['fill'] = val;
+            }
             delete el.attributes['data-gradient'];
-            if (elFillColor) elFillColor.style.backgroundColor = val;
+            if (elFillColor) elFillColor.style.backgroundColor = el.attributes['fill'];
             callbacks.onUpdateElement(el);
           }
         }
@@ -493,7 +502,16 @@ export class AppearanceInspector {
             el.attributes['fill'] = 'currentColor';
             delete el.attributes['data-gradient'];
           } else {
-            el.attributes['fill'] = val.startsWith('#') || val === 'none' ? val : `#${val}`;
+            const raw = val.startsWith('#') || val === 'none' ? val : `#${val}`;
+            const decomp = Color.decomposeColor(raw);
+            if (decomp) {
+              el.attributes['fill'] = decomp.color;
+              if (decomp.alpha !== undefined && decomp.alpha < 1) {
+                el.attributes['fill-opacity'] = decomp.alpha.toFixed(2);
+              }
+            } else {
+              el.attributes['fill'] = raw;
+            }
             delete el.attributes['data-gradient'];
             if (elFillColor) elFillColor.style.backgroundColor = el.attributes['fill'];
           }

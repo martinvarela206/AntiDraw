@@ -3,6 +3,22 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.38] - 2026-11-13
+
+### 🎨 W3C Standard Hex Color Alpha Decomposition (Universal Vector Engine Compatibility)
+- **Universal Alpha Decomposition Engine (`Color.ts`)**:
+  - Implemented `Color.decomposeColor(colorStr)` to parse and decompose 8-digit hexadecimal colors (`#RRGGBBAA`), 4-digit hexadecimal colors (`#RGBA`), `rgba(...)`, and standard color keywords into W3C SVG 1.1 compliant 6-digit hex (`#RRGGBB`) plus normalized alpha opacity (`0.0` to `1.0`).
+- **Standard Serialization & Deserialization Pipeline (`SvgSerializer.ts`, `SvgDeserializer.ts`)**:
+  - **Zero `#RRGGBBAA` in SVG Output**: Updated `SvgSerializer.serializeCleanAttrs` to decompose `fill` and `stroke` attributes into clean `#RRGGBB` hex while compounding or setting `fill-opacity` and `stroke-opacity`.
+  - **Gradient Stops Normalization**: Ensured gradient `<stop>` tags serialize with standard `stop-color` (6-digit hex) and `stop-opacity` attributes instead of 8-digit hex values.
+  - **Inbound Deserialization Sanitization**: Enhanced `SvgDeserializer` to normalize any pasted or imported SVG markup containing 8-digit or 4-digit hex into clean base colors and opacity attributes.
+- **Surgical SVG Preservation & UI Inspector Harmonization (`SurgicalSvgModifier.ts`, `AppearanceInspector.ts`, `StrokeInspector.ts`)**:
+  - **Surgical Alpha Decomposition**: Updated `SurgicalSvgModifier` to decompose 8-digit and 4-digit hex on mutated element attributes while preserving foreign XML comments and third-party namespaces intact.
+  - **Inspector Input Sanitization**: Upgraded hex inputs in `AppearanceInspector` and `StrokeInspector` to instantly normalize pasted 8-digit or 4-digit hex codes into 6-digit hex and update corresponding opacity sliders.
+- **Automated Test Coverage**: Added test suite `test-color-hex-alpha-decomposition.ts` (Suite 81) with 5 assertions covering `Color.decomposeColor`, inbound deserialization, SVG 1.1 serialization purity, gradient stop decomposition, and surgical localized patching.
+
+---
+
 ## [0.103.37] - 2026-11-13
 
 ### ⌨️ Keyboard Shortcuts Disambiguation & AltGr Collision Eradication
