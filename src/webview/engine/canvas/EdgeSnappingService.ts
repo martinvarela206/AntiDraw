@@ -1,6 +1,7 @@
 import { Point, VectorElement, PathVertex } from '../VectorModel.js';
 import { GuideLine } from './GuideManager.js';
 import { GridConfig } from './GridManager.js';
+import { BezierProjection } from '../geometry/BezierProjection.js';
 
 export interface EdgeSnapCandidate {
   snappedPt: Point;
@@ -182,7 +183,7 @@ export class EdgeSnappingService {
   }
 
   /**
-   * Projects a point onto a cubic Bézier curve via adaptive sampling and refinement.
+   * Projects a point onto a cubic Bézier curve via initial Bernstein sampling + bounded Newton-Raphson.
    */
   public static projectPointToCubicBezier(
     pt: Point,
@@ -190,40 +191,9 @@ export class EdgeSnappingService {
     p1: Point,
     p2: Point,
     p3: Point,
-    steps: number = 16
+    steps: number = 20
   ): Point {
-    let bestT = 0;
-    let minDist = Infinity;
-
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
-      const q = this.evalCubicBezier(t, p0, p1, p2, p3);
-      const d = Math.hypot(pt.x - q.x, pt.y - q.y);
-      if (d < minDist) {
-        minDist = d;
-        bestT = t;
-      }
-    }
-
-    // Refine around bestT using 5 iterations of golden section search
-    let tMin = Math.max(0, bestT - 1 / steps);
-    let tMax = Math.min(1, bestT + 1 / steps);
-
-    for (let iter = 0; iter < 5; iter++) {
-      const t1 = tMin + (tMax - tMin) * 0.382;
-      const t2 = tMin + (tMax - tMin) * 0.618;
-      const q1 = this.evalCubicBezier(t1, p0, p1, p2, p3);
-      const q2 = this.evalCubicBezier(t2, p0, p1, p2, p3);
-      const d1 = Math.hypot(pt.x - q1.x, pt.y - q1.y);
-      const d2 = Math.hypot(pt.x - q2.x, pt.y - q2.y);
-      if (d1 < d2) {
-        tMax = t2;
-      } else {
-        tMin = t1;
-      }
-    }
-
-    return this.evalCubicBezier((tMin + tMax) / 2, p0, p1, p2, p3);
+    return BezierProjection.projectPoint(pt, p0, p1, p2, p3, { sampleSteps: steps }).point;
   }
 
   private static evalCubicBezier(t: number, p0: Point, p1: Point, p2: Point, p3: Point): Point {

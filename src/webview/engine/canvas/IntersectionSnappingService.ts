@@ -246,7 +246,9 @@ export class IntersectionSnappingService {
       const nextPA = EdgeSnappingService.projectPointToCubicBezier(qB, p0, p1, p2, p3);
 
       const dist = Math.hypot(pA.x - qB.x, pA.y - qB.y);
-      if (dist < 1.5) {
+      const shift = Math.hypot(nextPA.x - pA.x, nextPA.y - pA.y);
+
+      if (dist < 0.2) {
         const mid = { x: (pA.x + qB.x) / 2, y: (pA.y + qB.y) / 2 };
         if (Math.hypot(queryPt.x - mid.x, queryPt.y - mid.y) <= threshold) {
           return mid;
@@ -254,8 +256,8 @@ export class IntersectionSnappingService {
         return null;
       }
 
-      if (Math.hypot(nextPA.x - pA.x, nextPA.y - pA.y) < 0.05) {
-        if (dist <= 2.5) {
+      if (shift < 0.01) {
+        if (dist <= 1.0) {
           const mid = { x: (pA.x + qB.x) / 2, y: (pA.y + qB.y) / 2 };
           if (Math.hypot(queryPt.x - mid.x, queryPt.y - mid.y) <= threshold) {
             return mid;

@@ -3,6 +3,18 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.26] - 2026-11-12
+
+### 📐 Robust Bézier Projection & High-Order Convergence
+- **Hybrid Sampling + Bounded Newton-Raphson Projection (`BezierProjection` & `EdgeSnappingService`)**:
+  - **Global Convergence Architecture (`BezierProjection`)**: Engineered 3-phase hybrid solver combining global Bernstein uniform interval sampling across $[0, 1]$ (to isolate the global minimum basin of attraction) with second-order Newton-Raphson root finding on $g(t) = (B(t) - P) \cdot B'(t) = 0$.
+  - **Analytical Derivatives & Backtracking Line Search**: Implemented exact first $B'(t)$ and second $B''(t)$ analytical derivatives paired with line search step-halving, preventing basin overshoot near inflection points and eliminating divergence.
+  - **Boundary Guarding**: Guaranteed strict clamping against endpoints $t=0$ and $t=1$, eliminating NaN instability.
+  - **Sub-Pixel Snapping & Meeting Calibration**: Refactored `EdgeSnappingService.projectPointToCubicBezier` to delegate to `BezierProjection`, achieving sub-pixel precision across edge snapping and the Bézier meeting intersection algorithm.
+  - **Automated Test Coverage**: Added test suite `test-robust-bezier-projection.ts` (Suite 69) verifying 5 assertions covering analytical derivatives, linear degenerate projections, arch peak convergence, boundary clamping, and `EdgeSnappingService` delegation.
+
+---
+
 ## [0.103.25] - 2026-11-12
 
 ### ⚡ Spatial Grid Broad-Phase Snapping & Intersection Acceleration
