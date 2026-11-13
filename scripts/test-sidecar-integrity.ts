@@ -33,13 +33,10 @@ export async function runSidecarIntegrityTests(): Promise<boolean> {
 
   const sampleSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="500" height="400"><rect id="r1" width="50" height="50"/></svg>';
 
-  await test('Resolves standardized .svg.json and legacy .json URIs', () => {
+  await test('Resolves standardized .svg.json URI', () => {
     const svgUri = Uri.file('/workspace/art/badge.svg') as any;
     const canonicalUri = SidecarIntegrityService.getSidecarUri(svgUri);
     assert.equal(canonicalUri.path, '/workspace/art/badge.svg.json', 'Standardized extension is .svg.json');
-
-    const legacyUri = SidecarIntegrityService.getLegacySidecarUri(svgUri);
-    assert.equal(legacyUri.path, '/workspace/art/badge.json', 'Legacy extension replaces .svg with .json');
   });
 
   await test('Computes consistent SHA-256 hash across LF and CRLF line endings', () => {

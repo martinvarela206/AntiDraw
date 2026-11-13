@@ -621,6 +621,8 @@ export class TranslateInteraction {
         this.initialElementsMap.forEach((origVerts, id) => {
           const el = ctx.model.getElementById(id) || ctx.model.elements.find((e) => e.id === id);
           if (el) {
+            el.dirty = true;
+            ctx.model.markElementDirty(id);
             el.vertices = origVerts.map((v) => ({
               ...v,
               x: v.x + this.ghostDragOffset!.x,

@@ -463,6 +463,8 @@ export class CanvasActionDispatcher {
       });
     } else {
       selectedEls.forEach((el) => {
+        el.dirty = true;
+        this.ctx.model.markElementDirty(el.id);
         if (el.vertices && el.vertices.length > 0) {
           el.vertices = el.vertices.map((v) => ({
             ...v,

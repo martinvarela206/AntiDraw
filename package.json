@@ -2,7 +2,7 @@
   "name": "antidraw",
   "displayName": "%antidraw.displayName%",
   "description": "%antidraw.description%",
-  "version": "0.103.47",
+  "version": "0.103.48",
   "icon": "icon.png",
   "publisher": "martinvarela206",
   "author": {
@@ -122,7 +122,7 @@
     "package": "pnpm run build:prod && vsce package --no-dependencies",
     "package:pre-release": "pnpm run build:prod && vsce package --no-dependencies --pre-release",
     "publish:marketplace": "vsce publish --no-dependencies",
-    "publish:openvsx": "npx -y ovsx publish antidraw-0.103.47.vsix"
+    "publish:openvsx": "npx -y ovsx publish antidraw-0.103.48.vsix"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

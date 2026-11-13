@@ -96,13 +96,7 @@ export class AntiDrawEditorProvider implements vscode.CustomEditorProvider<AntiD
       try {
         data = await vscode.workspace.fs.readFile(canonicalUri);
       } catch (_e) {
-        // Fallback to legacy .json if .svg.json is not yet created
-        try {
-          const legacyUri = SidecarIntegrityService.getLegacySidecarUri(svgUri);
-          data = await vscode.workspace.fs.readFile(legacyUri);
-        } catch (_legacyErr) {
-          return null;
-        }
+        return null;
       }
 
       if (!data) return null;
@@ -181,29 +175,17 @@ export class AntiDrawEditorProvider implements vscode.CustomEditorProvider<AntiD
         }
       }
     } else {
-      // SVG opened: check if companion .adrw already exists
-      try {
-        const adrwBytes = await vscode.workspace.fs.readFile(adrwUri);
-        const adrwText = new TextDecoder('utf-8').decode(adrwBytes);
-        container = AdrwProjectService.parseContainer(adrwText, baseFileName);
-        if (container.companionMetadata) {
-          const { persistent, volatile, hasVolatile } = SessionStateStorage.splitMetadata(container.companionMetadata);
-          container.companionMetadata = persistent;
-          if (hasVolatile) {
-            await SessionStateStorage.saveSessionState(this.context.workspaceState, uri, volatile);
-          }
+      // SVG opened: read SVG content directly and companion .svg.json (strictly without .adrw generation)
+      const svgBytes = await vscode.workspace.fs.readFile(uri);
+      const svgText = new TextDecoder('utf-8').decode(svgBytes);
+      const sidecarMeta = await this.readSidecarMetadata(uri, svgText);
+      container = AdrwProjectService.createFromSvg(svgText, baseFileName, sidecarMeta);
+      if (container.companionMetadata) {
+        const { persistent, volatile, hasVolatile } = SessionStateStorage.splitMetadata(container.companionMetadata);
+        container.companionMetadata = persistent;
+        if (hasVolatile) {
+          await SessionStateStorage.saveSessionState(this.context.workspaceState, uri, volatile);
         }
-      } catch (_e) {
-        // Generate new .adrw container from SVG
-        const svgBytes = await vscode.workspace.fs.readFile(uri);
-        const svgText = new TextDecoder('utf-8').decode(svgBytes);
-        const sidecarMeta = await this.readSidecarMetadata(uri, svgText);
-        container = AdrwProjectService.createFromSvg(svgText, baseFileName, sidecarMeta);
-        const serialized = AdrwProjectService.serializeContainer(container);
-        await AtomicFileWriter.write(vscode.workspace.fs, adrwUri, new TextEncoder().encode(serialized));
-        vscode.window.showInformationMessage(
-          `[AntiDraw] Contenedor .adrw generado (${adrwUri.path.split('/').pop()}). Los cambios se guardan exclusivamente en el contenedor .adrw; el SVG original permanece protegido.`
-        );
       }
     }
 
@@ -267,7 +249,7 @@ export class AntiDrawEditorProvider implements vscode.CustomEditorProvider<AntiD
         text: document.container.svgContent,
         metadata: mergedMeta || null,
         locale: vscode.env.language,
-        documentUri: document.isAdrw ? document.uri.toString() : document.adrwUri.toString(),
+        documentUri: document.uri.toString(),
         documentDirUri: document.docDir.toString(),
         documentDirWebviewUri: docDirWebviewUri,
         fileName: document.baseFileName,
@@ -543,19 +525,27 @@ export class AntiDrawEditorProvider implements vscode.CustomEditorProvider<AntiD
       document.container.companionMetadata = persistent;
     }
 
-    const serialized = AdrwProjectService.serializeContainer(document.container);
-    const targetUri = document.isAdrw ? document.uri : document.adrwUri;
-    await AtomicFileWriter.write(vscode.workspace.fs, targetUri, new TextEncoder().encode(serialized));
-
-    // For SVG documents: also synchronize clean companion sidecar JSON (.svg.json) with hash
-    if (!document.isAdrw && document.container.companionMetadata) {
-      const sidecarUri = SidecarIntegrityService.getSidecarUri(document.uri);
-      const payload = SidecarIntegrityService.packageSidecar(
-        document.container.svgContent,
-        document.container.companionMetadata
+    if (document.isAdrw) {
+      const serialized = AdrwProjectService.serializeContainer(document.container);
+      await AtomicFileWriter.write(vscode.workspace.fs, document.uri, new TextEncoder().encode(serialized));
+    } else {
+      // Save directly to the SVG file
+      await AtomicFileWriter.write(
+        vscode.workspace.fs,
+        document.uri,
+        new TextEncoder().encode(document.container.svgContent)
       );
-      const sidecarText = JSON.stringify(payload, null, 2);
-      await AtomicFileWriter.write(vscode.workspace.fs, sidecarUri, new TextEncoder().encode(sidecarText));
+
+      // For SVG documents: also synchronize clean companion sidecar JSON (.svg.json) with hash
+      if (document.container.companionMetadata) {
+        const sidecarUri = SidecarIntegrityService.getSidecarUri(document.uri);
+        const payload = SidecarIntegrityService.packageSidecar(
+          document.container.svgContent,
+          document.container.companionMetadata
+        );
+        const sidecarText = JSON.stringify(payload, null, 2);
+        await AtomicFileWriter.write(vscode.workspace.fs, sidecarUri, new TextEncoder().encode(sidecarText));
+      }
     }
 
     document.setDirty(false);
@@ -574,8 +564,26 @@ export class AntiDrawEditorProvider implements vscode.CustomEditorProvider<AntiD
       document.container.companionMetadata = persistent;
     }
 
-    const serialized = AdrwProjectService.serializeContainer(document.container);
-    await AtomicFileWriter.write(vscode.workspace.fs, destination, new TextEncoder().encode(serialized));
+    const isAdrwDest = destination.path.toLowerCase().endsWith('.adrw');
+    if (isAdrwDest) {
+      const serialized = AdrwProjectService.serializeContainer(document.container);
+      await AtomicFileWriter.write(vscode.workspace.fs, destination, new TextEncoder().encode(serialized));
+    } else {
+      await AtomicFileWriter.write(
+        vscode.workspace.fs,
+        destination,
+        new TextEncoder().encode(document.container.svgContent)
+      );
+      if (document.container.companionMetadata) {
+        const sidecarUri = SidecarIntegrityService.getSidecarUri(destination);
+        const payload = SidecarIntegrityService.packageSidecar(
+          document.container.svgContent,
+          document.container.companionMetadata
+        );
+        const sidecarText = JSON.stringify(payload, null, 2);
+        await AtomicFileWriter.write(vscode.workspace.fs, sidecarUri, new TextEncoder().encode(sidecarText));
+      }
+    }
   }
 
   /**
@@ -585,10 +593,15 @@ export class AntiDrawEditorProvider implements vscode.CustomEditorProvider<AntiD
     document: AntiDrawCustomDocument,
     _cancellation: vscode.CancellationToken
   ): Promise<void> {
-    const sourceUri = document.isAdrw ? document.uri : document.adrwUri;
-    const data = await vscode.workspace.fs.readFile(sourceUri);
+    const data = await vscode.workspace.fs.readFile(document.uri);
     const text = new TextDecoder('utf-8').decode(data);
-    document.container = AdrwProjectService.parseContainer(text, document.baseFileName);
+
+    if (document.isAdrw) {
+      document.container = AdrwProjectService.parseContainer(text, document.baseFileName);
+    } else {
+      const sidecarMeta = await this.readSidecarMetadata(document.uri, text);
+      document.container = AdrwProjectService.createFromSvg(text, document.baseFileName, sidecarMeta);
+    }
 
     if (document.container.companionMetadata) {
       const { persistent } = SessionStateStorage.splitMetadata(document.container.companionMetadata);
@@ -605,7 +618,7 @@ export class AntiDrawEditorProvider implements vscode.CustomEditorProvider<AntiD
       text: document.container.svgContent,
       metadata: mergedMeta || null,
       locale: vscode.env.language,
-      documentUri: document.isAdrw ? document.uri.toString() : document.adrwUri.toString(),
+      documentUri: document.uri.toString(),
       documentDirUri: document.docDir.toString(),
       fileName: document.baseFileName,
     });

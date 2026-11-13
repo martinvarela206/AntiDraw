@@ -38,14 +38,6 @@ export class SidecarIntegrityService {
   }
 
   /**
-   * Resolves the legacy .json URI (replacing .svg with .json) for backward-compatible fallback.
-   */
-  public static getLegacySidecarUri(svgUri: vscode.Uri): vscode.Uri {
-    const jsonPath = svgUri.path.replace(/\.svg$/i, '.json');
-    return svgUri.with({ path: jsonPath });
-  }
-
-  /**
    * Computes a deterministic SHA-256 hash of SVG markup, normalizing line endings and trimming.
    */
   public static computeSvgHash(svgContent: string): string {

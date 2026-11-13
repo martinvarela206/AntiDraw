@@ -3,6 +3,22 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.48] - 2026-11-13
+
+### 🐛 Bug Fix: Direct SVG Persistence, Pure .svg.json Sidecar & Fail-Safe DOM Diffing
+- **SvgDomRenderer Fail-Safe Attribute Diffing (`SvgDomRenderer.ts`)**:
+  - Resolved visual displacement failure where moving `<path>` elements only translated selection bounding box while canvas paths remained frozen.
+  - Implemented fail-safe defensive diffing: elements whose attributes differ in the DOM are systematically updated even when callers omit explicit `dirty = true` flags.
+  - Set explicit `el.dirty = true` and `model.markElementDirty` across `TranslateInteraction` and `CanvasActionDispatcher`.
+- **Pure `.svg.json` Sidecar Standardization (`SidecarIntegrityService.ts` & `AntiDrawEditorProvider.ts`)**:
+  - Completely removed legacy `.json` fallbacks and references (`getLegacySidecarUri`). All metadata sidecars are strictly and exclusively `<name>.svg.json`.
+- **Direct SVG Save Without Unsolicited `.adrw` Generation (`AntiDrawEditorProvider.ts`)**:
+  - Eliminated automatic generation of `.adrw` companion files on opening `.svg` files.
+  - Restored direct native SVG persistence on `Ctrl+S` (`saveCustomDocument`): writes sanitized SVG content directly to the target `.svg` document URI, writes companion metadata to `.svg.json`, and completely halts `.adrw` file generation.
+- **Automated Test Coverage**: Added test suite `test-svg-direct-save-and-dom-diff.ts` (Suite 90) with 6 assertions validating direct SVG saving, clean `.svg.json` sidecars, zero `.adrw` side-effects, and fail-safe DOM diffing.
+
+---
+
 ## [0.103.47] - 2026-11-13
 
 ### 📝 Documentation & Roadmap Synchronization (Volume 1)

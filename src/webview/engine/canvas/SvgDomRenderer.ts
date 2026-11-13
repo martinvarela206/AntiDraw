@@ -164,19 +164,21 @@ export class SvgDomRenderer {
       const existing = existingNodeMap.get(el.id);
 
       if (existing) {
-        if (el.dirty !== false) {
-          // In-place attribute diffing
-          for (const [attrKey, attrVal] of Object.entries(el.attributes)) {
-            if (existing.getAttribute(attrKey) !== attrVal) {
-              if (el.tagName === 'image' && (attrKey === 'href' || attrKey === 'xlink:href')) {
-                const resolved = AssetUriResolver.resolveLiveAssetUri(attrVal);
-                existing.setAttribute(attrKey, resolved);
-                existing.setAttributeNS('http://www.w3.org/1999/xlink', 'href', resolved);
-              } else {
-                existing.setAttribute(attrKey, attrVal);
-              }
+        let hasDiff = false;
+        // In-place attribute diffing: check and synchronize modified attributes
+        for (const [attrKey, attrVal] of Object.entries(el.attributes)) {
+          if (existing.getAttribute(attrKey) !== attrVal) {
+            if (el.tagName === 'image' && (attrKey === 'href' || attrKey === 'xlink:href')) {
+              const resolved = AssetUriResolver.resolveLiveAssetUri(attrVal);
+              existing.setAttribute(attrKey, resolved);
+              existing.setAttributeNS('http://www.w3.org/1999/xlink', 'href', resolved);
+            } else {
+              existing.setAttribute(attrKey, attrVal);
             }
+            hasDiff = true;
           }
+        }
+        if (hasDiff || el.dirty === true) {
           el.dirty = false;
           SvgDomRenderer.stats.nodesUpdated++;
         } else {
