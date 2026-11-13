@@ -3,6 +3,17 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.47] - 2026-11-13
+
+### 📝 Documentation & Roadmap Synchronization (Volume 1)
+- **Master Document Roadmap Realignment (`AntiDraw_Documento_Maestro_Vol1_Estrategia_y_Arquitectura.md`)**:
+  - Synchronized header metadata and snapshot versioning to current `v0.103.47 (Public Beta)` with 5 decoupled architectural layers.
+  - Replaced legacy roadmap Mermaid diagram (§4.1) removing outdated milestones (`v0.85` / `v0.90` / `v0.95`) with real-world active progression (`v0.103.x` integrated Public Beta -> `v1.0.0` Gold Marketplace Release).
+  - Updated implementation phase progress (§4.3): formally marked Phase 2 (Snapping & Parametric Geometry) and Phase 3 (Topology, DCEL Planar Partition, Shape Builder, Layer Tree & Variable Width Stroke) as 100% completed (`Completada ✅`).
+  - Synchronized repository artifact references in Part II to `antidraw-0.103.47.vsix`.
+
+---
+
 ## [0.103.46] - 2026-11-13
 
 ### 📋 Single Source of Truth Tool Catalog Manifest & Dynamic Manual Synchronization
