@@ -10,6 +10,7 @@ import { formatNum } from '../geometry/PathGeometryCompiler.js';
 import { RectPrimitive } from '../primitives/RectPrimitive.js';
 import { SvgSanitizer } from '../security/SvgSanitizer.js';
 import { IsomorphicXmlParserFactory, IXmlParser } from './XmlParser.js';
+import { CssStyleResolver } from './CssStyleResolver.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Dedicated SVG Deserialization Service (SvgDeserializer)
@@ -176,7 +177,24 @@ export class SvgDeserializer {
       ctx.canvas.svgStrokeLinecap = rootStrokeLinecap;
       ctx.canvas.svgStrokeLinejoin = rootStrokeLinejoin;
 
-      if (companionMetadata?.canvas?.currentColor) {
+      const cssResolver = CssStyleResolver.fromDocument(doc, companionMetadata);
+      if (styleAttr) {
+        for (const pair of styleAttr.split(';')) {
+          const colon = pair.indexOf(':');
+          if (colon > 0) {
+            const p = pair.substring(0, colon).trim();
+            const v = pair.substring(colon + 1).trim();
+            if (p.startsWith('--') && v) {
+              cssResolver.setGlobalVariable(p, v);
+            }
+          }
+        }
+      }
+
+      const rootSvgColor = svgEl.getAttribute('color');
+      if (rootSvgColor && rootSvgColor.trim()) {
+        ctx.canvas.currentColor = rootSvgColor.trim();
+      } else if (companionMetadata?.canvas?.currentColor) {
         ctx.canvas.currentColor = companionMetadata.canvas.currentColor;
       } else if (!ctx.canvas.currentColor) {
         ctx.canvas.currentColor = '#000000';
@@ -300,6 +318,9 @@ export class SvgDeserializer {
       };
 
       const rootInheritedAttrs = extractPresentationAttrs(svgEl);
+      if (ctx.canvas.currentColor && !rootInheritedAttrs['color']) {
+        rootInheritedAttrs['color'] = ctx.canvas.currentColor;
+      }
 
       // Parse child vector elements with recursive group and cascading presentation attribute inheritance
       const usedIds = new Set<string>();
@@ -308,6 +329,7 @@ export class SvgDeserializer {
       const parseNode = (
         node: Element,
         inherited: Record<string, string>,
+        inheritedVars: Record<string, string> = {},
         targetList: VectorElement[] = ctx.elements,
         depth: number = 0,
         maxDepth: number = 64
@@ -328,10 +350,22 @@ export class SvgDeserializer {
           }
           if (node.hasAttribute('style')) gAttrs.style = node.getAttribute('style')!;
           if (node.hasAttribute('transform')) gAttrs.transform = node.getAttribute('transform')!;
-          SvgDeserializer.cleanStyleAttr(gAttrs);
-          if (gAttrs.transform) {
-            gAttrs.transform = SvgDeserializer.normalizeTransform(gAttrs.transform);
+
+          const inlinePres = extractPresentationAttrs(node);
+          for (const [k, v] of Object.entries(inlinePres)) {
+            if (gAttrs[k] === undefined) {
+              gAttrs[k] = v;
+            }
           }
+
+          const { effectiveColor, elementVars } = SvgDeserializer.applyCssAndResolve(
+            node,
+            gAttrs,
+            inherited,
+            inheritedVars,
+            cssResolver,
+            ctx.canvas.currentColor || '#000000'
+          );
 
           const groupElemId = node.getAttribute('id') || `group_${elementIdx++}_${Date.now().toString(36)}`;
           if (!gAttrs.id) gAttrs.id = groupElemId;
@@ -348,9 +382,14 @@ export class SvgDeserializer {
             children: [],
           };
 
-          const groupInherited = { ...inherited, ...extractPresentationAttrs(node), ...gAttrs };
+          const groupInherited = {
+            ...inherited,
+            ...extractPresentationAttrs(node),
+            ...gAttrs,
+            color: effectiveColor,
+          };
           Array.from(node.children).forEach((ch) =>
-            parseNode(ch, groupInherited, groupEl.children!, depth + 1, maxDepth)
+            parseNode(ch, groupInherited, elementVars, groupEl.children!, depth + 1, maxDepth)
           );
 
           targetList.push(groupEl);
@@ -389,10 +428,14 @@ export class SvgDeserializer {
             if (elemAttrs[k] === undefined) elemAttrs[k] = v;
           }
 
-          SvgDeserializer.cleanStyleAttr(elemAttrs);
-          if (elemAttrs.transform) {
-            elemAttrs.transform = SvgDeserializer.normalizeTransform(elemAttrs.transform);
-          }
+          SvgDeserializer.applyCssAndResolve(
+            node,
+            elemAttrs,
+            inherited,
+            inheritedVars,
+            cssResolver,
+            ctx.canvas.currentColor || '#000000'
+          );
 
           const fontSize = parseFloat(elemAttrs['font-size'] || '14') || 14;
           elemAttrs.id = textElemId;
@@ -470,10 +513,14 @@ export class SvgDeserializer {
             if (elemAttrs[k] === undefined) elemAttrs[k] = v;
           }
 
-          SvgDeserializer.cleanStyleAttr(elemAttrs);
-          if (elemAttrs.transform) {
-            elemAttrs.transform = SvgDeserializer.normalizeTransform(elemAttrs.transform);
-          }
+          SvgDeserializer.applyCssAndResolve(
+            node,
+            elemAttrs,
+            inherited,
+            inheritedVars,
+            cssResolver,
+            ctx.canvas.currentColor || '#000000'
+          );
 
           elemAttrs.id = textElemId;
           const fontSize = parseFloat(elemAttrs['font-size'] || '14') || 14;
@@ -561,10 +608,14 @@ export class SvgDeserializer {
             }
           }
 
-          SvgDeserializer.cleanStyleAttr(attrs);
-          if (attrs.transform) {
-            attrs.transform = SvgDeserializer.normalizeTransform(attrs.transform);
-          }
+          SvgDeserializer.applyCssAndResolve(
+            node,
+            attrs,
+            inherited,
+            inheritedVars,
+            cssResolver,
+            ctx.canvas.currentColor || '#000000'
+          );
 
           const parseFinite = (val: string | null, defVal: number): number => {
             if (!val) return defVal;
@@ -871,7 +922,7 @@ export class SvgDeserializer {
       };
 
       Array.from(svgEl.children).forEach((child) =>
-        parseNode(child, rootInheritedAttrs, ctx.elements, 0, 64)
+        parseNode(child, rootInheritedAttrs, {}, ctx.elements, 0, 64)
       );
     } catch (e) {
       console.error('Failed to parse SVG string', e);
@@ -923,15 +974,36 @@ export class SvgDeserializer {
    * Normalizes CSS transform declarations into canonical unitless SVG standard attribute format.
    * Converts units (px, deg, rad, grad, turn) and remaps single-axis functions (translateX, translateY, scaleX, scaleY, skew).
    */
-  public static normalizeTransform(transformStr: string): string {
+  public static normalizeTransform(transformStr: string, cssVars?: Record<string, string>): string {
     if (!transformStr || !transformStr.trim()) return '';
+
+    // Pre-resolve CSS variables if present
+    if (cssVars || transformStr.includes('var(')) {
+      const resolver = new CssStyleResolver();
+      if (cssVars) {
+        for (const [k, v] of Object.entries(cssVars)) {
+          resolver.setGlobalVariable(k, v);
+        }
+      }
+      transformStr = resolver.resolveVariables(transformStr, cssVars);
+    }
+
     const fnRegex = /([a-zA-Z]+)\s*\(([^)]*)\)/g;
     const parts: string[] = [];
     let match: RegExpExecArray | null;
 
     while ((match = fnRegex.exec(transformStr)) !== null) {
       const fn = match[1].toLowerCase();
-      const rawArgs = match[2].trim();
+      let rawArgs = match[2].trim();
+      if (rawArgs.includes('var(')) {
+        const resolver = new CssStyleResolver();
+        if (cssVars) {
+          for (const [k, v] of Object.entries(cssVars)) {
+            resolver.setGlobalVariable(k, v);
+          }
+        }
+        rawArgs = resolver.resolveVariables(rawArgs, cssVars);
+      }
       const args = rawArgs.split(/[\s,]+/).filter(Boolean);
 
       switch (fn) {
@@ -1080,7 +1152,7 @@ export class SvgDeserializer {
    * Cleans an element's inline style attribute, extracting and normalizing transform
    * and expanding font shorthand into direct element attributes.
    */
-  public static cleanStyleAttr(attrs: Record<string, string>): void {
+  public static cleanStyleAttr(attrs: Record<string, string>, cssVars?: Record<string, string>): void {
     if (!attrs.style) return;
     const decls = attrs.style.split(';');
     const remainingDecls: string[] = [];
@@ -1089,11 +1161,21 @@ export class SvgDeserializer {
       const colon = d.indexOf(':');
       if (colon <= 0) continue;
       const prop = d.substring(0, colon).trim().toLowerCase();
-      const val = d.substring(colon + 1).trim();
+      let val = d.substring(colon + 1).trim();
       if (!val) continue;
 
+      if (cssVars || val.includes('var(')) {
+        const resolver = new CssStyleResolver();
+        if (cssVars) {
+          for (const [k, v] of Object.entries(cssVars)) {
+            resolver.setGlobalVariable(k, v);
+          }
+        }
+        val = resolver.resolveVariables(val, cssVars);
+      }
+
       if (prop === 'transform') {
-        const norm = SvgDeserializer.normalizeTransform(val);
+        const norm = SvgDeserializer.normalizeTransform(val, cssVars);
         if (norm) {
           attrs.transform = attrs.transform ? `${attrs.transform} ${norm}` : norm;
         }
@@ -1114,5 +1196,103 @@ export class SvgDeserializer {
     } else {
       delete attrs.style;
     }
+  }
+
+  /**
+   * Applies CSS classes, internal stylesheet rules, variables, currentColor cascading, and transform normalizations.
+   */
+  public static applyCssAndResolve(
+    node: Element,
+    attrs: Record<string, string>,
+    inherited: Record<string, string>,
+    inheritedVars: Record<string, string>,
+    cssResolver: CssStyleResolver,
+    canvasDefaultColor: string
+  ): { effectiveColor: string; elementVars: Record<string, string> } {
+    const tag = node.tagName.toLowerCase();
+    const nodeId = node.getAttribute('id') || null;
+    const nodeClass = node.getAttribute('class') || '';
+    const classList = nodeClass.split(/\s+/).filter(Boolean);
+
+    // Extract inline style variables if any
+    const inlineVars: Record<string, string> = {};
+    if (attrs.style) {
+      for (const pair of attrs.style.split(';')) {
+        const colon = pair.indexOf(':');
+        if (colon > 0) {
+          const p = pair.substring(0, colon).trim();
+          const v = pair.substring(colon + 1).trim();
+          if (p.startsWith('--') && v) {
+            inlineVars[p] = v;
+          }
+        }
+      }
+    }
+
+    // Match rules from stylesheet
+    const matched = cssResolver.matchElement(tag, nodeId, classList);
+    const elementVars: Record<string, string> = {
+      ...inheritedVars,
+      ...matched.variables,
+      ...inlineVars,
+    };
+
+    // Apply declarations from matched CSS rules if not directly declared on element
+    for (const [prop, val] of Object.entries(matched.declarations)) {
+      if (prop === 'transform') {
+        if (attrs.transform) {
+          attrs.transform = `${val} ${attrs.transform}`;
+        } else {
+          attrs.transform = val;
+        }
+      } else if (attrs[prop] === undefined) {
+        attrs[prop] = val;
+      }
+    }
+
+    // Resolve var(...) in all attributes
+    for (const [k, v] of Object.entries(attrs)) {
+      if (typeof v === 'string' && v.includes('var(')) {
+        attrs[k] = cssResolver.resolveVariables(v, elementVars);
+      }
+    }
+
+    // Determine cascading effectiveColor
+    if (!attrs.color && attrs.style) {
+      const match = attrs.style.match(/(?:^|;)\s*color\s*:\s*([^;]+)/i);
+      if (match) {
+        attrs.color = match[1].trim();
+      }
+    }
+    const rawColor = attrs.color || inherited['color'] || '';
+    const effectiveColor = rawColor
+      ? cssResolver.resolveVariables(rawColor, elementVars)
+      : (canvasDefaultColor || '#000000');
+
+    // Resolve currentColor for fill and stroke
+    if (attrs.fill) {
+      const fillCheck = attrs.fill.trim().toLowerCase();
+      if (fillCheck === 'currentcolor') {
+        attrs['data-original-fill'] = 'currentColor';
+        attrs.fill = effectiveColor;
+      }
+    }
+    if (attrs.stroke) {
+      const strokeCheck = attrs.stroke.trim().toLowerCase();
+      if (strokeCheck === 'currentcolor') {
+        attrs['data-original-stroke'] = 'currentColor';
+        attrs.stroke = effectiveColor;
+      }
+    }
+
+    // Clean inline style attribute (removes transform & font shorthand, expanding into attrs)
+    SvgDeserializer.cleanStyleAttr(attrs, elementVars);
+
+    // Normalize transform
+    if (attrs.transform) {
+      attrs.transform = SvgDeserializer.normalizeTransform(attrs.transform, elementVars);
+    }
+
+    return { effectiveColor, elementVars };
   }
 }

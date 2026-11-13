@@ -3,6 +3,18 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.31] - 2026-11-12
+
+### 🎨 Extended CSS Transformations, Variable Expansion & currentColor Cascading
+- **CSS Stylesheet Parsing & Scoped Selector Matching (`CssStyleResolver.ts`)**:
+  - **Internal `<style>` Parser**: Extracted stylesheet definitions across root and `<defs>` blocks, supporting element tag selectors (`rect`, `path`), class selectors (`.icon`), compound selectors (`rect.icon`), and ID selectors (`#id`) weighted by standard CSS specificity calculations.
+  - **CSS Custom Property (`var(...)`) Expansion**: Added recursive CSS variable resolution supporting nested variables and fallbacks (`var(--primary, var(--fallback, #10b981))`) in presentation attributes and transforms.
+  - **Cascading `currentColor` Resolution**: Implemented standard W3C `currentColor` inheritance through root `<svg>` and container `<g>` hierarchies, resolving computed color values on child elements while lossless preserving `data-original-fill` / `data-original-stroke` markers.
+  - **Composite CSS + Inline Transform Normalization**: Enabled canonical unitless normalisation (`SvgDeserializer.normalizeTransform`) for transforms defined in CSS classes, inline styles, or combined cascading sequences.
+  - **Automated Test Coverage**: Added test suite `test-css-transforms-variables-currentcolor.ts` (Suite 74) verifying 5 assertions covering class transforms, CSS variable expansion, nested fallbacks, currentColor container cascades, and composite transform specificity.
+
+---
+
 ## [0.103.30] - 2026-11-12
 
 ### 📐 Analytical Schneider Curve Segmentation & Corner Detection
