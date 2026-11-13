@@ -2,6 +2,7 @@ import { VectorElement, VectorModel } from '../../engine/VectorModel.js';
 import { BlendEngine, BlendConfig } from '../../engine/blend/BlendEngine.js';
 import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
 import { I18nService } from '../../i18n/index.js';
+import { ToolIcons } from '../../icons/ToolIcons.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Dedicated Blend Tool Inspector (BlendInspector - MDWiki 8.8)
@@ -57,9 +58,9 @@ export class BlendInspector {
             <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-subtle, rgba(0,0,0,0.15)); padding:4px 6px; border-radius:4px;">
               <span style="font-size:10.5px; color:var(--text-muted);">${I18nService.t('inspector.figureA')}:</span>
               <div style="display:flex; align-items:center; gap:3px;">
-                <button type="button" class="prop-input" id="btn-blend-prev-a" style="cursor:pointer; width:22px; padding:1px; text-align:center;">◀</button>
+                <button type="button" class="prop-input" id="btn-blend-prev-a" style="cursor:pointer; width:22px; padding:1px; display:inline-flex; align-items:center; justify-content:center;">${ToolIcons.arrowLeft}</button>
                 <input type="number" class="prop-input" id="el-blend-start-a" min="0" max="99" value="${cfg.startNodeAIndex}" style="width:36px; text-align:center; padding:1px;" />
-                <button type="button" class="prop-input" id="btn-blend-next-a" style="cursor:pointer; width:22px; padding:1px; text-align:center;">▶</button>
+                <button type="button" class="prop-input" id="btn-blend-next-a" style="cursor:pointer; width:22px; padding:1px; display:inline-flex; align-items:center; justify-content:center;">${ToolIcons.arrowRight}</button>
               </div>
             </div>
 
@@ -67,9 +68,9 @@ export class BlendInspector {
             <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-subtle, rgba(0,0,0,0.15)); padding:4px 6px; border-radius:4px;">
               <span style="font-size:10.5px; color:var(--text-muted);">${I18nService.t('inspector.figureB')}:</span>
               <div style="display:flex; align-items:center; gap:3px;">
-                <button type="button" class="prop-input" id="btn-blend-prev-b" style="cursor:pointer; width:22px; padding:1px; text-align:center;">◀</button>
+                <button type="button" class="prop-input" id="btn-blend-prev-b" style="cursor:pointer; width:22px; padding:1px; display:inline-flex; align-items:center; justify-content:center;">${ToolIcons.arrowLeft}</button>
                 <input type="number" class="prop-input" id="el-blend-start-b" min="0" max="99" value="${cfg.startNodeBIndex}" style="width:36px; text-align:center; padding:1px;" />
-                <button type="button" class="prop-input" id="btn-blend-next-b" style="cursor:pointer; width:22px; padding:1px; text-align:center;">▶</button>
+                <button type="button" class="prop-input" id="btn-blend-next-b" style="cursor:pointer; width:22px; padding:1px; display:inline-flex; align-items:center; justify-content:center;">${ToolIcons.arrowRight}</button>
               </div>
             </div>
           </div>

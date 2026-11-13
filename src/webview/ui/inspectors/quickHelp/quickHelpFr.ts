@@ -11,7 +11,7 @@ export const TOOL_HELP_MAP_FR: Record<string, ToolHelpConfig> = {
       { keys: ['Mini-HUD'], description: 'Pilule flottante sur la boîte englobante pour basculer en 1 clic : Déplacer, Échelle, Rotation' },
       { keys: ['Clic avec pause'], description: 'Alterne les modes : Échelle → Rotation → Déformation libre (Perspective)' },
       { keys: ['D'], description: 'Déformation libre / Perspective : active/désactive les poignées homographiques 3x3' },
-      { keys: ['Bouton ▱'], description: 'Bouton dédié dans l’inspecteur pour basculer la déformation libre' },
+      { keys: ['Déformer (D)'], description: 'Bouton dédié dans l’inspecteur pour basculer la déformation libre' },
       { keys: ['Clic'], description: 'Sélectionne l’élément sous le curseur ou désélectionne dans le vide' },
       { keys: ['Maj', 'Clic'], description: 'Ajoute ou retire l’élément de la sélection multiple' },
       { keys: ['Glisser'], description: 'Déplace les éléments sélectionnés sur le canevas' },

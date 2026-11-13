@@ -2,6 +2,7 @@ import { VectorElement, VectorModel } from '../../engine/VectorModel.js';
 import { SelectionTool, BoundingBox } from '../../engine/SelectionTool.js';
 import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
 import { I18nService } from '../../i18n/index.js';
+import { ToolIcons } from '../../icons/ToolIcons.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Dedicated Ellipse, Pie & Arc Inspector (EllipseInspector)
@@ -106,7 +107,7 @@ export class EllipseInspector {
                 <span class="prop-coord-sublabel">°</span>
               </div>
             </div>
-            <button class="prop-input" id="btn-ellipse-invert-angles" style="width: 26px; height: 26px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;" title="⇄">⇄</button>
+            <button class="prop-input" id="btn-ellipse-invert-angles" style="width: 26px; height: 26px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;" title="Invertir ángulos">${ToolIcons.swap}</button>
           </div>
         </div>
         <!-- Donut / Ring Inner Ratio (FEAT-10) -->
@@ -122,7 +123,7 @@ export class EllipseInspector {
           </div>
         </div>
         <div class="prop-row" style="gap: 6px; margin-top: 6px;">
-          <button class="prop-input" id="btn-ellipse-swap-radii" style="flex: 1; cursor: pointer; height: 24px; font-size: 10px; text-align: center;" title="⇄ ${I18nService.t('inspector.rotate90')}">⇄ ${I18nService.t('inspector.rotate90')}</button>
+          <button class="prop-input" id="btn-ellipse-swap-radii" style="flex: 1; cursor: pointer; height: 24px; font-size: 10px; text-align: center; display: inline-flex; align-items: center; justify-content: center; gap: 4px;" title="${I18nService.t('inspector.rotate90')}">${ToolIcons.swap} ${I18nService.t('inspector.rotate90')}</button>
           <button class="prop-input" id="btn-ellipse-to-path" style="flex: 1; cursor: pointer; height: 24px; font-size: 10px; text-align: center;" title="${I18nService.t('inspector.convertToCurves')} (Ctrl+Q)">${I18nService.t('inspector.convertToCurves')}</button>
         </div>
       </div>

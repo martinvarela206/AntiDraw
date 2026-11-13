@@ -2,6 +2,7 @@ import { VectorElement, VectorModel, RectCorners } from '../../engine/VectorMode
 import { SelectionTool, BoundingBox } from '../../engine/SelectionTool.js';
 import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
 import { I18nService } from '../../i18n/index.js';
+import { ToolIcons } from '../../icons/ToolIcons.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Dedicated Rectangle & Advanced Corner Inspector (RectInspector)
@@ -102,9 +103,9 @@ export class RectInspector {
             </div>
           </div>
           <div class="prop-row" style="gap: 4px;">
-            <button class="prop-input" id="btn-rect-unify-corners" style="flex:1.2; cursor:pointer; font-size:9px; height:22px; padding:0; font-weight:600;" title="${I18nService.t('inspector.unifyCorners')}">⬭ ${I18nService.t('inspector.unifyCorners')}</button>
+            <button class="prop-input" id="btn-rect-unify-corners" style="flex:1.2; cursor:pointer; font-size:9px; height:22px; padding:0; font-weight:600; display:inline-flex; align-items:center; justify-content:center; gap:3px;" title="${I18nService.t('inspector.unifyCorners')}">${ToolIcons.rectTool} ${I18nService.t('inspector.unifyCorners')}</button>
             <button class="prop-input" id="btn-rect-sync-tl" style="flex:1; cursor:pointer; font-size:9px; height:22px; padding:0;" title="${I18nService.t('inspector.copyTL')}">${I18nService.t('inspector.copyTL')}</button>
-            <button class="prop-input" id="btn-rect-invert-corners" style="flex:1; cursor:pointer; font-size:9px; height:22px; padding:0;" title="${I18nService.t('inspector.invertCorners')}">⇄ ${I18nService.t('inspector.invertCorners')}</button>
+            <button class="prop-input" id="btn-rect-invert-corners" style="flex:1; cursor:pointer; font-size:9px; height:22px; padding:0; display:inline-flex; align-items:center; justify-content:center; gap:3px;" title="${I18nService.t('inspector.invertCorners')}">${ToolIcons.swap} ${I18nService.t('inspector.invertCorners')}</button>
           </div>
         </div>
 

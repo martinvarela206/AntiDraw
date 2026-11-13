@@ -1,6 +1,7 @@
 import { VectorElement, VectorModel } from '../../engine/VectorModel.js';
 import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
 import { I18nService } from '../../i18n/index.js';
+import { ToolIcons } from '../../icons/ToolIcons.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Dedicated Line, Polyline & Polygon Inspector (LineInspector)
@@ -12,7 +13,7 @@ import { I18nService } from '../../i18n/index.js';
  * 2. Real-Time Bidirectional Geometric Synchronization (FEAT-04):
  *    Extracts origin (`x1`, `y1`) and destination (`x2`, `y2`) coordinates with fallback to vertex arrays,
  *    analytically calculates Euclidean length and polar angle in degrees, and supports coordinate inversion
- *    (`⇄ Invertir Puntos`) as well as lossless conversion to freeform Bézier curves (`<path>`).
+ *    (`Invertir Puntos`) as well as lossless conversion to freeform Bézier curves (`<path>`).
  */
 export class LineInspector {
   public static render(el: VectorElement, model: VectorModel): string {
@@ -66,7 +67,7 @@ export class LineInspector {
           </div>
         </div>
         <div class="prop-row" style="gap: 6px; margin-top: 6px;">
-          <button class="prop-input" id="btn-line-reverse" style="flex: 1; cursor: pointer; height: 24px; font-size: 10px; text-align: center;" title="${I18nService.t('inspector.reversePointsTitle')}">⇄ ${I18nService.t('inspector.reversePoints')}</button>
+          <button class="prop-input" id="btn-line-reverse" style="flex: 1; cursor: pointer; height: 24px; font-size: 10px; text-align: center; display: inline-flex; align-items: center; justify-content: center; gap: 4px;" title="${I18nService.t('inspector.reversePointsTitle')}">${ToolIcons.swap} ${I18nService.t('inspector.reversePoints')}</button>
           <button class="prop-input" id="btn-line-to-path" style="flex: 1; cursor: pointer; height: 24px; font-size: 10px; text-align: center;" title="${I18nService.t('inspector.convertToCurves')} (Ctrl+Q)">${I18nService.t('inspector.convertToCurves')}</button>
         </div>
       </div>

@@ -92,11 +92,11 @@ export class RulerGuideInspector {
                   <button class="btn-icon" id="btn-grid-vis-${g.id}" style="width:20px; height:20px; font-size:11px;">
                     ${g.visible ? ToolIcons.eye : ToolIcons.eyeOff}
                   </button>
-                  <button class="btn-icon" id="btn-grid-up-${g.id}" ${idx === 0 ? 'disabled style="opacity:0.3;"' : ''} style="width:20px; height:20px; font-size:9px;">
-                    ▲
+                  <button class="btn-icon" id="btn-grid-up-${g.id}" ${idx === 0 ? 'disabled style="opacity:0.3;"' : ''} style="width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center;">
+                    ${ToolIcons.arrowUp}
                   </button>
-                  <button class="btn-icon" id="btn-grid-down-${g.id}" ${idx === grids.length - 1 ? 'disabled style="opacity:0.3;"' : ''} style="width:20px; height:20px; font-size:9px;">
-                    ▼
+                  <button class="btn-icon" id="btn-grid-down-${g.id}" ${idx === grids.length - 1 ? 'disabled style="opacity:0.3;"' : ''} style="width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center;">
+                    ${ToolIcons.arrowDown}
                   </button>
                   ${grids.length > 1 ? `
                     <button class="btn-icon" id="btn-grid-del-${g.id}" style="width:20px; height:20px; font-size:11px; color:#ef4444;">

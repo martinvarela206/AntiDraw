@@ -3,6 +3,27 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.41] - 2026-11-13
+
+### 🎨 Residual Emoji Eradication & Standardized SVG Vector Icons
+- **Eradication of Residual Unicode Glyphs & Emojis**:
+  - Replaced all raw unicode glyphs and emoji characters (`▲`, `◆`, `★`, `⬡`, `✴`, `✹`, `🔒/🔓`, `✓`, `⟳`, `⟲`, `▱`, `⇄`, `▼`, `◀`, `▶`) across all UI inspector panels and buttons with crisp, standardized SVG vector icons normalized to 1.4px stroke width and 24x24 viewBox.
+- **New Vector Assets & Centralized Registries (`assets/icons/*.svg`, `ToolIcons.ts`, `icons/index.ts`)**:
+  - Added dedicated W3C SVG vector assets: `reset.svg` (counterclockwise restore arrow), `rotate_cw.svg` (clockwise rotation arrow), `distort.svg` (affine homography parallelogram), `swap_horizontal.svg` (bidirectional exchange arrows), `arrow_up.svg` / `arrow_down.svg` (grid layer reordering chevrons), `arrow_left.svg` / `arrow_right.svg` (blend start-node navigation arrowheads), `hexagon.svg` (regular polygon ratio badge), `triangle.svg` (preset 3), `diamond.svg` (preset 4), and `octagon.svg` (preset 8).
+  - Registered all new icons in `ToolIcons` and `ICONS` registries with aliases (`rotate`, `swap`, `reverse`, `reset`).
+- **Complete Inspector Modernization**:
+  - **Geometry & MultiSelection Inspectors**: Updated mode buttons and pivot resets with `ToolIcons.rotate`, `ToolIcons.distort`, and `ToolIcons.reset`.
+  - **Appearance Inspector**: Replaced raw `⇄` and `⟲` in gradient direction invert, radial gradient center/radius/focus/rotation resets, and fill lock resets with `ToolIcons.swap` and `ToolIcons.reset`.
+  - **Blend Inspector**: Replaced raw `◀` and `▶` start node steppers for Figure A and Figure B with `ToolIcons.arrowLeft` and `ToolIcons.arrowRight`.
+  - **Ellipse & Line Inspectors**: Replaced raw `⇄` in angle invert, 90° radii swap, and point reverse with `ToolIcons.swap`.
+  - **Primitive & Rectangle Inspectors**: Upgraded polygon/star presets with crisp vector icons and replaced `⬭` and `⬡` with normalized `ToolIcons.rectTool` and `ToolIcons.hexagon`.
+  - **RulerGuide Inspector**: Replaced raw `▲` and `▼` in grid reorder controls with `ToolIcons.arrowUp` and `ToolIcons.arrowDown`.
+  - **StrokeMarkerControls & PropertyPanel**: Replaced raw `⟲` in marker color reset and loop close with `ToolIcons.reset` and `ToolIcons.rotate`.
+  - **Internationalization (i18n)**: Sanitized localized strings in all 7 languages (EN, ES, DE, FR, JA, RU, ZH-CN) removing hardcoded `⟲` characters so clean localized text pairs with SVG vector components.
+- **Automated Test Coverage**: Added test suite `test-emoji-eradication-svg-icons.ts` (Suite 84) with 5 assertions verifying asset presence and 24x24 viewBox structure, registry mappings, clean inspector HTML generation, and zero residual text glyphs across all UI templates and i18n dictionaries.
+
+---
+
 ## [0.103.40] - 2026-11-13
 
 ### ♿ UI Inactive States Stack, ARIA Toolbar Semantics & Contextual Command Guarding

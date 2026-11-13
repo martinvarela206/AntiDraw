@@ -38,13 +38,13 @@ export class GeometryInspector {
           <div style="display:flex; gap:4px; flex:1;" role="group" aria-label="${I18nService.t('inspector.mode')}">
             <button class="prop-input ${selectionTool.selectionMode === 'move' ? 'mode-active-btn' : ''}" id="btn-mode-move" role="button" aria-pressed="${selectionTool.selectionMode === 'move'}" style="flex:1; cursor:pointer; font-weight:600; padding:4px; display:flex; align-items:center; justify-content:center; gap:3px; ${selectionTool.selectionMode === 'move' ? 'background:#10b981; color:#ffffff; border:1px solid #059669;' : ''}" title="${I18nService.t('inspector.modeMove')} (W)"><span class="mode-glyph">✥</span> ${I18nService.t('inspector.modeMove')}</button>
             <button class="prop-input ${selectionTool.selectionMode === 'scale' ? 'mode-active-btn' : ''}" id="btn-mode-scale" role="button" aria-pressed="${selectionTool.selectionMode === 'scale'}" style="flex:1; cursor:pointer; font-weight:600; padding:4px; display:flex; align-items:center; justify-content:center; gap:3px; ${selectionTool.selectionMode === 'scale' ? 'background:var(--figma-brand); color:#ffffff; border:1px solid #4f46e5;' : ''}" title="${I18nService.t('inspector.modeScale')} (E)"><span class="mode-glyph">⤢</span> ${I18nService.t('inspector.modeScale')}</button>
-            <button class="prop-input ${selectionTool.selectionMode === 'rotate' ? 'mode-active-btn' : ''}" id="btn-mode-rotate" role="button" aria-pressed="${selectionTool.selectionMode === 'rotate'}" style="flex:1; cursor:pointer; font-weight:600; padding:4px; display:flex; align-items:center; justify-content:center; gap:3px; ${selectionTool.selectionMode === 'rotate' ? 'background:#8b5cf6; color:#ffffff; border:1px solid #7c3aed;' : ''}" title="${I18nService.t('inspector.modeRotate')} (R)"><span class="mode-glyph">⟳</span> ${I18nService.t('inspector.modeRotate')}</button>
+            <button class="prop-input ${selectionTool.selectionMode === 'rotate' ? 'mode-active-btn' : ''}" id="btn-mode-rotate" role="button" aria-pressed="${selectionTool.selectionMode === 'rotate'}" style="flex:1; cursor:pointer; font-weight:600; padding:4px; display:flex; align-items:center; justify-content:center; gap:3px; ${selectionTool.selectionMode === 'rotate' ? 'background:#8b5cf6; color:#ffffff; border:1px solid #7c3aed;' : ''}" title="${I18nService.t('inspector.modeRotate')} (R)"><span class="mode-glyph">${ToolIcons.rotate}</span> ${I18nService.t('inspector.modeRotate')}</button>
           </div>
         </div>
         <div class="prop-row" style="margin-top:2px;">
           <span class="prop-label" style="font-size:11px;">${I18nService.t('inspector.advanced')}</span>
           <div style="display:flex; gap:6px; flex:1;">
-            <button class="prop-input" id="btn-mode-distort" style="flex:1; cursor:pointer; font-weight:600; padding:3px 6px; font-size:11px; display:flex; align-items:center; justify-content:center; gap:4px; ${selectionTool.selectionMode === 'distort' ? 'background:#f59e0b; color:#0f172a; border-color:#d97706;' : 'background:transparent; border:1px solid var(--border-color);'}" title="${I18nService.t('inspector.modeDistort')} (D)">${selectionTool.selectionMode === 'distort' ? '▰ ' + I18nService.t('inspector.modeDistortActive') : '▱ ' + I18nService.t('inspector.modeDistort')}</button>
+            <button class="prop-input" id="btn-mode-distort" style="flex:1; cursor:pointer; font-weight:600; padding:3px 6px; font-size:11px; display:flex; align-items:center; justify-content:center; gap:4px; ${selectionTool.selectionMode === 'distort' ? 'background:#f59e0b; color:#0f172a; border-color:#d97706;' : 'background:transparent; border:1px solid var(--border-color);'}" title="${I18nService.t('inspector.modeDistort')} (D)">${ToolIcons.distort} ${selectionTool.selectionMode === 'distort' ? I18nService.t('inspector.modeDistortActive') : I18nService.t('inspector.modeDistort')}</button>
           </div>
         </div>
         <div class="prop-row" style="margin-top:2px;">
@@ -72,7 +72,7 @@ export class GeometryInspector {
           <input type="number" class="prop-input" id="el-pivot-x" value="${Math.round(pivot.x)}" />
           <span class="prop-label" style="width:20px; text-align:right;">Y</span>
           <input type="number" class="prop-input" id="el-pivot-y" value="${Math.round(pivot.y)}" />
-          <button class="prop-input" id="btn-reset-pivot" style="width:auto; padding:2px 8px; cursor:pointer;" title="${I18nService.t('inspector.resetPivot')}">⟲</button>
+          <button class="prop-input" id="btn-reset-pivot" style="width:auto; padding:2px 8px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;" title="${I18nService.t('inspector.resetPivot')}">${ToolIcons.reset}</button>
         </div>
         ${(() => {
           const opacityAttr = el.attributes['opacity'];

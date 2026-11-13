@@ -11,7 +11,7 @@ export const TOOL_HELP_MAP_JA: Record<string, ToolHelpConfig> = {
       { keys: ['Mini-HUD'], description: '境界ボックス上のフローティングピル：1クリックで 移動、拡大縮小、回転 を切替' },
       { keys: ['長めのクリック'], description: 'モード循環：拡大縮小 → 回転 → 自由変形（遠近法）' },
       { keys: ['D'], description: '自由変形 / 遠近法：3x3 ホモグラフィ制御ハンドルの表示/非表示' },
-      { keys: ['▱ ボタン'], description: 'インスペクター内の専用ボタンで自由変形を切り替え' },
+      { keys: ['変形 (D)'], description: 'インスペクター内の専用ボタンで自由変形を切り替え' },
       { keys: ['クリック'], description: 'カーソル下の要素を選択、または余白クリックで選択解除' },
       { keys: ['Shift', 'クリック'], description: '複数選択に要素を追加または選択から除外' },
       { keys: ['ドラッグ'], description: 'キャンバス上で選択要素を移動' },

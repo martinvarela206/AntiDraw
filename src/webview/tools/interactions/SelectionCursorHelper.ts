@@ -6,8 +6,8 @@
  *    indicators for each active selection mode:
  *    - 'move': Emerald green badge (#10b981) with ✥ icon and 'MOV' badge (fallback: 'move')
  *    - 'scale': Indigo blue badge (#6366f1) with ⤢ icon and 'SCL' badge (fallback: 'default')
- *    - 'rotate': Violet purple badge (#8b5cf6) with ⟳ icon and 'ROT' badge (fallback: 'grab')
- *    - 'distort': Amber badge (#f59e0b) with ▱ icon and 'DST' badge (fallback: 'crosshair')
+ *    - 'rotate': Violet purple badge (#8b5cf6) with 'ROT' badge (fallback: 'grab')
+ *    - 'distort': Amber badge (#f59e0b) with 'DST' badge (fallback: 'crosshair')
  *
  * 2. Visual Accessibility & Zero Reliance on Color Alone (WCAG / Color Blindness):
  *    Never relies exclusively on color hue differences to convey the active transform mode.
@@ -50,9 +50,9 @@ export class SelectionCursorHelper {
       shortcut: 'E',
       color: '#6366f1',
       strokeColor: '#312e81',
-      symbol: '⤢',
+      symbol: 'SCL',
       fallback: 'default',
-      svgUrl: SelectionCursorHelper.buildSvgCursorUrl('#6366f1', '#312e81', '⤢', 'SCL'),
+      svgUrl: SelectionCursorHelper.buildSvgCursorUrl('#6366f1', '#312e81', 'SCL', 'SCL'),
     },
     rotate: {
       id: 'rotate',
@@ -61,9 +61,9 @@ export class SelectionCursorHelper {
       shortcut: 'R',
       color: '#8b5cf6',
       strokeColor: '#4c1d95',
-      symbol: '⟳',
+      symbol: 'ROT',
       fallback: 'grab',
-      svgUrl: SelectionCursorHelper.buildSvgCursorUrl('#8b5cf6', '#4c1d95', '⟳', 'ROT'),
+      svgUrl: SelectionCursorHelper.buildSvgCursorUrl('#8b5cf6', '#4c1d95', 'ROT', 'ROT'),
     },
     distort: {
       id: 'distort',
@@ -72,9 +72,9 @@ export class SelectionCursorHelper {
       shortcut: 'D',
       color: '#f59e0b',
       strokeColor: '#78350f',
-      symbol: '▱',
+      symbol: 'DST',
       fallback: 'crosshair',
-      svgUrl: SelectionCursorHelper.buildSvgCursorUrl('#f59e0b', '#78350f', '▱', 'DST'),
+      svgUrl: SelectionCursorHelper.buildSvgCursorUrl('#f59e0b', '#78350f', 'DST', 'DST'),
     },
   };
 

@@ -19,6 +19,10 @@ import alignLeftSvg from '../assets/icons/align_left.svg';
 import alignMiddleSvg from '../assets/icons/align_middle.svg';
 import alignRightSvg from '../assets/icons/align_right.svg';
 import alignTopSvg from '../assets/icons/align_top.svg';
+import arrowDownSvg from '../assets/icons/arrow_down.svg';
+import arrowLeftSvg from '../assets/icons/arrow_left.svg';
+import arrowRightSvg from '../assets/icons/arrow_right.svg';
+import arrowUpSvg from '../assets/icons/arrow_up.svg';
 import blendSvg from '../assets/icons/blend.svg';
 import bringForwardSvg from '../assets/icons/bring_forward.svg';
 import bringFrontSvg from '../assets/icons/bring_front.svg';
@@ -28,7 +32,9 @@ import chevronDownSvg from '../assets/icons/chevron_down.svg';
 import circleToolSvg from '../assets/icons/circle_tool.svg';
 import closeSvg from '../assets/icons/close.svg';
 import combineSvg from '../assets/icons/combine.svg';
+import diamondSvg from '../assets/icons/diamond.svg';
 import diceSvg from '../assets/icons/dice.svg';
+import distortSvg from '../assets/icons/distort.svg';
 import ellipseToolSvg from '../assets/icons/ellipse_tool.svg';
 import eraserToolSvg from '../assets/icons/eraser_tool.svg';
 import excludeSvg from '../assets/icons/exclude.svg';
@@ -43,6 +49,7 @@ import gridVisibilitySvg from '../assets/icons/grid_visibility.svg';
 import guideDoubleArrowVerticalLeftRotateSvg from '../assets/icons/guide_double_arrow_vertical_left_rotate.svg';
 import guideDoubleArrowVerticalRightRotateSvg from '../assets/icons/guide_double_arrow_vertical_right_rotate.svg';
 import guidesVisibilitySvg from '../assets/icons/guides_visibility.svg';
+import hexagonSvg from '../assets/icons/hexagon.svg';
 import imageToolSvg from '../assets/icons/image_tool.svg';
 import intersectSvg from '../assets/icons/intersect.svg';
 import joinNodesSvg from '../assets/icons/join_nodes.svg';
@@ -58,11 +65,14 @@ import nodeSharpSvg from '../assets/icons/node_sharp.svg';
 import nodeSmoothSvg from '../assets/icons/node_smooth.svg';
 import nodeSymmetricSvg from '../assets/icons/node_symmetric.svg';
 import nodeToolSvg from '../assets/icons/node_tool.svg';
+import octagonSvg from '../assets/icons/octagon.svg';
 import penToolSvg from '../assets/icons/pen_tool.svg';
 import polygonToolSvg from '../assets/icons/polygon_tool.svg';
 import polylineToolSvg from '../assets/icons/polyline_tool.svg';
 import rectToolSvg from '../assets/icons/rect_tool.svg';
 import redoSvg from '../assets/icons/redo.svg';
+import resetSvg from '../assets/icons/reset.svg';
+import rotateCwSvg from '../assets/icons/rotate_cw.svg';
 import rulerCornerSvg from '../assets/icons/ruler_corner.svg';
 import rulersVisibilitySvg from '../assets/icons/rulers_visibility.svg';
 import scissorsToolSvg from '../assets/icons/scissors_tool.svg';
@@ -83,8 +93,10 @@ import starToolSvg from '../assets/icons/star_tool.svg';
 import strokeToolSvg from '../assets/icons/stroke_tool.svg';
 import subtractSvg from '../assets/icons/subtract.svg';
 import sunSvg from '../assets/icons/sun.svg';
+import swapHorizontalSvg from '../assets/icons/swap_horizontal.svg';
 import targetSvg from '../assets/icons/target.svg';
 import trashSvg from '../assets/icons/trash.svg';
+import triangleSvg from '../assets/icons/triangle.svg';
 import undoSvg from '../assets/icons/undo.svg';
 import unionSvg from '../assets/icons/union.svg';
 import unlockSvg from '../assets/icons/unlock.svg';
@@ -100,6 +112,10 @@ export const ToolIcons = {
   alignMiddle: alignMiddleSvg,
   alignRight: alignRightSvg,
   alignTop: alignTopSvg,
+  arrowDown: arrowDownSvg,
+  arrowLeft: arrowLeftSvg,
+  arrowRight: arrowRightSvg,
+  arrowUp: arrowUpSvg,
   blend: blendSvg,
   bringForward: bringForwardSvg,
   bringFront: bringFrontSvg,
@@ -109,7 +125,9 @@ export const ToolIcons = {
   circleTool: circleToolSvg,
   close: closeSvg,
   combine: combineSvg,
+  diamond: diamondSvg,
   dice: diceSvg,
+  distort: distortSvg,
   ellipseTool: ellipseToolSvg,
   eraserTool: eraserToolSvg,
   exclude: excludeSvg,
@@ -124,6 +142,7 @@ export const ToolIcons = {
   guideDoubleArrowVerticalLeftRotate: guideDoubleArrowVerticalLeftRotateSvg,
   guideDoubleArrowVerticalRightRotate: guideDoubleArrowVerticalRightRotateSvg,
   guidesVisibility: guidesVisibilitySvg,
+  hexagon: hexagonSvg,
   imageTool: imageToolSvg,
   intersect: intersectSvg,
   joinNodes: joinNodesSvg,
@@ -139,11 +158,15 @@ export const ToolIcons = {
   nodeSmooth: nodeSmoothSvg,
   nodeSymmetric: nodeSymmetricSvg,
   nodeTool: nodeToolSvg,
+  octagon: octagonSvg,
   penTool: penToolSvg,
   polygonTool: polygonToolSvg,
   polylineTool: polylineToolSvg,
   rectTool: rectToolSvg,
   redo: redoSvg,
+  reset: resetSvg,
+  rotateCw: rotateCwSvg,
+  rotate: rotateCwSvg,
   rulerCorner: rulerCornerSvg,
   rulersVisibility: rulersVisibilitySvg,
   scissorsTool: scissorsToolSvg,
@@ -164,8 +187,12 @@ export const ToolIcons = {
   strokeTool: strokeToolSvg,
   subtract: subtractSvg,
   sun: sunSvg,
+  swapHorizontal: swapHorizontalSvg,
+  swap: swapHorizontalSvg,
+  reverse: swapHorizontalSvg,
   target: targetSvg,
   trash: trashSvg,
+  triangle: triangleSvg,
   undo: undoSvg,
   union: unionSvg,
   unlock: unlockSvg,

@@ -7,6 +7,7 @@ import { LineInspector } from './LineInspector.js';
 import { ShapeDefaultsInspector } from './ShapeDefaultsInspector.js';
 import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
 import { I18nService } from '../../i18n/index.js';
+import { ToolIcons } from '../../icons/ToolIcons.js';
 
 /**
  * PrimitiveInspector
@@ -129,12 +130,12 @@ export class PrimitiveInspector {
           <input type="number" class="prop-coord-input" id="star-points" value="${starPoints}" min="3" max="64" step="1" style="flex: 1;" />
         </div>
         <div class="prop-row" style="gap: 4px;">
-          <button class="prop-input" id="btn-star-preset-3" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="3">3</button>
-          <button class="prop-input" id="btn-star-preset-4" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="4">4</button>
-          <button class="prop-input" id="btn-star-preset-5" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="5">5</button>
-          <button class="prop-input" id="btn-star-preset-6" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="6">6</button>
-          <button class="prop-input" id="btn-star-preset-8" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="8">8</button>
-          <button class="prop-input" id="btn-star-preset-12" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="12">12</button>
+          <button class="prop-input" id="btn-star-preset-3" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0; display:inline-flex; align-items:center; justify-content:center; gap:2px;" title="3">${ToolIcons.triangle} 3</button>
+          <button class="prop-input" id="btn-star-preset-4" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0; display:inline-flex; align-items:center; justify-content:center; gap:2px;" title="4">${ToolIcons.diamond} 4</button>
+          <button class="prop-input" id="btn-star-preset-5" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0; display:inline-flex; align-items:center; justify-content:center; gap:2px;" title="5">${ToolIcons.starTool} 5</button>
+          <button class="prop-input" id="btn-star-preset-6" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0; display:inline-flex; align-items:center; justify-content:center; gap:2px;" title="6">${ToolIcons.hexagon} 6</button>
+          <button class="prop-input" id="btn-star-preset-8" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0; display:inline-flex; align-items:center; justify-content:center; gap:2px;" title="8">${ToolIcons.octagon} 8</button>
+          <button class="prop-input" id="btn-star-preset-12" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0; display:inline-flex; align-items:center; justify-content:center; gap:2px;" title="12">${ToolIcons.starTool} 12</button>
         </div>
 
         <div class="prop-row" style="gap: 6px; margin-top: 6px;">
@@ -148,7 +149,7 @@ export class PrimitiveInspector {
         <div class="prop-row" style="gap: 4px;">
           <button class="prop-input" id="btn-star-ratio-25" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="25%">25% ${I18nService.t('inspector.sharp')}</button>
           <button class="prop-input" id="btn-star-ratio-50" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="50%">50% ${I18nService.t('inspector.medium')}</button>
-          <button class="prop-input" id="btn-star-ratio-regular" style="flex:1.2; cursor:pointer; font-size:9px; height:20px; padding:0;" title="${Math.round(regularRatio * 100)}%">⬡ ${Math.round(regularRatio * 100)}% Regular</button>
+          <button class="prop-input" id="btn-star-ratio-regular" style="flex:1.2; cursor:pointer; font-size:9px; height:20px; padding:0; display:inline-flex; align-items:center; justify-content:center; gap:2px;" title="${Math.round(regularRatio * 100)}%">${ToolIcons.hexagon} ${Math.round(regularRatio * 100)}% Regular</button>
           <button class="prop-input" id="btn-star-ratio-130" style="flex:1; cursor:pointer; font-size:9px; height:20px; padding:0;" title="130%">130% ${I18nService.t('inspector.outer')}</button>
         </div>
 

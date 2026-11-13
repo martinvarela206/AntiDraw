@@ -155,7 +155,7 @@ export class StrokeMarkerControls {
         <div class="color-picker-row">
           <button type="button" class="color-swatch" id="el-marker-color" style="background-color: ${markerColorDisplay};" title="${I18nService.t('inspector.markerColorTooltip')}"></button>
           <input type="text" class="prop-input" id="el-marker-color-hex" value="${isCustomMarkerColor ? markerColor : I18nService.t('inspector.markerAutoPlaceholder')}" placeholder="${I18nService.t('inspector.markerAutoPlaceholder')}" title="${I18nService.t('inspector.markerColorTooltip')}" />
-          <button class="prop-input" id="btn-reset-marker-color" style="width:26px; height:24px; padding:0; display:flex; align-items:center; justify-content:center; cursor:pointer;" title="${I18nService.t('inspector.markerResetColorTooltip')}">⟲</button>
+          <button class="prop-input" id="btn-reset-marker-color" style="width:26px; height:24px; padding:0; display:flex; align-items:center; justify-content:center; cursor:pointer;" title="${I18nService.t('inspector.markerResetColorTooltip')}">${ToolIcons.reset}</button>
         </div>
       </div>
     `;

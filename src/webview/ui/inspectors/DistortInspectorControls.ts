@@ -1,6 +1,7 @@
 import { SelectionTool } from '../../engine/SelectionTool.js';
 import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
 import { I18nService } from '../../i18n/index.js';
+import { ToolIcons } from '../../icons/ToolIcons.js';
 
 /**
  * ARCHITECTURAL RATIONALE: Modular Distort & Homography Inspector Component
@@ -64,16 +65,16 @@ export class DistortInspectorControls {
         <input type="number" step="any" class="prop-input" id="${idPrefix}distort-corner-y" value="${cY}" />
       </div>
       <div class="prop-row" style="margin-top:4px; gap:4px;">
-        <button class="prop-input" id="${idPrefix}btn-reset-active-corner" style="flex:1; padding:4px; cursor:pointer; font-size:11px;">${I18nService.t('inspector.resetCorner')}</button>
-        <button class="prop-input" id="${idPrefix}btn-reset-all-corners" style="flex:1; padding:4px; cursor:pointer; font-size:11px;">${I18nService.t('inspector.resetAll')}</button>
+        <button class="prop-input" id="${idPrefix}btn-reset-active-corner" style="flex:1; padding:4px; cursor:pointer; font-size:11px; display:inline-flex; align-items:center; justify-content:center; gap:4px;">${ToolIcons.reset} ${I18nService.t('inspector.resetCorner')}</button>
+        <button class="prop-input" id="${idPrefix}btn-reset-all-corners" style="flex:1; padding:4px; cursor:pointer; font-size:11px; display:inline-flex; align-items:center; justify-content:center; gap:4px;">${ToolIcons.reset} ${I18nService.t('inspector.resetAll')}</button>
       </div>
       <div class="prop-row" style="margin-top:6px; border-top:1px dashed var(--border-color); padding-top:4px;">
         <span class="prop-label" style="font-size:11px;">${I18nService.t('inspector.skew')}</span>
-        <button class="prop-input" id="${idPrefix}btn-reset-skew" style="flex:1; padding:2px 4px; cursor:pointer; font-size:11px;">${I18nService.t('inspector.resetSkew')}</button>
+        <button class="prop-input" id="${idPrefix}btn-reset-skew" style="flex:1; padding:2px 4px; cursor:pointer; font-size:11px; display:inline-flex; align-items:center; justify-content:center; gap:4px;">${ToolIcons.reset} ${I18nService.t('inspector.resetSkew')}</button>
       </div>
       <div class="prop-row" style="margin-top:6px; border-top:1px dashed var(--border-color); padding-top:4px; display:flex; justify-content:space-between; align-items:center;">
         <span style="font-size:11px; font-weight:600;">${I18nService.t('inspector.warpArc')}</span>
-        <button class="prop-input" id="${idPrefix}btn-reset-warp" style="padding:2px 6px; cursor:pointer; font-size:10px;">${I18nService.t('inspector.resetCorner')}</button>
+        <button class="prop-input" id="${idPrefix}btn-reset-warp" style="padding:2px 6px; cursor:pointer; font-size:10px; display:inline-flex; align-items:center; justify-content:center; gap:4px;">${ToolIcons.reset} ${I18nService.t('inspector.resetCorner')}</button>
       </div>
       <div class="prop-row" style="margin-top:4px;">
         <span class="prop-label" style="font-size:11px;">${I18nService.t('inspector.curvature')}</span>

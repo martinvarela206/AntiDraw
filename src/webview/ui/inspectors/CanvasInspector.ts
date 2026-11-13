@@ -4,6 +4,7 @@ import type { PropertyPanelCallbacks } from '../PropertyPanel.js';
 import { SwatchPaletteInspector } from './SwatchPaletteInspector.js';
 import { I18nService } from '../../i18n/I18nService.js';
 import { ColorPickerPopover } from '../ColorPickerPopover.js';
+import { ToolIcons } from '../../icons/ToolIcons.js';
 
 export interface ViewBoxPreset {
   id: string;
@@ -130,7 +131,7 @@ export class CanvasInspector {
           <div class="color-picker-row" style="display:flex; gap:4px; align-items:center;">
             <button type="button" class="color-swatch" id="canvas-currentcolor-color" style="background-color: ${canvas.currentColor || '#000000'};" title="${I18nService.t('common.color')}"></button>
             <input type="text" class="prop-input" id="canvas-currentcolor-hex" value="${canvas.currentColor || '#000000'}" style="flex:1;" />
-            <button class="prop-input" id="btn-reset-canvas-currentcolor" style="width:26px; height:24px; padding:0; display:flex; align-items:center; justify-content:center; cursor:pointer;" title="${I18nService.t('inspector.canvasResetColorTooltip')}">⟲</button>
+            <button class="prop-input" id="btn-reset-canvas-currentcolor" style="width:26px; height:24px; padding:0; display:flex; align-items:center; justify-content:center; cursor:pointer;" title="${I18nService.t('inspector.canvasResetColorTooltip')}">${ToolIcons.reset}</button>
           </div>
         </div>
       </div>

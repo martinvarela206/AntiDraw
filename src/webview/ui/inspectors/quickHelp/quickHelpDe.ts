@@ -11,7 +11,7 @@ export const TOOL_HELP_MAP_DE: Record<string, ToolHelpConfig> = {
       { keys: ['Mini-HUD'], description: 'Schwebende Pille am Begrenzungsrahmen: 1-Klick-Wechsel: Verschieben, Skalieren, Drehen' },
       { keys: ['Verzögerter Klick'], description: 'Modus durchschalten: Skalieren → Drehen → Freies Verzerren (Perspektive)' },
       { keys: ['D'], description: 'Freies Verzerren / Perspektive: 3x3-Homographie-Quad-Griffe ein-/ausschalten' },
-      { keys: ['Taste ▱'], description: 'Dedizierte Schaltfläche im Inspektor zum Umschalten des freien Verzerrens' },
+      { keys: ['Verzerren (D)'], description: 'Dedizierte Schaltfläche im Inspektor zum Umschalten des freien Verzerrens' },
       { keys: ['Klick'], description: 'Wählt Element unter dem Cursor aus oder hebt Auswahl auf leerem Raum auf' },
       { keys: ['Umschalt', 'Klick'], description: 'Fügt Element zur Mehrfachauswahl hinzu oder entfernt es' },
       { keys: ['Ziehen'], description: 'Verschiebt ausgewählte Elemente auf der Leinwand' },

@@ -1,6 +1,7 @@
 import { Point } from '../../engine/VectorModel.js';
 import { BoundingBox } from '../../engine/geometry/BoundingBoxCalculator.js';
 import { I18nService } from '../../i18n/index.js';
+import { ToolIcons } from '../../icons/ToolIcons.js';
 
 export type SelectionHudMode = 'move' | 'scale' | 'rotate';
 
@@ -9,7 +10,7 @@ export type SelectionHudMode = 'move' | 'scale' | 'rotate';
  *
  * 1. Single Responsibility:
  *    Encapsulates DOM lifecycle, active mode state synchronization, and user interaction
- *    for the workspace-anchored contextual mode pill: `[ ✥ Mover | ⤢ Escalar | ⟳ Rotar ]`.
+ *    for the workspace-anchored contextual mode pill: `[ MOV Mover | SCL Escalar | ROT Rotar ]`.
  *
  * 2. Unobstructed Canvas Workspace (Anti-Collision UX):
  *    Anchored inside `#canvas-container` immediately beneath the top ruler (`.ruler-top-container`).
@@ -142,7 +143,7 @@ export class SelectionMiniHud {
         <span class="mini-hud-icon">⤢</span> <span class="mini-hud-badge">SCL</span> ${I18nService.t('miniHud.scale')}
       </button>
       <button type="button" class="mini-hud-btn ${this.currentMode === 'rotate' ? 'active' : ''}" data-mode="rotate" role="button" aria-pressed="${this.currentMode === 'rotate'}" title="${I18nService.t('miniHud.rotateTitle')} (R)">
-        <span class="mini-hud-icon">⟳</span> <span class="mini-hud-badge">ROT</span> ${I18nService.t('miniHud.rotate')}
+        <span class="mini-hud-icon">${ToolIcons.rotate}</span> <span class="mini-hud-badge">ROT</span> ${I18nService.t('miniHud.rotate')}
       </button>
     `;
 
@@ -310,22 +311,22 @@ export class SelectionMiniHud {
         ${!isMove && !isScale ? `<line x1="-34" y1="-8" x2="-34" y2="8" stroke="#334155" stroke-width="1" />` : ''}
         ${!isScale && !isRotate ? `<line x1="34" y1="-8" x2="34" y2="8" stroke="#334155" stroke-width="1" />` : ''}
 
-        <!-- Button 1: Move (✥ Move) -->
+        <!-- Button 1: Move ([MOV] Move) -->
         <g class="mini-hud-btn mini-hud-move">
           <title>${I18nService.t('miniHud.moveTitle')}</title>
-          <text x="-68" y="4" text-anchor="middle" fill="${moveTextColor}" font-size="11" font-weight="${moveFontWeight}" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">✥ ${I18nService.t('miniHud.move')}</text>
+          <text x="-68" y="4" text-anchor="middle" fill="${moveTextColor}" font-size="11" font-weight="${moveFontWeight}" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">[MOV] ${I18nService.t('miniHud.move')}</text>
         </g>
 
-        <!-- Button 2: Scale (⤢ Scale) -->
+        <!-- Button 2: Scale ([SCL] Scale) -->
         <g class="mini-hud-btn mini-hud-scale">
           <title>${I18nService.t('miniHud.scaleTitle')}</title>
-          <text x="0" y="4" text-anchor="middle" fill="${scaleTextColor}" font-size="11" font-weight="${scaleFontWeight}" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">⤢ ${I18nService.t('miniHud.scale')}</text>
+          <text x="0" y="4" text-anchor="middle" fill="${scaleTextColor}" font-size="11" font-weight="${scaleFontWeight}" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">[SCL] ${I18nService.t('miniHud.scale')}</text>
         </g>
 
-        <!-- Button 3: Rotate (⟳ Rotate) -->
+        <!-- Button 3: Rotate ([ROT] Rotate) -->
         <g class="mini-hud-btn mini-hud-rotate">
           <title>${I18nService.t('miniHud.rotateTitle')}</title>
-          <text x="68" y="4" text-anchor="middle" fill="${rotateTextColor}" font-size="11" font-weight="${rotateFontWeight}" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">⟳ ${I18nService.t('miniHud.rotate')}</text>
+          <text x="68" y="4" text-anchor="middle" fill="${rotateTextColor}" font-size="11" font-weight="${rotateFontWeight}" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">[ROT] ${I18nService.t('miniHud.rotate')}</text>
         </g>
       </g>
     `;

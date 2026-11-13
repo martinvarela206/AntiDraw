@@ -128,7 +128,7 @@ export class AppearanceInspector {
             <div id="gradient-bar-preview" style="height: 18px; border-radius: 4px; border: 1px solid var(--border-subtle); background: ${gradientCss}; margin-bottom: 6px;"></div>
             <div style="display: flex; gap: 4px; justify-content: space-between; align-items: center;">
               <button class="prop-input" id="btn-add-gradient-stop" style="cursor: pointer; width: auto; padding: 3px 8px; font-size: 10px; font-weight: 600;" title="Añadir parada de color">+ Parada</button>
-              <button class="prop-input" id="btn-reverse-gradient" style="cursor: pointer; width: auto; padding: 3px 8px; font-size: 11px; font-weight: 600;" title="Invertir dirección del degradado">⇄ Invertir</button>
+              <button class="prop-input" id="btn-reverse-gradient" style="cursor: pointer; width: auto; padding: 3px 8px; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;" title="Invertir dirección del degradado">${ToolIcons.swap} Invertir</button>
               <button class="prop-input" id="btn-delete-gradient-stop" style="cursor: pointer; width: auto; padding: 3px 8px; font-size: 10px; color: #ef4444; display: inline-flex; align-items: center;" title="Eliminar parada activa" ${grad.stops.length <= 2 ? 'disabled' : ''}>${ToolIcons.trash}</button>
             </div>
           </div>
@@ -163,7 +163,7 @@ export class AppearanceInspector {
                   <span class="prop-coord-sublabel">%</span>
                 </div>
               </div>
-              <button class="prop-input" id="btn-reset-radial-center" style="width: 26px; height: 26px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;" title="Centrar al 50%, 50%">⟲</button>
+              <button class="prop-input" id="btn-reset-radial-center" style="width: 26px; height: 26px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;" title="Centrar al 50%, 50%">${ToolIcons.reset}</button>
             </div>
             <div class="prop-row" style="gap: 6px;">
               <span class="prop-label" style="width: 46px;" title="Radios de dispersión elíptica del gradiente radial (Rx / Ry)">Radios</span>
@@ -179,7 +179,7 @@ export class AppearanceInspector {
                   <span class="prop-coord-sublabel">%</span>
                 </div>
               </div>
-              <button class="prop-input" id="btn-reset-radial-radius" style="width: 26px; height: 26px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;" title="Restablecer radios al 50%">⟲</button>
+              <button class="prop-input" id="btn-reset-radial-radius" style="width: 26px; height: 26px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;" title="Restablecer radios al 50%">${ToolIcons.reset}</button>
             </div>
             <!-- Focal Point (fx, fy) -->
             <div class="prop-row" style="gap: 6px;">
@@ -196,13 +196,13 @@ export class AppearanceInspector {
                   <span class="prop-coord-sublabel">%</span>
                 </div>
               </div>
-              <button class="prop-input" id="btn-sync-radial-focus" style="width: 26px; height: 26px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;" title="Igualar foco al centro">⟲</button>
+              <button class="prop-input" id="btn-sync-radial-focus" style="width: 26px; height: 26px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;" title="Igualar foco al centro">${ToolIcons.reset}</button>
             </div>
             <!-- Rotation -->
             <div class="prop-row" style="gap: 6px;">
               <span class="prop-label" style="width: 46px;">Rotación</span>
               <input type="number" class="prop-input" id="radial-rotation" value="${grad.rotation ?? 0}" min="0" max="360" step="15" style="flex:1;" />
-              <button class="prop-input" id="btn-reset-radial-rotation" style="width: 26px; height: 26px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;" title="Restablecer rotación a 0°">⟲</button>
+              <button class="prop-input" id="btn-reset-radial-rotation" style="width: 26px; height: 26px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;" title="Restablecer rotación a 0°">${ToolIcons.reset}</button>
             </div>
           </div>
 
@@ -219,7 +219,7 @@ export class AppearanceInspector {
                   ${grad.lockScale !== false ? ToolIcons.lock : ToolIcons.unlock}
                 </button>
                 <button class="prop-input" id="btn-reset-fill-scale" style="width: 28px; height: 24px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px;" title="Restablecer escala del relleno a las dimensiones del vector">
-                  ⟲
+                  ${ToolIcons.reset}
                 </button>
               </div>
 
@@ -230,7 +230,7 @@ export class AppearanceInspector {
                   ${grad.lockPosition !== false ? ToolIcons.lock : ToolIcons.unlock}
                 </button>
                 <button class="prop-input" id="btn-reset-fill-pos" style="width: 28px; height: 24px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px;" title="Recentrar posición del relleno en el centro del vector">
-                  ⟲
+                  ${ToolIcons.reset}
                 </button>
               </div>
 
@@ -241,7 +241,7 @@ export class AppearanceInspector {
                   ${grad.lockRotation !== false ? ToolIcons.lock : ToolIcons.unlock}
                 </button>
                 <button class="prop-input" id="btn-reset-fill-rot" style="width: 28px; height: 24px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px;" title="Restablecer rotación del relleno a 0° relativo al vector">
-                  ⟲
+                  ${ToolIcons.reset}
                 </button>
               </div>
             </div>

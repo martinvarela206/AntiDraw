@@ -188,6 +188,26 @@ body {
 .mode-glyph {
   font-size: 12px;
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mode-glyph svg {
+  width: 13px;
+  height: 13px;
+  stroke: currentColor;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+button.prop-input svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  flex-shrink: 0;
+  vertical-align: middle;
+  display: inline-block;
 }
 
 .mini-hud-badge {
@@ -630,6 +650,16 @@ body {
 .mini-hud-btn .mini-hud-icon {
   font-size: 12px;
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mini-hud-btn .mini-hud-icon svg {
+  width: 12px;
+  height: 12px;
+  stroke: currentColor;
+  vertical-align: middle;
 }
 
 /*

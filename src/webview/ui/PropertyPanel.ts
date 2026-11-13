@@ -450,8 +450,8 @@ export class PropertyPanel {
           <button class="prop-input" id="btn-finish-path" style="cursor:pointer; background:var(--accent-color); color:#fff; text-align:center; font-weight:600; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
             ${ToolIcons.check} ${I18nService.t('inspector.finishPath')}
           </button>
-          <button class="prop-input" id="btn-close-path" style="cursor:pointer; background:var(--bg-panel-hover); text-align:center;">
-            ⟳ ${I18nService.t('inspector.closeLoop')}
+          <button class="prop-input" id="btn-close-path" style="cursor:pointer; background:var(--bg-panel-hover); text-align:center; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+            ${ToolIcons.rotate} ${I18nService.t('inspector.closeLoop')}
           </button>
         </div>
       </div>

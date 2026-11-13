@@ -359,9 +359,9 @@ export async function runSelectionModesTests(): Promise<boolean> {
   // 5.3 SVG Overlay Markup
   const hudSvgMove = miniHud.renderOverlay(groupBox, 'move', 1.0);
   assert(hudSvgMove.includes('class="selection-mini-hud"'), 'Mini-HUD SVG: Contains selection-mini-hud class');
-  assert(hudSvgMove.includes('✥ Mover'), 'Mini-HUD SVG: Contains "✥ Mover" label');
-  assert(hudSvgMove.includes('⤢ Escalar'), 'Mini-HUD SVG: Contains "⤢ Escalar" label');
-  assert(hudSvgMove.includes('⟳ Rotar'), 'Mini-HUD SVG: Contains "⟳ Rotar" label');
+  assert(hudSvgMove.includes('Mover'), 'Mini-HUD SVG: Contains "Mover" label');
+  assert(hudSvgMove.includes('Escalar'), 'Mini-HUD SVG: Contains "Escalar" label');
+  assert(hudSvgMove.includes('Rotar'), 'Mini-HUD SVG: Contains "Rotar" label');
   assert(hudSvgMove.includes('fill="#10b981"'), 'Mini-HUD SVG: Move mode highlights with emerald hue (#10b981)');
 
   const hudSvgScale = miniHud.renderOverlay(groupBox, 'scale', 1.0);
@@ -538,9 +538,9 @@ export async function runSelectionModesTests(): Promise<boolean> {
 
   // 7.7 QuickHelpInspector documentation for distort
   const hasDHotkey = selectHelp.shortcuts.some((s: any) => s.keys.includes('D') && s.description.includes('Deformación Libre'));
-  const hasDistortButton = selectHelp.shortcuts.some((s: any) => s.keys.some((k: string) => k.includes('▱')) && s.description.includes('Deformación Libre'));
+  const hasDistortButton = selectHelp.shortcuts.some((s: any) => s.keys.some((k: string) => k.includes('Distorsión') || k.includes('Distort') || k.includes('▱')) && s.description.includes('Deformación Libre'));
   assert(hasDHotkey, 'QuickHelpInspector documents "D" hotkey for Deformación Libre');
-  assert(hasDistortButton, 'QuickHelpInspector documents dedicated "Botón ▱" for Deformación Libre');
+  assert(hasDistortButton, 'QuickHelpInspector documents dedicated distort button for Deformación Libre');
 
   // -----------------------------------------------------------------------------------
   // Summary
