@@ -174,15 +174,15 @@ export class MultiSelectionInspector {
         </div>
       </div>
 
-      <div class="panel-section">
+      <div class="panel-section" role="group" aria-label="${I18nService.t('panels.pathfinder')}">
         <div class="panel-title">${I18nService.t('panels.pathfinder')}</div>
         <div class="prop-row" style="justify-content: flex-start; gap: 6px; flex-wrap: wrap;">
-          <button class="btn-icon" id="btn-prop-bool-union" title="${I18nService.t('inspector.union')}">${ToolIcons.union}</button>
-          <button class="btn-icon" id="btn-prop-bool-subtract" title="${I18nService.t('inspector.subtract')}">${ToolIcons.subtract}</button>
-          <button class="btn-icon" id="btn-prop-bool-intersect" title="${I18nService.t('inspector.intersect')}">${ToolIcons.intersect}</button>
-          <button class="btn-icon" id="btn-prop-bool-exclude" title="${I18nService.t('inspector.exclude')}">${ToolIcons.exclude}</button>
-          <button class="btn-icon" id="btn-prop-bool-combine" title="${I18nService.t('inspector.combine')}">${ToolIcons.combine}</button>
-          <button class="btn-icon" id="btn-prop-bool-fragment" title="${I18nService.t('inspector.fragment')}">${ToolIcons.fragment}</button>
+          <button class="btn-icon ${elements.length < 2 ? 'disabled' : ''}" id="btn-prop-bool-union" ${elements.length < 2 ? 'disabled aria-disabled="true"' : ''} title="${I18nService.t('inspector.union')}${elements.length < 2 ? ' (' + I18nService.t('inspector.pathfinderMinObjects') + ')' : ''}">${ToolIcons.union}</button>
+          <button class="btn-icon ${elements.length < 2 ? 'disabled' : ''}" id="btn-prop-bool-subtract" ${elements.length < 2 ? 'disabled aria-disabled="true"' : ''} title="${I18nService.t('inspector.subtract')}${elements.length < 2 ? ' (' + I18nService.t('inspector.pathfinderMinObjects') + ')' : ''}">${ToolIcons.subtract}</button>
+          <button class="btn-icon ${elements.length < 2 ? 'disabled' : ''}" id="btn-prop-bool-intersect" ${elements.length < 2 ? 'disabled aria-disabled="true"' : ''} title="${I18nService.t('inspector.intersect')}${elements.length < 2 ? ' (' + I18nService.t('inspector.pathfinderMinObjects') + ')' : ''}">${ToolIcons.intersect}</button>
+          <button class="btn-icon ${elements.length < 2 ? 'disabled' : ''}" id="btn-prop-bool-exclude" ${elements.length < 2 ? 'disabled aria-disabled="true"' : ''} title="${I18nService.t('inspector.exclude')}${elements.length < 2 ? ' (' + I18nService.t('inspector.pathfinderMinObjects') + ')' : ''}">${ToolIcons.exclude}</button>
+          <button class="btn-icon ${elements.length < 2 ? 'disabled' : ''}" id="btn-prop-bool-combine" ${elements.length < 2 ? 'disabled aria-disabled="true"' : ''} title="${I18nService.t('inspector.combine')}${elements.length < 2 ? ' (' + I18nService.t('inspector.pathfinderMinObjects') + ')' : ''}">${ToolIcons.combine}</button>
+          <button class="btn-icon ${elements.length < 2 ? 'disabled' : ''}" id="btn-prop-bool-fragment" ${elements.length < 2 ? 'disabled aria-disabled="true"' : ''} title="${I18nService.t('inspector.fragment')}${elements.length < 2 ? ' (' + I18nService.t('inspector.pathfinderMinObjects') + ')' : ''}">${ToolIcons.fragment}</button>
         </div>
       </div>
 

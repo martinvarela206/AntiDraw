@@ -26,7 +26,7 @@ export function registerSystemCommands(registry: CommandRegistry): void {
     label: 'Deshacer',
     category: 'edit',
     shortcut: 'Ctrl+Z',
-    isEnabled: (ctx: CommandContext) => ctx.historyService?.canUndo ?? true,
+    isEnabled: (ctx: CommandContext) => ctx.historyService ? ctx.historyService.canUndo : (typeof (ctx as any).canUndo === 'boolean' ? (ctx as any).canUndo : false),
     execute: (ctx: CommandContext) => {
       if (typeof ctx.undo === 'function') {
         ctx.undo();
@@ -41,7 +41,7 @@ export function registerSystemCommands(registry: CommandRegistry): void {
     label: 'Rehacer',
     category: 'edit',
     shortcut: 'Ctrl+Y',
-    isEnabled: (ctx: CommandContext) => ctx.historyService?.canRedo ?? true,
+    isEnabled: (ctx: CommandContext) => ctx.historyService ? ctx.historyService.canRedo : (typeof (ctx as any).canRedo === 'boolean' ? (ctx as any).canRedo : false),
     execute: (ctx: CommandContext) => {
       if (typeof ctx.redo === 'function') {
         ctx.redo();

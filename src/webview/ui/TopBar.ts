@@ -5,6 +5,9 @@ import { I18nService } from '../i18n/I18nService.js';
 export interface TopBarCallbacks {
   onUndo?: () => void;
   onRedo?: () => void;
+  getCanUndo?: () => boolean;
+  getCanRedo?: () => boolean;
+  getSelectionCount?: () => number;
   onAlign: (type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => void;
   onAlignTargetChange?: (target: 'selection' | 'key_object' | 'canvas') => void;
   onFlip?: (axis: 'horizontal' | 'vertical') => void;
@@ -28,9 +31,12 @@ export class TopBar {
     this.container = container;
     this.canvasMgr = canvasMgr;
     this.callbacks = callbacks;
+    this.container.setAttribute('role', 'toolbar');
+    this.container.setAttribute('aria-label', I18nService.t('topbar.toolbar'));
     this.render();
 
     I18nService.onLanguageChange(() => {
+      this.container.setAttribute('aria-label', I18nService.t('topbar.toolbar'));
       this.update();
     });
   }
@@ -41,43 +47,47 @@ export class TopBar {
 
   private render(): void {
     const t = (k: string) => I18nService.t(k);
+    const canUndo = this.callbacks.getCanUndo ? this.callbacks.getCanUndo() : true;
+    const canRedo = this.callbacks.getCanRedo ? this.callbacks.getCanRedo() : true;
+    const selectionCount = this.callbacks.getSelectionCount ? this.callbacks.getSelectionCount() : 0;
+    const hasSelection = selectionCount > 0;
 
     this.container.innerHTML = `
       <!-- History (Undo / Redo) -->
-      <div class="top-bar-group">
-        <button class="btn-icon" id="btn-undo" title="${t('topbar.undo')}">${ToolIcons.undo}</button>
-        <button class="btn-icon" id="btn-redo" title="${t('topbar.redo')}">${ToolIcons.redo}</button>
+      <div class="top-bar-group" role="group" aria-label="${t('topbar.history')}">
+        <button class="btn-icon ${canUndo ? '' : 'disabled'}" id="btn-undo" ${canUndo ? '' : 'disabled aria-disabled="true"'} title="${t('topbar.undo')}${canUndo ? '' : ' (' + t('topbar.noHistory') + ')'}">${ToolIcons.undo}</button>
+        <button class="btn-icon ${canRedo ? '' : 'disabled'}" id="btn-redo" ${canRedo ? '' : 'disabled aria-disabled="true"'} title="${t('topbar.redo')}${canRedo ? '' : ' (' + t('topbar.noHistory') + ')'}">${ToolIcons.redo}</button>
       </div>
 
       <div class="top-bar-divider"></div>
 
       <!-- Alignments -->
-      <div class="top-bar-group" id="topbar-align-group">
-        <select class="top-bar-select" id="select-topbar-align-target" title="${t('topbar.alignTo')}">
+      <div class="top-bar-group" id="topbar-align-group" role="group" aria-label="${t('topbar.alignment')}">
+        <select class="top-bar-select ${hasSelection ? '' : 'disabled'}" id="select-topbar-align-target" ${hasSelection ? '' : 'disabled aria-disabled="true"'} title="${t('topbar.alignTo')}">
           <option value="selection" ${this.canvasMgr.alignmentTarget === 'selection' ? 'selected' : ''}>${t('topbar.alignToSelection')}</option>
           <option value="key_object" ${this.canvasMgr.alignmentTarget === 'key_object' ? 'selected' : ''}>${t('topbar.alignToKeyObject')}</option>
           <option value="canvas" ${this.canvasMgr.alignmentTarget === 'canvas' ? 'selected' : ''}>${t('topbar.alignToCanvas')}</option>
         </select>
-        <button class="btn-icon" id="btn-align-left" title="${t('topbar.alignLeft')}">${ToolIcons.alignLeft}</button>
-        <button class="btn-icon" id="btn-align-center" title="${t('topbar.alignCenter')}">${ToolIcons.alignCenter}</button>
-        <button class="btn-icon" id="btn-align-right" title="${t('topbar.alignRight')}">${ToolIcons.alignRight}</button>
-        <button class="btn-icon" id="btn-align-top" title="${t('topbar.alignTop')}">${ToolIcons.alignTop}</button>
-        <button class="btn-icon" id="btn-align-middle" title="${t('topbar.alignMiddle')}">${ToolIcons.alignMiddle}</button>
-        <button class="btn-icon" id="btn-align-bottom" title="${t('topbar.alignBottom')}">${ToolIcons.alignBottom}</button>
+        <button class="btn-icon ${hasSelection ? '' : 'disabled'}" id="btn-align-left" ${hasSelection ? '' : 'disabled aria-disabled="true"'} title="${t('topbar.alignLeft')}${hasSelection ? '' : ' (' + t('topbar.selectionRequired') + ')'}">${ToolIcons.alignLeft}</button>
+        <button class="btn-icon ${hasSelection ? '' : 'disabled'}" id="btn-align-center" ${hasSelection ? '' : 'disabled aria-disabled="true"'} title="${t('topbar.alignCenter')}${hasSelection ? '' : ' (' + t('topbar.selectionRequired') + ')'}">${ToolIcons.alignCenter}</button>
+        <button class="btn-icon ${hasSelection ? '' : 'disabled'}" id="btn-align-right" ${hasSelection ? '' : 'disabled aria-disabled="true"'} title="${t('topbar.alignRight')}${hasSelection ? '' : ' (' + t('topbar.selectionRequired') + ')'}">${ToolIcons.alignRight}</button>
+        <button class="btn-icon ${hasSelection ? '' : 'disabled'}" id="btn-align-top" ${hasSelection ? '' : 'disabled aria-disabled="true"'} title="${t('topbar.alignTop')}${hasSelection ? '' : ' (' + t('topbar.selectionRequired') + ')'}">${ToolIcons.alignTop}</button>
+        <button class="btn-icon ${hasSelection ? '' : 'disabled'}" id="btn-align-middle" ${hasSelection ? '' : 'disabled aria-disabled="true"'} title="${t('topbar.alignMiddle')}${hasSelection ? '' : ' (' + t('topbar.selectionRequired') + ')'}">${ToolIcons.alignMiddle}</button>
+        <button class="btn-icon ${hasSelection ? '' : 'disabled'}" id="btn-align-bottom" ${hasSelection ? '' : 'disabled aria-disabled="true"'} title="${t('topbar.alignBottom')}${hasSelection ? '' : ' (' + t('topbar.selectionRequired') + ')'}">${ToolIcons.alignBottom}</button>
       </div>
 
       <!-- Flip / Mirror -->
-      <div class="top-bar-group">
-        <button class="btn-icon" id="btn-flip-h" title="${t('topbar.flipHorizontal')}">${ToolIcons.flipHorizontal}</button>
-        <button class="btn-icon" id="btn-flip-v" title="${t('topbar.flipVertical')}">${ToolIcons.flipVertical}</button>
+      <div class="top-bar-group" role="group" aria-label="${t('topbar.flip')}">
+        <button class="btn-icon ${hasSelection ? '' : 'disabled'}" id="btn-flip-h" ${hasSelection ? '' : 'disabled aria-disabled="true"'} title="${t('topbar.flipHorizontal')}${hasSelection ? '' : ' (' + t('topbar.selectionRequired') + ')'}">${ToolIcons.flipHorizontal}</button>
+        <button class="btn-icon ${hasSelection ? '' : 'disabled'}" id="btn-flip-v" ${hasSelection ? '' : 'disabled aria-disabled="true"'} title="${t('topbar.flipVertical')}${hasSelection ? '' : ' (' + t('topbar.selectionRequired') + ')'}">${ToolIcons.flipVertical}</button>
       </div>
 
       <!-- Z-Ordering -->
-      <div class="top-bar-group">
-        <button class="btn-icon" id="btn-z-front" title="${t('topbar.bringFront')}">${ToolIcons.bringFront}</button>
-        <button class="btn-icon" id="btn-z-forward" title="${t('topbar.bringForward')}">${ToolIcons.bringForward}</button>
-        <button class="btn-icon" id="btn-z-backward" title="${t('topbar.sendBackward')}">${ToolIcons.sendBackward}</button>
-        <button class="btn-icon" id="btn-z-back" title="${t('topbar.sendBack')}">${ToolIcons.sendBack}</button>
+      <div class="top-bar-group" role="group" aria-label="${t('topbar.zOrder')}">
+        <button class="btn-icon ${hasSelection ? '' : 'disabled'}" id="btn-z-front" ${hasSelection ? '' : 'disabled aria-disabled="true"'} title="${t('topbar.bringFront')}${hasSelection ? '' : ' (' + t('topbar.selectionRequired') + ')'}">${ToolIcons.bringFront}</button>
+        <button class="btn-icon ${hasSelection ? '' : 'disabled'}" id="btn-z-forward" ${hasSelection ? '' : 'disabled aria-disabled="true"'} title="${t('topbar.bringForward')}${hasSelection ? '' : ' (' + t('topbar.selectionRequired') + ')'}">${ToolIcons.bringForward}</button>
+        <button class="btn-icon ${hasSelection ? '' : 'disabled'}" id="btn-z-backward" ${hasSelection ? '' : 'disabled aria-disabled="true"'} title="${t('topbar.sendBackward')}${hasSelection ? '' : ' (' + t('topbar.selectionRequired') + ')'}">${ToolIcons.sendBackward}</button>
+        <button class="btn-icon ${hasSelection ? '' : 'disabled'}" id="btn-z-back" ${hasSelection ? '' : 'disabled aria-disabled="true"'} title="${t('topbar.sendBack')}${hasSelection ? '' : ' (' + t('topbar.selectionRequired') + ')'}">${ToolIcons.sendBack}</button>
       </div>
 
       <div class="top-bar-divider"></div>

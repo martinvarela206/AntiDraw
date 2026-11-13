@@ -31,6 +31,13 @@ export const de: Translations = {
     "closed": "Geschlossen"
   },
   "topbar": {
+    "toolbar": "Aktionsleiste oben",
+    "history": "Verlauf und Rückgängig-Aktionen",
+    "alignment": "Ausrichtungssteuerung",
+    "flip": "Spiegel- und Umkehrsteuerung",
+    "zOrder": "Ebenenstapelreihenfolge",
+    "noHistory": "Keine Aktionen im Verlauf",
+    "selectionRequired": "Auswahl erforderlich",
     "undo": "Rückgängig (Ctrl+Z)",
     "redo": "Wiederholen (Ctrl+Y)",
     "alignLeft": "Links ausrichten",
@@ -158,6 +165,7 @@ export const de: Translations = {
     "alignTop": "Oben ausrichten",
     "alignMiddle": "Vertikal zentrieren",
     "alignBottom": "Unten ausrichten",
+    "pathfinderMinObjects": "Erfordert mindestens 2 ausgewählte Objekte",
     "blendMode": "Mischmodus (mix-blend-mode)",
     "blendModeNormal": "Normal",
     "blendModeMultiply": "Multiplizieren",

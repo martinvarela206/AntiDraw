@@ -31,6 +31,13 @@ export const ru: Translations = {
     "closed": "замкнутый"
   },
   "topbar": {
+    "toolbar": "Верхняя панель действий",
+    "history": "История и отмена действий",
+    "alignment": "Управление выравниванием",
+    "flip": "Отражение и зеркалирование",
+    "zOrder": "Порядок слоев",
+    "noHistory": "Нет действий в истории",
+    "selectionRequired": "Требуется предварительное выделение",
     "undo": "Отменить (Ctrl+Z)",
     "redo": "Повторить (Ctrl+Y)",
     "alignLeft": "Выровнять по левому краю",
@@ -158,6 +165,7 @@ export const ru: Translations = {
     "alignTop": "Выровнять по верхнему краю",
     "alignMiddle": "Выровнять по центру по вертикали",
     "alignBottom": "Выровнять по нижнему краю",
+    "pathfinderMinObjects": "Требуется минимум 2 выбранных объекта",
     "blendMode": "Режим наложения (mix-blend-mode)",
     "blendModeNormal": "Обычный",
     "blendModeMultiply": "Умножение",

@@ -32,6 +32,13 @@ export const es: Translations = {
   },
 
   topbar: {
+    toolbar: 'Barra de acciones superior',
+    history: 'Acciones de deshacer e historial',
+    alignment: 'Controles de alineación',
+    flip: 'Controles de volteo y espejo',
+    zOrder: 'Orden de apilamiento de capas',
+    noHistory: 'Sin acciones en el historial',
+    selectionRequired: 'Requiere selección previa',
     undo: 'Deshacer (Ctrl+Z)',
     redo: 'Rehacer (Ctrl+Y)',
     alignLeft: 'Alinear a la Izquierda',
@@ -165,6 +172,7 @@ export const es: Translations = {
     alignTop: 'Alinear Arriba',
     alignMiddle: 'Centrar Verticalmente',
     alignBottom: 'Alinear Abajo',
+    pathfinderMinObjects: 'Requiere al menos 2 vectores seleccionados',
     blendMode: 'Modo de Fusión (mix-blend-mode)',
     blendModeNormal: 'Normal',
     blendModeMultiply: 'Multiplicar (Multiply)',

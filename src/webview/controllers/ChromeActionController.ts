@@ -92,6 +92,9 @@ export class ChromeActionController {
     return {
       onUndo: () => this.ctx.historyService().undo(),
       onRedo: () => this.ctx.historyService().redo(),
+      getCanUndo: () => this.ctx.historyService().canUndo,
+      getCanRedo: () => this.ctx.historyService().canRedo,
+      getSelectionCount: () => this.ctx.selectionTool.selectedElementIds.size,
       onAlign: (type) => this.ctx.actionDispatcher().align(type),
       onAlignTargetChange: (target) => {
         this.ctx.selectionTool.alignmentTarget = target;

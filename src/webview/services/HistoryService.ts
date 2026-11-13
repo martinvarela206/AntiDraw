@@ -183,6 +183,7 @@ export class HistoryService {
       this.undoStack.shift();
     }
     this.redoStack = [];
+    this.ctx.onHistoryApplied?.();
     return patch;
   }
 

@@ -32,6 +32,13 @@ export const zhCn: Translations = {
   },
 
   topbar: {
+    toolbar: '顶部操作工具栏',
+    history: '历史与撤销操作',
+    alignment: '对齐控制',
+    flip: '翻转与镜像控制',
+    zOrder: '图层堆叠顺序',
+    noHistory: '历史中没有可撤销的操作',
+    selectionRequired: '需要先选择对象',
     undo: '撤销 (Ctrl+Z)',
     redo: '重做 (Ctrl+Y)',
     alignLeft: '左对齐',
@@ -165,6 +172,7 @@ export const zhCn: Translations = {
     alignTop: '顶对齐',
     alignMiddle: '垂直居中对齐',
     alignBottom: '底对齐',
+    pathfinderMinObjects: '需要选择至少 2 个对象',
     blendMode: '混合模式 (mix-blend-mode)',
     blendModeNormal: '正常 (Normal)',
     blendModeMultiply: '正片叠底 (Multiply)',

@@ -735,15 +735,15 @@ export class PropertyPanel {
 
       ${EffectsInspector.renderHtml(ds, is)}
 
-      <div class="panel-section">
+      <div class="panel-section" role="group" aria-label="${I18nService.t('panels.pathfinder')}">
         <div class="panel-title">${I18nService.t('panels.pathfinder')}</div>
         <div class="prop-row" style="justify-content: flex-start; gap: 6px; flex-wrap: wrap;">
-          <button class="btn-icon" id="btn-prop-bool-union-single" title="${I18nService.t('inspector.union')}">${ToolIcons.union}</button>
-          <button class="btn-icon" id="btn-prop-bool-subtract-single" title="${I18nService.t('inspector.subtract')}">${ToolIcons.subtract}</button>
-          <button class="btn-icon" id="btn-prop-bool-intersect-single" title="${I18nService.t('inspector.intersect')}">${ToolIcons.intersect}</button>
-          <button class="btn-icon" id="btn-prop-bool-exclude-single" title="${I18nService.t('inspector.exclude')}">${ToolIcons.exclude}</button>
-          <button class="btn-icon" id="btn-prop-bool-combine-single" title="${I18nService.t('inspector.combine')}">${ToolIcons.combine}</button>
-          <button class="btn-icon" id="btn-prop-bool-fragment-single" title="${I18nService.t('inspector.fragment')}">${ToolIcons.fragment}</button>
+          <button class="btn-icon disabled" id="btn-prop-bool-union-single" disabled aria-disabled="true" title="${I18nService.t('inspector.union')} (${I18nService.t('inspector.pathfinderMinObjects')})">${ToolIcons.union}</button>
+          <button class="btn-icon disabled" id="btn-prop-bool-subtract-single" disabled aria-disabled="true" title="${I18nService.t('inspector.subtract')} (${I18nService.t('inspector.pathfinderMinObjects')})">${ToolIcons.subtract}</button>
+          <button class="btn-icon disabled" id="btn-prop-bool-intersect-single" disabled aria-disabled="true" title="${I18nService.t('inspector.intersect')} (${I18nService.t('inspector.pathfinderMinObjects')})">${ToolIcons.intersect}</button>
+          <button class="btn-icon disabled" id="btn-prop-bool-exclude-single" disabled aria-disabled="true" title="${I18nService.t('inspector.exclude')} (${I18nService.t('inspector.pathfinderMinObjects')})">${ToolIcons.exclude}</button>
+          <button class="btn-icon disabled" id="btn-prop-bool-combine-single" disabled aria-disabled="true" title="${I18nService.t('inspector.combine')} (${I18nService.t('inspector.pathfinderMinObjects')})">${ToolIcons.combine}</button>
+          <button class="btn-icon disabled" id="btn-prop-bool-fragment-single" disabled aria-disabled="true" title="${I18nService.t('inspector.fragment')} (${I18nService.t('inspector.pathfinderMinObjects')})">${ToolIcons.fragment}</button>
         </div>
       </div>
     `;

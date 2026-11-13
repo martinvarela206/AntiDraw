@@ -218,6 +218,23 @@ body {
   user-select: none;
 }
 
+.btn-icon:disabled,
+.btn-icon.disabled,
+.btn-icon[aria-disabled="true"] {
+  opacity: 0.35 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+  filter: grayscale(80%);
+}
+
+.top-bar-select:disabled,
+.top-bar-select.disabled,
+.top-bar-select[aria-disabled="true"] {
+  opacity: 0.35 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+}
+
 .btn-icon:hover {
   background-color: var(--figma-bg-hover);
   color: var(--figma-text-primary);

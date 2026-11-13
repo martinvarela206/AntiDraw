@@ -3,6 +3,22 @@
 All notable changes to the "AntiDraw" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.103.40] - 2026-11-13
+
+### ♿ UI Inactive States Stack, ARIA Toolbar Semantics & Contextual Command Guarding
+- **Semantic ARIA Toolbar Architecture (`TopBar.ts`, `Toolbar.ts`)**:
+  - **Toolbar Role & Structural Grouping**: Decorated `TopBar` and `Toolbar` containers with semantic `role="toolbar"` and localized `aria-label` attributes.
+  - **Group Roles**: Structured top action clusters (history, alignment, flip, z-order) into semantic container groups (`role="group"`) with explicit accessible labels.
+- **Dynamic Inactive Controls & State Disabling (`TopBar.ts`, `PropertyPanel.ts`, `MultiSelectionInspector.ts`)**:
+  - **History Guarding (Undo/Redo)**: Dynamically disables `#btn-undo` and `#btn-redo` when the respective history stacks are empty (`disabled`, `aria-disabled="true"`, and `.disabled` CSS class with grayscale filter and pointer-events suppression).
+  - **Zero-Selection Guarding**: Automatically disables all alignment actions (`alignLeft`, `alignCenter`, etc.), flip controls, z-order stacking actions, and the alignment target dropdown when no elements are selected.
+  - **Pathfinder Guarding (<2 Objects)**: In both `PropertyPanel` single-element inspection and `MultiSelectionInspector` with `<2` elements, all constructive solid geometry / boolean operation buttons (union, subtract, intersect, exclude, combine, fragment) are rendered disabled with `aria-disabled="true"` and explanatory tooltips indicating that at least 2 selected vector objects are required.
+- **CommandRegistry Precondition Alignment (`SystemCommands.ts`, `BooleanCommands.ts`, `TransformCommands.ts`)**:
+  - Synchronized `isEnabled` precondition callbacks across `edit.undo`, `edit.redo`, `transform.align`, `transform.flip`, and `boolean.*` so headless and shortcut executions verify contextual validity before dispatch.
+- **Automated Test Coverage**: Added test suite `test-ui-inactive-states-aria.ts` (Suite 83) with 5 assertions covering semantic ARIA roles, empty history disabling, zero-selection button suppression, Pathfinder object count constraints, and `CommandRegistry.isEnabled` evaluations.
+
+---
+
 ## [0.103.39] - 2026-11-13
 
 ### 🎯 Selection Ergonomics, Visual Accessibility & Multi-Target Alignment

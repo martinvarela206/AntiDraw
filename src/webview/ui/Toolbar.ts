@@ -83,12 +83,15 @@ export class Toolbar {
     onToolDoubleClick?: (tool: ToolType) => void
   ) {
     this.container = container;
+    this.container.setAttribute('role', 'toolbar');
+    this.container.setAttribute('aria-label', I18nService.t('toolbar.tools') || 'Herramientas');
     this.onToolChangeCallback = onToolChange;
     this.onToolDoubleClickCallback = onToolDoubleClick;
     this.setupGlobalListeners();
     this.render();
 
     I18nService.onLanguageChange(() => {
+      this.container.setAttribute('aria-label', I18nService.t('toolbar.tools') || 'Herramientas');
       this.render();
     });
   }

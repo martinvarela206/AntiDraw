@@ -34,6 +34,13 @@ export interface Translations {
 
   // TopBar
   topbar: {
+    toolbar: string;
+    history: string;
+    alignment: string;
+    flip: string;
+    zOrder: string;
+    noHistory: string;
+    selectionRequired: string;
     undo: string;
     redo: string;
     alignLeft: string;
@@ -172,6 +179,7 @@ export interface Translations {
     alignTop: string;
     alignMiddle: string;
     alignBottom: string;
+    pathfinderMinObjects: string;
     blendMode: string;
     blendModeNormal: string;
     blendModeMultiply: string;

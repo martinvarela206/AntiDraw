@@ -72,6 +72,7 @@ class AntiDrawApp {
       getRulerView: () => this.layoutMgr?.rulerView,
       getPropertyPanel: () => this.layoutMgr?.propertyPanel,
       getCanvasView: () => this.canvasView,
+      getTopBar: () => this.layoutMgr?.topBar,
     });
 
     // 2. Core services (History, Clipboard, Action Dispatcher, Workspace Layout)

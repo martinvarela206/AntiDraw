@@ -62,6 +62,7 @@ export class CoreServiceRegistry {
         tools?.shapeBuilderToolHandler?.invalidate();
         tools?.smartFillToolHandler?.invalidateCache();
         workspaceLayout?.renderOverlay();
+        ctx.getLayoutMgr()?.topBar.update();
       },
     });
 

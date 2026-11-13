@@ -36,6 +36,7 @@ export interface ToolFactoryContext {
   getRulerView: () => RulerView | undefined;
   getPropertyPanel: () => PropertyPanel | undefined;
   getCanvasView: () => CanvasView | undefined;
+  getTopBar?: () => import('../ui/TopBar.js').TopBar | undefined;
 }
 
 export interface ToolSuite {
@@ -98,7 +99,10 @@ export class ToolFactory {
     };
 
     const selectToolHandler = new SelectToolHandler(toolCtx, ctx.nodeEditorTool, {
-      onSelectionChanged: () => ctx.getPropertyPanel()?.update(null, 'select'),
+      onSelectionChanged: () => {
+        ctx.getPropertyPanel()?.update(null, 'select');
+        ctx.getTopBar?.()?.update();
+      },
       onGuideSelected: (guide) => {
         ctx.getRulerView()?.setCornerActive(false);
         ctx.getPropertyPanel()?.showGuideSettings(guide);

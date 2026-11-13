@@ -31,6 +31,13 @@ export const ja: Translations = {
     "closed": "クローズ"
   },
   "topbar": {
+    "toolbar": "上部アクションツールバー",
+    "history": "履歴と元に戻す操作",
+    "alignment": "整列コントロール",
+    "flip": "反転コントロール",
+    "zOrder": "レイヤー順序",
+    "noHistory": "履歴に操作がありません",
+    "selectionRequired": "オブジェクトの選択が必要です",
     "undo": "元に戻す (Ctrl+Z)",
     "redo": "やり直し (Ctrl+Y)",
     "alignLeft": "左揃え",
@@ -158,6 +165,7 @@ export const ja: Translations = {
     "alignTop": "上揃え",
     "alignMiddle": "垂直方向中央揃え",
     "alignBottom": "下揃え",
+    "pathfinderMinObjects": "2つ以上のオブジェクトを選択してください",
     "blendMode": "描画モード (mix-blend-mode)",
     "blendModeNormal": "標準",
     "blendModeMultiply": "乗算",

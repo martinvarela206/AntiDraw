@@ -32,6 +32,13 @@ export const en: Translations = {
   },
 
   topbar: {
+    toolbar: 'Top Action Toolbar',
+    history: 'History and Undo Actions',
+    alignment: 'Alignment Controls',
+    flip: 'Flip and Mirror Controls',
+    zOrder: 'Layer Stacking Order',
+    noHistory: 'No actions in history',
+    selectionRequired: 'Requires selection',
     undo: 'Undo (Ctrl+Z)',
     redo: 'Redo (Ctrl+Y)',
     alignLeft: 'Align Left',
@@ -165,6 +172,7 @@ export const en: Translations = {
     alignTop: 'Align Top',
     alignMiddle: 'Align Middle Vertical',
     alignBottom: 'Align Bottom',
+    pathfinderMinObjects: 'Requires 2+ selected objects',
     blendMode: 'Blend Mode (mix-blend-mode)',
     blendModeNormal: 'Normal',
     blendModeMultiply: 'Multiply',

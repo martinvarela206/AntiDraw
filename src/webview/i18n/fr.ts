@@ -31,6 +31,13 @@ export const fr: Translations = {
     "closed": "fermé"
   },
   "topbar": {
+    "toolbar": "Barre d'actions supérieure",
+    "history": "Actions d'historique et d'annulation",
+    "alignment": "Contrôles d'alignement",
+    "flip": "Contrôles de retournement",
+    "zOrder": "Ordre d'empilement des calques",
+    "noHistory": "Aucune action dans l'historique",
+    "selectionRequired": "Sélection requise",
     "undo": "Annuler (Ctrl+Z)",
     "redo": "Rétablir (Ctrl+Y)",
     "alignLeft": "Aligner à gauche",
@@ -158,6 +165,7 @@ export const fr: Translations = {
     "alignTop": "Aligner en haut",
     "alignMiddle": "Centrer verticalement",
     "alignBottom": "Aligner en bas",
+    "pathfinderMinObjects": "Nécessite au moins 2 objets sélectionnés",
     "blendMode": "Mode de fusion (mix-blend-mode)",
     "blendModeNormal": "Normal",
     "blendModeMultiply": "Produit",
